@@ -1,0 +1,22 @@
+{
+  "name": "family-tree",
+  "version": "1.0.0",
+  "description": "Desktop family tree application",
+  "type": "module",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "d3": "^7.9.0",
+    "electron": "^31.1.0",
+    "electron-vite": "^2.3.0",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.0"
+  },
+  "dependencies": {
+    "sql.js": "^1.14.1"
+  }
+}

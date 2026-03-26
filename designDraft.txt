@@ -1,0 +1,51 @@
+possible future
+	- 3d mode?
+	- a feature that play the tree in a time scale, the tree evolves as time passes, people only appear when time reaches their birth, links between marriages
+	- future feature, click a person, reveals the relationships of other people to the person, different languages
+
+must later
+	- the state of the graph is saved to database
+	- all people tab
+	- relationships tab
+	- timeline tab
+	- update settings
+
+big feature
+	- toggle for tagging persons, family cluster, tags can have type, for example family type or elemental power type, types options will appear somewhere on screen allowing user to change
+		- clicking tags in the auto mode can realign the persons according to tags
+	- maternal or paternal toggles, that focuses on maternal relationship vs paternal
+	- log in?
+
+small feature
+	- clicking the relationship lines will reveal info such as when the relationship was formed
+	- allow export image, placement of the tree and name of the tree and add styling
+	- different styles to the family tree?
+	- add settings in the left menu, allow tweaks to font size etc, curvy line vs straight lines, different languages?
+		- allow changes to color, line styles
+	- share buttons?
+	- sliders for auto mode, control the strength of gravity, stretchiness of lines, generational top to bottom alignment
+		- add explainers to these sliders in a question mark next to the sliders
+	- allow age, name and gender to be unknown
+	- allow user to make multiple trees
+
+visuals
+	- different color for mother or father relationship
+	- toggle for highlighting married couples
+	- dead people is highlighted by being darker or some symbol?
+	- divorced relationship
+	- name the tree
+	- fix light mode
+	- allow resizing the side bars
+
+
+
+
+
+
+
+
+
+
+
+
+

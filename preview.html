@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>FamilyTree — Preview</title>
+<style>
+/* ── TOKENS ─────────────────────────────────────── */
+:root {
+  --bg:      #0f1117; --surface: #181c27; --elevated:#1f2437;
+  --hover:   #252c42; --border:  rgba(255,255,255,.07);
+  --accent:  #6c8ef5; --adim:    rgba(108,142,245,.14);
+  --pink:    #f06292; --amber:   #f5a623; --green: #4caf72;
+  --t1: #e8eaf6; --t2: #9ea3b8; --t3: #4a5068;
+  --shadow:  0 8px 32px rgba(0,0,0,.55);
+  --font:    -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+[data-theme="light"] {
+  --bg:#f0f2f8; --surface:#fff; --elevated:#e8ecf5; --hover:#dde3f0;
+  --border:rgba(0,0,0,.08); --t1:#1a1d2e; --t2:#4a5068; --t3:#9099b8;
+  --shadow:0 4px 20px rgba(0,0,0,.1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+/* ── FIXED SHELL ────────────────────────────────── */
+body{font-family:var(--font);background:var(--bg);color:var(--t1);overflow:hidden}
+
+#topbar{
+  position:fixed;top:0;left:0;right:0;height:48px;z-index:20;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 16px;gap:10px;
+}
+.logo{font-weight:700;font-size:15px;letter-spacing:.4px;color:var(--accent)}
+.logo span{color:var(--t1)}
+.spacer{flex:1}
+.btn{display:flex;align-items:center;gap:5px;padding:6px 14px;border-radius:8px;
+     border:none;cursor:pointer;font:inherit;font-size:13px;font-weight:500;transition:filter .15s,background .15s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{filter:brightness(1.12)}
+.btn-ghost{background:transparent;color:var(--t2);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--hover);color:var(--t1)}
+.icon-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);
+          background:transparent;cursor:pointer;display:flex;align-items:center;
+          justify-content:center;color:var(--t2);font-size:15px;transition:background .15s}
+.icon-btn:hover{background:var(--hover);color:var(--t1)}
+
+#lsidebar{
+  position:fixed;top:48px;left:0;width:240px;bottom:0;z-index:10;
+  background:var(--surface);border-right:1px solid var(--border);
+  overflow-y:auto;padding:12px 0;display:flex;flex-direction:column;gap:2px;
+}
+#rsidebar{
+  position:fixed;top:48px;right:0;width:300px;bottom:0;z-index:10;
+  background:var(--surface);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+#grapharea{
+  position:fixed;top:48px;left:240px;right:300px;bottom:0;
+  background:var(--bg);overflow:hidden;
+}
+#tree{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
+
+/* ── LEFT SIDEBAR ────────────────────────────────── */
+.s-sec{padding:10px 16px 4px;font-size:10px;font-weight:700;
+       text-transform:uppercase;letter-spacing:1px;color:var(--t3)}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 16px;cursor:pointer;
+          font-size:13px;font-weight:500;color:var(--t2);
+          border-left:2px solid transparent;transition:background .12s,color .12s}
+.nav-item:hover{background:var(--hover);color:var(--t1)}
+.nav-item.active{color:var(--accent);background:var(--adim);border-left-color:var(--accent)}
+.nav-icon{font-size:15px;width:20px;text-align:center}
+.nav-badge{margin-left:auto;background:var(--accent);color:#fff;
+           border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700}
+.s-div{border:none;border-top:1px solid var(--border);margin:6px 14px}
+.theme-row{display:flex;gap:6px;padding:6px 14px}
+.tpill{flex:1;padding:5px;border-radius:7px;border:1px solid var(--border);
+       background:transparent;cursor:pointer;font:inherit;font-size:11px;
+       font-weight:600;color:var(--t2);transition:all .15s;text-align:center}
+.tpill.active{border-color:var(--accent);color:var(--accent);background:var(--adim)}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;
+            margin:6px 12px;background:var(--elevated);border-radius:10px;padding:12px}
+.stat{text-align:center}
+.stat-n{font-size:20px;font-weight:700;color:var(--t1);line-height:1}
+.stat-l{font-size:10px;color:var(--t3);margin-top:3px}
+
+/* ── RIGHT SIDEBAR ───────────────────────────────── */
+.rbar-head{padding:12px 12px 8px;border-bottom:1px solid var(--border)}
+.rbar-title{font-size:13px;font-weight:700;color:var(--t1);margin-bottom:8px}
+.rbar-srch{display:flex;align-items:center;gap:6px;
+           background:var(--elevated);border-radius:8px;padding:6px 10px}
+.rbar-srch input{background:none;border:none;outline:none;font:inherit;
+                 font-size:12px;color:var(--t1);flex:1;min-width:0}
+.rbar-srch input::placeholder{color:var(--t3)}
+#personList{flex:1;overflow-y:auto;padding:6px}
+.pcard{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;
+       cursor:pointer;border:1px solid transparent;margin-bottom:3px;
+       transition:background .14s,border-color .14s}
+.pcard:hover{background:var(--elevated);border-color:var(--border)}
+.pcard.selected{background:var(--adim);border-color:var(--accent)}
+.pav{width:38px;height:38px;border-radius:50%;flex-shrink:0;display:flex;
+     align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff}
+.pinfo{flex:1;min-width:0}
+.pname{font-size:13px;font-weight:600;color:var(--t1);
+       white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.psub{font-size:11px;color:var(--t3);margin-top:1px;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nbadge{font-size:9px;background:var(--adim);color:var(--accent);
+        border-radius:4px;padding:1px 5px;font-weight:700;
+        vertical-align:middle;margin-left:4px}
+
+/* ── GRAPH OVERLAYS ─────────────────────────────── */
+.gsearch{position:absolute;top:14px;left:50%;transform:translateX(-50%);
+         display:flex;align-items:center;gap:8px;
+         background:var(--surface);border:1px solid var(--border);
+         border-radius:10px;padding:7px 14px;box-shadow:var(--shadow);min-width:260px;z-index:5}
+.gsearch input{background:none;border:none;outline:none;font:inherit;
+               font-size:13px;color:var(--t1);flex:1}
+.gsearch input::placeholder{color:var(--t3)}
+.gctrl{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);
+       display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);
+       border-radius:12px;padding:5px;box-shadow:var(--shadow);z-index:5}
+.cbtn{width:30px;height:30px;border-radius:7px;border:none;background:transparent;
+      cursor:pointer;color:var(--t2);font-size:15px;
+      display:flex;align-items:center;justify-content:center;transition:background .12s}
+.cbtn:hover{background:var(--hover);color:var(--t1)}
+.csep{width:1px;background:var(--border);margin:3px 2px}
+.legend{position:absolute;bottom:18px;right:16px;
+        background:var(--surface);border:1px solid var(--border);
+        border-radius:10px;padding:10px 14px;font-size:11px;color:var(--t2);z-index:5}
+.legrow{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.legrow:last-child{margin-bottom:0}
+.legdot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.legline{width:22px;border-top:2px solid;flex-shrink:0}
+
+/* ── SVG NODE HOVER ─────────────────────────────── */
+.node-g{cursor:pointer}
+.node-g circle.nc{transition:filter .18s}
+.node-g:hover circle.nc{filter:drop-shadow(0 0 8px rgba(108,142,245,.75))}
+.node-g text{pointer-events:none}
+
+/* ── MODAL ──────────────────────────────────────── */
+#modalbg{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.6);
+         backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;
+         opacity:0;pointer-events:none;transition:opacity .22s}
+#modalbg.open{opacity:1;pointer-events:all}
+#modalbox{background:var(--surface);border:1px solid var(--border);border-radius:20px;
+          width:560px;max-height:86vh;display:flex;flex-direction:column;overflow:hidden;
+          box-shadow:var(--shadow);transform:translateY(36px) scale(.97);opacity:0;
+          transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .24s}
+#modalbg.open #modalbox{transform:translateY(0) scale(1);opacity:1}
+.mhero{position:relative;height:190px;overflow:hidden}
+.mhero-bg{position:absolute;inset:0;width:100%;height:100%}
+.mhero-ov{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.6))}
+.mclose{position:absolute;top:12px;right:12px;width:28px;height:28px;border-radius:7px;
+        background:rgba(0,0,0,.45);border:none;color:#fff;cursor:pointer;
+        font-size:14px;display:flex;align-items:center;justify-content:center}
+.mavwrap{position:absolute;bottom:-30px;left:24px}
+.mav{width:66px;height:66px;border-radius:50%;border:3px solid var(--surface);
+     display:flex;align-items:center;justify-content:center;
+     font-weight:700;font-size:20px;color:#fff}
+.mname{position:absolute;bottom:42px;left:104px;font-size:19px;font-weight:700;
+       color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+.mdates{position:absolute;bottom:24px;left:104px;font-size:12px;color:rgba(255,255,255,.75)}
+.mbody{padding:42px 24px 20px;overflow-y:auto;flex:1}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.mf label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);margin-bottom:3px}
+.mf p{font-size:13px;color:var(--t1)}
+.stitle{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t3);margin-bottom:9px}
+.biotext{font-size:13px;line-height:1.65;color:var(--t2);margin-bottom:20px}
+.rchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}
+.rchip{display:flex;align-items:center;gap:6px;background:var(--elevated);
+       border:1px solid var(--border);border-radius:20px;padding:5px 12px;
+       font-size:12px;cursor:pointer;transition:border-color .12s,color .12s}
+.rchip:hover{border-color:var(--accent);color:var(--accent)}
+.rdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mfoot{padding:12px 24px;border-top:1px solid var(--border);
+       display:flex;gap:8px;justify-content:flex-end}
+
+/* scrollbar */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- ══ TOPBAR ═══════════════════════════════════════════════════ -->
+<div id="topbar">
+  <div class="logo">🌳 Family<span>Tree</span></div>
+  <button class="btn btn-ghost" onclick="openAdd()">＋ Add Person</button>
+  <div class="spacer"></div>
+  <button class="btn btn-ghost">⬆ Export</button>
+  <button class="icon-btn" id="themeBtn" onclick="toggleTheme()">☀</button>
+</div>
+
+<!-- ══ LEFT SIDEBAR ═════════════════════════════════════════════ -->
+<div id="lsidebar">
+  <div class="s-sec">Navigation</div>
+  <div class="nav-item active"><span class="nav-icon">🌐</span>Tree View</div>
+  <div class="nav-item"><span class="nav-icon">👥</span>All People<span class="nav-badge">18</span></div>
+  <div class="nav-item"><span class="nav-icon">🔗</span>Relationships</div>
+  <div class="nav-item"><span class="nav-icon">🔍</span>Search</div>
+  <hr class="s-div"/>
+  <div class="s-sec">Appearance</div>
+  <div class="theme-row">
+    <button class="tpill active" id="dp" onclick="setTheme('dark')">Dark</button>
+    <button class="tpill" id="lp" onclick="setTheme('light')">Light</button>
+  </div>
+  <hr class="s-div"/>
+  <div class="s-sec">Layout</div>
+  <div class="nav-item"><span class="nav-icon">🌳</span>Hierarchical</div>
+  <div class="nav-item"><span class="nav-icon">⚛</span>Force Graph</div>
+  <div class="nav-item"><span class="nav-icon">⭕</span>Radial</div>
+  <hr class="s-div"/>
+  <div class="s-sec">Statistics</div>
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-n">18</div><div class="stat-l">People</div></div>
+    <div class="stat"><div class="stat-n">4</div><div class="stat-l">Generations</div></div>
+    <div class="stat"><div class="stat-n">5</div><div class="stat-l">Couples</div></div>
+    <div class="stat"><div class="stat-n">1</div><div class="stat-l">Adopted</div></div>
+  </div>
+  <hr class="s-div"/>
+  <div class="s-sec">Data</div>
+  <div class="nav-item"><span class="nav-icon">💾</span>Export JSON</div>
+  <div class="nav-item"><span class="nav-icon">📂</span>Import</div>
+  <div class="nav-item"><span class="nav-icon">⚙</span>Settings</div>
+</div>
+
+<!-- ══ GRAPH AREA ════════════════════════════════════════════════ -->
+<div id="grapharea">
+
+  <div class="gsearch">
+    <span style="color:var(--t3);font-size:14px">🔍</span>
+    <input placeholder="Search family members…"/>
+  </div>
+
+  <!-- ─── THE TREE — fully inline SVG, no JS needed to render ─── -->
+  <svg id="tree" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid meet"
+       xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <!-- arrow for parent edges -->
+      <marker id="arr" markerWidth="7" markerHeight="7" refX="5.5" refY="2.5" orient="auto">
+        <path d="M0,0 L0,5 L7,2.5z" fill="#6c8ef5" opacity=".8"/>
+      </marker>
+      <!-- arrow for adopted edges -->
+      <marker id="arra" markerWidth="7" markerHeight="7" refX="5.5" refY="2.5" orient="auto">
+        <path d="M0,0 L0,5 L7,2.5z" fill="#f5a623" opacity=".9"/>
+      </marker>
+      <!-- glow filter for selected node -->
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="3" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+
+    <!-- ── SPOUSE EDGES (pink dashed) ─────────────────────────── -->
+    <g stroke="#f06292" stroke-dasharray="6,4" stroke-width="1.8" fill="none" opacity=".65">
+      <!-- Robert ↔ Dorothy -->
+      <path d="M105,72 Q162,54 220,72"/>
+      <!-- James ↔ Margaret -->
+      <path d="M160,215 Q222,197 285,215"/>
+      <!-- Thomas ↔ Sarah -->
+      <path d="M195,380 Q265,362 335,380"/>
+      <!-- Emily ↔ Victor -->
+      <path d="M493,310 Q554,292 615,310"/>
+      <!-- Michael ↔ Jake -->
+      <path d="M758,310 Q818,292 878,310"/>
+      <!-- Henry ↔ Grace -->
+      <path d="M672,108 Q731,90 790,108"/>
+    </g>
+
+    <!-- ── PARENT EDGES (blue with arrow) ─────────────────────── -->
+    <g stroke="#6c8ef5" stroke-width="1.6" fill="none" opacity=".55" marker-end="url(#arr)">
+      <!-- Robert → James -->
+      <path d="M105,72 Q132,126 160,215"/>
+      <!-- Dorothy → James -->
+      <path d="M220,72 Q190,126 160,215"/>
+      <!-- James → Thomas -->
+      <path d="M160,215 Q177,280 195,380"/>
+      <!-- James → Emily -->
+      <path d="M160,215 Q326,245 493,310"/>
+      <!-- James → Michael -->
+      <path d="M160,215 Q459,245 758,310"/>
+      <!-- Margaret → Thomas -->
+      <path d="M285,215 Q240,280 195,380"/>
+      <!-- Margaret → Emily -->
+      <path d="M285,215 Q389,245 493,310"/>
+      <!-- Margaret → Michael -->
+      <path d="M285,215 Q521,245 758,310"/>
+      <!-- Thomas → Lucas -->
+      <path d="M195,380 Q136,446 78,548"/>
+      <!-- Thomas → Olivia -->
+      <path d="M195,380 Q186,456 178,568"/>
+      <!-- Thomas → Noah -->
+      <path d="M195,380 Q236,451 278,558"/>
+      <!-- Thomas → Sophia -->
+      <path d="M195,380 Q286,456 378,568"/>
+      <!-- Sarah → Lucas -->
+      <path d="M335,380 Q206,446 78,548"/>
+      <!-- Sarah → Olivia -->
+      <path d="M335,380 Q256,456 178,568"/>
+      <!-- Sarah → Noah -->
+      <path d="M335,380 Q306,451 278,558"/>
+      <!-- Sarah → Sophia -->
+      <path d="M335,380 Q356,456 378,568"/>
+      <!-- Henry → Sarah -->
+      <path d="M672,108 Q503,226 335,380"/>
+      <!-- Grace → Sarah -->
+      <path d="M790,108 Q562,226 335,380"/>
+      <!-- Emily → Chloe -->
+      <path d="M493,310 Q523,402 554,530"/>
+      <!-- Victor → Chloe -->
+      <path d="M615,310 Q584,402 554,530"/>
+    </g>
+
+    <!-- ── ADOPTED EDGES (amber dashed arrow) ─────────────────── -->
+    <g stroke="#f5a623" stroke-dasharray="4,3" stroke-width="1.8" fill="none" opacity=".75" marker-end="url(#arra)">
+      <!-- Michael → Mia -->
+      <path d="M758,310 Q788,402 818,530"/>
+      <!-- Jake → Mia -->
+      <path d="M878,310 Q848,402 818,530"/>
+    </g>
+
+    <!-- ── GENERATION LABELS ────────────────────────────────────── -->
+    <g fill="rgba(108,142,245,0.18)" font-size="9" font-family="system-ui,sans-serif"
+       text-anchor="start" letter-spacing="1">
+      <text x="8" y="20">GEN 1</text>
+      <text x="8" y="162">GEN 2</text>
+      <text x="8" y="308">GEN 3</text>
+      <text x="8" y="500">GEN 4</text>
+    </g>
+
+    <!-- ── NODES ────────────────────────────────────────────────── -->
+
+    <!-- Robert Anderson — Gen 1, deceased -->
+    <g class="node-g" onclick="openModal(1)" transform="translate(105,72)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#3a7bd5" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">RA</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Robert</text>
+      <!-- deceased indicator -->
+      <circle r="5" cx="16" cy="-16" fill="#555" stroke="var(--surface)" stroke-width="1.5"/>
+      <text x="16" y="-12" text-anchor="middle" dominant-baseline="central" fill="#aaa" font-size="7">✕</text>
+    </g>
+
+    <!-- Dorothy Anderson — Gen 1, deceased -->
+    <g class="node-g" onclick="openModal(2)" transform="translate(220,72)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#c95fa0" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">DA</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Dorothy</text>
+      <circle r="5" cx="16" cy="-16" fill="#555" stroke="var(--surface)" stroke-width="1.5"/>
+      <text x="16" y="-12" text-anchor="middle" dominant-baseline="central" fill="#aaa" font-size="7">✕</text>
+    </g>
+
+    <!-- James Anderson — Gen 2 -->
+    <g class="node-g" onclick="openModal(3)" transform="translate(160,215)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#3a7bd5" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">JA</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">James</text>
+    </g>
+
+    <!-- Margaret Anderson — Gen 2 -->
+    <g class="node-g" onclick="openModal(4)" transform="translate(285,215)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#c95fa0" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">MA</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Margaret</text>
+    </g>
+
+    <!-- Henry Clarke — Gen 2, in-laws -->
+    <g class="node-g" onclick="openModal(13)" transform="translate(672,108)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#1565c0" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">HC</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Henry</text>
+    </g>
+
+    <!-- Grace Clarke — Gen 2, in-laws -->
+    <g class="node-g" onclick="openModal(14)" transform="translate(790,108)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#ad1457" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">GC</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Grace</text>
+    </g>
+
+    <!-- Thomas Anderson — Gen 3 -->
+    <g class="node-g" onclick="openModal(5)" transform="translate(195,380)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#3a7bd5" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">TA</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Thomas</text>
+    </g>
+
+    <!-- Sarah Anderson — Gen 3 -->
+    <g class="node-g" onclick="openModal(6)" transform="translate(335,380)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#c95fa0" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">SA</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Sarah</text>
+    </g>
+
+    <!-- Emily Reed — Gen 3 -->
+    <g class="node-g" onclick="openModal(7)" transform="translate(493,310)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#c95fa0" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">ER</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Emily</text>
+    </g>
+
+    <!-- Victor Reed — Gen 3, in-law by marriage -->
+    <g class="node-g" onclick="openModal(15)" transform="translate(615,310)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#00695c" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">VR</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Victor</text>
+    </g>
+
+    <!-- Michael Anderson — Gen 3 -->
+    <g class="node-g" onclick="openModal(8)" transform="translate(758,310)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#3a7bd5" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">MA</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Michael</text>
+    </g>
+
+    <!-- Jake Morrison — Gen 3, same-sex spouse -->
+    <g class="node-g" onclick="openModal(17)" transform="translate(878,310)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#00838f" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">JM</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Jake</text>
+    </g>
+
+    <!-- Lucas Anderson — Gen 4 -->
+    <g class="node-g" onclick="openModal(9)" transform="translate(78,548)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#3a7bd5" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">LA</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Lucas</text>
+    </g>
+
+    <!-- Olivia Anderson — Gen 4 -->
+    <g class="node-g" onclick="openModal(10)" transform="translate(178,568)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#c95fa0" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">OA</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Olivia</text>
+    </g>
+
+    <!-- Noah Anderson — Gen 4 -->
+    <g class="node-g" onclick="openModal(11)" transform="translate(278,558)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#3a7bd5" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">NA</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Noah</text>
+    </g>
+
+    <!-- Sophia Anderson — Gen 4 -->
+    <g class="node-g" onclick="openModal(12)" transform="translate(378,568)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#c95fa0" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">SA</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Sophia</text>
+    </g>
+
+    <!-- Chloe Reed — Gen 4 -->
+    <g class="node-g" onclick="openModal(16)" transform="translate(554,530)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <circle class="nc" r="22" fill="#7b1fa2" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">CR</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Chloe</text>
+    </g>
+
+    <!-- Mia Morrison — Gen 4, adopted -->
+    <g class="node-g" onclick="openModal(18)" transform="translate(818,530)">
+      <circle r="23" fill="rgba(0,0,0,.25)" transform="translate(2,3)"/>
+      <!-- amber ring to mark adopted -->
+      <circle r="26" fill="none" stroke="#f5a623" stroke-width="1.5" stroke-dasharray="4,3" opacity=".7"/>
+      <circle class="nc" r="22" fill="#c95fa0" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">MM</text>
+      <text text-anchor="middle" y="35" fill="rgba(232,234,246,.8)" font-size="9.5" font-weight="500" font-family="system-ui,sans-serif">Mia</text>
+    </g>
+
+  </svg><!-- end #tree -->
+
+  <!-- graph controls overlay -->
+  <div class="gctrl">
+    <button class="cbtn" title="Zoom in">＋</button>
+    <button class="cbtn" title="Zoom out">－</button>
+    <div class="csep"></div>
+    <button class="cbtn" title="Fit all">⊡</button>
+    <div class="csep"></div>
+    <button class="cbtn" title="Physics">⚛</button>
+  </div>
+
+  <!-- legend -->
+  <div class="legend">
+    <div class="legrow"><div class="legdot" style="background:#3a7bd5"></div>Male</div>
+    <div class="legrow"><div class="legdot" style="background:#c95fa0"></div>Female</div>
+    <div class="legrow"><div class="legline" style="border-color:#6c8ef5"></div>Parent / Child</div>
+    <div class="legrow"><div class="legline" style="border-color:#f06292;border-top-style:dashed"></div>Spouse</div>
+    <div class="legrow"><div class="legline" style="border-color:#f5a623;border-top-style:dashed"></div>Adopted</div>
+  </div>
+
+</div><!-- end #grapharea -->
+
+<!-- ══ RIGHT SIDEBAR — hardcoded person cards ═══════════════════ -->
+<div id="rsidebar">
+  <div class="rbar-head">
+    <div class="rbar-title">Family Members</div>
+    <div class="rbar-srch">
+      <span style="color:var(--t3);font-size:13px">🔍</span>
+      <input placeholder="Filter…"/>
+    </div>
+  </div>
+  <div id="personList">
+    <!-- Gen 1 -->
+    <div class="pcard" onclick="openModal(1)">
+      <div class="pav" style="background:#3a7bd5">RA</div>
+      <div class="pinfo"><div class="pname">Robert Anderson</div><div class="psub">1925–1998 · Great-Grandfather</div></div>
+    </div>
+    <div class="pcard" onclick="openModal(2)">
+      <div class="pav" style="background:#c95fa0">DA</div>
+      <div class="pinfo"><div class="pname">Dorothy Anderson</div><div class="psub">1928–2005 · Great-Grandmother</div></div>
+    </div>
+    <!-- Gen 2 -->
+    <div class="pcard" onclick="openModal(3)">
+      <div class="pav" style="background:#3a7bd5">JA</div>
+      <div class="pinfo"><div class="pname">James Anderson</div><div class="psub">1952 · Grandfather</div></div>
+    </div>
+    <div class="pcard" onclick="openModal(4)">
+      <div class="pav" style="background:#c95fa0">MA</div>
+      <div class="pinfo"><div class="pname">Margaret Anderson</div><div class="psub">1955 · Grandmother</div></div>
+    </div>
+    <div class="pcard" onclick="openModal(13)">
+      <div class="pav" style="background:#1565c0">HC</div>
+      <div class="pinfo"><div class="pname">Henry Clarke<span class="nbadge">NEW</span></div><div class="psub">1950 · Sarah's Father</div></div>
+    </div>
+    <div class="pcard" onclick="openModal(14)">
+      <div class="pav" style="background:#ad1457">GC</div>
+      <div class="pinfo"><div class="pname">Grace Clarke<span class="nbadge">NEW</span></div><div class="psub">1953 · Sarah's Mother</div></div>
+    </div>
+    <!-- Gen 3 -->
+    <div class="pcard" onclick="openModal(5)">
+      <div class="pav" style="background:#3a7bd5">TA</div>
+      <div class="pinfo"><div class="pname">Thomas Anderson</div><div class="psub">1979 · Father</div></div>
+    </div>
+    <div class="pcard" onclick="openModal(6)">
+      <div class="pav" style="background:#c95fa0">SA</div>
+      <div class="pinfo"><div class="pname">Sarah Anderson</div><div class="psub">1981 · Mother</div></div>
+    </div>
+    <div class="pcard" onclick="openModal(7)">
+      <div class="pav" style="background:#c95fa0">ER</div>
+      <div class="pinfo"><div class="pname">Emily Reed</div><div class="psub">1983 · Aunt</div></div>
+    </div>
+    <div class="pcard" onclick="openModal(15)">
+      <div class="pav" style="background:#00695c">VR</div>
+      <div class="pinfo"><div class="pname">Victor Reed<span class="nbadge">NEW</span></div><div class="psub">1980 · Emily's Husband</div></div>
+    </div>
+    <div class="pcard" onclick="openModal(8)">
+      <div class="pav" style="background:#3a7bd5">MA</div>
+      <div class="pinfo"><div class="pname">Michael Anderson</div><div class="psub">1985 · Uncle</div></div>
+    </div>
+    <div class="pcard" onclick="openModal(17)">
+      <div class="pav" style="background:#00838f">JM</div>
+      <div class="pinfo"><div class="pname">Jake Morrison<span class="nbadge">NEW</span></div><div class="psub">1983 · Michael's Husband</div></div>
+    </div>
+    <!-- Gen 4 -->
+    <div class="pcard" onclick="openModal(9)">
+      <div class="pav" style="background:#3a7bd5">LA</div>
+      <div class="pinfo"><div class="pname">Lucas Anderson</div><div class="psub">2005 · Son</div></div>
+    </div>
+    <div class="pcard" onclick="openModal(10)">
+      <div class="pav" style="background:#c95fa0">OA</div>
+      <div class="pinfo"><div class="pname">Olivia Anderson</div><div class="psub">2008 · Daughter</div></div>
+    </div>
+    <div class="pcard" onclick="openModal(11)">
+      <div class="pav" style="background:#3a7bd5">NA</div>
+      <div class="pinfo"><div class="pname">Noah Anderson</div><div class="psub">2010 · Son</div></div>
+    </div>
+    <div class="pcard" onclick="openModal(12)">
+      <div class="pav" style="background:#c95fa0">SA</div>
+      <div class="pinfo"><div class="pname">Sophia Anderson</div><div class="psub">2014 · Daughter</div></div>
+    </div>
+    <div class="pcard" onclick="openModal(16)">
+      <div class="pav" style="background:#7b1fa2">CR</div>
+      <div class="pinfo"><div class="pname">Chloe Reed<span class="nbadge">NEW</span></div><div class="psub">2012 · Cousin</div></div>
+    </div>
+    <div class="pcard" onclick="openModal(18)">
+      <div class="pav" style="background:#c95fa0">MM</div>
+      <div class="pinfo"><div class="pname">Mia Morrison<span class="nbadge">NEW</span></div><div class="psub">2020 · Cousin (Adopted)</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PERSON DETAIL MODAL ══════════════════════════════════════ -->
+<div id="modalbg">
+  <div id="modalbox">
+    <div class="mhero">
+      <div class="mhero-bg" id="mHeroBg"></div>
+      <div class="mhero-ov"></div>
+      <button class="mclose" onclick="closeModal()">✕</button>
+      <div class="mavwrap"><div class="mav" id="mAv"></div></div>
+      <div class="mname" id="mName"></div>
+      <div class="mdates" id="mDates"></div>
+    </div>
+    <div class="mbody">
+      <div class="mgrid">
+        <div class="mf"><label>Full Name</label><p id="mfName"></p></div>
+        <div class="mf"><label>Born</label><p id="mfBorn"></p></div>
+        <div class="mf"><label>Occupation</label><p id="mfOcc"></p></div>
+        <div class="mf"><label>Location</label><p id="mfLoc"></p></div>
+      </div>
+      <div class="stitle">Biography</div>
+      <p class="biotext" id="mBio"></p>
+      <div class="stitle">Relationships</div>
+      <div class="rchips" id="mChips"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-ghost">✎ Edit</button>
+      <button class="btn btn-primary">View in Tree</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── DATA (used only for the interactive modal) ──────────────────
+const PEOPLE = [
+  {id:1,  name:"Robert Anderson",   born:1925,died:1998,gender:"M",color:"#3a7bd5",initials:"RA",occ:"Carpenter",            loc:"Chicago, IL",       bio:"Robert Anderson was a skilled carpenter who built his own home in Chicago. A decorated WWII veteran, he was known for his quiet strength and deep faith. He and Dorothy raised James until his passing in 1998."},
+  {id:2,  name:"Dorothy Anderson",  born:1928,died:2005,gender:"F",color:"#c95fa0",initials:"DA",occ:"Homemaker",            loc:"Chicago, IL",       bio:"Dorothy was the heart of the Anderson household — a gifted cook and storyteller who kept the family history alive. She outlived Robert by seven years and passed away surrounded by her grandchildren."},
+  {id:3,  name:"James Anderson",    born:1952,          gender:"M",color:"#3a7bd5",initials:"JA",occ:"Civil Engineer",       loc:"New York, NY",      bio:"James grew up in Chicago and earned his Civil Engineering degree from Columbia in 1974. He oversaw major East Coast infrastructure projects for 30 years. He and Margaret raised Thomas, Emily, and Michael."},
+  {id:4,  name:"Margaret Anderson", born:1955,          gender:"F",color:"#c95fa0",initials:"MA",occ:"School Principal",     loc:"New York, NY",      bio:"Margaret built a distinguished career in education, rising to Principal of Jefferson Elementary for 28 years. She is the family organizer — every reunion and milestone bears her signature touch."},
+  {id:5,  name:"Thomas Anderson",   born:1979,          gender:"M",color:"#3a7bd5",initials:"TA",occ:"Architect",            loc:"Brooklyn, NY",      bio:"Thomas followed his father into construction but chose design over engineering. He runs his own architecture firm in Brooklyn and has four children with Sarah. He coaches little league on weekends."},
+  {id:6,  name:"Sarah Anderson",    born:1981,          gender:"F",color:"#c95fa0",initials:"SA",occ:"Pediatrician",         loc:"Brooklyn, NY",      bio:"Sarah Clarke-Anderson grew up in Boston and studied medicine at Tufts. She has been a pediatrician for 18 years. She met Thomas at a mutual friend's wedding and they married in 2004."},
+  {id:7,  name:"Emily Reed",        born:1983,          gender:"F",color:"#c95fa0",initials:"ER",occ:"Photographer",         loc:"Portland, OR",      bio:"Emily (nee Anderson) is a celebrated portrait and travel photographer. She met Victor at a film festival in 2007 and they married in 2010. Their daughter Chloe inherited her artistic eye."},
+  {id:8,  name:"Michael Anderson",  born:1985,          gender:"M",color:"#3a7bd5",initials:"MA",occ:"Software Engineer",    loc:"San Francisco, CA", bio:"Michael is a senior software engineer in San Francisco. He married Jake Morrison in 2018 after seven years together. They adopted their daughter Mia in 2020."},
+  {id:9,  name:"Lucas Anderson",    born:2005,          gender:"M",color:"#3a7bd5",initials:"LA",occ:"Student",              loc:"Brooklyn, NY",      bio:"Lucas is the eldest of Thomas and Sarah's children. He is a passionate basketball player and aspires to study engineering like his grandfather James."},
+  {id:10, name:"Olivia Anderson",   born:2008,          gender:"F",color:"#c95fa0",initials:"OA",occ:"Student",              loc:"Brooklyn, NY",      bio:"Olivia is the family bookworm. She reads voraciously and has already written two short stories that won awards at her middle school."},
+  {id:11, name:"Noah Anderson",     born:2010,          gender:"M",color:"#3a7bd5",initials:"NA",occ:"Student",              loc:"Brooklyn, NY",      bio:"Noah is best friends with his cousin Chloe despite living on opposite coasts. He is the prankster of the family and can usually be found wearing a mischievous grin."},
+  {id:12, name:"Sophia Anderson",   born:2014,          gender:"F",color:"#c95fa0",initials:"SA",occ:"Student",              loc:"Brooklyn, NY",      bio:"Sophia is the youngest of Thomas and Sarah's children. Fearless and curious, she already speaks basic Mandarin thanks to Margaret's encouragement."},
+  {id:13, name:"Henry Clarke",      born:1950,          gender:"M",color:"#1565c0",initials:"HC",occ:"History Teacher",      loc:"Boston, MA",        bio:"Henry Clarke taught high school history in Boston for 35 years. A gentle, well-read man, he loves debating American history at family dinners. He and Grace have been married since 1975."},
+  {id:14, name:"Grace Clarke",      born:1953,          gender:"F",color:"#ad1457",initials:"GC",occ:"Retired Nurse",        loc:"Boston, MA",        bio:"Grace Clarke is a retired nurse and passionate gardener. She and Henry still live in the same Boston home where Sarah grew up. Grace is known for her lemon cake at every family gathering."},
+  {id:15, name:"Victor Reed",       born:1980,          gender:"M",color:"#00695c",initials:"VR",occ:"Documentary Filmmaker",loc:"Portland, OR",      bio:"Victor Reed is an award-winning documentary filmmaker focused on environmental storytelling. He met Emily at the Portland Film Festival in 2007 and they married three years later."},
+  {id:16, name:"Chloe Reed",        born:2012,          gender:"F",color:"#7b1fa2",initials:"CR",occ:"Student",              loc:"Portland, OR",      bio:"Chloe Reed is Emily and Victor's daughter. She has her mother's eye for beauty and her father's love of stories. She and cousin Noah have a prank war spanning three years."},
+  {id:17, name:"Jake Morrison",     born:1983,          gender:"M",color:"#00838f",initials:"JM",occ:"Pediatric Doctor",     loc:"San Francisco, CA", bio:"Jake Morrison is a pediatrician — making him and Sarah the only two doctors in the family. He and Michael married in 2018 and adopted Mia together in 2020."},
+  {id:18, name:"Mia Morrison",      born:2020,          gender:"F",color:"#c95fa0",initials:"MM",occ:"Toddler",              loc:"San Francisco, CA", bio:"Mia is the youngest member of the entire family, adopted by Michael and Jake in 2020. She has Michael's laugh and Jake's stubbornness and is adored by everyone."},
+];
+
+const EDGES = [
+  {from:1,to:2,type:"spouse"},{from:3,to:4,type:"spouse"},{from:5,to:6,type:"spouse"},
+  {from:7,to:15,type:"spouse"},{from:8,to:17,type:"spouse"},{from:13,to:14,type:"spouse"},
+  {from:1,to:3,type:"parent"},{from:2,to:3,type:"parent"},
+  {from:3,to:5,type:"parent"},{from:3,to:7,type:"parent"},{from:3,to:8,type:"parent"},
+  {from:4,to:5,type:"parent"},{from:4,to:7,type:"parent"},{from:4,to:8,type:"parent"},
+  {from:5,to:9,type:"parent"},{from:5,to:10,type:"parent"},{from:5,to:11,type:"parent"},{from:5,to:12,type:"parent"},
+  {from:6,to:9,type:"parent"},{from:6,to:10,type:"parent"},{from:6,to:11,type:"parent"},{from:6,to:12,type:"parent"},
+  {from:13,to:6,type:"parent"},{from:14,to:6,type:"parent"},
+  {from:7,to:16,type:"parent"},{from:15,to:16,type:"parent"},
+  {from:8,to:18,type:"adopted"},{from:17,to:18,type:"adopted"},
+];
+
+// ── MODAL ───────────────────────────────────────────────────────
+function openModal(id) {
+  const p = PEOPLE.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('mHeroBg').style.cssText =
+    'position:absolute;inset:0;background:linear-gradient(135deg,'+p.color+'dd,'+p.color+'44)';
+  document.getElementById('mAv').style.background = p.color;
+  document.getElementById('mAv').textContent = p.initials;
+  document.getElementById('mName').textContent = p.name;
+  document.getElementById('mDates').textContent =
+    'Born '+p.born+(p.died?' · Died '+p.died:'')+' · '+p.loc;
+  document.getElementById('mfName').textContent = p.name;
+  document.getElementById('mfBorn').textContent = p.born+(p.died?' – '+p.died:' · Present');
+  document.getElementById('mfOcc').textContent  = p.occ;
+  document.getElementById('mfLoc').textContent  = p.loc;
+  document.getElementById('mBio').textContent   = p.bio;
+
+  var chips = document.getElementById('mChips');
+  chips.innerHTML = '';
+  var rels = [];
+  EDGES.forEach(function(e) {
+    if (e.type==='spouse' && (e.from===id||e.to===id)) {
+      var o = PEOPLE.find(function(x){return x.id===(e.from===id?e.to:e.from);});
+      if(o) rels.push({label:'Spouse',name:o.name.split(' ')[0],color:'#f06292',oid:o.id});
+    }
+    if ((e.type==='parent'||e.type==='adopted') && e.from===id) {
+      var c = PEOPLE.find(function(x){return x.id===e.to;});
+      if(c) rels.push({label:e.type==='adopted'?'Adopted child':c.gender==='M'?'Son':'Daughter',
+                       name:c.name.split(' ')[0],color:e.type==='adopted'?'#f5a623':'#4caf72',oid:c.id});
+    }
+    if ((e.type==='parent'||e.type==='adopted') && e.to===id) {
+      var pa = PEOPLE.find(function(x){return x.id===e.from;});
+      if(pa) rels.push({label:e.type==='adopted'?'Adoptive parent':pa.gender==='M'?'Father':'Mother',
+                        name:pa.name.split(' ')[0],color:'#f5a623',oid:pa.id});
+    }
+  });
+  if (!rels.length) {
+    chips.innerHTML = '<span style="font-size:12px;color:var(--t3)">No relationships recorded.</span>';
+  } else {
+    rels.forEach(function(r) {
+      var d = document.createElement('div');
+      d.className = 'rchip';
+      d.innerHTML = '<div class="rdot" style="background:'+r.color+'"></div>'+r.label+': '+r.name;
+      d.onclick = function(){ openModal(r.oid); };
+      chips.appendChild(d);
+    });
+  }
+
+  // highlight selected card
+  document.querySelectorAll('.pcard').forEach(function(c){ c.classList.remove('selected'); });
+  document.querySelectorAll('.pcard').forEach(function(c){
+    if (c.getAttribute('onclick') === 'openModal('+id+')') c.classList.add('selected');
+  });
+
+  document.getElementById('modalbg').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalbg').classList.remove('open');
+  document.querySelectorAll('.pcard').forEach(function(c){ c.classList.remove('selected'); });
+}
+document.getElementById('modalbg').addEventListener('click', function(e){
+  if (e.target === this) closeModal();
+});
+
+// ── THEME ───────────────────────────────────────────────────────
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  document.getElementById('dp').classList.toggle('active', t==='dark');
+  document.getElementById('lp').classList.toggle('active', t==='light');
+  document.getElementById('themeBtn').textContent = t==='dark' ? '☀' : '🌙';
+}
+function toggleTheme() {
+  setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+}
+
+// ── ADD PLACEHOLDER ─────────────────────────────────────────────
+function openAdd() { alert('Add Person form — coming in the full Electron app!'); }
+</script>
+</body>
+</html>
