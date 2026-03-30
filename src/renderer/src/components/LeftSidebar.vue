@@ -112,6 +112,20 @@
       </button>
     </div>
 
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-section">
+      <div class="nav-section-label">View</div>
+      <button
+        class="nav-item"
+        :class="{ active: store.cleanTree }"
+        @click="store.cleanTree = !store.cleanTree"
+      >
+        <span class="nav-icon">{{ store.cleanTree ? '👁' : '✨' }}</span>
+        <span>Clean Tree</span>
+      </button>
+    </div>
+
     <div class="sidebar-spacer"></div>
 
     <!-- Footer -->

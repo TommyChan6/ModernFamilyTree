@@ -1,33 +1,70 @@
 <template>
   <div class="graph-area" ref="containerEl">
     <svg ref="svgEl" class="graph-svg"></svg>
-    <div class="graph-search">
+    <div class="graph-search" :class="{ 'clean-hide-up': store.cleanTree }">
       <span class="search-icon">🔍</span>
       <input v-model="searchQuery" placeholder="Search family members…" @input="highlightSearch" />
     </div>
-    <div class="graph-controls">
-      <button class="ctrl-btn" @click="zoomIn" title="Zoom in">＋</button>
-      <button class="ctrl-btn" @click="zoomOut" title="Zoom out">－</button>
-      <div class="ctrl-sep"></div>
-      <button class="ctrl-btn" @click="fitAll" title="Fit all">⊡</button>
-      <button class="ctrl-btn" @click="resetZoom" title="Reset view">⊕</button>
-      <div class="ctrl-sep"></div>
-      <button
-        v-for="m in modes"
-        :key="m.id"
-        class="ctrl-btn ctrl-btn-wide"
-        :class="{ 'ctrl-btn-active': currentMode === m.id }"
-        @click="switchMode(m.id)"
-        :title="m.title"
-      >{{ m.label }}</button>
-      <div class="ctrl-sep"></div>
-      <button class="ctrl-btn ctrl-btn-wide" :class="emphBtnClass('neutral')" @click="cycleEmphasis('neutral')" title="No emphasis">◯ Neutral</button>
-      <button class="ctrl-btn ctrl-btn-wide" :class="emphBtnClass('paternal')" @click="cycleEmphasis('paternal')" title="Paternal emphasis">♂ Paternal</button>
-      <button class="ctrl-btn ctrl-btn-wide" :class="emphBtnClass('maternal')" @click="cycleEmphasis('maternal')" title="Maternal emphasis">♀ Maternal</button>
-      <div class="ctrl-sep"></div>
-      <button class="ctrl-btn" :class="{ 'ctrl-btn-lock': store.lockNodes }" @click="store.lockNodes = !store.lockNodes" title="Lock/unlock node clicks">{{ store.lockNodes ? '🔒' : '👤' }}</button>
-      <button class="ctrl-btn" :class="{ 'ctrl-btn-lock': store.lockLines }" @click="store.lockLines = !store.lockLines" title="Lock/unlock line clicks">{{ store.lockLines ? '🔒' : '🔗' }}</button>
+    <div class="bottom-bars" :class="{ 'clean-hide-down': store.cleanTree }">
+      <div class="graph-controls">
+        <button class="ctrl-btn" @click="zoomIn" title="Zoom in">＋</button>
+        <button class="ctrl-btn" @click="zoomOut" title="Zoom out">－</button>
+        <div class="ctrl-sep"></div>
+        <button class="ctrl-btn" @click="fitAll" title="Fit all">⊡</button>
+        <button class="ctrl-btn" @click="resetZoom" title="Reset view">⊕</button>
+        <div class="ctrl-sep"></div>
+        <button
+          v-for="m in modes"
+          :key="m.id"
+          class="ctrl-btn ctrl-btn-wide"
+          :class="{ 'ctrl-btn-active': currentMode === m.id }"
+          @click="switchMode(m.id)"
+          :title="m.title"
+        >{{ m.label }}</button>
+        <div class="ctrl-sep"></div>
+        <button class="ctrl-btn" :class="{ 'ctrl-btn-lock': store.lockNodes }" @click="store.lockNodes = !store.lockNodes" title="Lock/unlock node clicks">{{ store.lockNodes ? '🔒' : '👤' }}</button>
+        <button class="ctrl-btn" :class="{ 'ctrl-btn-lock': store.lockLines }" @click="store.lockLines = !store.lockLines" title="Lock/unlock line clicks">{{ store.lockLines ? '🔒' : '🔗' }}</button>
+      </div>
+      <div class="states-bar">
+        <template v-for="(name, i) in currentModeStates" :key="i">
+          <input
+            v-if="renamingState && renamingState.idx === i && renamingState.mode === currentMode"
+            v-model="renameInput"
+            class="state-rename-input"
+            @keydown.enter="confirmRename"
+            @keydown.escape="cancelRename"
+            @blur="confirmRename"
+          />
+          <div v-else class="state-btn-wrap">
+            <button
+              class="state-btn"
+              :class="{ 'state-btn-active': currentStateIndex === i }"
+              @click="switchState(i)"
+            >{{ name }}</button>
+            <button class="state-menu-dot" @click.stop="openStateMenu($event, i)">⋯</button>
+          </div>
+        </template>
+        <button class="state-btn state-btn-add" @click="addState" title="New state">＋</button>
+      </div>
     </div>
+    <!-- State context menu -->
+    <Transition name="ctx-menu">
+      <div v-if="stateMenu" class="state-context-menu" :style="stateMenuStyle" @click.stop>
+        <button class="ctx-menu-item" @click="startRenameFromMenu">
+          <span class="ctx-menu-icon">✏</span> Rename
+        </button>
+        <button class="ctx-menu-item" @click="duplicateStateFromMenu">
+          <span class="ctx-menu-icon">⧉</span> Duplicate
+        </button>
+        <button
+          v-if="currentModeStates.length > 1"
+          class="ctx-menu-item ctx-menu-danger"
+          @click="deleteStateFromMenu"
+        >
+          <span class="ctx-menu-icon">✕</span> Delete
+        </button>
+      </div>
+    </Transition>
     <Transition name="relpop">
       <div v-if="store.relPopup" class="rel-popup" :style="relPopupStyle" @click.stop>
         <button class="rel-popup-close" @click="store.relPopup = null">✕</button>
@@ -38,20 +75,35 @@
       </div>
     </Transition>
     <!-- Highlights panel -->
-    <div class="highlights-panel">
+    <div class="highlights-panel" :class="{ 'clean-hide-right': store.cleanTree }">
       <div class="highlights-title">Highlights</div>
-      <div class="highlight-group">
+      <div class="highlight-row">
         <div class="highlight-label">Lineage</div>
         <div class="seg-slider">
           <div class="seg-track">
             <div class="seg-thumb" :class="'seg-pos-' + lineageIndex"></div>
           </div>
           <button
-            v-for="(opt, i) in lineageOptions"
+            v-for="opt in lineageOptions"
             :key="opt.id"
             class="seg-option"
             :class="{ 'seg-active': activeEmphasis === opt.id }"
             @click="cycleEmphasis(opt.id)"
+          >{{ opt.label }}</button>
+        </div>
+      </div>
+      <div class="highlight-row">
+        <div class="highlight-label">Gender</div>
+        <div class="seg-slider">
+          <div class="seg-track">
+            <div class="seg-thumb seg-thumb-gender" :class="'seg-pos-' + genderIndex"></div>
+          </div>
+          <button
+            v-for="opt in genderOptions"
+            :key="opt.id"
+            class="seg-option"
+            :class="{ 'seg-active': activeGender === opt.id }"
+            @click="setGenderHighlight(opt.id)"
           >{{ opt.label }}</button>
         </div>
       </div>
@@ -75,7 +127,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import * as d3 from 'd3'
 import { useMainStore } from '../store/index.js'
 import { nodeColor, linkPath, getLinkStroke, getLinkWidth, getLinkEmphOpacity, getLinkMarker, getDashArray } from './graph/linkHelpers.js'
@@ -113,6 +165,22 @@ const modeEmphasis = { custom: 'neutral', auto: 'neutral', age: 'neutral', gener
 
 const { cancelAnimation, animateToPositions, animateToPositionsWithReset } = useGraphAnimation(ctx)
 
+// ── Per-mode multi-state system ─────────────────────────────────────────────
+// Each mode has an array of states (snapshots) the user can create and switch between
+const modeStateNames = reactive({
+  custom: ['State 1'], auto: ['State 1'], age: ['State 1'], generation: ['State 1']
+})
+const modeActiveStateIdx = reactive({
+  custom: 0, auto: 0, age: 0, generation: 0
+})
+// Snapshots: modeStateSnapshots[mode][stateIdx] = { id: {x,y}, ... } or null
+const modeStateSnapshots = reactive({
+  custom: [null], auto: [null], age: [null], generation: [null]
+})
+
+const currentModeStates = computed(() => modeStateNames[currentMode.value])
+const currentStateIndex = computed(() => modeActiveStateIdx[currentMode.value])
+
 // ── Emphasis ────────────────────────────────────────────────────────────────
 function emphVisual() { return activeEmphasis.value }
 
@@ -126,12 +194,56 @@ const lineageIndex = computed(() => {
   return idx >= 0 ? idx : 0
 })
 
-function emphBtnClass(which) {
-  const e = activeEmphasis.value
-  if (which === 'neutral') return { 'ctrl-btn-emph-active': e === 'neutral' }
-  if (which === 'paternal') return { 'ctrl-btn-emph-active': e === 'paternal', 'ctrl-btn-paternal': e === 'paternal' }
-  if (which === 'maternal') return { 'ctrl-btn-emph-active': e === 'maternal', 'ctrl-btn-maternal': e === 'maternal' }
-  return {}
+const genderOptions = [
+  { id: 'normal', label: 'Normal' },
+  { id: 'male', label: 'Male' },
+  { id: 'female', label: 'Female' },
+]
+const activeGender = ref('normal')
+const genderIndex = computed(() => {
+  const idx = genderOptions.findIndex(o => o.id === activeGender.value)
+  return idx >= 0 ? idx : 0
+})
+
+function setGenderHighlight(which) {
+  if (activeGender.value === which) return
+  activeGender.value = which
+  applyGenderHighlight()
+}
+
+function applyGenderHighlight() {
+  if (!ctx.rootGroup) return
+  const g = activeGender.value
+  const gs = store.graphSettings
+
+  ctx.rootGroup.selectAll('g.graph-node')
+    .transition().duration(250).ease(d3.easeCubicOut)
+    .attr('opacity', d => {
+      if (g === 'normal') return gs.nodeOpacity
+      if (g === 'male') return d.gender === 'male' ? gs.nodeOpacity : gs.nodeOpacity * 0.25
+      if (g === 'female') return d.gender === 'female' ? gs.nodeOpacity : gs.nodeOpacity * 0.25
+      return gs.nodeOpacity
+    })
+
+  ctx.rootGroup.selectAll('g.graph-node').select('.node-circle')
+    .transition().duration(250).ease(d3.easeCubicOut)
+    .attr('r', d => {
+      const base = gs.nodeRadius
+      if (g === 'normal') return base
+      if (g === 'male' && d.gender === 'male') return base * 1.15
+      if (g === 'female' && d.gender === 'female') return base * 1.15
+      return base
+    })
+
+  ctx.rootGroup.selectAll('g.graph-node').select('.node-shadow')
+    .transition().duration(250).ease(d3.easeCubicOut)
+    .attr('r', d => {
+      const base = gs.nodeRadius + 2
+      if (g === 'normal') return base
+      if (g === 'male' && d.gender === 'male') return base + 2
+      if (g === 'female' && d.gender === 'female') return base + 2
+      return base
+    })
 }
 
 // ── Popup computeds ─────────────────────────────────────────────────────────
@@ -171,9 +283,177 @@ const relPopupStatus = computed(() => store.relPopup?.rel?.status === 'divorced'
 function snapshotMode(mode) {
   const snap = {}
   ctx.nodesData.forEach(n => { snap[n.id] = { x: n.x, y: n.y } })
+  const idx = modeActiveStateIdx[mode]
+  modeStateSnapshots[mode][idx] = snap
   ctx.modeSnapshots[mode] = snap
 }
 function hasSnapshot(mode) { return ctx.modeSnapshots[mode] && Object.keys(ctx.modeSnapshots[mode]).length > 0 }
+
+function saveCurrentState() {
+  const mode = currentMode.value
+  if (mode === 'generation') snapshotGenMode()
+  else snapshotMode(mode)
+}
+
+function switchState(idx) {
+  const mode = currentMode.value
+  if (idx === modeActiveStateIdx[mode]) return
+  cancelAnimation()
+
+  // Save current state
+  saveCurrentState()
+
+  // Switch to new state
+  modeActiveStateIdx[mode] = idx
+  const snap = modeStateSnapshots[mode][idx]
+  ctx.modeSnapshots[mode] = snap
+
+  // Re-enter mode to load the new state's snapshot
+  removeGuides(ctx)
+  if (mode === 'auto') enterAutoMode()
+  else if (mode === 'custom') enterCustomMode()
+  else if (mode === 'age') enterAgeMode()
+  else if (mode === 'generation') enterGenerationMode()
+  applyEmphasis()
+}
+
+function addState() {
+  const mode = currentMode.value
+
+  // Save current state first
+  saveCurrentState()
+
+  // Create new state (copy current positions as starting point)
+  const newIdx = modeStateNames[mode].length
+  modeStateNames[mode].push(`State ${newIdx + 1}`)
+  const snap = {}
+  ctx.nodesData.forEach(n => { snap[n.id] = { x: n.x, y: n.y } })
+
+  // For generation mode, also copy row state
+  if (mode === 'generation') {
+    snap._genRowYValues = [...ctx.genRowYValues]
+    snap._genRowSpacing = ctx.genRowSpacing
+  }
+
+  modeStateSnapshots[mode].push(snap)
+  modeActiveStateIdx[mode] = newIdx
+  ctx.modeSnapshots[mode] = snap
+}
+
+const renamingState = ref(null) // { mode, idx }
+const renameInput = ref('')
+const stateMenu = ref(null) // { idx, x, y }
+const stateMenuStyle = computed(() => {
+  if (!stateMenu.value) return {}
+  return { left: stateMenu.value.x + 'px', top: stateMenu.value.y + 'px' }
+})
+
+let closeMenuListener = null
+
+function openStateMenu(event, idx) {
+  event.stopPropagation()
+  // Remove old listener if any
+  if (closeMenuListener) { document.removeEventListener('mousedown', closeMenuListener, true); closeMenuListener = null }
+
+  const container = containerEl.value
+  if (!container) return
+  const rect = container.getBoundingClientRect()
+
+  // Position menu above the click point
+  stateMenu.value = {
+    idx,
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top - 120
+  }
+
+  // Close on mousedown outside the menu (delayed 2 frames to skip current event)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      closeMenuListener = (e) => {
+        // Don't close if clicking inside the menu
+        const menuEl = document.querySelector('.state-context-menu')
+        if (menuEl && menuEl.contains(e.target)) return
+        stateMenu.value = null
+        document.removeEventListener('mousedown', closeMenuListener, true)
+        closeMenuListener = null
+      }
+      document.addEventListener('mousedown', closeMenuListener, true)
+    })
+  })
+}
+
+function closeMenu() {
+  stateMenu.value = null
+  if (closeMenuListener) { document.removeEventListener('mousedown', closeMenuListener, true); closeMenuListener = null }
+}
+
+function startRenameFromMenu() {
+  const idx = stateMenu.value?.idx
+  const mode = currentMode.value
+  closeMenu()
+  if (idx === undefined) return
+  renameInput.value = modeStateNames[mode][idx]
+  renamingState.value = { mode, idx }
+  nextTick(() => {
+    const el = document.querySelector('.state-rename-input')
+    if (el) { el.focus(); el.select() }
+  })
+}
+
+function duplicateStateFromMenu() {
+  const idx = stateMenu.value?.idx
+  const mode = currentMode.value
+  closeMenu()
+  if (idx === undefined) return
+  saveCurrentState()
+  const srcSnap = modeStateSnapshots[mode][idx]
+  const newSnap = srcSnap ? JSON.parse(JSON.stringify(srcSnap)) : null
+  const newIdx = modeStateNames[mode].length
+  modeStateNames[mode].push(modeStateNames[mode][idx] + ' copy')
+  modeStateSnapshots[mode].push(newSnap)
+  modeActiveStateIdx[mode] = newIdx
+  ctx.modeSnapshots[mode] = newSnap
+}
+
+function deleteStateFromMenu() {
+  const idx = stateMenu.value?.idx
+  closeMenu()
+  if (idx === undefined) return
+  const mode = currentMode.value
+  if (modeStateNames[mode].length <= 1) return
+
+  modeStateNames[mode].splice(idx, 1)
+  modeStateSnapshots[mode].splice(idx, 1)
+
+  // Adjust active index
+  let newActive = modeActiveStateIdx[mode]
+  if (newActive >= modeStateNames[mode].length) newActive = modeStateNames[mode].length - 1
+  if (newActive === idx || idx < newActive) newActive = Math.max(0, newActive - (idx < newActive ? 1 : 0))
+  modeActiveStateIdx[mode] = newActive
+  ctx.modeSnapshots[mode] = modeStateSnapshots[mode][newActive] || null
+
+  // If deleted the active state, reload
+  if (idx === currentStateIndex.value || newActive !== modeActiveStateIdx[mode]) {
+    removeGuides(ctx)
+    if (mode === 'auto') enterAutoMode()
+    else if (mode === 'custom') enterCustomMode()
+    else if (mode === 'age') enterAgeMode()
+    else if (mode === 'generation') enterGenerationMode()
+    applyEmphasis()
+  }
+}
+
+function confirmRename() {
+  if (!renamingState.value) return
+  const { mode, idx } = renamingState.value
+  const val = renameInput.value.trim()
+  if (val) modeStateNames[mode].splice(idx, 1, val)
+  renamingState.value = null
+}
+
+function cancelRename() {
+  renamingState.value = null
+}
 
 
 // ── Ticked ──────────────────────────────────────────────────────────────────
@@ -405,12 +685,15 @@ function switchMode(newMode) {
   if (!ctx.nodesData.length) { currentMode.value = newMode; return }
 
   const oldMode = currentMode.value
-  if (oldMode === 'generation') snapshotGenMode()
-  else snapshotMode(oldMode)
+  saveCurrentState()
   removeGuides(ctx)
   modeEmphasis[oldMode] = activeEmphasis.value
   currentMode.value = newMode
   activeEmphasis.value = modeEmphasis[newMode] || 'neutral'
+
+  // Restore the new mode's active state snapshot
+  const newIdx = modeActiveStateIdx[newMode]
+  ctx.modeSnapshots[newMode] = modeStateSnapshots[newMode][newIdx] || null
 
   if (newMode === 'auto') enterAutoMode()
   else if (newMode === 'custom') enterCustomMode()
@@ -508,6 +791,8 @@ function snapshotGenMode() {
   ctx.nodesData.forEach(n => { snap[n.id] = { x: n.x, y: n.y } })
   snap._genRowYValues = [...ctx.genRowYValues]
   snap._genRowSpacing = ctx.genRowSpacing
+  const idx = modeActiveStateIdx['generation']
+  modeStateSnapshots['generation'][idx] = snap
   ctx.modeSnapshots['generation'] = snap
 }
 
@@ -607,11 +892,12 @@ watch(() => store.graphSettings, () => {
 <style scoped>
 .graph-area { position: relative; background: var(--bg); overflow: hidden; }
 .graph-svg { display: block; width: 100%; height: 100%; }
-.graph-search { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 7px 14px; min-width: 260px; z-index: 5; box-shadow: var(--shadow); }
+.graph-search { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 7px 14px; min-width: 260px; z-index: 5; box-shadow: var(--shadow); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; }
 .graph-search input { background: none; border: none; outline: none; font: inherit; font-size: 13px; color: var(--t1); flex: 1; padding: 0; box-shadow: none; width: auto; }
 .graph-search input::placeholder { color: var(--t3); }
 .search-icon { font-size: 13px; flex-shrink: 0; }
-.graph-controls { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 5px; box-shadow: var(--shadow); z-index: 5; }
+.bottom-bars { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; align-items: flex-end; z-index: 5; transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; }
+.graph-controls { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 5px; box-shadow: var(--shadow); }
 .ctrl-btn { width: 30px; height: 30px; border-radius: 7px; border: none; background: transparent; cursor: pointer; color: var(--t2); font-size: 15px; display: flex; align-items: center; justify-content: center; transition: background 0.12s; font-family: var(--font); }
 .ctrl-btn:hover { background: var(--hover); color: var(--t1); }
 .ctrl-btn-wide { width: auto; padding: 0 10px; gap: 4px; font-size: 11px; font-weight: 600; position: relative; }
@@ -625,9 +911,6 @@ watch(() => store.graphSettings, () => {
 .leg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .leg-line { width: 22px; height: 2px; flex-shrink: 0; border-radius: 1px; }
 .leg-dashed { height: 0; border-top: 2px dashed; background: none !important; }
-.ctrl-btn-emph-active { border: 1px solid rgba(255, 255, 255, 0.12); }
-.ctrl-btn-emph-active.ctrl-btn-paternal { background: rgba(74, 144, 217, 0.18); color: #4a90d9; border-color: rgba(74, 144, 217, 0.35); }
-.ctrl-btn-emph-active.ctrl-btn-maternal { background: rgba(217, 74, 138, 0.18); color: #d94a8a; border-color: rgba(217, 74, 138, 0.35); }
 .ctrl-btn-lock { background: rgba(239, 83, 80, 0.15); color: #ef5350; }
 .rel-popup { position: absolute; z-index: 20; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; min-width: 180px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); transform: translateX(-50%) translateY(-100%); display: flex; flex-direction: column; gap: 6px; }
 .rel-popup-close { position: absolute; top: 6px; right: 8px; width: 22px; height: 22px; border-radius: 5px; border: none; background: transparent; color: var(--t3); font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -640,6 +923,175 @@ watch(() => store.graphSettings, () => {
 .relpop-leave-active { transition: opacity 0.12s ease, transform 0.12s ease; }
 .relpop-enter-from { opacity: 0; transform: translateX(-50%) translateY(-90%) scale(0.92); }
 .relpop-leave-to { opacity: 0; transform: translateX(-50%) translateY(-100%) scale(0.95); }
+
+/* Clean tree — slide panels out */
+.states-bar {
+  display: flex;
+  gap: 3px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: var(--shadow);
+}
+
+.state-btn {
+  padding: 5px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--t3);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.state-btn:hover {
+  background: var(--hover);
+  color: var(--t1);
+}
+
+.state-btn-active {
+  background: var(--adim);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.state-btn-add {
+  color: var(--t3);
+  font-size: 14px;
+  padding: 4px 10px;
+  font-weight: 600;
+}
+
+.state-btn-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.state-menu-dot {
+  position: absolute;
+  right: -2px;
+  top: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: none;
+  background: var(--surface);
+  color: var(--t3);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.12s, color 0.12s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  z-index: 2;
+  line-height: 1;
+  padding: 0;
+}
+
+.state-btn-wrap:hover .state-menu-dot {
+  opacity: 1;
+}
+
+.state-menu-dot:hover {
+  background: var(--hover);
+  color: var(--t1);
+}
+
+.state-btn-add:hover {
+  color: var(--accent);
+  background: var(--adim);
+}
+
+/* State context menu */
+.state-context-menu {
+  position: absolute;
+  z-index: 100;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  min-width: 130px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  transform-origin: top left;
+}
+
+.ctx-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: none;
+  background: transparent;
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 7px;
+  transition: background 0.1s, color 0.1s;
+  text-align: left;
+}
+
+.ctx-menu-item:hover {
+  background: var(--hover);
+  color: var(--t1);
+}
+
+.ctx-menu-icon {
+  font-size: 12px;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.ctx-menu-danger:hover {
+  background: rgba(239, 83, 80, 0.12);
+  color: #ef5350;
+}
+
+.ctx-menu-enter-active {
+  transition: opacity 0.15s ease, transform 0.18s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.ctx-menu-leave-active {
+  transition: opacity 0.1s ease, transform 0.1s ease;
+}
+.ctx-menu-enter-from {
+  opacity: 0;
+  transform: scale(0.9);
+}
+.ctx-menu-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.state-rename-input {
+  width: 80px;
+  padding: 4px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--elevated);
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(108, 142, 245, 0.2);
+}
+
+.clean-hide-up { transform: translateX(-50%) translateY(calc(-100% - 30px)); opacity: 0; pointer-events: none; }
+.bottom-bars.clean-hide-down { transform: translateX(-50%) translateY(calc(100% + 30px)); opacity: 0; pointer-events: none; }
+.clean-hide-right { transform: translateX(calc(100% + 30px)); opacity: 0; pointer-events: none; }
 
 /* Highlights panel */
 .highlights-panel {
@@ -656,6 +1108,7 @@ watch(() => store.graphSettings, () => {
   flex-direction: column;
   gap: 10px;
   min-width: 180px;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
 }
 
 .highlights-title {
@@ -666,22 +1119,25 @@ watch(() => store.graphSettings, () => {
   color: var(--t3);
 }
 
-.highlight-group {
+.highlight-row {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
 }
 
 .highlight-label {
   font-size: 11px;
   font-weight: 600;
   color: var(--t2);
+  min-width: 52px;
+  flex-shrink: 0;
 }
 
 /* Segmented slider */
 .seg-slider {
   position: relative;
   display: flex;
+  flex: 1;
   background: var(--elevated);
   border-radius: 8px;
   padding: 2px;
@@ -708,6 +1164,10 @@ watch(() => store.graphSettings, () => {
 .seg-pos-0 { left: 0; }
 .seg-pos-1 { left: calc(100% / 3); background: #4a90d9; }
 .seg-pos-2 { left: calc(200% / 3); background: #d94a8a; }
+
+.seg-thumb-gender.seg-pos-0 { background: var(--accent); }
+.seg-thumb-gender.seg-pos-1 { background: #3a7bd5; }
+.seg-thumb-gender.seg-pos-2 { background: #c95fa0; }
 
 .seg-option {
   flex: 1;
