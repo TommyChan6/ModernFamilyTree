@@ -17,6 +17,7 @@ export const useMainStore = defineStore('main', () => {
   const relPopup = ref(null)  // { rel, x, y } when showing relationship popup
   const cleanTree = ref(false)
   const currentDate = ref(null) // { year } or null
+  const graphDirty = ref(false)
 
   // Graph visual settings
   const graphSettings = ref({
@@ -212,5 +213,19 @@ export const useMainStore = defineStore('main', () => {
     toggleSettings,
     updateGraphSetting,
     resetGraphSettings,
+    graphDirty,
+    markGraphDirty() { graphDirty.value = true },
+    clearGraphDirty() { graphDirty.value = false },
+    async saveGraphState(graphState) {
+      await api.invoke('settings:set', { key: 'graphState', value: JSON.stringify(graphState) })
+      graphDirty.value = false
+    },
+    async loadGraphState() {
+      const res = await api.invoke('settings:getAll')
+      if (res.success && res.data.graphState) {
+        try { return JSON.parse(res.data.graphState) } catch { return null }
+      }
+      return null
+    },
   }
 })

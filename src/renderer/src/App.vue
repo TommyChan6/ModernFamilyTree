@@ -14,12 +14,12 @@
       </button>
     </header>
     <div class="workspace" :style="workspaceStyle">
-      <LeftSidebar :style="{ width: leftWidth + 'px' }" />
+      <LeftSidebar :style="{ width: leftWidth + 'px' }" @save="handleSave" />
       <div
         class="resize-handle resize-handle-left"
         @mousedown="startResizeLeft"
       ></div>
-      <GraphCanvas />
+      <GraphCanvas ref="graphRef" />
       <div
         class="resize-handle resize-handle-right"
         @mousedown="startResizeRight"
@@ -43,6 +43,13 @@ import PersonForm from './components/PersonForm.vue'
 import GraphSettings from './components/GraphSettings.vue'
 
 const store = useMainStore()
+const graphRef = ref(null)
+
+async function handleSave() {
+  if (graphRef.value?.saveGraphLayout) {
+    await graphRef.value.saveGraphLayout()
+  }
+}
 
 // Sidebar widths
 const leftWidth = ref(240)
@@ -117,6 +124,10 @@ onMounted(async () => {
     store.setTheme(settingsRes.data.theme)
   }
   await store.loadAll()
+
+  // Expose to main process for close confirmation
+  window.__isGraphDirty = () => store.graphDirty
+  window.__saveGraphLayout = () => handleSave()
 })
 
 onUnmounted(() => {

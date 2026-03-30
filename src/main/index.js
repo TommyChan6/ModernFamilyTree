@@ -33,6 +33,44 @@ function createWindow() {
     mainWindow.show()
   })
 
+  // Close confirmation for unsaved changes
+  let forceClose = false
+  mainWindow.on('close', async (e) => {
+    if (forceClose) return
+    e.preventDefault()
+    const dirty = await mainWindow.webContents.executeJavaScript(
+      'window.__isGraphDirty ? window.__isGraphDirty() : false'
+    ).catch(() => false)
+
+    if (dirty) {
+      const { response } = await dialog.showMessageBox(mainWindow, {
+        type: 'question',
+        buttons: ['Save & Close', 'Discard & Close', 'Cancel'],
+        defaultId: 0,
+        cancelId: 2,
+        title: 'Unsaved Changes',
+        message: 'You have unsaved graph layout changes.',
+        detail: 'Would you like to save before closing?'
+      })
+      if (response === 0) {
+        // Save then close
+        await mainWindow.webContents.executeJavaScript(
+          'window.__saveGraphLayout ? window.__saveGraphLayout() : Promise.resolve()'
+        ).catch(() => {})
+        forceClose = true
+        mainWindow.close()
+      } else if (response === 1) {
+        // Discard and close
+        forceClose = true
+        mainWindow.close()
+      }
+      // response === 2: Cancel, do nothing
+    } else {
+      forceClose = true
+      mainWindow.close()
+    }
+  })
+
   if (process.env.NODE_ENV === 'development' && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {

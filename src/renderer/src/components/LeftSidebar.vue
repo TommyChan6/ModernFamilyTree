@@ -89,6 +89,11 @@
     <!-- Data -->
     <div class="sidebar-section">
       <div class="nav-section-label">Data</div>
+      <button class="nav-item save-btn" :class="{ 'save-dirty': store.graphDirty }" @click="$emit('save')">
+        <span class="nav-icon">💾</span>
+        <span>Save Layout</span>
+        <span v-if="store.graphDirty" class="save-badge">unsaved</span>
+      </button>
       <button class="nav-item" @click="handleExport">
         <span class="nav-icon">⬆</span>
         <span>Export JSON</span>
@@ -331,6 +336,32 @@ function handleImport() {
   font-size: 11px;
   color: var(--t3);
   text-align: center;
+}
+
+.save-btn {
+  position: relative;
+}
+
+.save-dirty {
+  color: var(--accent) !important;
+}
+
+.save-badge {
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #f5a623;
+  background: rgba(245, 166, 35, 0.12);
+  padding: 2px 6px;
+  border-radius: 6px;
+  animation: pulse-badge 2s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .date-row {

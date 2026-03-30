@@ -455,6 +455,7 @@ function snapshotMode(mode) {
   const idx = modeActiveStateIdx[mode]
   modeStateSnapshots[mode][idx] = snap
   ctx.modeSnapshots[mode] = snap
+  store.markGraphDirty()
 }
 function hasSnapshot(mode) { return ctx.modeSnapshots[mode] && Object.keys(ctx.modeSnapshots[mode]).length > 0 }
 
@@ -963,6 +964,7 @@ function snapshotGenMode() {
   const idx = modeActiveStateIdx['generation']
   modeStateSnapshots['generation'][idx] = snap
   ctx.modeSnapshots['generation'] = snap
+  store.markGraphDirty()
 }
 
 // ── Emphasis ────────────────────────────────────────────────────────────────
@@ -1030,7 +1032,69 @@ function highlightSearch() {
 }
 
 // ── Lifecycle & watchers ────────────────────────────────────────────────────
-onMounted(() => { initGraph(); updateGraph() })
+// ── Save / Load graph layout ────────────────────────────────────────────────
+function collectGraphState() {
+  // Save current state before collecting
+  saveCurrentState()
+  return {
+    currentMode: currentMode.value,
+    activeEmphasis: activeEmphasis.value,
+    modeEmphasis: { ...modeEmphasis },
+    modeStateNames: JSON.parse(JSON.stringify(modeStateNames)),
+    modeActiveStateIdx: { ...modeActiveStateIdx },
+    modeStateSnapshots: JSON.parse(JSON.stringify(modeStateSnapshots)),
+    genRowYValues: [...ctx.genRowYValues],
+    genRowSpacing: ctx.genRowSpacing,
+  }
+}
+
+function restoreGraphState(state) {
+  if (!state) return
+  // Restore mode state names and snapshots
+  for (const mode of ['custom', 'auto', 'age', 'generation']) {
+    if (state.modeStateNames?.[mode]) modeStateNames[mode] = state.modeStateNames[mode]
+    if (state.modeActiveStateIdx?.[mode] !== undefined) modeActiveStateIdx[mode] = state.modeActiveStateIdx[mode]
+    if (state.modeStateSnapshots?.[mode]) modeStateSnapshots[mode] = state.modeStateSnapshots[mode]
+    if (state.modeEmphasis?.[mode]) modeEmphasis[mode] = state.modeEmphasis[mode]
+    // Restore the active snapshot for each mode
+    const idx = modeActiveStateIdx[mode]
+    ctx.modeSnapshots[mode] = modeStateSnapshots[mode]?.[idx] || null
+  }
+  if (state.genRowYValues) ctx.genRowYValues = state.genRowYValues
+  if (state.genRowSpacing) ctx.genRowSpacing = state.genRowSpacing
+  if (state.activeEmphasis) activeEmphasis.value = state.activeEmphasis
+  if (state.currentMode) {
+    currentMode.value = state.currentMode
+    // Enter the saved mode
+    removeGuides(ctx)
+    if (state.currentMode === 'auto') enterAutoMode()
+    else if (state.currentMode === 'custom') enterCustomMode()
+    else if (state.currentMode === 'age') enterAgeMode()
+    else if (state.currentMode === 'generation') enterGenerationMode()
+    applyEmphasis()
+  }
+}
+
+async function saveGraphLayout() {
+  const state = collectGraphState()
+  await store.saveGraphState(state)
+}
+
+async function loadSavedGraphState() {
+  const state = await store.loadGraphState()
+  if (state) restoreGraphState(state)
+}
+
+defineExpose({ saveGraphLayout, collectGraphState })
+
+onMounted(async () => {
+  initGraph()
+  updateGraph()
+  // Load saved graph state after initial render
+  await nextTick()
+  await loadSavedGraphState()
+  store.clearGraphDirty()
+})
 onUnmounted(() => { ctx.simulation?.stop(); ctx.resizeObserver?.disconnect(); cancelAnimation() })
 
 watch([() => store.persons, () => store.relationships], () => updateGraph(), { deep: true })
