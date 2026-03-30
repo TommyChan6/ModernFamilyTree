@@ -35,8 +35,8 @@ export function isMaternal(d, persons) {
 }
 
 export function getLinkStroke(d, emph, gs, persons) {
-  if (emph === 'paternal' && isPaternal(d, persons)) return '#4a90d9'
-  if (emph === 'maternal' && isMaternal(d, persons)) return '#d94a8a'
+  if (emph === 'paternal' && isPaternal(d, persons)) return d.type === 'adopted' ? '#7bb8f0' : '#4a90d9'
+  if (emph === 'maternal' && isMaternal(d, persons)) return d.type === 'adopted' ? '#eda0c4' : '#d94a8a'
   if (d.type === 'spouse') return gs.spouseColor
   if (d.type === 'adopted') return gs.adoptedColor
   return gs.parentChildColor
@@ -59,8 +59,8 @@ export function getLinkEmphOpacity(d, emph, gs, persons) {
 
 export function getLinkMarker(d, emph, persons) {
   if (d.type === 'parent_child' || d.type === 'adopted') {
-    if (emph === 'paternal' && isPaternal(d, persons)) return 'url(#arr-pat)'
-    if (emph === 'maternal' && isMaternal(d, persons)) return 'url(#arr-mat)'
+    if (emph === 'paternal' && isPaternal(d, persons)) return d.type === 'adopted' ? 'url(#arr-pat-ad)' : 'url(#arr-pat)'
+    if (emph === 'maternal' && isMaternal(d, persons)) return d.type === 'adopted' ? 'url(#arr-mat-ad)' : 'url(#arr-mat)'
     return d.type === 'adopted' ? 'url(#arr-a)' : 'url(#arr)'
   }
   return null

@@ -22,12 +22,8 @@
       >{{ m.label }}</button>
       <div class="ctrl-sep"></div>
       <button class="ctrl-btn ctrl-btn-wide" :class="emphBtnClass('neutral')" @click="cycleEmphasis('neutral')" title="No emphasis">◯ Neutral</button>
-      <button class="ctrl-btn ctrl-btn-wide" :class="emphBtnClass('paternal')" @click="cycleEmphasis('paternal')" title="Paternal emphasis">
-        <span class="emph-label">♂ Paternal</span><span v-if="isHardPaternal" class="emph-bar emph-bar-pat"></span>
-      </button>
-      <button class="ctrl-btn ctrl-btn-wide" :class="emphBtnClass('maternal')" @click="cycleEmphasis('maternal')" title="Maternal emphasis">
-        <span class="emph-label">♀ Maternal</span><span v-if="isHardMaternal" class="emph-bar emph-bar-mat"></span>
-      </button>
+      <button class="ctrl-btn ctrl-btn-wide" :class="emphBtnClass('paternal')" @click="cycleEmphasis('paternal')" title="Paternal emphasis">♂ Paternal</button>
+      <button class="ctrl-btn ctrl-btn-wide" :class="emphBtnClass('maternal')" @click="cycleEmphasis('maternal')" title="Maternal emphasis">♀ Maternal</button>
       <div class="ctrl-sep"></div>
       <button class="ctrl-btn" :class="{ 'ctrl-btn-lock': store.lockNodes }" @click="store.lockNodes = !store.lockNodes" title="Lock/unlock node clicks">{{ store.lockNodes ? '🔒' : '👤' }}</button>
       <button class="ctrl-btn" :class="{ 'ctrl-btn-lock': store.lockLines }" @click="store.lockLines = !store.lockLines" title="Lock/unlock line clicks">{{ store.lockLines ? '🔒' : '🔗' }}</button>
@@ -41,12 +37,39 @@
         <div v-if="relPopupStatus" class="rel-popup-status" :class="relPopupStatus">{{ relPopupStatus }}</div>
       </div>
     </Transition>
+    <!-- Highlights panel -->
+    <div class="highlights-panel">
+      <div class="highlights-title">Highlights</div>
+      <div class="highlight-group">
+        <div class="highlight-label">Lineage</div>
+        <div class="seg-slider">
+          <div class="seg-track">
+            <div class="seg-thumb" :class="'seg-pos-' + lineageIndex"></div>
+          </div>
+          <button
+            v-for="(opt, i) in lineageOptions"
+            :key="opt.id"
+            class="seg-option"
+            :class="{ 'seg-active': activeEmphasis === opt.id }"
+            @click="cycleEmphasis(opt.id)"
+          >{{ opt.label }}</button>
+        </div>
+      </div>
+    </div>
+
     <div class="graph-legend">
-      <div class="leg-row"><div class="leg-dot" style="background:#3a7bd5"></div>Male</div>
-      <div class="leg-row"><div class="leg-dot" style="background:#c95fa0"></div>Female</div>
-      <div class="leg-row"><div class="leg-line" style="background:#8b6cc5"></div>Parent/Child</div>
-      <div class="leg-row"><div class="leg-line leg-dashed" style="border-color:#f06292"></div>Spouse</div>
-      <div class="leg-row"><div class="leg-line leg-dashed" style="border-color:#f5a623"></div>Adopted</div>
+      <div class="panel-title">Legend</div>
+      <div class="leg-section">
+        <div class="leg-section-label">Nodes</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#3a7bd5"></div>Male</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#c95fa0"></div>Female</div>
+      </div>
+      <div class="leg-section">
+        <div class="leg-section-label">Lines</div>
+        <div class="leg-row"><div class="leg-line" style="background:#8b6cc5"></div>Parent / Child</div>
+        <div class="leg-row"><div class="leg-line leg-dashed" style="border-color:#f06292"></div>Spouse</div>
+        <div class="leg-row"><div class="leg-line leg-dashed" style="border-color:#f5a623"></div>Adopted</div>
+      </div>
     </div>
   </div>
 </template>
@@ -86,39 +109,28 @@ const ctx = {
   ticked: null,        // set below
 }
 
-const hardSnapshots = {
-  custom: { paternal: null, maternal: null }, auto: { paternal: null, maternal: null },
-  age: { paternal: null, maternal: null }, generation: { paternal: null, maternal: null },
-}
 const modeEmphasis = { custom: 'neutral', auto: 'neutral', age: 'neutral', generation: 'neutral' }
 
 const { cancelAnimation, animateToPositions, animateToPositionsWithReset } = useGraphAnimation(ctx)
 
-// ── Emphasis computeds ──────────────────────────────────────────────────────
-const isHardPaternal = computed(() => activeEmphasis.value === 'hard_paternal')
-const isHardMaternal = computed(() => activeEmphasis.value === 'hard_maternal')
-const isHard = computed(() => isHardPaternal.value || isHardMaternal.value)
+// ── Emphasis ────────────────────────────────────────────────────────────────
+function emphVisual() { return activeEmphasis.value }
 
-function emphVisual() {
-  const e = activeEmphasis.value
-  if (e === 'paternal' || e === 'hard_paternal') return 'paternal'
-  if (e === 'maternal' || e === 'hard_maternal') return 'maternal'
-  return 'neutral'
-}
+const lineageOptions = [
+  { id: 'neutral', label: 'Neutral' },
+  { id: 'paternal', label: 'Paternal' },
+  { id: 'maternal', label: 'Maternal' },
+]
+const lineageIndex = computed(() => {
+  const idx = lineageOptions.findIndex(o => o.id === activeEmphasis.value)
+  return idx >= 0 ? idx : 0
+})
 
 function emphBtnClass(which) {
   const e = activeEmphasis.value
   if (which === 'neutral') return { 'ctrl-btn-emph-active': e === 'neutral' }
-  if (which === 'paternal') return {
-    'ctrl-btn-emph-active': e === 'paternal' || e === 'hard_paternal',
-    'ctrl-btn-paternal': e === 'paternal' || e === 'hard_paternal',
-    'ctrl-btn-hard': e === 'hard_paternal',
-  }
-  if (which === 'maternal') return {
-    'ctrl-btn-emph-active': e === 'maternal' || e === 'hard_maternal',
-    'ctrl-btn-maternal': e === 'maternal' || e === 'hard_maternal',
-    'ctrl-btn-hard': e === 'hard_maternal',
-  }
+  if (which === 'paternal') return { 'ctrl-btn-emph-active': e === 'paternal', 'ctrl-btn-paternal': e === 'paternal' }
+  if (which === 'maternal') return { 'ctrl-btn-emph-active': e === 'maternal', 'ctrl-btn-maternal': e === 'maternal' }
   return {}
 }
 
@@ -162,11 +174,7 @@ function snapshotMode(mode) {
   ctx.modeSnapshots[mode] = snap
 }
 function hasSnapshot(mode) { return ctx.modeSnapshots[mode] && Object.keys(ctx.modeSnapshots[mode]).length > 0 }
-function snapshotHard(mode, key) {
-  const snap = {}
-  ctx.nodesData.forEach(n => { snap[n.id] = { x: n.x, y: n.y } })
-  hardSnapshots[mode][key] = snap
-}
+
 
 // ── Ticked ──────────────────────────────────────────────────────────────────
 function ticked() {
@@ -180,6 +188,7 @@ function ticked() {
   updateGuideWidths(ctx)
 }
 ctx.ticked = ticked
+ctx.theme = store.theme
 
 // ── Init graph ──────────────────────────────────────────────────────────────
 function initGraph() {
@@ -192,11 +201,14 @@ function initGraph() {
   const defs = ctx.svgSelection.append('defs')
 
   const nodeR = store.graphSettings.nodeRadius
-  ;[{ id: 'arr', fill: '#8b6cc5' }, { id: 'arr-a', fill: '#f5a623' }, { id: 'arr-pat', fill: '#4a90d9' }, { id: 'arr-mat', fill: '#d94a8a' }]
+  ;[{ id: 'arr', fill: '#8b6cc5' }, { id: 'arr-a', fill: '#f5a623' }, { id: 'arr-pat', fill: '#4a90d9' }, { id: 'arr-mat', fill: '#d94a8a' }, { id: 'arr-pat-ad', fill: '#7bb8f0' }, { id: 'arr-mat-ad', fill: '#eda0c4' }]
     .forEach(({ id, fill }) => {
-      defs.append('marker').attr('id', id).attr('markerWidth', 6).attr('markerHeight', 6)
-        .attr('refX', Math.round(nodeR / 1.8) + 6).attr('refY', 3).attr('orient', 'auto').attr('viewBox', '0 0 6 6')
-        .append('path').attr('d', 'M0,0 L0,6 L6,3z').attr('fill', fill).attr('opacity', 0.9)
+      defs.append('marker').attr('id', id)
+        .attr('markerWidth', 10).attr('markerHeight', 10)
+        .attr('refX', nodeR + 10).attr('refY', 5)
+        .attr('orient', 'auto').attr('markerUnits', 'userSpaceOnUse')
+        .attr('viewBox', '0 0 10 10')
+        .append('path').attr('d', 'M0,0 L0,10 L10,5z').attr('fill', fill).attr('opacity', 0.9)
     })
 
   const glowFilter = defs.append('filter').attr('id', 'glow')
@@ -204,6 +216,28 @@ function initGraph() {
   const fm = glowFilter.append('feMerge')
   fm.append('feMergeNode').attr('in', 'coloredBlur')
   fm.append('feMergeNode').attr('in', 'SourceGraphic')
+
+  // Gradient drop shadow for nodes — dark mode
+  const shadowDark = defs.append('filter').attr('id', 'node-shadow-dark')
+    .attr('x', '-40%').attr('y', '-40%').attr('width', '180%').attr('height', '180%')
+  shadowDark.append('feGaussianBlur').attr('in', 'SourceAlpha').attr('stdDeviation', 4).attr('result', 'blur')
+  shadowDark.append('feOffset').attr('dx', 2).attr('dy', 3).attr('result', 'offsetBlur')
+  shadowDark.append('feComponentTransfer').attr('in', 'offsetBlur').attr('result', 'shadow')
+    .append('feFuncA').attr('type', 'linear').attr('slope', 0.35)
+  const fmDark = shadowDark.append('feMerge')
+  fmDark.append('feMergeNode').attr('in', 'shadow')
+  fmDark.append('feMergeNode').attr('in', 'SourceGraphic')
+
+  // Gradient drop shadow for nodes — light mode (softer, more diffuse)
+  const shadowLight = defs.append('filter').attr('id', 'node-shadow-light')
+    .attr('x', '-40%').attr('y', '-40%').attr('width', '180%').attr('height', '180%')
+  shadowLight.append('feGaussianBlur').attr('in', 'SourceAlpha').attr('stdDeviation', 6).attr('result', 'blur')
+  shadowLight.append('feOffset').attr('dx', 1).attr('dy', 2).attr('result', 'offsetBlur')
+  shadowLight.append('feComponentTransfer').attr('in', 'offsetBlur').attr('result', 'shadow')
+    .append('feFuncA').attr('type', 'linear').attr('slope', 0.15)
+  const fmLight = shadowLight.append('feMerge')
+  fmLight.append('feMergeNode').attr('in', 'shadow')
+  fmLight.append('feMergeNode').attr('in', 'SourceGraphic')
 
   ctx.zoomBehavior = d3.zoom().scaleExtent([0.1, 4]).on('zoom', e => ctx.rootGroup.attr('transform', e.transform))
   ctx.svgSelection.call(ctx.zoomBehavior)
@@ -296,8 +330,9 @@ function renderNodes() {
 
   const gs = store.graphSettings, r = gs.nodeRadius
   const entered = node.enter().append('g').attr('class', 'graph-node').attr('opacity', 0).attr('cursor', 'pointer')
-  entered.append('circle').attr('class', 'node-shadow').attr('r', r + 2).attr('fill', 'rgba(0,0,0,0.25)').attr('transform', 'translate(2,3)')
+  const isLight = store.theme === 'light'
   entered.append('circle').attr('class', 'node-circle').attr('r', r).attr('stroke', 'rgba(255,255,255,0.18)').attr('stroke-width', 1.5)
+    .attr('filter', isLight ? 'url(#node-shadow-light)' : 'url(#node-shadow-dark)')
   entered.append('text').attr('class', 'node-initials').attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
     .attr('fill', '#fff').attr('font-size', Math.max(9, r * 0.55)).attr('font-weight', 700)
     .attr('font-family', 'system-ui, sans-serif').attr('pointer-events', 'none')
@@ -307,24 +342,25 @@ function renderNodes() {
 
   entered
     .on('mouseenter', function () { if (gs.glowOnHover) d3.select(this).select('.node-circle').attr('filter', 'url(#glow)') })
-    .on('mouseleave', function () { const d = d3.select(this).datum(); if (store.selectedPersonId !== d.id) d3.select(this).select('.node-circle').attr('filter', null) })
+    .on('mouseleave', function () { const d = d3.select(this).datum(); if (store.selectedPersonId !== d.id) d3.select(this).select('.node-circle').attr('filter', store.theme === 'light' ? 'url(#node-shadow-light)' : 'url(#node-shadow-dark)') })
     .on('click', (event, d) => { event.stopPropagation(); if (store.lockNodes) return; store.relPopup = null; store.selectPerson(d.id) })
   entered.transition().duration(400).attr('opacity', 1)
 
   const merged = entered.merge(node)
   merged.attr('opacity', gs.nodeOpacity)
-  merged.select('.node-shadow').attr('r', gs.nodeRadius + 2)
+  const isLightTheme = store.theme === 'light'
+  const shadowFilter = isLightTheme ? 'url(#node-shadow-light)' : 'url(#node-shadow-dark)'
   merged.select('.node-circle').attr('r', gs.nodeRadius)
     .attr('fill', d => { const c = store.selectedPersonId === d.id ? d3.color(nodeColor(d.gender, gs))?.brighter(0.4)?.toString() : null; return c || nodeColor(d.gender, gs) })
     .attr('stroke', d => store.selectedPersonId === d.id ? '#6c8ef5' : 'rgba(255,255,255,0.18)')
     .attr('stroke-width', d => store.selectedPersonId === d.id ? 3 : 1.5)
-    .attr('filter', d => store.selectedPersonId === d.id ? 'url(#glow)' : null)
+    .attr('filter', d => store.selectedPersonId === d.id ? 'url(#glow)' : shadowFilter)
   merged.select('.node-initials').attr('font-size', Math.max(9, gs.nodeRadius * 0.55))
     .text(d => { const p = d.name.trim().split(/\s+/); return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : d.name.substring(0, 2).toUpperCase() })
   merged.select('.node-label').attr('y', gs.nodeRadius + 14).attr('font-size', gs.labelSize)
     .attr('display', gs.showLabels ? null : 'none')
     .text(d => d.name.split(' ')[0])
-    .attr('fill', d => store.selectedPersonId === d.id ? '#6c8ef5' : 'rgba(232,234,246,0.85)')
+    .attr('fill', d => store.selectedPersonId === d.id ? '#6c8ef5' : (isLightTheme ? '#4a5068' : 'rgba(232,234,246,0.85)'))
   applyDrag(merged)
 }
 
@@ -332,25 +368,23 @@ function renderNodes() {
 function applyDrag(sel) {
   sel.on('.drag', null)
   const mode = currentMode.value
-  const hardKey = isHardPaternal.value ? 'paternal' : isHardMaternal.value ? 'maternal' : null
   const filterDrag = () => !store.lockNodes
-  const onEnd = () => { if (hardKey) snapshotHard(mode, hardKey) }
 
   if (mode === 'auto') {
     sel.call(d3.drag().filter(filterDrag)
       .on('start', (e, d) => { if (!e.active) ctx.simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y })
       .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y })
-      .on('end', (e, d) => { if (!e.active) ctx.simulation.alphaTarget(0); if (hardKey) { d.fx = d.x; d.fy = d.y; onEnd() } else { d.fx = null; d.fy = null } }))
+      .on('end', (e, d) => { if (!e.active) ctx.simulation.alphaTarget(0); d.fx = null; d.fy = null }))
   } else if (mode === 'custom') {
     sel.call(d3.drag().filter(filterDrag)
       .on('start', (e, d) => { d.fx = d.x; d.fy = d.y })
       .on('drag', (e, d) => { d.x = e.x; d.y = e.y; d.fx = e.x; d.fy = e.y; ticked() })
-      .on('end', () => { hardKey ? onEnd() : snapshotMode('custom') }))
+      .on('end', () => { snapshotMode('custom') }))
   } else if (mode === 'age') {
     sel.call(d3.drag().filter(filterDrag)
       .on('start', (e, d) => { d.fx = d.x })
       .on('drag', (e, d) => { d.x = e.x; d.fx = e.x; ticked() })
-      .on('end', () => { hardKey ? onEnd() : snapshotMode('age') }))
+      .on('end', () => { snapshotMode('age') }))
   } else if (mode === 'generation') {
     sel.call(d3.drag().filter(filterDrag)
       .on('start', (e, d) => { d.fx = d.x; d.fy = d.y; removeGenPreview(ctx) })
@@ -358,7 +392,7 @@ function applyDrag(sel) {
       .on('end', (e, d) => {
         removeGenPreview(ctx)
         const ty = resolveGenTarget(d.y, ctx); d.fx = d.x; d.fy = ty; d.y = ty; ticked()
-        cleanupEmptyGenRows(ctx, isHard.value, snapshotMode, ticked); onEnd()
+        cleanupEmptyGenRows(ctx, snapshotGenMode, ticked)
       }))
   }
 }
@@ -370,24 +404,19 @@ function switchMode(newMode) {
   cancelAnimation()
   if (!ctx.nodesData.length) { currentMode.value = newMode; return }
 
-  const oldMode = currentMode.value, oldEmph = activeEmphasis.value
-  if (oldEmph === 'hard_paternal' || oldEmph === 'hard_maternal') snapshotHard(oldMode, oldEmph === 'hard_paternal' ? 'paternal' : 'maternal')
-  if (oldEmph !== 'hard_paternal' && oldEmph !== 'hard_maternal') snapshotMode(oldMode)
+  const oldMode = currentMode.value
+  if (oldMode === 'generation') snapshotGenMode()
+  else snapshotMode(oldMode)
   removeGuides(ctx)
   modeEmphasis[oldMode] = activeEmphasis.value
   currentMode.value = newMode
-  const restoredEmph = modeEmphasis[newMode] || 'neutral'
-  activeEmphasis.value = restoredEmph
+  activeEmphasis.value = modeEmphasis[newMode] || 'neutral'
 
   if (newMode === 'auto') enterAutoMode()
   else if (newMode === 'custom') enterCustomMode()
   else if (newMode === 'age') enterAgeMode()
   else if (newMode === 'generation') enterGenerationMode()
 
-  if (restoredEmph === 'hard_paternal' || restoredEmph === 'hard_maternal') {
-    const snap = hardSnapshots[newMode][restoredEmph === 'hard_paternal' ? 'paternal' : 'maternal']
-    if (snap) { setTimeout(() => animateToPositionsWithReset(snap, () => { ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = n.y }); applyEmphasis(); reapplyDrag() }), 520); return }
-  }
   applyEmphasis()
 }
 
@@ -440,73 +469,86 @@ function enterGenerationMode() {
   ctx.simulation.stop()
   const container = ctx.containerRef; if (!container) return
   const { width, height } = container.getBoundingClientRect()
+
+  if (hasSnapshot('generation')) {
+    // Restore saved positions and saved row state exactly as they were
+    const snap = ctx.modeSnapshots['generation']
+    if (snap._genRowYValues) ctx.genRowYValues = [...snap._genRowYValues]
+    if (snap._genRowSpacing) ctx.genRowSpacing = snap._genRowSpacing
+
+    const targets = {}
+    ctx.nodesData.forEach(n => { targets[n.id] = snap[n.id] ? { x: snap[n.id].x, y: snap[n.id].y } : { x: n.x, y: n.y } })
+
+    // Build genInfo-like object for drawing guides from saved rows
+    const savedGenInfo = { genLabels: ctx.genRowYValues.map((y, i) => ({ label: `Gen ${i + 1}`, y })) }
+    animateToPositionsWithReset(targets, () => {
+      ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = n.y })
+      drawGenGuides(ctx, savedGenInfo)
+      reapplyDrag()
+    })
+    return
+  }
+
+  // First time: compute layout from relationships
   const genInfo = computeGenLayout(ctx.nodesData, store.relationships, width, height)
   ctx.genRowYValues = genInfo.genLabels.map(g => g.y)
   ctx.genRowSpacing = genInfo.rowHeight || 140
 
-  if (hasSnapshot('generation')) {
-    const snap = ctx.modeSnapshots['generation'], targets = {}
-    ctx.nodesData.forEach(n => { targets[n.id] = { x: snap[n.id]?.x ?? genInfo.targets[n.id]?.x ?? n.x, y: nearestGenRowY(snap[n.id]?.y ?? genInfo.targets[n.id]?.y ?? n.y, ctx) } })
-    animateToPositionsWithReset(targets, () => { ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = n.y }); drawGenGuides(ctx, genInfo); reapplyDrag() })
-    return
-  }
   drawGenGuides(ctx, genInfo)
-  animateToPositionsWithReset(genInfo.targets, () => { ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = genInfo.targets[n.id]?.y ?? n.y }); snapshotMode('generation'); reapplyDrag() })
+  animateToPositionsWithReset(genInfo.targets, () => {
+    ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = genInfo.targets[n.id]?.y ?? n.y })
+    snapshotGenMode()
+    reapplyDrag()
+  })
+}
+
+// Save generation snapshot including row state
+function snapshotGenMode() {
+  const snap = {}
+  ctx.nodesData.forEach(n => { snap[n.id] = { x: n.x, y: n.y } })
+  snap._genRowYValues = [...ctx.genRowYValues]
+  snap._genRowSpacing = ctx.genRowSpacing
+  ctx.modeSnapshots['generation'] = snap
 }
 
 // ── Emphasis ────────────────────────────────────────────────────────────────
 function applyEmphasis() {
-  if (!ctx.rootGroup) return
+  if (!ctx.rootGroup || !ctx.svgSelection) return
   const emph = emphVisual(), gs = store.graphSettings, persons = store.persons
+
   ctx.rootGroup.selectAll('g.graph-link-group').select('.graph-link')
     .transition().duration(250).ease(d3.easeCubicOut)
     .attr('stroke', d => getLinkStroke(d, emph, gs, persons))
     .attr('stroke-width', d => getLinkWidth(d, emph, gs, persons))
     .attr('opacity', d => getLinkEmphOpacity(d, emph, gs, persons))
     .attr('marker-end', d => getLinkMarker(d, emph, persons))
-}
 
-function restoreModeConstraints(mode) {
-  if (mode === 'auto') { ctx.nodesData.forEach(n => { n.fx = null; n.fy = null }); ctx.simulation.alpha(0.15).restart() }
-  else if (mode === 'age' && ctx.containerRef) { const ai = computeAgeYPositions(ctx.nodesData, ctx.containerRef.getBoundingClientRect().height); ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = ai.yMap[n.id] }) }
-  else if (mode === 'generation') { ctx.nodesData.forEach(n => { n.fy = nearestGenRowY(n.y, ctx); n.y = n.fy; n.fx = n.x }) }
-  else { ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = n.y }) }
+  // Animate paternal/maternal marker sizes
+  const isEmphPat = emph === 'paternal'
+  const isEmphMat = emph === 'maternal'
+  const patSize = isEmphPat ? 16 : 10
+  const matSize = isEmphMat ? 16 : 10
+  const nodeR = gs.nodeRadius
+
+  ;['#arr-pat', '#arr-pat-ad'].forEach(id => {
+    ctx.svgSelection.select(id).transition().duration(250).ease(d3.easeCubicOut)
+      .attr('markerWidth', patSize).attr('markerHeight', patSize)
+      .attr('refX', nodeR + (isEmphPat ? 14 : 10))
+  })
+  ;['#arr-mat', '#arr-mat-ad'].forEach(id => {
+    ctx.svgSelection.select(id).transition().duration(250).ease(d3.easeCubicOut)
+      .attr('markerWidth', matSize).attr('markerHeight', matSize)
+      .attr('refX', nodeR + (isEmphMat ? 14 : 10))
+  })
 }
 
 function cycleEmphasis(which) {
-  cancelAnimation()
-  const cur = activeEmphasis.value, mode = currentMode.value
-  const curIsHard = cur === 'hard_paternal' || cur === 'hard_maternal'
-  let next = 'neutral'
-  if (which === 'neutral') next = 'neutral'
-  else if (which === 'paternal') { next = cur === 'paternal' ? 'hard_paternal' : cur === 'hard_paternal' ? 'paternal' : 'paternal' }
-  else if (which === 'maternal') { next = cur === 'maternal' ? 'hard_maternal' : cur === 'hard_maternal' ? 'maternal' : 'maternal' }
-  const nextIsHard = next === 'hard_paternal' || next === 'hard_maternal'
-
-  if (!curIsHard && !nextIsHard) { activeEmphasis.value = next; modeEmphasis[mode] = next; applyEmphasis(); return }
-
-  if (!curIsHard && nextIsHard) {
-    const hk = next === 'hard_paternal' ? 'paternal' : 'maternal'
-    snapshotMode(mode); if (mode === 'auto') ctx.simulation.stop()
-    if (hardSnapshots[mode][hk]) { animateToPositionsWithReset(hardSnapshots[mode][hk], () => { ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = n.y }); activeEmphasis.value = next; modeEmphasis[mode] = next; applyEmphasis(); reapplyDrag() }) }
-    else { snapshotHard(mode, hk); activeEmphasis.value = next; modeEmphasis[mode] = next; applyEmphasis(); reapplyDrag() }
-    return
-  }
-
-  if (curIsHard && !nextIsHard) {
-    snapshotHard(mode, cur === 'hard_paternal' ? 'paternal' : 'maternal')
-    const bs = ctx.modeSnapshots[mode]
-    if (bs) { animateToPositionsWithReset(bs, () => { restoreModeConstraints(mode); activeEmphasis.value = next; modeEmphasis[mode] = next; applyEmphasis(); reapplyDrag() }) }
-    else { activeEmphasis.value = next; modeEmphasis[mode] = next; applyEmphasis(); reapplyDrag() }
-    return
-  }
-
-  if (curIsHard && nextIsHard) {
-    snapshotHard(mode, cur === 'hard_paternal' ? 'paternal' : 'maternal')
-    const nk = next === 'hard_paternal' ? 'paternal' : 'maternal'
-    if (hardSnapshots[mode][nk]) { animateToPositionsWithReset(hardSnapshots[mode][nk], () => { ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = n.y }); activeEmphasis.value = next; modeEmphasis[mode] = next; applyEmphasis(); reapplyDrag() }) }
-    else { snapshotHard(mode, nk); activeEmphasis.value = next; modeEmphasis[mode] = next; applyEmphasis(); reapplyDrag() }
-  }
+  const mode = currentMode.value
+  // Clicking the same state again = no-op
+  if (activeEmphasis.value === which) return
+  activeEmphasis.value = which
+  modeEmphasis[mode] = which
+  applyEmphasis()
 }
 
 // ── Zoom / search ───────────────────────────────────────────────────────────
@@ -540,10 +582,21 @@ onUnmounted(() => { ctx.simulation?.stop(); ctx.resizeObserver?.disconnect(); ca
 watch([() => store.persons, () => store.relationships], () => updateGraph(), { deep: true })
 watch(() => store.selectedPersonId, () => { if (ctx.rootGroup) renderNodes() })
 watch(() => store.lockNodes, () => reapplyDrag())
+watch(() => store.theme, () => {
+  ctx.theme = store.theme
+  if (!ctx.rootGroup) return
+  renderNodes(); renderLinks()
+  // Update guide line colors for new theme
+  const light = store.theme === 'light'
+  const guideStroke = light ? 'rgba(0, 0, 0, 0.10)' : 'rgba(232, 234, 246, 0.12)'
+  const guideFill = light ? 'rgba(0, 0, 0, 0.22)' : 'rgba(232, 234, 246, 0.25)'
+  ctx.rootGroup.selectAll('.mode-guides line').attr('stroke', guideStroke)
+  ctx.rootGroup.selectAll('.mode-guides text').attr('fill', guideFill)
+})
 watch(() => store.graphSettings, () => {
   if (!ctx.rootGroup || !ctx.simulation) return
-  const gs = store.graphSettings, refX = Math.round(gs.nodeRadius / 1.8) + 6
-  ;['#arr', '#arr-a', '#arr-pat', '#arr-mat'].forEach(id => ctx.svgSelection?.select(id).attr('refX', refX))
+  const gs = store.graphSettings, refX = gs.nodeRadius + 10
+  ;['#arr', '#arr-a', '#arr-pat', '#arr-mat', '#arr-pat-ad', '#arr-mat-ad'].forEach(id => ctx.svgSelection?.select(id).attr('refX', refX))
   ctx.svgSelection?.select('#arr path').attr('fill', gs.parentChildColor)
   ctx.svgSelection?.select('#arr-a path').attr('fill', gs.adoptedColor)
   if (currentMode.value === 'auto') { ctx.simulation.force('link').distance(gs.linkDistance); ctx.simulation.force('charge').strength(gs.chargeStrength); ctx.simulation.force('collide').radius(gs.nodeRadius + 30); ctx.simulation.alpha(0.2).restart() }
@@ -564,21 +617,17 @@ watch(() => store.graphSettings, () => {
 .ctrl-btn-wide { width: auto; padding: 0 10px; gap: 4px; font-size: 11px; font-weight: 600; position: relative; }
 .ctrl-btn-active { background: var(--adim); color: var(--accent); border: 1px solid rgba(108, 142, 245, 0.3); }
 .ctrl-sep { width: 1px; background: var(--border); margin: 3px 2px; }
-.graph-legend { position: absolute; bottom: 18px; right: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 11px; color: var(--t2); z-index: 5; }
-.leg-row { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
-.leg-row:last-child { margin-bottom: 0; }
+.graph-legend { position: absolute; bottom: 18px; right: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; font-size: 11px; color: var(--t2); z-index: 5; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 10px; min-width: 140px; }
+.panel-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--t3); }
+.leg-section { display: flex; flex-direction: column; gap: 5px; }
+.leg-section-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--t3); opacity: 0.7; }
+.leg-row { display: flex; align-items: center; gap: 8px; font-weight: 500; }
 .leg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.leg-line { width: 22px; height: 2px; flex-shrink: 0; }
-.leg-dashed { height: 0; border-top: 2px dashed; }
+.leg-line { width: 22px; height: 2px; flex-shrink: 0; border-radius: 1px; }
+.leg-dashed { height: 0; border-top: 2px dashed; background: none !important; }
 .ctrl-btn-emph-active { border: 1px solid rgba(255, 255, 255, 0.12); }
 .ctrl-btn-emph-active.ctrl-btn-paternal { background: rgba(74, 144, 217, 0.18); color: #4a90d9; border-color: rgba(74, 144, 217, 0.35); }
 .ctrl-btn-emph-active.ctrl-btn-maternal { background: rgba(217, 74, 138, 0.18); color: #d94a8a; border-color: rgba(217, 74, 138, 0.35); }
-.emph-label { pointer-events: none; }
-.emph-bar { position: absolute; bottom: 0; left: 3px; right: 3px; height: 3px; border-radius: 2px 2px 0 0; }
-.emph-bar-pat { background: #4a90d9; box-shadow: 0 0 8px rgba(74, 144, 217, 0.7); }
-.emph-bar-mat { background: #d94a8a; box-shadow: 0 0 8px rgba(217, 74, 138, 0.7); }
-.ctrl-btn-hard.ctrl-btn-paternal { background: rgba(74, 144, 217, 0.25); color: #5ca3ef; border-color: rgba(74, 144, 217, 0.5); }
-.ctrl-btn-hard.ctrl-btn-maternal { background: rgba(217, 74, 138, 0.25); color: #e86aab; border-color: rgba(217, 74, 138, 0.5); }
 .ctrl-btn-lock { background: rgba(239, 83, 80, 0.15); color: #ef5350; }
 .rel-popup { position: absolute; z-index: 20; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; min-width: 180px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); transform: translateX(-50%) translateY(-100%); display: flex; flex-direction: column; gap: 6px; }
 .rel-popup-close { position: absolute; top: 6px; right: 8px; width: 22px; height: 22px; border-radius: 5px; border: none; background: transparent; color: var(--t3); font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -591,4 +640,98 @@ watch(() => store.graphSettings, () => {
 .relpop-leave-active { transition: opacity 0.12s ease, transform 0.12s ease; }
 .relpop-enter-from { opacity: 0; transform: translateX(-50%) translateY(-90%) scale(0.92); }
 .relpop-leave-to { opacity: 0; transform: translateX(-50%) translateY(-100%) scale(0.95); }
+
+/* Highlights panel */
+.highlights-panel {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  z-index: 5;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 180px;
+}
+
+.highlights-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--t3);
+}
+
+.highlight-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.highlight-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t2);
+}
+
+/* Segmented slider */
+.seg-slider {
+  position: relative;
+  display: flex;
+  background: var(--elevated);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 0;
+}
+
+.seg-track {
+  position: absolute;
+  inset: 2px;
+  pointer-events: none;
+}
+
+.seg-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(100% / 3);
+  background: var(--accent);
+  border-radius: 6px;
+  opacity: 0.18;
+  transition: left 0.25s cubic-bezier(0.4, 0.0, 0.2, 1), background 0.25s;
+}
+
+.seg-pos-0 { left: 0; }
+.seg-pos-1 { left: calc(100% / 3); background: #4a90d9; }
+.seg-pos-2 { left: calc(200% / 3); background: #d94a8a; }
+
+.seg-option {
+  flex: 1;
+  padding: 5px 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--t3);
+  cursor: pointer;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  border-radius: 6px;
+  transition: color 0.2s;
+}
+
+.seg-option:hover {
+  color: var(--t1);
+}
+
+.seg-option.seg-active {
+  color: var(--t1);
+  font-weight: 700;
+}
 </style>
