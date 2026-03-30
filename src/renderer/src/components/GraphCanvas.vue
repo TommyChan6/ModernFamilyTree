@@ -107,6 +107,42 @@
           >{{ opt.label }}</button>
         </div>
       </div>
+      <div class="highlight-row">
+        <div class="highlight-label">Marriage</div>
+        <div class="seg-slider">
+          <div class="seg-track">
+            <div class="seg-thumb seg-thumb-couples" :class="'seg-pos-' + couplesIndex"></div>
+          </div>
+          <button
+            v-for="opt in couplesOptions"
+            :key="opt.id"
+            class="seg-option"
+            :class="{ 'seg-active': activeCouples === opt.id }"
+            @click="setCouplesHighlight(opt.id)"
+          >{{ opt.label }}</button>
+        </div>
+      </div>
+      <div class="highlight-divider"></div>
+      <div
+        class="highlight-row"
+        :class="{ 'highlight-disabled': !store.currentDate }"
+        :title="!store.currentDate ? 'Set current date first to use this filter' : ''"
+      >
+        <div class="highlight-label">Deceased</div>
+        <div class="seg-slider" :class="{ 'seg-disabled': !store.currentDate }">
+          <div class="seg-track">
+            <div class="seg-thumb seg-thumb-deceased" :class="'seg-pos-' + deceasedIndex"></div>
+          </div>
+          <button
+            v-for="opt in deceasedOptions"
+            :key="opt.id"
+            class="seg-option"
+            :class="{ 'seg-active': activeDeceased === opt.id }"
+            @click="setDeceasedHighlight(opt.id)"
+            :disabled="!store.currentDate"
+          >{{ opt.label }}</button>
+        </div>
+      </div>
     </div>
 
     <div class="graph-legend">
@@ -185,7 +221,7 @@ const currentStateIndex = computed(() => modeActiveStateIdx[currentMode.value])
 function emphVisual() { return activeEmphasis.value }
 
 const lineageOptions = [
-  { id: 'neutral', label: 'Neutral' },
+  { id: 'neutral', label: 'Default' },
   { id: 'paternal', label: 'Paternal' },
   { id: 'maternal', label: 'Maternal' },
 ]
@@ -195,7 +231,7 @@ const lineageIndex = computed(() => {
 })
 
 const genderOptions = [
-  { id: 'normal', label: 'Normal' },
+  { id: 'normal', label: 'Default' },
   { id: 'male', label: 'Male' },
   { id: 'female', label: 'Female' },
 ]
@@ -242,6 +278,139 @@ function applyGenderHighlight() {
       if (g === 'normal') return base
       if (g === 'male' && d.gender === 'male') return base + 2
       if (g === 'female' && d.gender === 'female') return base + 2
+      return base
+    })
+}
+
+// ── Couples highlight ────────────────────────────────────────────────────────
+const couplesOptions = [
+  { id: 'normal', label: 'Default' },
+  { id: 'married', label: 'Married' },
+  { id: 'divorced', label: 'Divorced' },
+  { id: 'single', label: 'Single' },
+]
+const activeCouples = ref('normal')
+const couplesIndex = computed(() => {
+  const idx = couplesOptions.findIndex(o => o.id === activeCouples.value)
+  return idx >= 0 ? idx : 0
+})
+
+function setCouplesHighlight(which) {
+  if (activeCouples.value === which) return
+  activeCouples.value = which
+  applyCouplesHighlight()
+}
+
+function applyCouplesHighlight() {
+  if (!ctx.rootGroup) return
+  const c = activeCouples.value
+  const gs = store.graphSettings
+  const rels = store.relationships
+
+  // Find persons who are in the target relationship
+  const highlightedIds = new Set()
+  if (c !== 'normal') {
+    const allSpouseIds = new Set()
+    const marriedIds = new Set()
+    const divorcedIds = new Set()
+    rels.forEach(r => {
+      if (r.type !== 'spouse') return
+      allSpouseIds.add(r.person_a_id); allSpouseIds.add(r.person_b_id)
+      if (r.status === 'divorced') { divorcedIds.add(r.person_a_id); divorcedIds.add(r.person_b_id) }
+      else { marriedIds.add(r.person_a_id); marriedIds.add(r.person_b_id) }
+    })
+    if (c === 'married') marriedIds.forEach(id => highlightedIds.add(id))
+    else if (c === 'divorced') divorcedIds.forEach(id => highlightedIds.add(id))
+    else if (c === 'single') {
+      ctx.nodesData.forEach(n => { if (!allSpouseIds.has(n.id)) highlightedIds.add(n.id) })
+    }
+  }
+
+  ctx.rootGroup.selectAll('g.graph-node')
+    .transition().duration(250).ease(d3.easeCubicOut)
+    .attr('opacity', d => {
+      if (c === 'normal') return gs.nodeOpacity
+      return highlightedIds.has(d.id) ? gs.nodeOpacity : gs.nodeOpacity * 0.2
+    })
+
+  ctx.rootGroup.selectAll('g.graph-node').select('.node-circle')
+    .transition().duration(250).ease(d3.easeCubicOut)
+    .attr('r', d => {
+      const base = gs.nodeRadius
+      if (c === 'normal') return base
+      return highlightedIds.has(d.id) ? base * 1.15 : base
+    })
+
+  // Also highlight/dim the spouse lines
+  ctx.rootGroup.selectAll('g.graph-link-group').select('.graph-link')
+    .transition().duration(250).ease(d3.easeCubicOut)
+    .attr('opacity', d => {
+      if (c === 'normal') return gs.linkOpacity
+      if (c === 'single') return d.type === 'spouse' ? gs.linkOpacity * 0.15 : gs.linkOpacity * 0.3
+      if (d.type !== 'spouse') return gs.linkOpacity * 0.2
+      if (c === 'married' && d.status !== 'divorced') return Math.min(1, gs.linkOpacity * 1.5)
+      if (c === 'divorced' && d.status === 'divorced') return Math.min(1, gs.linkOpacity * 1.5)
+      return gs.linkOpacity * 0.2
+    })
+    .attr('stroke-width', d => {
+      const base = d.type === 'spouse' ? gs.spouseWidth : d.type === 'adopted' ? gs.adoptedWidth : gs.parentChildWidth
+      if (c === 'normal' || c === 'single') return base
+      if (d.type !== 'spouse') return base
+      if (c === 'married' && d.status !== 'divorced') return base * 2
+      if (c === 'divorced' && d.status === 'divorced') return base * 2
+      return base
+    })
+}
+
+// ── Date & Deceased highlight ───────────────────────────────────────────────
+const deceasedOptions = [
+  { id: 'normal', label: 'Default' },
+  { id: 'deceased', label: 'Deceased' },
+  { id: 'living', label: 'Living' },
+]
+const activeDeceased = ref('normal')
+const deceasedIndex = computed(() => {
+  const idx = deceasedOptions.findIndex(o => o.id === activeDeceased.value)
+  return idx >= 0 ? idx : 0
+})
+
+function isDeceased(person) {
+  if (!store.currentDate) return false
+  return person.death_year && person.death_year <= store.currentDate.year
+}
+
+function isLiving(person) {
+  if (!store.currentDate) return true
+  return !person.death_year || person.death_year > store.currentDate.year
+}
+
+function setDeceasedHighlight(which) {
+  if (!store.currentDate) return
+  if (activeDeceased.value === which) return
+  activeDeceased.value = which
+  applyDeceasedHighlight()
+}
+
+function applyDeceasedHighlight() {
+  if (!ctx.rootGroup) return
+  const d = activeDeceased.value
+  const gs = store.graphSettings
+
+  ctx.rootGroup.selectAll('g.graph-node')
+    .transition().duration(250).ease(d3.easeCubicOut)
+    .attr('opacity', person => {
+      if (d === 'normal') return gs.nodeOpacity
+      if (d === 'deceased') return isDeceased(person) ? gs.nodeOpacity : gs.nodeOpacity * 0.2
+      if (d === 'living') return isLiving(person) ? gs.nodeOpacity : gs.nodeOpacity * 0.2
+      return gs.nodeOpacity
+    })
+
+  ctx.rootGroup.selectAll('g.graph-node').select('.node-circle')
+    .transition().duration(250).ease(d3.easeCubicOut)
+    .attr('r', person => {
+      const base = gs.nodeRadius
+      if (d === 'deceased' && isDeceased(person)) return base * 1.15
+      if (d === 'living' && isLiving(person)) return base * 1.15
       return base
     })
 }
@@ -867,6 +1036,12 @@ onUnmounted(() => { ctx.simulation?.stop(); ctx.resizeObserver?.disconnect(); ca
 watch([() => store.persons, () => store.relationships], () => updateGraph(), { deep: true })
 watch(() => store.selectedPersonId, () => { if (ctx.rootGroup) renderNodes() })
 watch(() => store.lockNodes, () => reapplyDrag())
+watch(() => store.currentDate, () => {
+  if (!store.currentDate && activeDeceased.value !== 'normal') {
+    activeDeceased.value = 'normal'
+    applyDeceasedHighlight()
+  }
+})
 watch(() => store.theme, () => {
   ctx.theme = store.theme
   if (!ctx.rootGroup) return
@@ -1168,6 +1343,40 @@ watch(() => store.graphSettings, () => {
 .seg-thumb-gender.seg-pos-0 { background: var(--accent); }
 .seg-thumb-gender.seg-pos-1 { background: #3a7bd5; }
 .seg-thumb-gender.seg-pos-2 { background: #c95fa0; }
+
+.seg-thumb-couples { width: calc(100% / 4); }
+.seg-thumb-couples.seg-pos-0 { left: 0; background: var(--accent); }
+.seg-thumb-couples.seg-pos-1 { left: calc(100% / 4); background: #f06292; }
+.seg-thumb-couples.seg-pos-2 { left: calc(200% / 4); background: #ef5350; }
+.seg-thumb-couples.seg-pos-3 { left: calc(300% / 4); background: #78909c; }
+
+.seg-thumb-deceased.seg-pos-0 { background: var(--accent); }
+.seg-thumb-deceased.seg-pos-1 { background: #78909c; }
+.seg-thumb-deceased.seg-pos-2 { background: #4caf72; }
+
+.highlight-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+.highlight-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.highlight-disabled .highlight-label {
+  cursor: not-allowed;
+}
+
+.seg-disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.seg-disabled .seg-option {
+  cursor: not-allowed;
+}
 
 .seg-option {
   flex: 1;

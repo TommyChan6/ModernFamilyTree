@@ -16,6 +16,7 @@ export const useMainStore = defineStore('main', () => {
   const lockLines = ref(false)
   const relPopup = ref(null)  // { rel, x, y } when showing relationship popup
   const cleanTree = ref(false)
+  const currentDate = ref(null) // { year } or null
 
   // Graph visual settings
   const graphSettings = ref({
@@ -188,6 +189,7 @@ export const useMainStore = defineStore('main', () => {
     graphSettings,
     lockNodes,
     cleanTree,
+    currentDate,
     lockLines,
     relPopup,
     // computed

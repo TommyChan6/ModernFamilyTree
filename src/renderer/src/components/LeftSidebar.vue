@@ -115,6 +115,29 @@
     <div class="sidebar-divider"></div>
 
     <div class="sidebar-section">
+      <div class="nav-section-label">Current Date</div>
+      <div class="date-row">
+        <input
+          type="number"
+          class="sidebar-date-input"
+          :value="store.currentDate?.year || ''"
+          @change="setCurrentDate($event.target.value)"
+          placeholder="Enter year…"
+          min="1"
+          max="2200"
+        />
+        <button
+          v-if="store.currentDate"
+          class="date-clear-btn"
+          @click="setCurrentDate('')"
+          title="Clear date"
+        >✕</button>
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-section">
       <div class="nav-section-label">View</div>
       <button
         class="nav-item"
@@ -141,6 +164,11 @@ import { useMainStore } from '../store/index.js'
 
 const store = useMainStore()
 const activeView = ref('tree')
+
+function setCurrentDate(val) {
+  const year = parseInt(val)
+  store.currentDate = (year && year > 0) ? { year } : null
+}
 
 const generationCount = computed(() => {
   // Simple heuristic: number of distinct birth decade groups
@@ -303,5 +331,58 @@ function handleImport() {
   font-size: 11px;
   color: var(--t3);
   text-align: center;
+}
+
+.date-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 16px 8px;
+}
+
+.sidebar-date-input {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--elevated);
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  outline: none;
+  width: 100%;
+  min-width: 0;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.sidebar-date-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(108, 142, 245, 0.15);
+}
+
+.sidebar-date-input::placeholder {
+  color: var(--t3);
+}
+
+.date-clear-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--t3);
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s;
+}
+
+.date-clear-btn:hover {
+  background: rgba(239, 83, 80, 0.12);
+  color: #ef5350;
 }
 </style>
