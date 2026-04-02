@@ -592,18 +592,25 @@ function deleteStateFromMenu() {
   const mode = currentMode.value
   if (modeStateNames[mode].length <= 1) return
 
+  const wasActive = modeActiveStateIdx[mode] === idx
+
   modeStateNames[mode].splice(idx, 1)
   modeStateSnapshots[mode].splice(idx, 1)
 
   // Adjust active index
   let newActive = modeActiveStateIdx[mode]
-  if (newActive >= modeStateNames[mode].length) newActive = modeStateNames[mode].length - 1
-  if (newActive === idx || idx < newActive) newActive = Math.max(0, newActive - (idx < newActive ? 1 : 0))
+  if (wasActive) {
+    // Deleted the active state — switch to nearest
+    newActive = Math.min(idx, modeStateNames[mode].length - 1)
+  } else if (idx < newActive) {
+    // Deleted before the active — shift index down
+    newActive--
+  }
   modeActiveStateIdx[mode] = newActive
   ctx.modeSnapshots[mode] = modeStateSnapshots[mode][newActive] || null
 
-  // If deleted the active state, reload
-  if (idx === currentStateIndex.value || newActive !== modeActiveStateIdx[mode]) {
+  // Reload if the active state was deleted
+  if (wasActive) {
     removeGuides(ctx)
     if (mode === 'auto') enterAutoMode()
     else if (mode === 'custom') enterCustomMode()
@@ -611,6 +618,7 @@ function deleteStateFromMenu() {
     else if (mode === 'generation') enterGenerationMode()
     applyEmphasis()
   }
+  store.markGraphDirty()
 }
 
 function confirmRename() {
@@ -773,6 +781,10 @@ function renderLinks() {
     .attr('opacity', d => getLinkEmphOpacity(d, emph, gs, persons))
 }
 
+function getImageUrl(filePath) {
+  return window.electronAPI?.getImageUrl?.(filePath) || null
+}
+
 function renderNodes() {
   const layer = ctx.rootGroup.select('.nodes-layer')
   const node = layer.selectAll('g.graph-node').data(ctx.nodesData, d => d.id)
@@ -781,11 +793,25 @@ function renderNodes() {
   const gs = store.graphSettings, r = gs.nodeRadius
   const entered = node.enter().append('g').attr('class', 'graph-node').attr('opacity', 0).attr('cursor', 'pointer')
   const isLight = store.theme === 'light'
+
+  // Clip path for circular image — defined per node with unique id
+  entered.append('clipPath').attr('class', 'node-clip')
+    .append('circle').attr('r', r)
+  // Background circle (always visible — acts as border ring and fallback)
   entered.append('circle').attr('class', 'node-circle').attr('r', r).attr('stroke', 'rgba(255,255,255,0.18)').attr('stroke-width', 1.5)
     .attr('filter', isLight ? 'url(#node-shadow-light)' : 'url(#node-shadow-dark)')
+  // Image element (hidden when no image)
+  entered.append('image').attr('class', 'node-image')
+    .attr('width', r * 2).attr('height', r * 2).attr('x', -r).attr('y', -r)
+    .attr('preserveAspectRatio', 'xMidYMid slice').attr('pointer-events', 'none')
+  // Initials text (hidden when image is present)
   entered.append('text').attr('class', 'node-initials').attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
     .attr('fill', '#fff').attr('font-size', Math.max(9, r * 0.55)).attr('font-weight', 700)
     .attr('font-family', 'system-ui, sans-serif').attr('pointer-events', 'none')
+  // Selection ring (on top of image)
+  entered.append('circle').attr('class', 'node-ring').attr('r', r).attr('fill', 'none')
+    .attr('stroke', 'transparent').attr('stroke-width', 0).attr('pointer-events', 'none')
+  // Name label below
   entered.append('text').attr('class', 'node-label').attr('text-anchor', 'middle').attr('y', r + 14)
     .attr('font-size', gs.labelSize).attr('font-weight', 500)
     .attr('font-family', 'system-ui, sans-serif').attr('pointer-events', 'none')
@@ -800,13 +826,46 @@ function renderNodes() {
   merged.attr('opacity', gs.nodeOpacity)
   const isLightTheme = store.theme === 'light'
   const shadowFilter = isLightTheme ? 'url(#node-shadow-light)' : 'url(#node-shadow-dark)'
+
+  // Assign unique clip-path ids and apply
+  merged.each(function (d) {
+    const el = d3.select(this)
+    const clipId = `clip-${d.id.replace(/[^a-zA-Z0-9-]/g, '')}`
+    el.select('.node-clip').attr('id', clipId)
+    el.select('.node-image').attr('clip-path', `url(#${clipId})`)
+  })
+
+  // Update clip circle radius
+  merged.select('.node-clip circle').attr('r', gs.nodeRadius)
+
+  // Background circle
   merged.select('.node-circle').attr('r', gs.nodeRadius)
     .attr('fill', d => { const c = store.selectedPersonId === d.id ? d3.color(nodeColor(d.gender, gs))?.brighter(0.4)?.toString() : null; return c || nodeColor(d.gender, gs) })
     .attr('stroke', d => store.selectedPersonId === d.id ? '#6c8ef5' : 'rgba(255,255,255,0.18)')
     .attr('stroke-width', d => store.selectedPersonId === d.id ? 3 : 1.5)
     .attr('filter', d => store.selectedPersonId === d.id ? 'url(#glow)' : shadowFilter)
+
+  // Image element — show or hide based on primary_image
+  merged.select('.node-image')
+    .attr('width', gs.nodeRadius * 2).attr('height', gs.nodeRadius * 2)
+    .attr('x', -gs.nodeRadius).attr('y', -gs.nodeRadius)
+    .attr('href', d => {
+      const url = d.primary_image ? getImageUrl(d.primary_image) : null
+      return url || null
+    })
+    .attr('display', d => d.primary_image ? null : 'none')
+
+  // Selection ring on top
+  merged.select('.node-ring').attr('r', gs.nodeRadius)
+    .attr('stroke', d => store.selectedPersonId === d.id ? '#6c8ef5' : 'transparent')
+    .attr('stroke-width', d => store.selectedPersonId === d.id ? 3 : 0)
+
+  // Initials — hidden when image is present
   merged.select('.node-initials').attr('font-size', Math.max(9, gs.nodeRadius * 0.55))
     .text(d => { const p = d.name.trim().split(/\s+/); return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : d.name.substring(0, 2).toUpperCase() })
+    .attr('display', d => d.primary_image ? 'none' : null)
+
+  // Name label
   merged.select('.node-label').attr('y', gs.nodeRadius + 14).attr('font-size', gs.labelSize)
     .attr('display', gs.showLabels ? null : 'none')
     .text(d => d.name.split(' ')[0])
@@ -944,15 +1003,33 @@ function enterGenerationMode() {
 
   // First time: compute layout from relationships
   const genInfo = computeGenLayout(ctx.nodesData, store.relationships, width, height)
+
+  // If no nodes or no generations computed, create default guide lines
+  if (genInfo.genLabels.length === 0) {
+    const defaultRows = 3
+    const spacing = 140
+    const totalH = (defaultRows - 1) * spacing
+    const startY = (height - totalH) / 2
+    for (let i = 0; i < defaultRows; i++) {
+      genInfo.genLabels.push({ label: `Gen ${i + 1}`, y: startY + i * spacing })
+    }
+    genInfo.rowHeight = spacing
+  }
+
   ctx.genRowYValues = genInfo.genLabels.map(g => g.y)
   ctx.genRowSpacing = genInfo.rowHeight || 140
 
   drawGenGuides(ctx, genInfo)
-  animateToPositionsWithReset(genInfo.targets, () => {
-    ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = genInfo.targets[n.id]?.y ?? n.y })
+  if (ctx.nodesData.length === 0) {
     snapshotGenMode()
     reapplyDrag()
-  })
+  } else {
+    animateToPositionsWithReset(genInfo.targets, () => {
+      ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = genInfo.targets[n.id]?.y ?? n.y })
+      snapshotGenMode()
+      reapplyDrag()
+    })
+  }
 }
 
 // Save generation snapshot including row state
@@ -1043,7 +1120,6 @@ function collectGraphState() {
     modeStateNames: JSON.parse(JSON.stringify(modeStateNames)),
     modeActiveStateIdx: { ...modeActiveStateIdx },
     modeStateSnapshots: JSON.parse(JSON.stringify(modeStateSnapshots)),
-    genRowYValues: [...ctx.genRowYValues],
     genRowSpacing: ctx.genRowSpacing,
   }
 }
@@ -1060,8 +1136,16 @@ function restoreGraphState(state) {
     const idx = modeActiveStateIdx[mode]
     ctx.modeSnapshots[mode] = modeStateSnapshots[mode]?.[idx] || null
   }
-  if (state.genRowYValues) ctx.genRowYValues = state.genRowYValues
+
+  // Restore genRowSpacing fallback; genRowYValues come from the active gen state snapshot
   if (state.genRowSpacing) ctx.genRowSpacing = state.genRowSpacing
+
+  // Restore gen row state from the active generation snapshot
+  const genIdx = modeActiveStateIdx['generation']
+  const genSnap = modeStateSnapshots['generation']?.[genIdx]
+  if (genSnap?._genRowYValues) ctx.genRowYValues = [...genSnap._genRowYValues]
+  if (genSnap?._genRowSpacing) ctx.genRowSpacing = genSnap._genRowSpacing
+
   if (state.activeEmphasis) activeEmphasis.value = state.activeEmphasis
   if (state.currentMode) {
     currentMode.value = state.currentMode
@@ -1087,17 +1171,24 @@ async function loadSavedGraphState() {
 
 defineExpose({ saveGraphLayout, collectGraphState })
 
-onMounted(async () => {
+let graphStateRestored = false
+
+onMounted(() => {
   initGraph()
   updateGraph()
-  // Load saved graph state after initial render
-  await nextTick()
-  await loadSavedGraphState()
-  store.clearGraphDirty()
 })
 onUnmounted(() => { ctx.simulation?.stop(); ctx.resizeObserver?.disconnect(); cancelAnimation() })
 
-watch([() => store.persons, () => store.relationships], () => updateGraph(), { deep: true })
+watch([() => store.persons, () => store.relationships], async () => {
+  updateGraph()
+  // Restore saved graph state once after data first loads
+  if (!graphStateRestored && store.persons.length > 0) {
+    graphStateRestored = true
+    await nextTick()
+    await loadSavedGraphState()
+    store.clearGraphDirty()
+  }
+}, { deep: true })
 watch(() => store.selectedPersonId, () => { if (ctx.rootGroup) renderNodes() })
 watch(() => store.lockNodes, () => reapplyDrag())
 watch(() => store.currentDate, () => {

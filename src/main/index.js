@@ -79,10 +79,11 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  // Handle appimg:// protocol
+  // Handle appimg:// protocol — serves image files from absolute paths
   protocol.handle('appimg', async (req) => {
-    const filename = decodeURIComponent(req.url.replace('appimg://', ''))
-    const filePath = path.join(app.getPath('userData'), 'images', filename).replace(/\\/g, '/')
+    const decoded = decodeURIComponent(req.url.replace('appimg://', ''))
+    // decoded is a full absolute path (e.g. C:\Users\...\images\uuid.jpg)
+    const filePath = decoded.replace(/\\/g, '/')
     return net.fetch('file:///' + filePath)
   })
 

@@ -172,36 +172,42 @@
             </div>
           </div>
 
-          <!-- Photos (edit only) -->
-          <div v-if="store.editingPerson" class="form-section">
+          <!-- Photos -->
+          <div class="form-section">
             <div class="form-section-label">Photos</div>
-            <div v-if="photos.length > 0" class="photo-gallery">
-              <div
-                v-for="photo in photos"
-                :key="photo.id"
-                class="photo-thumb"
-                :class="{ primary: photo.is_primary }"
-              >
-                <img :src="photoUrl(photo.file_path)" :alt="'Photo'" />
-                <div class="photo-overlay">
-                  <button
-                    v-if="!photo.is_primary"
-                    class="photo-action-btn"
-                    title="Set as primary"
-                    @click="setPrimary(photo)"
-                  >⭐</button>
-                  <button
-                    class="photo-action-btn photo-delete-btn"
-                    title="Delete photo"
-                    @click="deletePhoto(photo)"
-                  >🗑</button>
-                </div>
-                <div v-if="photo.is_primary" class="primary-badge">Primary</div>
-              </div>
+            <div v-if="!store.editingPerson && pendingPhotoPaths.length === 0" class="photo-hint">
+              Photos can be added after creating the person.
             </div>
-            <button class="btn btn-ghost btn-sm" @click="addPhoto">
-              📷 Add Photo
-            </button>
+            <div v-if="store.editingPerson">
+              <div v-if="photos.length > 0" class="photo-gallery">
+                <div
+                  v-for="photo in photos"
+                  :key="photo.id"
+                  class="photo-thumb"
+                  :class="{ primary: photo.is_primary }"
+                >
+                  <img :src="photoUrl(photo.file_path)" :alt="'Photo'" />
+                  <div class="photo-overlay">
+                    <button
+                      v-if="!photo.is_primary"
+                      class="photo-action-btn photo-star-btn"
+                      title="Set as primary"
+                      @click="setPrimary(photo)"
+                    >★</button>
+                    <span v-else class="photo-primary-icon">★</span>
+                    <button
+                      class="photo-action-btn photo-delete-btn"
+                      title="Delete photo"
+                      @click="deletePhoto(photo)"
+                    >✕</button>
+                  </div>
+                  <div v-if="photo.is_primary" class="primary-badge">Primary</div>
+                </div>
+              </div>
+              <button class="btn btn-ghost btn-sm" style="margin-top: 8px;" @click="addPhoto">
+                + Add Photo
+              </button>
+            </div>
           </div>
         </div>
 
@@ -240,6 +246,7 @@ const submitting = ref(false)
 const pendingLinks = ref([])
 const newLink = ref({ personId: '', relType: 'child_of', formedDate: '', divorced: false })
 const photos = ref([])
+const pendingPhotoPaths = ref([]) // file paths queued for new persons
 const existingRels = ref([])
 
 const formTitle = computed(() => {
@@ -388,9 +395,9 @@ async function addPhoto() {
   })
   if (addRes.success) {
     photos.value.push(addRes.data)
-    // Update primary_image on person in store
     if (isPrimary) {
-      await store.updatePerson({ ...store.editingPerson, primary_image: addRes.data.file_path })
+      const idx = store.persons.findIndex(p => p.id === store.editingPerson.id)
+      if (idx !== -1) store.persons[idx] = { ...store.persons[idx], primary_image: addRes.data.file_path }
     }
   }
 }
@@ -399,11 +406,23 @@ async function setPrimary(photo) {
   if (!store.editingPerson) return
   await api.invoke('images:setPrimary', { imageId: photo.id, personId: store.editingPerson.id })
   photos.value.forEach(p => { p.is_primary = p.id === photo.id ? 1 : 0 })
+  // Update person's primary_image in the store so the graph node updates
+  const idx = store.persons.findIndex(p => p.id === store.editingPerson.id)
+  if (idx !== -1) store.persons[idx] = { ...store.persons[idx], primary_image: photo.file_path }
 }
 
 async function deletePhoto(photo) {
   await api.invoke('images:delete', { imageId: photo.id })
   photos.value = photos.value.filter(p => p.id !== photo.id)
+  if (photo.is_primary && store.editingPerson) {
+    // If remaining photos exist, make the first one primary
+    if (photos.value.length > 0) {
+      await setPrimary(photos.value[0])
+    } else {
+      const idx = store.persons.findIndex(p => p.id === store.editingPerson.id)
+      if (idx !== -1) store.persons[idx] = { ...store.persons[idx], primary_image: null }
+    }
+  }
 }
 
 function validate() {
@@ -728,6 +747,24 @@ async function handleSubmit() {
   padding: 2px 0;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.photo-star-btn {
+  color: #ffd54f !important;
+}
+
+.photo-primary-icon {
+  color: #ffd54f;
+  font-size: 14px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.photo-hint {
+  font-size: 12px;
+  color: var(--t3);
+  font-style: italic;
+  padding: 4px 0;
 }
 
 /* Relationship cards */

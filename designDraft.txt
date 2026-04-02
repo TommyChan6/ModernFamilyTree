@@ -1,51 +1,64 @@
 possible future
 	- 3d mode?
 	- a feature that play the tree in a time scale, the tree evolves as time passes, people only appear when time reaches their birth, links between marriages
-	- future feature, click a person, reveals the relationships of other people to the person, different languages
+	- reveal info: future feature, click a person, reveals the relationships of other people to the person, different languages
+	- mobile version
 
 must later
 	- the state of the graph is saved to database
-	- all people tab
-	- relationships tab
-	- timeline tab
+	- all people tab in the left menu
+	- relationships tab in the left menu
+	- timeline tab in the left menu
 	- update settings
+		- general update
+		- add language options
+		- more style settings
+	- share buttons?
 
 big feature
-	- toggle for tagging persons, family cluster, tags can have type, for example family type or elemental power type, types options will appear somewhere on screen allowing user to change
+	- toggle for tagged persons, family cluster, tags can have type, for example family type or elemental power type, types options will appear somewhere on screen allowing user to change
 		- clicking tags in the auto mode can realign the persons according to tags
-	- maternal or paternal toggles, that focuses on maternal relationship vs paternal
+x	- maternal or paternal toggles, that focuses on maternal relationship vs paternal
 	- log in?
+	- a mini map on the upper right corner for showing the current viewport in the whole family tree
 
 small feature
-	- clicking the relationship lines will reveal info such as when the relationship was formed
 	- allow export image, placement of the tree and name of the tree and add styling
 	- different styles to the family tree?
-	- add settings in the left menu, allow tweaks to font size etc, curvy line vs straight lines, different languages?
-		- allow changes to color, line styles
-	- share buttons?
 	- sliders for auto mode, control the strength of gravity, stretchiness of lines, generational top to bottom alignment
 		- add explainers to these sliders in a question mark next to the sliders
 	- allow age, name and gender to be unknown
 	- allow user to make multiple trees
+	- self defined relationships
+	- allow edits in the graph, for instance, click one node, then ctrl click another node to create a new relationship...
+	- multiselect the people and move them together
+	- allow import image as background, maps or household, school maps etc
+	- reveal info: show genetic inheritance
 
 visuals
 	- different color for mother or father relationship
 	- toggle for highlighting married couples
+	- toggle for highlighting maternal / paternal relationships
 	- dead people is highlighted by being darker or some symbol?
 	- divorced relationship
 	- name the tree
 	- fix light mode
-	- allow resizing the side bars
 
 
 
 
 
+vr rehabilitation, and full body human pose estimation
+
+ikt konsulent oslo kommune
+
+combine and sort by most relevant
+
+
+write a description for the web project
+web project, family tree, 2024 - now
+this is a solo developed full stack web project. the goal of the project is to develop a web based family member organizer and family tree generation software that allows the user to utilize in their own family or family of their choice. for instance, family trees of historical people, or fictional stories. the project is based on the next js, vue and electron in the desktop app. my aim is for the project to be easy, intuitive and competent.
 
 
 
-
-
-
-
-
+this is group worked web project, based on the board game go. the project aims to create a web-based board game which includes online multiplayer. our team used 

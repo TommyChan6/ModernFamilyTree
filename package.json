@@ -6,7 +6,9 @@
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build"
+    "build": "electron-vite build",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.4",
@@ -14,6 +16,7 @@
     "electron": "^31.1.0",
     "electron-vite": "^2.3.0",
     "pinia": "^2.1.7",
+    "vitest": "^1.6.0",
     "vue": "^3.4.0"
   },
   "dependencies": {
