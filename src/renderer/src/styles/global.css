@@ -3,6 +3,8 @@
 [data-theme="dark"] {
   --bg:       #0f1117;
   --surface:  #181c27;
+  --glass-strong: rgba(24, 28, 39, 0.68);
+  --glass-soft:   rgba(24, 28, 39, 0.82);
   --elevated: #1f2437;
   --hover:    #252c42;
   --border:   rgba(255, 255, 255, 0.07);
@@ -22,6 +24,8 @@
 [data-theme="light"] {
   --bg:       #f0f2f8;
   --surface:  #ffffff;
+  --glass-strong: rgba(255, 255, 255, 0.66);
+  --glass-soft:   rgba(255, 255, 255, 0.82);
   --elevated: #e8ecf5;
   --hover:    #dde3f0;
   --border:   rgba(0, 0, 0, 0.08);

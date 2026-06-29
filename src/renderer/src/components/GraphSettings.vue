@@ -50,6 +50,13 @@
                 </button>
               </div>
               <div class="setting-item setting-toggle-row">
+                <label>Show Age</label>
+                <button class="micro-toggle" :class="{ on: gs.showAge }"
+                  @click="set('showAge', !gs.showAge)">
+                  <span class="toggle-knob"></span>
+                </button>
+              </div>
+              <div class="setting-item setting-toggle-row">
                 <label>Glow on Hover</label>
                 <button class="micro-toggle" :class="{ on: gs.glowOnHover }"
                   @click="set('glowOnHover', !gs.glowOnHover)">

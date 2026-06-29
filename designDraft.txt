@@ -21,6 +21,7 @@ big feature
 x	- maternal or paternal toggles, that focuses on maternal relationship vs paternal
 	- log in?
 	- a mini map on the upper right corner for showing the current viewport in the whole family tree
+	- tutorial
 
 small feature
 	- allow export image, placement of the tree and name of the tree and add styling
@@ -44,7 +45,7 @@ visuals
 	- name the tree
 	- fix light mode
 
-
+avoid race condition
 
 
 
@@ -54,6 +55,9 @@ ikt konsulent oslo kommune
 
 combine and sort by most relevant
 
+webcruiter
+3_u!Bm7hcHkBB6V!mf9M_oTR
+
 
 write a description for the web project
 web project, family tree, 2024 - now
@@ -62,3 +66,7 @@ this is a solo developed full stack web project. the goal of the project is to d
 
 
 this is group worked web project, based on the board game go. the project aims to create a web-based board game which includes online multiplayer. our team used 
+
+
+
+follow best practices, avoid race conditions, good ui, responsive design, asynchronous, modular design, single responsibility

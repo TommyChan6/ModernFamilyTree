@@ -29,7 +29,15 @@
           class="avatar"
           :style="{ background: avatarGradient(person.gender) }"
         >
-          {{ initials(person.name) }}
+          <img
+            v-if="person.primary_image && imageUrl(person.primary_image)"
+            class="avatar-img"
+            :src="imageUrl(person.primary_image)"
+            alt=""
+          />
+          <svg v-else class="avatar-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path :d="PERSON_ICON_PATH" transform="translate(-5.28 -2.16) scale(1.44)" />
+          </svg>
         </div>
         <div class="person-info">
           <div class="person-name">{{ person.name }}</div>
@@ -64,9 +72,17 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useMainStore } from '../store/index.js'
+import { api } from '../api.js'
 
 const store = useMainStore()
 const searchQuery = ref('')
+
+// Default human silhouette (Material "person" icon, 24×24 viewBox) — matches the graph nodes
+const PERSON_ICON_PATH = 'M12 12.5c2.49 0 4.5-2.01 4.5-4.5S14.49 3.5 12 3.5 7.5 5.51 7.5 8s2.01 4.5 4.5 4.5zm0 2.25c-3 0-9 1.51-9 4.5V22h18v-2.75c0-2.99-6-4.5-9-4.5z'
+
+function imageUrl(filename) {
+  return api.getImageUrl(filename) || ''
+}
 
 const filteredPersons = computed(() => {
   const q = searchQuery.value.toLowerCase().trim()
@@ -77,14 +93,6 @@ const filteredPersons = computed(() => {
     (p.location || '').toLowerCase().includes(q)
   )
 })
-
-function initials(name) {
-  const parts = (name || '').trim().split(/\s+/)
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-  }
-  return name.substring(0, 2).toUpperCase()
-}
 
 function genderColor(gender) {
   if (gender === 'male') return '#3a7bd5'
@@ -187,13 +195,24 @@ function avatarGradient(gender) {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-  color: #fff;
   flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.avatar-icon {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  fill: rgba(255, 255, 255, 0.92);
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .person-info {

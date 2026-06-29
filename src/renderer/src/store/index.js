@@ -39,6 +39,7 @@ export const useMainStore = defineStore('main', () => {
     chargeStrength: -380,
     labelSize: 10,
     showLabels: true,
+    showAge: false,
     lineCurvature: 0.04,
     glowOnHover: true,
     nodeOpacity: 1.0,
@@ -202,7 +203,7 @@ export const useMainStore = defineStore('main', () => {
       nodeRadius: 22, parentChildColor: '#8b6cc5', parentChildWidth: 1.8,
       spouseColor: '#f06292', spouseWidth: 2, adoptedColor: '#f5a623', adoptedWidth: 1.8,
       maleColor: '#3a7bd5', femaleColor: '#c95fa0', unknownColor: '#5c6bc0',
-      linkDistance: 160, chargeStrength: -380, labelSize: 10, showLabels: true,
+      linkDistance: 160, chargeStrength: -380, labelSize: 10, showLabels: true, showAge: false,
       lineCurvature: 0.04, glowOnHover: true, nodeOpacity: 1.0, linkOpacity: 0.6,
     }
   }

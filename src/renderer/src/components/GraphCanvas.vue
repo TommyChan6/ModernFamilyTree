@@ -169,7 +169,7 @@ import { useMainStore } from '../store/index.js'
 import { nodeColor, linkPath, getLinkStroke, getLinkWidth, getLinkEmphOpacity, getLinkMarker, getDashArray } from './graph/linkHelpers.js'
 import { computeAgeYPositions } from './graph/layoutAge.js'
 import { computeGenLayout } from './graph/layoutGeneration.js'
-import { drawYearGuides, drawGenGuides, removeGuides, updateGuideWidths, nearestGenRowY, updateGenPreview, removeGenPreview, resolveGenTarget, cleanupEmptyGenRows } from './graph/guideLines.js'
+import { drawYearGuides, drawGenGuides, removeGuides, updateGuideWidths, nearestGenRowY, updateGenPreview, removeGenPreview, resolveGenTarget, cleanupEmptyGenRows, drawCurrentYearLine, removeCurrentYearLine } from './graph/guideLines.js'
 import { useGraphAnimation } from './graph/useGraphAnimation.js'
 
 const store = useMainStore()
@@ -186,12 +186,15 @@ const modes = [
   { id: 'generation', label: '🏛 Gen', title: 'Generational layout' }
 ]
 
+// Default human silhouette (Material "person" icon, 24×24 viewBox, centred ~12,12)
+const PERSON_ICON_PATH = 'M12 12.5c2.49 0 4.5-2.01 4.5-4.5S14.49 3.5 12 3.5 7.5 5.51 7.5 8s2.01 4.5 4.5 4.5zm0 2.25c-3 0-9 1.51-9 4.5V22h18v-2.75c0-2.99-6-4.5-9-4.5z'
+
 // ── Shared mutable context ──────────────────────────────────────────────────
 const ctx = {
   simulation: null, zoomBehavior: null, svgSelection: null, rootGroup: null,
   nodesData: [], linksData: [],
   animTimer: null, resizeObserver: null,
-  genRowYValues: [], genRowSpacing: 140, genPreviewLine: null, guideLineElements: [],
+  genRowYValues: [], genRowSpacing: 140, genPreviewLine: null, guideLineElements: [], currentYearLine: null,
   modeSnapshots: { custom: null, auto: null, age: null, generation: null },
   containerRef: null,  // set in onMounted
   ticked: null,        // set below
@@ -785,6 +788,15 @@ function getImageUrl(filePath) {
   return window.electronAPI?.getImageUrl?.(filePath) || null
 }
 
+// Age in years: counted to the current date (or today if none set), capped at death year.
+function ageOf(d) {
+  if (!d.birth_year) return null
+  const refYear = store.currentDate?.year ?? new Date().getFullYear()
+  const endYear = d.death_year ? Math.min(d.death_year, refYear) : refYear
+  const age = endYear - d.birth_year
+  return age >= 0 ? age : null
+}
+
 function renderNodes() {
   const layer = ctx.rootGroup.select('.nodes-layer')
   const node = layer.selectAll('g.graph-node').data(ctx.nodesData, d => d.id)
@@ -804,17 +816,19 @@ function renderNodes() {
   entered.append('image').attr('class', 'node-image')
     .attr('width', r * 2).attr('height', r * 2).attr('x', -r).attr('y', -r)
     .attr('preserveAspectRatio', 'xMidYMid slice').attr('pointer-events', 'none')
-  // Initials text (hidden when image is present)
-  entered.append('text').attr('class', 'node-initials').attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
-    .attr('fill', '#fff').attr('font-size', Math.max(9, r * 0.55)).attr('font-weight', 700)
-    .attr('font-family', 'system-ui, sans-serif').attr('pointer-events', 'none')
+  // Default human silhouette (shown when no image). Clip lives on the (untransformed) group
+  // so the circle clip stays in node coords; the inner path carries the sizing transform.
+  entered.append('g').attr('class', 'node-person-icon').attr('pointer-events', 'none')
+    .append('path').attr('class', 'node-person-path').attr('d', PERSON_ICON_PATH)
   // Selection ring (on top of image)
   entered.append('circle').attr('class', 'node-ring').attr('r', r).attr('fill', 'none')
     .attr('stroke', 'transparent').attr('stroke-width', 0).attr('pointer-events', 'none')
-  // Name label below
-  entered.append('text').attr('class', 'node-label').attr('text-anchor', 'middle').attr('y', r + 14)
+  // Name label below — persistent name + age tspans so the age can fade independently
+  const labelEl = entered.append('text').attr('class', 'node-label').attr('text-anchor', 'middle').attr('y', r + 14)
     .attr('font-size', gs.labelSize).attr('font-weight', 500)
     .attr('font-family', 'system-ui, sans-serif').attr('pointer-events', 'none')
+  labelEl.append('tspan').attr('class', 'node-name')
+  labelEl.append('tspan').attr('class', 'node-age').attr('opacity', 0).attr('font-weight', 600)
 
   entered
     .on('mouseenter', function () { if (gs.glowOnHover) d3.select(this).select('.node-circle').attr('filter', 'url(#glow)') })
@@ -860,16 +874,37 @@ function renderNodes() {
     .attr('stroke', d => store.selectedPersonId === d.id ? '#6c8ef5' : 'transparent')
     .attr('stroke-width', d => store.selectedPersonId === d.id ? 3 : 0)
 
-  // Initials — hidden when image is present
-  merged.select('.node-initials').attr('font-size', Math.max(9, gs.nodeRadius * 0.55))
-    .text(d => { const p = d.name.trim().split(/\s+/); return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : d.name.substring(0, 2).toUpperCase() })
+  // Default human silhouette — framed-avatar look: head in the upper half, shoulders fill
+  // the bottom of the circle and are clipped by it. Hidden when image present.
+  // Head circle is centred at (12,8) in the 24×24 viewBox; shoulders span x:[3,21].
+  const iconScale = gs.nodeRadius * 0.12
+  const iconHeadY = gs.nodeRadius * 0.22 // head centre sits this far above circle centre
+  merged.select('.node-person-icon')
+    .attr('clip-path', d => `url(#clip-${d.id.replace(/[^a-zA-Z0-9-]/g, '')})`)
     .attr('display', d => d.primary_image ? 'none' : null)
+  merged.select('.node-person-path')
+    .attr('transform', `translate(${-12 * iconScale}, ${-iconHeadY - 8 * iconScale}) scale(${iconScale})`)
+    .attr('fill', 'rgba(255,255,255,0.92)')
 
-  // Name label
+  // Name label (with optional age shown dimmer, just to the right of the name)
+  const ageFill = isLightTheme ? '#9099b8' : 'rgba(158,163,184,0.85)'
   merged.select('.node-label').attr('y', gs.nodeRadius + 14).attr('font-size', gs.labelSize)
     .attr('display', gs.showLabels ? null : 'none')
-    .text(d => d.name.split(' ')[0])
     .attr('fill', d => store.selectedPersonId === d.id ? '#6c8ef5' : (isLightTheme ? '#4a5068' : 'rgba(232,234,246,0.85)'))
+  merged.select('.node-name').text(d => d.name.split(' ')[0])
+  // Age tspan — fades in/out smoothly when the setting is toggled
+  merged.select('.node-age').attr('fill', ageFill).each(function (d) {
+    const sel = d3.select(this)
+    const age = ageOf(d)
+    const show = gs.showAge && age != null
+    if (show) {
+      sel.text(age).attr('dx', 4)
+      sel.transition('age').duration(260).attr('opacity', 1)
+    } else {
+      sel.transition('age').duration(220).attr('opacity', 0)
+        .on('end', function () { d3.select(this).text('').attr('dx', 0) })
+    }
+  })
   applyDrag(merged)
 }
 
@@ -934,6 +969,7 @@ function switchMode(newMode) {
 
 function enterAutoMode() {
   ctx.simulation.stop()
+  removeCurrentYearLine(ctx)
   if (hasSnapshot('auto')) {
     animateToPositionsWithReset(ctx.modeSnapshots['auto'], () => { ctx.nodesData.forEach(n => { n.fx = null; n.fy = null; n.vx = 0; n.vy = 0 }); ctx.simulation.alpha(0.15).restart(); reapplyDrag() })
   } else { ctx.nodesData.forEach(n => { n.fx = null; n.fy = null }); ctx.simulation.alpha(0.3).restart(); reapplyDrag() }
@@ -941,6 +977,7 @@ function enterAutoMode() {
 
 function enterCustomMode() {
   ctx.simulation.stop()
+  removeCurrentYearLine(ctx)
   if (hasSnapshot('custom')) {
     animateToPositionsWithReset(ctx.modeSnapshots['custom'], () => { ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = n.y }); reapplyDrag() })
   } else { ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = n.y }); snapshotMode('custom'); reapplyDrag() }
@@ -955,7 +992,7 @@ function enterAgeMode() {
   if (hasSnapshot('age')) {
     const snap = ctx.modeSnapshots['age'], targets = {}
     ctx.nodesData.forEach(n => { targets[n.id] = { x: snap[n.id]?.x ?? n.x, y: ageInfo.yMap[n.id] } })
-    animateToPositionsWithReset(targets, () => { ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = ageInfo.yMap[n.id] }); drawYearGuides(ctx, ageInfo.minYear, ageInfo.maxYear, ageInfo.padding, ageInfo.usableHeight); reapplyDrag() })
+    animateToPositionsWithReset(targets, () => { ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = ageInfo.yMap[n.id] }); drawYearGuides(ctx, ageInfo.minYear, ageInfo.maxYear, ageInfo.padding, ageInfo.usableHeight); drawCurrentYearLine(ctx, ageInfo, store.currentDate?.year ?? null, false); reapplyDrag() })
     return
   }
 
@@ -974,11 +1011,21 @@ function enterAgeMode() {
   })
 
   drawYearGuides(ctx, ageInfo.minYear, ageInfo.maxYear, ageInfo.padding, ageInfo.usableHeight)
+  drawCurrentYearLine(ctx, ageInfo, store.currentDate?.year ?? null, false)
   animateToPositionsWithReset(targets, () => { ctx.nodesData.forEach(n => { n.fx = n.x; n.fy = ageInfo.yMap[n.id] }); snapshotMode('age'); reapplyDrag() })
+}
+
+// Re-position the Age-mode "current year" line (e.g. when the current year is set/changed/theme).
+function refreshCurrentYearLine(animate) {
+  if (currentMode.value !== 'age' || !ctx.rootGroup || !ctx.containerRef) return
+  const { height } = ctx.containerRef.getBoundingClientRect()
+  const ageInfo = computeAgeYPositions(ctx.nodesData, height)
+  drawCurrentYearLine(ctx, ageInfo, store.currentDate?.year ?? null, animate)
 }
 
 function enterGenerationMode() {
   ctx.simulation.stop()
+  removeCurrentYearLine(ctx)
   const container = ctx.containerRef; if (!container) return
   const { width, height } = container.getBoundingClientRect()
 
@@ -1196,6 +1243,8 @@ watch(() => store.currentDate, () => {
     activeDeceased.value = 'normal'
     applyDeceasedHighlight()
   }
+  if (ctx.rootGroup && store.graphSettings.showAge) renderNodes()
+  refreshCurrentYearLine(true)
 })
 watch(() => store.theme, () => {
   ctx.theme = store.theme
@@ -1207,6 +1256,7 @@ watch(() => store.theme, () => {
   const guideFill = light ? 'rgba(0, 0, 0, 0.22)' : 'rgba(232, 234, 246, 0.25)'
   ctx.rootGroup.selectAll('.mode-guides line').attr('stroke', guideStroke)
   ctx.rootGroup.selectAll('.mode-guides text').attr('fill', guideFill)
+  refreshCurrentYearLine(false)
 })
 watch(() => store.graphSettings, () => {
   if (!ctx.rootGroup || !ctx.simulation) return
@@ -1233,7 +1283,7 @@ watch(() => store.graphSettings, () => {
 .ctrl-btn-wide { width: auto; padding: 0 10px; gap: 4px; font-size: 11px; font-weight: 600; position: relative; }
 .ctrl-btn-active { background: var(--adim); color: var(--accent); border: 1px solid rgba(108, 142, 245, 0.3); }
 .ctrl-sep { width: 1px; background: var(--border); margin: 3px 2px; }
-.graph-legend { position: absolute; bottom: 18px; right: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; font-size: 11px; color: var(--t2); z-index: 5; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 10px; min-width: 140px; }
+.graph-legend { position: absolute; bottom: 18px; right: 16px; background: var(--glass-soft); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; font-size: 11px; color: var(--t2); z-index: 5; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 10px; min-width: 140px; }
 .panel-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--t3); }
 .leg-section { display: flex; flex-direction: column; gap: 5px; }
 .leg-section-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--t3); opacity: 0.7; }
@@ -1428,7 +1478,9 @@ watch(() => store.graphSettings, () => {
   position: absolute;
   top: 14px;
   right: 16px;
-  background: var(--surface);
+  background: var(--glass-strong);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 12px 16px;
@@ -1437,7 +1489,7 @@ watch(() => store.graphSettings, () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-width: 180px;
+  min-width: 220px;
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
 }
 
@@ -1535,7 +1587,7 @@ watch(() => store.graphSettings, () => {
 
 .seg-option {
   flex: 1;
-  padding: 5px 0;
+  padding: 5px 12px;
   border: none;
   background: transparent;
   font-family: var(--font);

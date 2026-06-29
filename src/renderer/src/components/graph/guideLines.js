@@ -20,12 +20,64 @@ export function getGuideExtentX(ctx) {
 }
 
 export function updateGuideWidths(ctx) {
-  if (!ctx.guideLineElements.length) return
+  if (!ctx.guideLineElements.length && !ctx.currentYearLine) return
   const { x1, x2 } = getGuideExtentX(ctx)
   ctx.guideLineElements.forEach(({ lineEl, textEl }) => {
     if (lineEl) lineEl.attr('x1', x1).attr('x2', x2)
     if (textEl) textEl.attr('x', x1 - 14)
   })
+  if (ctx.currentYearLine) {
+    ctx.currentYearLine.select('line').attr('x1', x1).attr('x2', x2)
+    ctx.currentYearLine.select('text').attr('x', x1 - 14)
+  }
+}
+
+// Highlighted "current year" line for Age mode. Creates (and fades in) the line on first
+// call, then slides smoothly to the new year position on subsequent calls (animate=true).
+export function drawCurrentYearLine(ctx, ageInfo, year, animate = true) {
+  if (!ctx.rootGroup) return
+  if (year == null || !ageInfo) { removeCurrentYearLine(ctx); return }
+
+  const light = ctx.theme === 'light'
+  const stroke = light ? 'rgba(108, 142, 245, 0.75)' : 'rgba(108, 142, 245, 0.65)'
+  const fill = light ? 'rgba(108, 142, 245, 0.9)' : 'rgba(108, 142, 245, 0.85)'
+
+  const { minYear, maxYear, padding, usableHeight } = ageInfo
+  const y = padding + ((year - minYear) / (maxYear - minYear || 1)) * usableHeight
+  const { x1, x2 } = getGuideExtentX(ctx)
+
+  let g = ctx.currentYearLine
+  if (!g) {
+    g = ctx.rootGroup.select('.guides-layer').append('g').attr('class', 'current-year-line').attr('opacity', 0)
+    g.append('line')
+      .attr('x1', x1).attr('x2', x2).attr('y1', y).attr('y2', y)
+      .attr('stroke-width', 1.5)
+    g.append('text')
+      .attr('x', x1 - 14).attr('y', y - 6)
+      .attr('font-size', 10).attr('font-family', 'system-ui, sans-serif').attr('font-weight', 700)
+    ctx.currentYearLine = g
+    g.transition().duration(400).attr('opacity', 1)
+  }
+
+  g.select('line').attr('stroke', stroke)
+  g.select('text').attr('fill', fill).text(`Now · ${year}`)
+
+  const line = g.select('line')
+  const text = g.select('text')
+  if (animate) {
+    line.transition('cyl').duration(450).ease(d3.easeCubicInOut).attr('x1', x1).attr('x2', x2).attr('y1', y).attr('y2', y)
+    text.transition('cyl').duration(450).ease(d3.easeCubicInOut).attr('x', x1 - 14).attr('y', y - 6)
+  } else {
+    line.attr('x1', x1).attr('x2', x2).attr('y1', y).attr('y2', y)
+    text.attr('x', x1 - 14).attr('y', y - 6)
+  }
+}
+
+export function removeCurrentYearLine(ctx) {
+  if (ctx.currentYearLine) {
+    ctx.currentYearLine.transition().duration(300).attr('opacity', 0).remove()
+    ctx.currentYearLine = null
+  }
 }
 
 export function removeGuides(ctx) {

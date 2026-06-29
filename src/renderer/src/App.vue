@@ -130,7 +130,7 @@ function cancelRename() {
 
 // ── Sidebar resize ──────────────────────────────────────────────────────────
 const leftWidth = ref(240)
-const rightWidth = ref(300)
+const rightWidth = ref(250)
 const MIN_WIDTH = 160
 const MAX_WIDTH = 500
 
@@ -399,7 +399,7 @@ onUnmounted(() => {
 .workspace {
   flex: 1 1 0;
   display: grid;
-  grid-template-columns: 240px 4px 1fr 4px 300px;
+  grid-template-columns: 240px 4px 1fr 4px 250px;
   min-height: 0;
 }
 

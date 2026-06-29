@@ -3,7 +3,11 @@
     "allow": [
       "Bash(npm install:*)",
       "Bash(npm uninstall:*)",
-      "Bash(npx vitest:*)"
+      "Bash(npx vitest:*)",
+      "Bash(npx vite *)",
+      "Bash(npm run *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'Add person-icon avatars, node age labels, and Age-mode current-year line' -m '- Show a default human silhouette on nodes without a primary image *)"
     ]
   }
 }
