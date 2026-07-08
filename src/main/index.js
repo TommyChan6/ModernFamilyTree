@@ -33,6 +33,18 @@ function createWindow() {
     mainWindow.show()
   })
 
+  // The default menu's Zoom In accelerator is "Ctrl+Plus", which on most
+  // keyboards requires Shift (Ctrl+Shift+=) — so plain Ctrl+= does nothing
+  // while Ctrl+- works. Bind Ctrl+= / Ctrl+numpad+ ourselves.
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || !(input.control || input.meta) || input.shift) return
+    if (input.key === '=' || input.key === '+') {
+      event.preventDefault()
+      const wc = mainWindow.webContents
+      wc.setZoomLevel(Math.min(wc.getZoomLevel() + 0.5, 5))
+    }
+  })
+
   // Close confirmation for unsaved changes
   let forceClose = false
   mainWindow.on('close', async (e) => {

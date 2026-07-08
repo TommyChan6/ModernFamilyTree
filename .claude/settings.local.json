@@ -7,7 +7,27 @@
       "Bash(npx vite *)",
       "Bash(npm run *)",
       "Bash(git add *)",
-      "Bash(git commit -m 'Add person-icon avatars, node age labels, and Age-mode current-year line' -m '- Show a default human silhouette on nodes without a primary image *)"
+      "Bash(git commit -m 'Add person-icon avatars, node age labels, and Age-mode current-year line' -m '- Show a default human silhouette on nodes without a primary image *)",
+      "PowerShell(npm run build)",
+      "PowerShell(npm test)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "PowerShell(npm install -D playwright-core --no-audit --no-fund)",
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\54c41550-3d92-4ca5-8eb8-80b8c9c49e26\\\\scratchpad\\\\drive-timeline.mjs\")",
+      "PowerShell($p = Start-Process -FilePath \"node_modules\\\\electron\\\\dist\\\\electron.exe\" -ArgumentList \".\" -PassThru -RedirectStandardError \"$env:TEMP\\\\el-err.txt\" -RedirectStandardOutput \"$env:TEMP\\\\el-out.txt\"; Start-Sleep -Seconds 6; if \\($p.HasExited\\) { \"exited code $\\($p.ExitCode\\)\" } else { \"running\"; Stop-Process -Id $p.Id -Force -Confirm:$false }; Get-Content \"$env:TEMP\\\\el-err.txt\" -TotalCount 20)",
+      "PowerShell(Select-String -Path out\\\\main\\\\index.js -Pattern '^import|require\\\\\\(' | Select-Object -First 15 | ForEach-Object Line)",
+      "PowerShell($job = Start-Job { Set-Location 'c:\\\\Users\\\\tommy\\\\OneDrive\\\\Desktop\\\\newFamilyTree'; npm run dev 2>&1 | Out-String }; Start-Sleep -Seconds 12; $out = Receive-Job $job; $out; $running = Get-Process electron -ErrorAction SilentlyContinue; if \\($running\\) { \"ELECTRON RUNNING: $\\($running.Count\\) processes\" } else { \"no electron process\" })",
+      "PowerShell(Get-Process electron -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Job)",
+      "PowerShell($dir = \"$env:TEMP\\\\claude\\\\eltest\"; New-Item -ItemType Directory -Force $dir | Out-Null; Set-Content -Encoding utf8 \"$dir\\\\package.json\" '{\"name\":\"t\",\"type\":\"module\",\"main\":\"main.mjs\"}'; Set-Content -Encoding utf8 \"$dir\\\\main.mjs\" 'import { app } from \"electron\"; app.whenReady\\(\\).then\\(\\(\\) => { console.log\\(\"ESM_OK\"\\); app.quit\\(\\); }\\);'; & \"c:\\\\Users\\\\tommy\\\\OneDrive\\\\Desktop\\\\newFamilyTree\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\" --no-sandbox $dir)",
+      "PowerShell(\"ELECTRON_RUN_AS_NODE=$env:ELECTRON_RUN_AS_NODE\"; $env:ELECTRON_RUN_AS_NODE = $null; & \"c:\\\\Users\\\\tommy\\\\OneDrive\\\\Desktop\\\\newFamilyTree\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\" \"$env:TEMP\\\\claude\\\\eltest\")",
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\54c41550-3d92-4ca5-8eb8-80b8c9c49e26\\\\scratchpad\\\\drive-hover.mjs\")",
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\54c41550-3d92-4ca5-8eb8-80b8c9c49e26\\\\scratchpad\\\\drive-hover2.mjs\")",
+      "PowerShell(Stop-Job -PassThru)",
+      "PowerShell(Remove-Job -Force)",
+      "PowerShell(npm uninstall playwright-core --no-audit --no-fund)",
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\54c41550-3d92-4ca5-8eb8-80b8c9c49e26\\\\scratchpad\\\\drive-zoom.mjs\")",
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\54c41550-3d92-4ca5-8eb8-80b8c9c49e26\\\\scratchpad\\\\drive-close.mjs\")"
     ]
   }
 }
