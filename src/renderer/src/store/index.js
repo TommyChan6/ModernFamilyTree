@@ -22,6 +22,7 @@ export const useMainStore = defineStore('main', () => {
   const cleanTree = ref(false)
   const currentDate = ref(null)
   const graphDirty = ref(false)
+  const activeView = ref('tree') // 'tree' | 'people' | 'relationships' | 'timeline'
 
   // Graph visual settings
   const graphSettings = ref({
@@ -215,7 +216,7 @@ export const useMainStore = defineStore('main', () => {
     // state
     persons, relationships, selectedPersonId, modalOpen, formOpen,
     editingPerson, theme, settingsOpen, graphSettings,
-    lockNodes, cleanTree, currentDate, lockLines, relPopup,
+    lockNodes, cleanTree, currentDate, lockLines, relPopup, activeView,
     // computed
     selectedPerson, personCount, coupleCount,
     // actions

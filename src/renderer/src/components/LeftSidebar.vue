@@ -5,16 +5,16 @@
       <div class="nav-section-label">Navigation</div>
       <button
         class="nav-item"
-        :class="{ active: activeView === 'tree' }"
-        @click="activeView = 'tree'"
+        :class="{ active: store.activeView === 'tree' }"
+        @click="store.activeView = 'tree'"
       >
         <span class="nav-icon">🌳</span>
         <span>Tree View</span>
       </button>
       <button
         class="nav-item"
-        :class="{ active: activeView === 'people' }"
-        @click="activeView = 'people'"
+        :class="{ active: store.activeView === 'people' }"
+        @click="store.activeView = 'people'"
       >
         <span class="nav-icon">👥</span>
         <span>All People</span>
@@ -22,16 +22,16 @@
       </button>
       <button
         class="nav-item"
-        :class="{ active: activeView === 'relationships' }"
-        @click="activeView = 'relationships'"
+        :class="{ active: store.activeView === 'relationships' }"
+        @click="store.activeView = 'relationships'"
       >
         <span class="nav-icon">🔗</span>
         <span>Relationships</span>
       </button>
       <button
         class="nav-item"
-        :class="{ active: activeView === 'timeline' }"
-        @click="activeView = 'timeline'"
+        :class="{ active: store.activeView === 'timeline' }"
+        @click="store.activeView = 'timeline'"
       >
         <span class="nav-icon">📅</span>
         <span>Timeline</span>
@@ -164,11 +164,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useMainStore } from '../store/index.js'
 
 const store = useMainStore()
-const activeView = ref('tree')
 
 function setCurrentDate(val) {
   const year = parseInt(val)

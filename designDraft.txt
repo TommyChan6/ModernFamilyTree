@@ -14,6 +14,7 @@ must later
 		- add language options
 		- more style settings
 	- share buttons?
+	- allow edits on the line design, for example drag it so that it has a curve in the direction the user want, to set up the line so it doesn't interfere with the other nodes
 
 big feature
 	- toggle for tagged persons, family cluster, tags can have type, for example family type or elemental power type, types options will appear somewhere on screen allowing user to change

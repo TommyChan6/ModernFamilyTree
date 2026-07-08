@@ -47,7 +47,15 @@
     <div class="workspace" :style="workspaceStyle">
       <LeftSidebar :style="{ width: leftWidth + 'px' }" @save="handleSave" />
       <div class="resize-handle resize-handle-left" @mousedown="startResizeLeft"></div>
-      <GraphCanvas ref="graphRef" :key="store.activeTreeId" />
+      <div class="canvas-stack">
+        <!-- Graph stays mounted (tucked away) so its layout & simulation state persist -->
+        <div class="canvas-layer" v-show="store.activeView !== 'people'">
+          <GraphCanvas ref="graphRef" :key="store.activeTreeId" />
+        </div>
+        <Transition name="people-view">
+          <PeopleView v-if="store.activeView === 'people'" :key="store.activeTreeId" />
+        </Transition>
+      </div>
       <div class="resize-handle resize-handle-right" @mousedown="startResizeRight"></div>
       <RightSidebar :style="{ width: rightWidth + 'px' }" />
     </div>
@@ -62,6 +70,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useMainStore } from './store/index.js'
 import LeftSidebar from './components/LeftSidebar.vue'
 import GraphCanvas from './components/GraphCanvas.vue'
+import PeopleView from './components/PeopleView.vue'
 import RightSidebar from './components/RightSidebar.vue'
 import PersonModal from './components/PersonModal.vue'
 import PersonForm from './components/PersonForm.vue'
@@ -401,6 +410,40 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 240px 4px 1fr 4px 250px;
   min-height: 0;
+}
+
+/* Center cell that holds both the graph and the People view */
+.canvas-stack {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Graph layer fills the cell; grid display lets .graph-area stretch to full height */
+.canvas-layer {
+  position: absolute;
+  inset: 0;
+  display: grid;
+}
+
+/* People view cross-fade / rise */
+.people-view-enter-active {
+  transition: opacity 0.32s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.people-view-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  position: absolute;
+  inset: 0;
+}
+.people-view-enter-from {
+  opacity: 0;
+  transform: translateY(14px) scale(0.99);
+}
+.people-view-leave-to {
+  opacity: 0;
+  transform: scale(0.99);
 }
 
 .resize-handle {
