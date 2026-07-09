@@ -124,6 +124,10 @@ import { TimelineRenderer } from './timeline/TimelineRenderer.js'
 
 const store = useMainStore()
 
+// This view stays mounted while hidden (App keeps its GL context alive to avoid a
+// white flash on view switches); `active` tells us when it's actually on screen.
+const props = defineProps({ active: { type: Boolean, default: true } })
+
 // ── Zoom constants ──────────────────────────────────────────────────────────
 const MIN_PX = 0.02      // min pixels per year (near-boundless zoom out)
 const MAX_PX = 64        // max pixels per year (zoomed all the way in)
@@ -478,6 +482,7 @@ async function saveMarriageEdit() {
 
 // ── Lifecycle ───────────────────────────────────────────────────────────────
 let ro = null
+let hasFitted = false
 onMounted(() => {
   const measure = () => {
     stageW.value = stageEl.value?.clientWidth || 0
@@ -498,9 +503,29 @@ onMounted(() => {
   renderer.setTheme(store.theme === 'light')
   renderer.setData(layout.value)
   measure()
-  nextTick(() => { measure(); fitAll(false) })
-  ro = new ResizeObserver(() => { measure(); clampPan(); syncCamera() })
+  nextTick(() => {
+    measure()
+    if (props.active && stageW.value) { fitAll(false); hasFitted = true }
+  })
+  // Ignore size reports while hidden (display:none reports 0×0, which would
+  // corrupt the pan/zoom state); re-measure only when actually laid out.
+  ro = new ResizeObserver(() => {
+    if (!stageEl.value?.clientWidth) return
+    measure(); clampPan(); syncCamera()
+  })
   if (stageEl.value) ro.observe(stageEl.value)
+
+  // Coming back into view: fit once (first reveal), otherwise keep the user's
+  // pan/zoom and just re-sync to the current stage size.
+  watch(() => props.active, (on) => {
+    if (!on) return
+    nextTick(() => {
+      measure()
+      if (!stageW.value) return
+      if (!hasFitted) { fitAll(false); hasFitted = true }
+      else { clampPan(); syncCamera() }
+    })
+  })
 })
 
 watch(layout, (L) => {

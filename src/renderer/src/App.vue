@@ -58,11 +58,22 @@
         <Transition name="people-view">
           <RelationshipsView v-if="store.activeView === 'relationships'" :key="store.activeTreeId" />
         </Transition>
+        <!-- WebGL views stay mounted (toggled with v-show) so their GL context is
+             never torn down mid-switch — tearing it down flashes the window white.
+             The Transition still animates the show/hide. -->
         <Transition name="people-view">
-          <TimelineView v-if="store.activeView === 'timeline'" :key="store.activeTreeId" />
+          <TimelineView
+            v-show="store.activeView === 'timeline'"
+            :active="store.activeView === 'timeline'"
+            :key="store.activeTreeId"
+          />
         </Transition>
         <Transition name="people-view">
-          <FactionsView v-if="store.activeView === 'factions'" :key="store.activeTreeId" />
+          <FactionsView
+            v-show="store.activeView === 'factions'"
+            :active="store.activeView === 'factions'"
+            :key="store.activeTreeId"
+          />
         </Transition>
       </div>
       <div class="resize-handle resize-handle-right" @mousedown="startResizeRight"></div>
