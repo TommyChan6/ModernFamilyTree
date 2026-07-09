@@ -27,7 +27,8 @@
       "PowerShell(Remove-Job -Force)",
       "PowerShell(npm uninstall playwright-core --no-audit --no-fund)",
       "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\54c41550-3d92-4ca5-8eb8-80b8c9c49e26\\\\scratchpad\\\\drive-zoom.mjs\")",
-      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\54c41550-3d92-4ca5-8eb8-80b8c9c49e26\\\\scratchpad\\\\drive-close.mjs\")"
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\54c41550-3d92-4ca5-8eb8-80b8c9c49e26\\\\scratchpad\\\\drive-close.mjs\")",
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\54c41550-3d92-4ca5-8eb8-80b8c9c49e26\\\\scratchpad\\\\drive-v3.mjs\")"
     ]
   }
 }

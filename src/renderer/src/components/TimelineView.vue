@@ -12,18 +12,7 @@
         >{{ undatedCount }} undated</span>
       </div>
 
-      <div class="tl-legend">
-        <span class="tl-legend-item">
-          <span class="tl-swatch" :style="{ background: colors.spouse }"></span>Marriage
-        </span>
-        <span class="tl-legend-item">
-          <span class="tl-swatch tl-swatch-dashed" :style="{ color: colors.spouse }"></span>Divorced
-        </span>
-        <span class="tl-legend-item">
-          <span class="tl-swatch" :style="{ background: colors.parentChild }"></span>Birth
-        </span>
-        <span class="tl-hint">Drag to pan · Scroll to zoom · Ctrl: time only · Shift: width only</span>
-      </div>
+      <span class="tl-hint">Drag to pan · Scroll to zoom · Ctrl: time only · Shift: width only</span>
     </div>
 
     <!-- Stage -->
@@ -81,7 +70,7 @@
             v-for="b in births"
             :key="b.key"
             class="tl-birth"
-            :class="{ dim: hoverId && !b.ids.includes(hoverId), lit: hoverId && b.ids.includes(hoverId) }"
+            :class="{ dim: connDimmed(b.ids), lit: hoverId && b.ids.includes(hoverId) }"
           >
             <path
               class="tl-birth-line"
@@ -98,7 +87,7 @@
             :key="m.id"
             class="tl-marriage"
             :class="{
-              dim: hoverId && !m.ids.includes(hoverId),
+              dim: connDimmed(m.ids),
               lit: hoverId && m.ids.includes(hoverId),
               divorced: m.divorced,
               estimated: m.estimated
@@ -127,8 +116,9 @@
             :key="p.id"
             class="tl-person"
             :class="{
-              dim: hoverId && !relatedSet.has(p.id),
+              dim: isDimmed(p.id),
               hovered: hoverId === p.id,
+              lit: searchOn && searchSet.has(p.id),
               selected: store.selectedPersonId === p.id
             }"
             :style="{ '--i': i }"
@@ -212,13 +202,38 @@
         </div>
       </div>
 
-      <!-- Floating zoom controls -->
+      <!-- Floating search (matches the tree view) -->
+      <div v-if="placed.length" class="tl-search" @pointerdown.stop @click.stop @wheel.stop>
+        <span class="tl-search-icon">🔍</span>
+        <input v-model="searchQuery" placeholder="Search family members…" />
+        <button v-if="searchQuery" class="tl-search-clear" @click="searchQuery = ''">✕</button>
+      </div>
+
+      <!-- Zoom controls (matches the tree view's control bar) -->
       <div v-if="placed.length" class="tl-controls" @pointerdown.stop @click.stop>
-        <button class="tl-ctrl-btn" title="Zoom out" @click="zoomBy(0.75)">−</button>
-        <span class="tl-zoom-label">{{ zoomLabel }}</span>
         <button class="tl-ctrl-btn" title="Zoom in" @click="zoomBy(1.3333)">＋</button>
+        <button class="tl-ctrl-btn" title="Zoom out" @click="zoomBy(0.75)">－</button>
         <div class="tl-ctrl-sep"></div>
-        <button class="tl-ctrl-btn tl-fit-btn" title="Fit everything" @click="fitAll(true)">⤢ Fit</button>
+        <button class="tl-ctrl-btn" title="Fit all" @click="fitAll(true)">⊡</button>
+        <div class="tl-ctrl-sep"></div>
+        <span class="tl-zoom-label">{{ zoomLabel }}</span>
+      </div>
+
+      <!-- Legend panel (matches the tree view) -->
+      <div v-if="placed.length" class="tl-legend-panel" @pointerdown.stop @wheel.stop>
+        <div class="tl-panel-title">Legend</div>
+        <div class="tl-leg-section">
+          <div class="tl-leg-label">People</div>
+          <div class="tl-leg-row"><span class="tl-leg-dot" :style="{ background: colors.male }"></span>Male</div>
+          <div class="tl-leg-row"><span class="tl-leg-dot" :style="{ background: colors.female }"></span>Female</div>
+        </div>
+        <div class="tl-leg-section">
+          <div class="tl-leg-label">Lines</div>
+          <div class="tl-leg-row"><span class="tl-leg-line" :style="{ background: colors.spouse }"></span>Marriage</div>
+          <div class="tl-leg-row"><span class="tl-leg-line tl-leg-dashed" :style="{ borderColor: colors.spouse }"></span>Divorced</div>
+          <div class="tl-leg-row"><span class="tl-leg-line" :style="{ background: colors.parentChild }"></span>Birth</div>
+          <div class="tl-leg-row"><span class="tl-leg-line tl-leg-dashed" :style="{ borderColor: colors.parentChild }"></span>Adopted</div>
+        </div>
       </div>
 
       <!-- Marriage year edit popup -->
@@ -263,6 +278,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { api } from '../api.js'
+import { computeGenLayout } from './graph/layoutGeneration.js'
 
 const store = useMainStore()
 
@@ -273,12 +289,12 @@ const GUTTER = 64        // fixed year-axis gutter width (screen px)
 const LANE_W = 150       // horizontal distance between lifelines (world px)
 const X0 = 110           // x of the first lane (world px)
 const Y_PAD = 40         // world-space padding above the first year
-const MIN_PX = 0.8       // min pixels per year (zoomed all the way out)
+const MIN_PX = 0.02      // min pixels per year (near-boundless zoom out)
 const MAX_PX = 64        // max pixels per year (zoomed all the way in)
 const BASE_PX = 8        // "100%" zoom reference
-const MIN_LS = 0.3       // min horizontal lane scale
+const MIN_LS = 0.05      // min horizontal lane scale
 const MAX_LS = 3         // max horizontal lane scale
-const CLAMP_PAD = 80
+const KEEP = 100         // min pixels of world that must stay in view
 
 // ── Viewport state ──────────────────────────────────────────────────────────
 const stageEl = ref(null)
@@ -293,10 +309,36 @@ const hoverId = ref(null)
 const mouseY = ref(null)
 const mEdit = ref(null)
 const meditInputRef = ref(null)
+const searchQuery = ref('')
 
+const searchOn = computed(() => searchQuery.value.trim().length > 0)
+const searchSet = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  const s = new Set()
+  if (!q) return s
+  store.persons.forEach(p => {
+    if ((p.name || '').toLowerCase().includes(q) ||
+        (p.occupation || '').toLowerCase().includes(q) ||
+        (p.location || '').toLowerCase().includes(q)) s.add(p.id)
+  })
+  return s
+})
+
+function isDimmed(id) {
+  if (hoverId.value) return !relatedSet.value.has(id)
+  if (searchOn.value) return !searchSet.value.has(id)
+  return false
+}
+function connDimmed(ids) {
+  if (hoverId.value) return !ids.includes(hoverId.value)
+  if (searchOn.value) return !ids.some(id => searchSet.value.has(id))
+  return false
+}
+
+const fmtPct = (v) => v >= 10 ? `${Math.round(v)}` : `${Math.max(0.1, Math.round(v * 10) / 10)}`
 const zoomLabel = computed(() => {
-  const v = Math.round((pxPerYear.value / BASE_PX) * 100)
-  const h = Math.round(laneScale.value * 100)
+  const v = fmtPct((pxPerYear.value / BASE_PX) * 100)
+  const h = fmtPct(laneScale.value * 100)
   return v === h ? `${v}%` : `↕${v}% ↔${h}%`
 })
 
@@ -318,11 +360,19 @@ function genderColor(g) {
 // ── Time scale ──────────────────────────────────────────────────────────────
 const refYear = computed(() => store.currentDate?.year ?? new Date().getFullYear())
 
-const datedPersons = computed(() =>
-  store.persons
-    .filter(p => p.birth_year)
-    .sort((a, b) => a.birth_year - b.birth_year || (a.name || '').localeCompare(b.name || ''))
-)
+// Lane order comes from the same family-tree layout the Tree View's
+// Generation mode uses: spouses sit side by side and children are placed
+// with their parents, so marriage/birth connectors stay short and readable.
+const datedPersons = computed(() => {
+  const dated = store.persons.filter(p => p.birth_year)
+  const { targets } = computeGenLayout(store.persons, store.relationships, 2000, 1000)
+  return dated.sort((a, b) => {
+    const xa = targets[a.id]?.x ?? Infinity
+    const xb = targets[b.id]?.x ?? Infinity
+    if (xa !== xb) return xa - xb
+    return (a.birth_year - b.birth_year) || (a.name || '').localeCompare(b.name || '')
+  })
+})
 const undatedCount = computed(() => store.persons.length - datedPersons.value.length)
 
 function lifeEnd(p) {
@@ -330,7 +380,9 @@ function lifeEnd(p) {
 }
 
 const minYear = computed(() =>
-  datedPersons.value.length ? datedPersons.value[0].birth_year : refYear.value - 50
+  datedPersons.value.length
+    ? Math.min(...datedPersons.value.map(p => p.birth_year))
+    : refYear.value - 50
 )
 const maxYear = computed(() => {
   let max = minYear.value + 10
@@ -477,10 +529,10 @@ const relatedSet = computed(() => {
 })
 
 // ── Year axis (ticks, bands, now-line — computed in screen space) ───────────
-const TICK_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500]
+const TICK_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000, 2000, 5000]
 
 const tickStep = computed(() =>
-  TICK_STEPS.find(s => s * pxPerYear.value >= 46) || 500
+  TICK_STEPS.find(s => s * pxPerYear.value >= 46) || TICK_STEPS[TICK_STEPS.length - 1]
 )
 
 function yearScreenY(year) {
@@ -544,14 +596,13 @@ function curPx() { return hasPending ? pendingPx : pxPerYear.value }
 function curLs() { return hasPending ? pendingLs : laneScale.value }
 
 function clampVals(px, ls, x, y) {
+  // Free pan/zoom, tree-view style: zooming out just reveals more of the
+  // year grid around a shrinking timeline. Only stop the world from being
+  // pushed entirely off-screen.
   const wW = worldWBase.value * ls
   const wH = yearSpan.value * px + Y_PAD * 2
-  const availW = stageW.value - GUTTER
-  let cx, cy
-  if (wW <= availW) cx = GUTTER + (availW - wW) / 2
-  else cx = Math.min(GUTTER + CLAMP_PAD, Math.max(stageW.value - wW - CLAMP_PAD, x))
-  if (wH <= stageH.value) cy = (stageH.value - wH) / 2
-  else cy = Math.min(CLAMP_PAD, Math.max(stageH.value - wH - CLAMP_PAD, y))
+  const cx = Math.min(stageW.value - KEEP, Math.max(GUTTER + KEEP - wW, x))
+  const cy = Math.min(stageH.value - KEEP, Math.max(KEEP - wH, y))
   return { x: cx, y: cy }
 }
 
@@ -668,13 +719,16 @@ function fitAll(animate = false) {
   if (!stageH.value) return
   const px = Math.min(MAX_PX, Math.max(MIN_PX, (stageH.value - 160) / yearSpan.value))
   const ls = Math.min(1, Math.max(MIN_LS, (stageW.value - GUTTER - 100) / worldWBase.value))
+  // The clamp no longer auto-centers, so center explicitly
+  const txT = GUTTER + Math.max(20, (stageW.value - GUTTER - worldWBase.value * ls) / 2)
+  const tyT = Math.max(40, (stageH.value - (yearSpan.value * px + Y_PAD * 2)) / 2)
   if (animate) {
-    tweenTo(px, ls, GUTTER + 40, 60)
+    tweenTo(px, ls, txT, tyT)
   } else {
     pxPerYear.value = px
     laneScale.value = ls
-    tx.value = GUTTER + 40
-    ty.value = 60
+    tx.value = txT
+    ty.value = tyT
     clampPan()
   }
 }
@@ -768,17 +822,6 @@ onBeforeUnmount(() => {
   cursor: help;
 }
 
-.tl-legend { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.tl-legend-item {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11.5px; font-weight: 600; color: var(--t2);
-}
-.tl-swatch { width: 18px; height: 3px; border-radius: 2px; }
-.tl-swatch-dashed {
-  background: none;
-  border-top: 3px dashed currentColor;
-  height: 0;
-}
 .tl-hint { font-size: 11px; color: var(--t3); font-weight: 500; }
 
 /* ── Stage ───────────────────────────────────────────────── */
@@ -838,6 +881,7 @@ onBeforeUnmount(() => {
   transition: stroke-width 0.2s ease, opacity 0.2s ease;
 }
 .tl-person.hovered .tl-life,
+.tl-person.lit .tl-life,
 .tl-person.selected .tl-life { stroke-width: 9; opacity: 1; }
 
 .tl-cap { stroke-width: 3; stroke-linecap: round; opacity: 0.9; }
@@ -918,30 +962,80 @@ onBeforeUnmount(() => {
 .tl-birth-line.adopted { stroke-dasharray: 4 4; }
 .tl-birth-dot { opacity: 0.8; }
 
-/* ── Floating controls ───────────────────────────────────── */
+/* ── Floating search (tree-view style) ───────────────────── */
+.tl-search {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 7px 14px; min-width: 260px; z-index: 5;
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  cursor: default;
+}
+.tl-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108, 142, 245, 0.15); }
+.tl-search-icon { font-size: 13px; flex-shrink: 0; }
+.tl-search input {
+  background: none; border: none; outline: none; font: inherit;
+  font-size: 13px; color: var(--t1); flex: 1; padding: 0; box-shadow: none; width: auto;
+}
+.tl-search input::placeholder { color: var(--t3); }
+.tl-search-clear {
+  border: none; background: transparent; color: var(--t3); cursor: pointer;
+  font-size: 11px; padding: 2px; border-radius: 4px; transition: color 0.12s;
+}
+.tl-search-clear:hover { color: var(--t1); }
+
+/* ── Zoom controls (tree-view control bar style) ─────────── */
 .tl-controls {
-  position: absolute; bottom: 16px; right: 16px; z-index: 4;
+  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+  z-index: 5;
   display: flex; align-items: center; gap: 4px;
-  border: 1px solid var(--border);
-  background: var(--glass-soft); backdrop-filter: blur(8px);
+  background: var(--surface); border: 1px solid var(--border);
   padding: 5px; border-radius: 12px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--shadow);
+  cursor: default;
 }
 .tl-ctrl-btn {
   border: none; background: transparent; color: var(--t2);
-  font-family: var(--font); font-size: 14px; font-weight: 700;
-  width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
+  font-family: var(--font); font-size: 15px;
+  width: 30px; height: 30px; border-radius: 7px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: background 0.13s, color 0.13s;
+  transition: background 0.12s, color 0.12s;
 }
 .tl-ctrl-btn:hover { background: var(--hover); color: var(--t1); }
-.tl-fit-btn { width: auto; padding: 0 10px; font-size: 12px; }
 .tl-zoom-label {
-  font-size: 11px; font-weight: 700; color: var(--t3);
+  font-size: 11px; font-weight: 600; color: var(--t3);
   min-width: 42px; text-align: center; font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  white-space: nowrap; padding: 0 6px;
 }
-.tl-ctrl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; }
+.tl-ctrl-sep { width: 1px; align-self: stretch; background: var(--border); margin: 3px 2px; }
+
+/* ── Legend panel (tree-view style) ──────────────────────── */
+.tl-legend-panel {
+  position: absolute; bottom: 18px; right: 16px; z-index: 5;
+  background: var(--glass-soft);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 11px; color: var(--t2);
+  box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 10px;
+  min-width: 140px;
+  cursor: default;
+}
+.tl-panel-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: var(--t3);
+}
+.tl-leg-section { display: flex; flex-direction: column; gap: 5px; }
+.tl-leg-label {
+  font-size: 9px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.6px; color: var(--t3); opacity: 0.7;
+}
+.tl-leg-row { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.tl-leg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.tl-leg-line { width: 22px; height: 2px; flex-shrink: 0; border-radius: 1px; }
+.tl-leg-dashed { height: 0; border-top: 2px dashed; background: none !important; }
 
 /* ── Marriage edit popup ─────────────────────────────────── */
 .tl-medit {
