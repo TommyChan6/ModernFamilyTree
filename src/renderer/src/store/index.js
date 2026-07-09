@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '../api.js'
+import { latestDataYear } from './currentYear.js'
 
 export const useMainStore = defineStore('main', () => {
   // ── Tree management ───────────────────────────────────────────────────────
@@ -24,7 +25,17 @@ export const useMainStore = defineStore('main', () => {
   const lockLines = ref(false)
   const relPopup = ref(null)
   const cleanTree = ref(false)
-  const currentDate = ref(null)
+  // Current year. `userCurrentYear` is the explicit user override (null = follow
+  // the data). While it's null the current year tracks the latest year present
+  // in the data; once the user sets a value it stays pinned there regardless of
+  // newly added later dates. `currentDate` ({ year } | null) is the effective
+  // value every view reads.
+  const userCurrentYear = ref(null)
+  const autoCurrentYear = computed(() => latestDataYear(persons.value, relationships.value))
+  const currentDate = computed(() => {
+    const y = userCurrentYear.value ?? autoCurrentYear.value
+    return y != null ? { year: y } : null
+  })
   const graphDirty = ref(false)
   const activeView = ref('tree') // 'tree' | 'people' | 'relationships' | 'timeline' | 'factions'
 
@@ -117,6 +128,7 @@ export const useMainStore = defineStore('main', () => {
       editingPerson.value = null
       relPopup.value = null
       graphDirty.value = false
+      userCurrentYear.value = null // revert to auto; restored from the tree's saved layout
       // Reload data for new tree
       await loadAll()
     }
@@ -310,6 +322,15 @@ export const useMainStore = defineStore('main', () => {
 
   function toggleSettings() { settingsOpen.value = !settingsOpen.value }
 
+  // Set (or clear, with a falsy value) the explicit current year. Clearing
+  // reverts to auto-tracking the latest year in the data. Part of the saved
+  // layout, so an explicit change lights up the unsaved-layout indicator.
+  function setCurrentYear(year) {
+    const y = parseInt(year)
+    userCurrentYear.value = (Number.isFinite(y) && y > 0) ? y : null
+    graphDirty.value = true
+  }
+
   function updateGraphSetting(key, value) {
     graphSettings.value[key] = value
     api.invoke('settings:set', { key: `graph_${key}`, value: JSON.stringify(value) })
@@ -333,7 +354,7 @@ export const useMainStore = defineStore('main', () => {
     persons, relationships, factions, scenarios, activeScenarioId,
     draggingPersonId, selectedPersonId, modalOpen, formOpen,
     editingPerson, theme, settingsOpen, graphSettings,
-    lockNodes, cleanTree, currentDate, lockLines, relPopup, activeView,
+    lockNodes, cleanTree, currentDate, userCurrentYear, autoCurrentYear, lockLines, relPopup, activeView,
     // computed
     selectedPerson, personCount, coupleCount, activeScenario, activeFactions,
     // actions
@@ -343,7 +364,7 @@ export const useMainStore = defineStore('main', () => {
     addPersonToFaction, removePersonFromFaction,
     createScenario, renameScenario, deleteScenario, setActiveScenario,
     selectPerson, openForm, closeModal, closeForm,
-    setTheme, toggleSettings, updateGraphSetting, resetGraphSettings,
+    setTheme, toggleSettings, setCurrentYear, updateGraphSetting, resetGraphSettings,
     graphDirty,
     markGraphDirty() { graphDirty.value = true },
     clearGraphDirty() { graphDirty.value = false },

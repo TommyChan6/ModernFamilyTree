@@ -1056,11 +1056,14 @@ function collectGraphState() {
     modeActiveStateIdx: { ...modeActiveStateIdx },
     modeStateSnapshots: JSON.parse(JSON.stringify(modeStateSnapshots)),
     genRowSpacing: ctx.genRowSpacing,
+    userCurrentYear: store.userCurrentYear,
   }
 }
 
 function restoreGraphState(state) {
   if (!state) return
+  // Restore the saved current-year override (undefined in older saves → auto).
+  store.userCurrentYear = state.userCurrentYear ?? null
   // Restore mode state names and snapshots
   for (const mode of ['custom', 'auto', 'age', 'generation']) {
     if (state.modeStateNames?.[mode]) modeStateNames[mode] = state.modeStateNames[mode]

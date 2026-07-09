@@ -142,11 +142,17 @@
           max="2200"
         />
         <button
-          v-if="store.currentDate"
+          v-if="store.userCurrentYear"
           class="date-clear-btn"
           @click="setCurrentDate('')"
-          title="Clear date"
+          title="Reset to latest year in data"
         >✕</button>
+      </div>
+      <div class="date-hint" v-if="!store.userCurrentYear && store.currentDate">
+        Auto · latest year in data
+      </div>
+      <div class="date-hint" v-else-if="!store.currentDate">
+        No dates yet
       </div>
     </div>
 
@@ -180,8 +186,7 @@ import { useMainStore } from '../store/index.js'
 const store = useMainStore()
 
 function setCurrentDate(val) {
-  const year = parseInt(val)
-  store.currentDate = (year && year > 0) ? { year } : null
+  store.setCurrentYear(val)
 }
 
 const generationCount = computed(() => {
@@ -424,5 +429,11 @@ function handleImport() {
 .date-clear-btn:hover {
   background: rgba(239, 83, 80, 0.12);
   color: #ef5350;
+}
+
+.date-hint {
+  padding: 0 16px 4px;
+  font-size: 10px;
+  color: var(--t3);
 }
 </style>

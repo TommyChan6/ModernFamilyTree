@@ -5,6 +5,7 @@ import {
   columnCount, gridHeight, rowWindow, ageOf, isDeceased,
   CARD_W, GAP, PAD, ROW_H,
 } from '../src/renderer/src/components/people/peopleLayout.js'
+import { latestDataYear } from '../src/renderer/src/store/currentYear.js'
 
 const REF = 2026
 
@@ -188,5 +189,45 @@ describe('People view — person display helpers', () => {
     expect(isDeceased({ death_year: 2020 }, REF)).toBe(true)
     expect(isDeceased({ death_year: 2100 }, REF)).toBe(false)
     expect(isDeceased({}, REF)).toBe(false)
+  })
+})
+
+describe('latestDataYear (temporary current year)', () => {
+  it('is null for an empty project', () => {
+    expect(latestDataYear([], [])).toBe(null)
+    expect(latestDataYear()).toBe(null)
+  })
+
+  it('uses the latest birth or death year across people', () => {
+    const persons = [
+      { id: 'a', birth_year: 1950, death_year: 2001 },
+      { id: 'b', birth_year: 1975 },
+      { id: 'c', birth_year: 1948, death_year: 1990 },
+    ]
+    expect(latestDataYear(persons, [])).toBe(2001)
+  })
+
+  it('picks a later birth year over an earlier death year', () => {
+    const persons = [
+      { id: 'a', birth_year: 1950, death_year: 1990 },
+      { id: 'b', birth_year: 1995 },
+    ]
+    expect(latestDataYear(persons, [])).toBe(1995)
+  })
+
+  it('considers relationship formed dates (numeric or string)', () => {
+    const persons = [{ id: 'a', birth_year: 1950 }]
+    const rels = [{ id: 'm', formed_date: '1999' }]
+    expect(latestDataYear(persons, rels)).toBe(1999)
+  })
+
+  it('ignores missing, zero and non-numeric years', () => {
+    const persons = [
+      { id: 'a', birth_year: null, death_year: undefined },
+      { id: 'b', birth_year: 0 },
+      { id: 'c', birth_year: 1960 },
+    ]
+    const rels = [{ id: 'm', formed_date: '' }, { id: 'n', formed_date: 'unknown' }]
+    expect(latestDataYear(persons, rels)).toBe(1960)
   })
 })
