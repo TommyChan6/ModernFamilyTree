@@ -56,7 +56,20 @@
       "PowerShell(npm i --no-save --no-audit --no-fund playwright-core | Out-Null; Write-Output installed; $t = Get-Item 'C:\\\\Users\\\\tommy\\\\AppData\\\\Roaming\\\\family-tree\\\\db\\\\familytree.json'; Write-Output \"real db mtime before: $\\($t.LastWriteTime\\)\")",
       "PowerShell($el = Get-Process electron -ErrorAction SilentlyContinue; Write-Output \"electron running: $\\($el.Count\\)\"; $j = Get-Content 'C:\\\\Users\\\\tommy\\\\AppData\\\\Roaming\\\\family-tree\\\\db\\\\familytree.json' -Raw | ConvertFrom-Json; Write-Output \"factions: $\\($j.factions.PSObject.Properties.Name.Count\\) scenarios: $\\(if \\($j.scenarios\\) { $j.scenarios.PSObject.Properties.Name.Count } else { 'none' }\\) theme: $\\($j.globalSettings.theme\\)\")",
       "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\ce1fc0fe-c8cb-4bec-921c-0ed21c8ae210\\\\scratchpad\\\\verify-scenarios.mjs\")",
-      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\ce1fc0fe-c8cb-4bec-921c-0ed21c8ae210\\\\scratchpad\\\\probe-nodedrag.mjs\")"
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\ce1fc0fe-c8cb-4bec-921c-0ed21c8ae210\\\\scratchpad\\\\probe-nodedrag.mjs\")",
+      "Bash(curl -s --max-time 25 \"https://genshin.jmp.blue/characters\")",
+      "Bash(curl -s --max-time 25 \"https://genshin.jmp.blue/characters/hu-tao\")",
+      "Bash(python -m json.tool)",
+      "Bash(node import-genshin.mjs)",
+      "Bash(node -e ' *)",
+      "PowerShell(Get-Process | Where-Object { $_.ProcessName -match 'electron|family' } | Select-Object Id, ProcessName, StartTime | Format-Table -AutoSize)",
+      "PowerShell($p = Get-Process | Where-Object { $_.ProcessName -match 'electron|family' }; if \\($p\\) { $p | Select-Object Id,ProcessName | Format-Table -AutoSize } else { \"NO APP RUNNING\" })",
+      "PowerShell($p = Get-Process | Where-Object { $_.ProcessName -match 'electron|family' }; if \\($p\\) { \"STILL RUNNING: \" + $p.Count } else { \"NO APP RUNNING\" })",
+      "Bash(node build-factions.mjs)",
+      "Bash(node set-ages.mjs)",
+      "PowerShell(npm install three@^0.169.0 --save)",
+      "PowerShell(npm test 2>&1)",
+      "PowerShell(npm run build 2>&1)"
     ]
   }
 }

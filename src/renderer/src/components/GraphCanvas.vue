@@ -1,6 +1,7 @@
 <template>
   <div class="graph-area" ref="containerEl">
-    <svg ref="svgEl" class="graph-svg"></svg>
+    <canvas ref="glCanvasEl" class="graph-gl"></canvas>
+    <canvas ref="overlayEl" class="graph-overlay"></canvas>
     <div class="graph-search" :class="{ 'clean-hide-up': store.cleanTree }">
       <span class="search-icon">🔍</span>
       <input v-model="searchQuery" placeholder="Search family members…" @input="highlightSearch" />
@@ -166,14 +167,17 @@
 import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import * as d3 from 'd3'
 import { useMainStore } from '../store/index.js'
-import { nodeColor, linkPath, getLinkStroke, getLinkWidth, getLinkEmphOpacity, getLinkMarker, getDashArray } from './graph/linkHelpers.js'
+import { nodeColor, getLinkStroke, getLinkWidth, getLinkEmphOpacity, getLinkMarker, getDashArray } from './graph/linkHelpers.js'
 import { computeAgeYPositions } from './graph/layoutAge.js'
 import { computeGenLayout } from './graph/layoutGeneration.js'
-import { drawYearGuides, drawGenGuides, removeGuides, updateGuideWidths, nearestGenRowY, updateGenPreview, removeGenPreview, resolveGenTarget, cleanupEmptyGenRows, drawCurrentYearLine, removeCurrentYearLine } from './graph/guideLines.js'
+import { drawYearGuides, drawGenGuides, removeGuides, nearestGenRowY, updateGenPreview, removeGenPreview, resolveGenTarget, cleanupEmptyGenRows, drawCurrentYearLine, removeCurrentYearLine, cancelGuideTimers } from './graph/guideLines.js'
 import { useGraphAnimation } from './graph/useGraphAnimation.js'
+import { WebGLGraphRenderer } from './graph/webgl/WebGLGraphRenderer.js'
+import { screenToWorld } from './graph/webgl/coords.js'
 
 const store = useMainStore()
-const svgEl = ref(null)
+const glCanvasEl = ref(null)
+const overlayEl = ref(null)
 const containerEl = ref(null)
 const searchQuery = ref('')
 const currentMode = ref('auto')
@@ -186,19 +190,21 @@ const modes = [
   { id: 'generation', label: '🏛 Gen', title: 'Generational layout' }
 ]
 
-// Default human silhouette (Material "person" icon, 24×24 viewBox, centred ~12,12)
-const PERSON_ICON_PATH = 'M12 12.5c2.49 0 4.5-2.01 4.5-4.5S14.49 3.5 12 3.5 7.5 5.51 7.5 8s2.01 4.5 4.5 4.5zm0 2.25c-3 0-9 1.51-9 4.5V22h18v-2.75c0-2.99-6-4.5-9-4.5z'
-
 // ── Shared mutable context ──────────────────────────────────────────────────
 const ctx = {
-  simulation: null, zoomBehavior: null, svgSelection: null, rootGroup: null,
+  simulation: null, zoomBehavior: null, zoomSelection: null, renderer: null,
   nodesData: [], linksData: [],
   animTimer: null, resizeObserver: null,
-  genRowYValues: [], genRowSpacing: 140, genPreviewLine: null, guideLineElements: [], currentYearLine: null,
+  transform: { x: 0, y: 0, k: 1 },
+  genRowYValues: [], genRowSpacing: 140,
+  arrowSize: 9,       // animated arrowhead size for lineage emphasis
   modeSnapshots: { custom: null, auto: null, age: null, generation: null },
-  containerRef: null,  // set in onMounted
-  ticked: null,        // set below
+  containerRef: null, // set in onMounted
+  ticked: null,       // set below
+  requestRedraw: null,
 }
+let hoverId = null      // node currently hovered (for glow)
+let couplesHiSet = null // ids highlighted by the Marriage filter, or null
 
 const modeEmphasis = { custom: 'neutral', auto: 'neutral', age: 'neutral', generation: 'neutral' }
 
@@ -250,40 +256,12 @@ function setGenderHighlight(which) {
   applyGenderHighlight()
 }
 
-function applyGenderHighlight() {
-  if (!ctx.rootGroup) return
-  const g = activeGender.value
-  const gs = store.graphSettings
+// Highlights are now visual filters computed at draw time in nodeVisual()/linkVisual().
+// Toggling one just flags the renderer to re-sync node/link styles and redraw.
+function markNodeStyles() { ctx.renderer?.markNodeStylesDirty(); ctx.requestRedraw?.() }
+function markLinkStyles() { ctx.renderer?.markLinkStylesDirty(); ctx.requestRedraw?.() }
 
-  ctx.rootGroup.selectAll('g.graph-node')
-    .transition().duration(250).ease(d3.easeCubicOut)
-    .attr('opacity', d => {
-      if (g === 'normal') return gs.nodeOpacity
-      if (g === 'male') return d.gender === 'male' ? gs.nodeOpacity : gs.nodeOpacity * 0.25
-      if (g === 'female') return d.gender === 'female' ? gs.nodeOpacity : gs.nodeOpacity * 0.25
-      return gs.nodeOpacity
-    })
-
-  ctx.rootGroup.selectAll('g.graph-node').select('.node-circle')
-    .transition().duration(250).ease(d3.easeCubicOut)
-    .attr('r', d => {
-      const base = gs.nodeRadius
-      if (g === 'normal') return base
-      if (g === 'male' && d.gender === 'male') return base * 1.15
-      if (g === 'female' && d.gender === 'female') return base * 1.15
-      return base
-    })
-
-  ctx.rootGroup.selectAll('g.graph-node').select('.node-shadow')
-    .transition().duration(250).ease(d3.easeCubicOut)
-    .attr('r', d => {
-      const base = gs.nodeRadius + 2
-      if (g === 'normal') return base
-      if (g === 'male' && d.gender === 'male') return base + 2
-      if (g === 'female' && d.gender === 'female') return base + 2
-      return base
-    })
-}
+function applyGenderHighlight() { markNodeStyles() }
 
 // ── Couples highlight ────────────────────────────────────────────────────────
 const couplesOptions = [
@@ -304,66 +282,26 @@ function setCouplesHighlight(which) {
   applyCouplesHighlight()
 }
 
-function applyCouplesHighlight() {
-  if (!ctx.rootGroup) return
+// Precompute the id set highlighted by the Marriage filter (read by nodeVisual/linkVisual).
+function recomputeCouplesSet() {
   const c = activeCouples.value
-  const gs = store.graphSettings
+  if (c === 'normal') { couplesHiSet = null; return }
   const rels = store.relationships
-
-  // Find persons who are in the target relationship
-  const highlightedIds = new Set()
-  if (c !== 'normal') {
-    const allSpouseIds = new Set()
-    const marriedIds = new Set()
-    const divorcedIds = new Set()
-    rels.forEach(r => {
-      if (r.type !== 'spouse') return
-      allSpouseIds.add(r.person_a_id); allSpouseIds.add(r.person_b_id)
-      if (r.status === 'divorced') { divorcedIds.add(r.person_a_id); divorcedIds.add(r.person_b_id) }
-      else { marriedIds.add(r.person_a_id); marriedIds.add(r.person_b_id) }
-    })
-    if (c === 'married') marriedIds.forEach(id => highlightedIds.add(id))
-    else if (c === 'divorced') divorcedIds.forEach(id => highlightedIds.add(id))
-    else if (c === 'single') {
-      ctx.nodesData.forEach(n => { if (!allSpouseIds.has(n.id)) highlightedIds.add(n.id) })
-    }
-  }
-
-  ctx.rootGroup.selectAll('g.graph-node')
-    .transition().duration(250).ease(d3.easeCubicOut)
-    .attr('opacity', d => {
-      if (c === 'normal') return gs.nodeOpacity
-      return highlightedIds.has(d.id) ? gs.nodeOpacity : gs.nodeOpacity * 0.2
-    })
-
-  ctx.rootGroup.selectAll('g.graph-node').select('.node-circle')
-    .transition().duration(250).ease(d3.easeCubicOut)
-    .attr('r', d => {
-      const base = gs.nodeRadius
-      if (c === 'normal') return base
-      return highlightedIds.has(d.id) ? base * 1.15 : base
-    })
-
-  // Also highlight/dim the spouse lines
-  ctx.rootGroup.selectAll('g.graph-link-group').select('.graph-link')
-    .transition().duration(250).ease(d3.easeCubicOut)
-    .attr('opacity', d => {
-      if (c === 'normal') return gs.linkOpacity
-      if (c === 'single') return d.type === 'spouse' ? gs.linkOpacity * 0.15 : gs.linkOpacity * 0.3
-      if (d.type !== 'spouse') return gs.linkOpacity * 0.2
-      if (c === 'married' && d.status !== 'divorced') return Math.min(1, gs.linkOpacity * 1.5)
-      if (c === 'divorced' && d.status === 'divorced') return Math.min(1, gs.linkOpacity * 1.5)
-      return gs.linkOpacity * 0.2
-    })
-    .attr('stroke-width', d => {
-      const base = d.type === 'spouse' ? gs.spouseWidth : d.type === 'adopted' ? gs.adoptedWidth : gs.parentChildWidth
-      if (c === 'normal' || c === 'single') return base
-      if (d.type !== 'spouse') return base
-      if (c === 'married' && d.status !== 'divorced') return base * 2
-      if (c === 'divorced' && d.status === 'divorced') return base * 2
-      return base
-    })
+  const allSpouseIds = new Set(), marriedIds = new Set(), divorcedIds = new Set()
+  rels.forEach(r => {
+    if (r.type !== 'spouse') return
+    allSpouseIds.add(r.person_a_id); allSpouseIds.add(r.person_b_id)
+    if (r.status === 'divorced') { divorcedIds.add(r.person_a_id); divorcedIds.add(r.person_b_id) }
+    else { marriedIds.add(r.person_a_id); marriedIds.add(r.person_b_id) }
+  })
+  const set = new Set()
+  if (c === 'married') marriedIds.forEach(id => set.add(id))
+  else if (c === 'divorced') divorcedIds.forEach(id => set.add(id))
+  else if (c === 'single') ctx.nodesData.forEach(n => { if (!allSpouseIds.has(n.id)) set.add(n.id) })
+  couplesHiSet = set
 }
+
+function applyCouplesHighlight() { recomputeCouplesSet(); markNodeStyles(); markLinkStyles() }
 
 // ── Date & Deceased highlight ───────────────────────────────────────────────
 const deceasedOptions = [
@@ -394,29 +332,7 @@ function setDeceasedHighlight(which) {
   applyDeceasedHighlight()
 }
 
-function applyDeceasedHighlight() {
-  if (!ctx.rootGroup) return
-  const d = activeDeceased.value
-  const gs = store.graphSettings
-
-  ctx.rootGroup.selectAll('g.graph-node')
-    .transition().duration(250).ease(d3.easeCubicOut)
-    .attr('opacity', person => {
-      if (d === 'normal') return gs.nodeOpacity
-      if (d === 'deceased') return isDeceased(person) ? gs.nodeOpacity : gs.nodeOpacity * 0.2
-      if (d === 'living') return isLiving(person) ? gs.nodeOpacity : gs.nodeOpacity * 0.2
-      return gs.nodeOpacity
-    })
-
-  ctx.rootGroup.selectAll('g.graph-node').select('.node-circle')
-    .transition().duration(250).ease(d3.easeCubicOut)
-    .attr('r', person => {
-      const base = gs.nodeRadius
-      if (d === 'deceased' && isDeceased(person)) return base * 1.15
-      if (d === 'living' && isLiving(person)) return base * 1.15
-      return base
-    })
-}
+function applyDeceasedHighlight() { markNodeStyles() }
 
 // ── Popup computeds ─────────────────────────────────────────────────────────
 const relPopupStyle = computed(() => {
@@ -638,18 +554,102 @@ function cancelRename() {
 
 
 // ── Ticked ──────────────────────────────────────────────────────────────────
+// The single render sink. Under WebGL it just marks the picker stale and requests a redraw;
+// the renderer's on-demand loop reads node positions and repaints (nodes + links + overlay).
 function ticked() {
-  if (!ctx.rootGroup) return
-  ctx.rootGroup.selectAll('g.graph-link-group').each(function (d) {
-    const p = linkPath(d, store.graphSettings.lineCurvature)
-    d3.select(this).select('.link-hit').attr('d', p)
-    d3.select(this).select('.graph-link').attr('d', p)
-  })
-  ctx.rootGroup.selectAll('g.graph-node').attr('transform', d => `translate(${d.x},${d.y})`)
-  updateGuideWidths(ctx)
+  if (!ctx.renderer) return
+  ctx.renderer.invalidatePicker()
+  ctx.renderer.requestRedraw()
 }
 ctx.ticked = ticked
-ctx.theme = store.theme
+ctx.requestRedraw = () => ctx.renderer?.requestRedraw()
+
+function getImageUrl(filePath) {
+  return window.electronAPI?.getImageUrl?.(filePath) || null
+}
+
+// Age in years: counted to the current date (or today if none set), capped at death year.
+function ageOf(d) {
+  if (!d.birth_year) return null
+  const refYear = store.currentDate?.year ?? new Date().getFullYear()
+  const endYear = d.death_year ? Math.min(d.death_year, refYear) : refYear
+  const age = endYear - d.birth_year
+  return age >= 0 ? age : null
+}
+
+// ── Per-node / per-link visual descriptors (single source of truth for styling) ──────
+// These reproduce the old SVG renderNodes/renderLinks styling, including the Highlights
+// panel filters, but as plain values consumed by the WebGL layers each redraw.
+function nodeVisual(n) {
+  const gs = store.graphSettings
+  const selected = store.selectedPersonId === n.id
+  const fill = selected
+    ? (d3.color(nodeColor(n.gender, gs))?.brighter(0.4)?.toString() || nodeColor(n.gender, gs))
+    : nodeColor(n.gender, gs)
+
+  let opacityMul = 1, radiusMul = 1
+  const g = activeGender.value
+  if (g === 'male') { if (n.gender === 'male') radiusMul = 1.15; else opacityMul *= 0.25 }
+  else if (g === 'female') { if (n.gender === 'female') radiusMul = 1.15; else opacityMul *= 0.25 }
+  if (couplesHiSet) { if (couplesHiSet.has(n.id)) radiusMul = Math.max(radiusMul, 1.15); else opacityMul *= 0.2 }
+  const dc = activeDeceased.value
+  if (dc === 'deceased') { if (isDeceased(n)) radiusMul = Math.max(radiusMul, 1.15); else opacityMul *= 0.2 }
+  else if (dc === 'living') { if (isLiving(n)) radiusMul = Math.max(radiusMul, 1.15); else opacityMul *= 0.2 }
+  const q = searchQuery.value.toLowerCase().trim()
+  if (q && !(n.name || '').toLowerCase().includes(q)) opacityMul *= 0.2
+
+  return {
+    radius: gs.nodeRadius * radiusMul,
+    fill,
+    border: selected ? '#6c8ef5' : '#ffffff',
+    borderPx: selected ? 3 : 1.5,
+    borderA: selected ? 0.95 : 0.18,
+    opacity: gs.nodeOpacity * opacityMul,
+    selected,
+    glow: (selected || (hoverId === n.id && gs.glowOnHover)) ? 1 : 0,
+    imageUrl: n.primary_image ? getImageUrl(n.primary_image) : null,
+  }
+}
+
+const MARKER_COLORS = {
+  'url(#arr-pat)': '#4a90d9', 'url(#arr-mat)': '#d94a8a',
+  'url(#arr-pat-ad)': '#7bb8f0', 'url(#arr-mat-ad)': '#eda0c4',
+}
+function markerColor(marker, gs) {
+  if (marker === 'url(#arr)') return gs.parentChildColor
+  if (marker === 'url(#arr-a)') return gs.adoptedColor
+  return MARKER_COLORS[marker] || gs.parentChildColor
+}
+
+function linkVisual(d) {
+  const gs = store.graphSettings, emph = emphVisual(), persons = store.persons
+  const colorHex = getLinkStroke(d, emph, gs, persons)
+  let width = getLinkWidth(d, emph, gs, persons)
+  let opacity = getLinkEmphOpacity(d, emph, gs, persons)
+
+  // Marriage highlight overrides opacity/width for spouse vs non-spouse (mirrors SVG).
+  const c = activeCouples.value
+  if (c !== 'normal') {
+    const base = d.type === 'spouse' ? gs.spouseWidth : d.type === 'adopted' ? gs.adoptedWidth : gs.parentChildWidth
+    if (c === 'single') { opacity = d.type === 'spouse' ? gs.linkOpacity * 0.15 : gs.linkOpacity * 0.3; width = base }
+    else if (d.type !== 'spouse') { opacity = gs.linkOpacity * 0.2; width = base }
+    else if (c === 'married' && d.status !== 'divorced') { opacity = Math.min(1, gs.linkOpacity * 1.5); width = base * 2 }
+    else if (c === 'divorced' && d.status === 'divorced') { opacity = Math.min(1, gs.linkOpacity * 1.5); width = base * 2 }
+    else { opacity = gs.linkOpacity * 0.2; width = base }
+  }
+
+  const dashStr = getDashArray(d)
+  let dashLen = 0, dashGap = 0
+  if (dashStr) { const p = dashStr.split(',').map(Number); dashLen = p[0]; dashGap = p[1] }
+
+  const marker = getLinkMarker(d, emph, persons)
+  const isPatMat = marker && (marker.includes('pat') || marker.includes('mat'))
+  return {
+    colorHex, width, opacity, dashLen, dashGap,
+    arrowColor: marker ? markerColor(marker, gs) : null,
+    arrowSize: isPatMat ? 14 : 9,
+  }
+}
 
 // ── Init graph ──────────────────────────────────────────────────────────────
 function initGraph() {
@@ -658,56 +658,39 @@ function initGraph() {
   ctx.containerRef = container
   const { width, height } = container.getBoundingClientRect()
 
-  ctx.svgSelection = d3.select(svgEl.value).attr('width', width).attr('height', height)
-  const defs = ctx.svgSelection.append('defs')
+  const hooks = {
+    getSettings: () => store.graphSettings,
+    getTheme: () => store.theme,
+    getNodes: () => ctx.nodesData,
+    getLinks: () => ctx.linksData,
+    getPersons: () => store.persons,
+    getEmphasis: () => emphVisual(),
+    nodeVisual,
+    linkVisual,
+    overlayOpts: () => ({
+      gs: store.graphSettings,
+      nodes: ctx.nodesData,
+      showLabels: store.graphSettings.showLabels,
+      showAge: store.graphSettings.showAge,
+      selectedId: store.selectedPersonId,
+      labelOpacityOf: (n) => Math.min(1, nodeVisual(n).opacity),
+      ageOf,
+    }),
+  }
+  ctx.renderer = new WebGLGraphRenderer({ glCanvas: glCanvasEl.value, overlayCanvas: overlayEl.value, hooks })
+  ctx.renderer.resize(width, height)
+  ctx.renderer.setTheme(store.theme === 'light')
 
-  const nodeR = store.graphSettings.nodeRadius
-  ;[{ id: 'arr', fill: '#8b6cc5' }, { id: 'arr-a', fill: '#f5a623' }, { id: 'arr-pat', fill: '#4a90d9' }, { id: 'arr-mat', fill: '#d94a8a' }, { id: 'arr-pat-ad', fill: '#7bb8f0' }, { id: 'arr-mat-ad', fill: '#eda0c4' }]
-    .forEach(({ id, fill }) => {
-      defs.append('marker').attr('id', id)
-        .attr('markerWidth', 10).attr('markerHeight', 10)
-        .attr('refX', nodeR + 10).attr('refY', 5)
-        .attr('orient', 'auto').attr('markerUnits', 'userSpaceOnUse')
-        .attr('viewBox', '0 0 10 10')
-        .append('path').attr('d', 'M0,0 L0,10 L10,5z').attr('fill', fill).attr('opacity', 0.9)
+  // d3.zoom on the (topmost) overlay canvas drives the shared camera transform.
+  ctx.zoomBehavior = d3.zoom().scaleExtent([0.1, 4])
+    .filter(zoomFilter)
+    .on('zoom', e => {
+      ctx.transform = { x: e.transform.x, y: e.transform.y, k: e.transform.k }
+      ctx.renderer.setCamera(ctx.transform)
     })
-
-  const glowFilter = defs.append('filter').attr('id', 'glow')
-  glowFilter.append('feGaussianBlur').attr('stdDeviation', 3).attr('result', 'coloredBlur')
-  const fm = glowFilter.append('feMerge')
-  fm.append('feMergeNode').attr('in', 'coloredBlur')
-  fm.append('feMergeNode').attr('in', 'SourceGraphic')
-
-  // Gradient drop shadow for nodes — dark mode
-  const shadowDark = defs.append('filter').attr('id', 'node-shadow-dark')
-    .attr('x', '-40%').attr('y', '-40%').attr('width', '180%').attr('height', '180%')
-  shadowDark.append('feGaussianBlur').attr('in', 'SourceAlpha').attr('stdDeviation', 4).attr('result', 'blur')
-  shadowDark.append('feOffset').attr('dx', 2).attr('dy', 3).attr('result', 'offsetBlur')
-  shadowDark.append('feComponentTransfer').attr('in', 'offsetBlur').attr('result', 'shadow')
-    .append('feFuncA').attr('type', 'linear').attr('slope', 0.35)
-  const fmDark = shadowDark.append('feMerge')
-  fmDark.append('feMergeNode').attr('in', 'shadow')
-  fmDark.append('feMergeNode').attr('in', 'SourceGraphic')
-
-  // Gradient drop shadow for nodes — light mode (softer, more diffuse)
-  const shadowLight = defs.append('filter').attr('id', 'node-shadow-light')
-    .attr('x', '-40%').attr('y', '-40%').attr('width', '180%').attr('height', '180%')
-  shadowLight.append('feGaussianBlur').attr('in', 'SourceAlpha').attr('stdDeviation', 6).attr('result', 'blur')
-  shadowLight.append('feOffset').attr('dx', 1).attr('dy', 2).attr('result', 'offsetBlur')
-  shadowLight.append('feComponentTransfer').attr('in', 'offsetBlur').attr('result', 'shadow')
-    .append('feFuncA').attr('type', 'linear').attr('slope', 0.15)
-  const fmLight = shadowLight.append('feMerge')
-  fmLight.append('feMergeNode').attr('in', 'shadow')
-  fmLight.append('feMergeNode').attr('in', 'SourceGraphic')
-
-  ctx.zoomBehavior = d3.zoom().scaleExtent([0.1, 4]).on('zoom', e => ctx.rootGroup.attr('transform', e.transform))
-  ctx.svgSelection.call(ctx.zoomBehavior)
-  ctx.svgSelection.on('click', () => { store.selectPerson(null); store.relPopup = null })
-
-  ctx.rootGroup = ctx.svgSelection.append('g').attr('class', 'root-group')
-  ctx.rootGroup.append('g').attr('class', 'guides-layer')
-  ctx.rootGroup.append('g').attr('class', 'links-layer')
-  ctx.rootGroup.append('g').attr('class', 'nodes-layer')
+  ctx.zoomSelection = d3.select(overlayEl.value)
+  ctx.zoomSelection.call(ctx.zoomBehavior)
+  installPointerHandlers()
 
   ctx.simulation = d3.forceSimulation()
     .force('link', d3.forceLink().id(d => d.id).distance(160).strength(0.4))
@@ -719,7 +702,7 @@ function initGraph() {
   ctx.resizeObserver = new ResizeObserver(() => {
     if (!container) return
     const r = container.getBoundingClientRect()
-    ctx.svgSelection.attr('width', r.width).attr('height', r.height)
+    ctx.renderer.resize(r.width, r.height)
     if (currentMode.value === 'auto') {
       ctx.simulation.force('center', d3.forceCenter(r.width / 2, r.height / 2))
       ctx.simulation.alpha(0.1).restart()
@@ -730,7 +713,7 @@ function initGraph() {
 
 // ── Data sync ───────────────────────────────────────────────────────────────
 function updateGraph() {
-  if (!ctx.simulation || !ctx.rootGroup) return
+  if (!ctx.simulation || !ctx.renderer) return
   const existingById = {}
   ctx.nodesData.forEach(n => { existingById[n.id] = n })
 
@@ -749,198 +732,131 @@ function updateGraph() {
   const hadNew = newNodes.length > ctx.nodesData.length
   ctx.nodesData = newNodes
   ctx.linksData = store.relationships.map(r => ({ ...r, source: r.person_a_id, target: r.person_b_id }))
+  // Drop stale interaction refs to nodes that no longer exist.
+  if (hoverId && !newNodes.some(n => n.id === hoverId)) hoverId = null
+  if (drag && !newNodes.includes(drag.node)) drag = null
   ctx.simulation.nodes(ctx.nodesData)
   ctx.simulation.force('link').links(ctx.linksData)
   if (currentMode.value === 'auto') ctx.simulation.alpha(hadNew ? 0.3 : 0.1).restart()
-  renderLinks()
-  renderNodes()
+  recomputeCouplesSet()
+  ctx.renderer.setData(ctx.nodesData, ctx.linksData)
 }
 
-// ── Rendering ───────────────────────────────────────────────────────────────
-function renderLinks() {
-  const layer = ctx.rootGroup.select('.links-layer')
-  const link = layer.selectAll('g.graph-link-group').data(ctx.linksData, d => d.id)
-  link.exit().remove()
+// ── Interaction: zoom + node drag + hover + click ────────────────────────────
+// Zoom/pan is handled by d3.zoom on the overlay canvas; node dragging is our own pointer
+// logic (there are no per-node DOM elements to attach d3.drag to). The zoom filter blocks
+// panning when the press lands on a draggable node so the two gestures never conflict.
+let drag = null            // { node, moved, downX, downY }
+let grab = { dx: 0, dy: 0 } // grab offset so the node doesn't jump to the cursor
+let pending = null          // potential click (press that didn't grab a node)
 
-  const entered = link.enter().append('g').attr('class', 'graph-link-group')
-  entered.append('path').attr('class', 'link-hit').attr('fill', 'none')
-    .attr('stroke', 'transparent').attr('stroke-width', 14).attr('cursor', 'pointer')
-  entered.append('path').attr('class', 'graph-link').attr('fill', 'none')
-    .attr('pointer-events', 'none').attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round')
+function clientToWorld(clientX, clientY) {
+  const rect = overlayEl.value.getBoundingClientRect()
+  return screenToWorld(clientX - rect.left, clientY - rect.top, ctx.transform)
+}
+function hitRadius() { return store.graphSettings.nodeRadius }
 
-  entered.select('.link-hit').on('click', (event, d) => {
-    event.stopPropagation()
-    if (store.lockLines) return
-    const rect = ctx.containerRef.getBoundingClientRect()
-    store.relPopup = { rel: d, x: event.clientX - rect.left, y: event.clientY - rect.top - 10 }
-  })
-
-  const gs = store.graphSettings, emph = emphVisual(), persons = store.persons
-  entered.merge(link).select('.graph-link')
-    .attr('stroke', d => getLinkStroke(d, emph, gs, persons))
-    .attr('stroke-width', d => getLinkWidth(d, emph, gs, persons))
-    .attr('stroke-dasharray', d => getDashArray(d))
-    .attr('marker-end', d => getLinkMarker(d, emph, persons))
-    .attr('opacity', d => getLinkEmphOpacity(d, emph, gs, persons))
+function zoomFilter(event) {
+  if (event.type === 'wheel') return !event.ctrlKey
+  if (event.button != null && event.button !== 0) return false
+  const w = clientToWorld(event.clientX, event.clientY)
+  const hit = ctx.renderer?.pickNode(w.x, w.y, hitRadius())
+  if (hit && !store.lockNodes) return false // grabbing a node -> no pan
+  return true
 }
 
-function getImageUrl(filePath) {
-  return window.electronAPI?.getImageUrl?.(filePath) || null
+function installPointerHandlers() {
+  const el = overlayEl.value
+  el.addEventListener('pointerdown', onPointerDown)
+  el.addEventListener('pointermove', onHoverMove)
+  window.addEventListener('pointermove', onPointerMove)
+  window.addEventListener('pointerup', onPointerUp)
+}
+function removePointerHandlers() {
+  const el = overlayEl.value
+  if (el) { el.removeEventListener('pointerdown', onPointerDown); el.removeEventListener('pointermove', onHoverMove) }
+  window.removeEventListener('pointermove', onPointerMove)
+  window.removeEventListener('pointerup', onPointerUp)
 }
 
-// Age in years: counted to the current date (or today if none set), capped at death year.
-function ageOf(d) {
-  if (!d.birth_year) return null
-  const refYear = store.currentDate?.year ?? new Date().getFullYear()
-  const endYear = d.death_year ? Math.min(d.death_year, refYear) : refYear
-  const age = endYear - d.birth_year
-  return age >= 0 ? age : null
-}
-
-function renderNodes() {
-  const layer = ctx.rootGroup.select('.nodes-layer')
-  const node = layer.selectAll('g.graph-node').data(ctx.nodesData, d => d.id)
-  node.exit().transition().duration(300).attr('opacity', 0).remove()
-
-  const gs = store.graphSettings, r = gs.nodeRadius
-  const entered = node.enter().append('g').attr('class', 'graph-node').attr('opacity', 0).attr('cursor', 'pointer')
-  const isLight = store.theme === 'light'
-
-  // Clip path for circular image — defined per node with unique id
-  entered.append('clipPath').attr('class', 'node-clip')
-    .append('circle').attr('r', r)
-  // Background circle (always visible — acts as border ring and fallback)
-  entered.append('circle').attr('class', 'node-circle').attr('r', r).attr('stroke', 'rgba(255,255,255,0.18)').attr('stroke-width', 1.5)
-    .attr('filter', isLight ? 'url(#node-shadow-light)' : 'url(#node-shadow-dark)')
-  // Image element (hidden when no image)
-  entered.append('image').attr('class', 'node-image')
-    .attr('width', r * 2).attr('height', r * 2).attr('x', -r).attr('y', -r)
-    .attr('preserveAspectRatio', 'xMidYMid slice').attr('pointer-events', 'none')
-  // Default human silhouette (shown when no image). Clip lives on the (untransformed) group
-  // so the circle clip stays in node coords; the inner path carries the sizing transform.
-  entered.append('g').attr('class', 'node-person-icon').attr('pointer-events', 'none')
-    .append('path').attr('class', 'node-person-path').attr('d', PERSON_ICON_PATH)
-  // Selection ring (on top of image)
-  entered.append('circle').attr('class', 'node-ring').attr('r', r).attr('fill', 'none')
-    .attr('stroke', 'transparent').attr('stroke-width', 0).attr('pointer-events', 'none')
-  // Name label below — persistent name + age tspans so the age can fade independently
-  const labelEl = entered.append('text').attr('class', 'node-label').attr('text-anchor', 'middle').attr('y', r + 14)
-    .attr('font-size', gs.labelSize).attr('font-weight', 500)
-    .attr('font-family', 'system-ui, sans-serif').attr('pointer-events', 'none')
-  labelEl.append('tspan').attr('class', 'node-name')
-  labelEl.append('tspan').attr('class', 'node-age').attr('opacity', 0).attr('font-weight', 600)
-
-  entered
-    .on('mouseenter', function () { if (gs.glowOnHover) d3.select(this).select('.node-circle').attr('filter', 'url(#glow)') })
-    .on('mouseleave', function () { const d = d3.select(this).datum(); if (store.selectedPersonId !== d.id) d3.select(this).select('.node-circle').attr('filter', store.theme === 'light' ? 'url(#node-shadow-light)' : 'url(#node-shadow-dark)') })
-    .on('click', (event, d) => { event.stopPropagation(); if (store.lockNodes) return; store.relPopup = null; store.selectPerson(d.id) })
-  entered.transition().duration(400).attr('opacity', 1)
-
-  const merged = entered.merge(node)
-  merged.attr('opacity', gs.nodeOpacity)
-  const isLightTheme = store.theme === 'light'
-  const shadowFilter = isLightTheme ? 'url(#node-shadow-light)' : 'url(#node-shadow-dark)'
-
-  // Assign unique clip-path ids and apply
-  merged.each(function (d) {
-    const el = d3.select(this)
-    const clipId = `clip-${d.id.replace(/[^a-zA-Z0-9-]/g, '')}`
-    el.select('.node-clip').attr('id', clipId)
-    el.select('.node-image').attr('clip-path', `url(#${clipId})`)
-  })
-
-  // Update clip circle radius
-  merged.select('.node-clip circle').attr('r', gs.nodeRadius)
-
-  // Background circle
-  merged.select('.node-circle').attr('r', gs.nodeRadius)
-    .attr('fill', d => { const c = store.selectedPersonId === d.id ? d3.color(nodeColor(d.gender, gs))?.brighter(0.4)?.toString() : null; return c || nodeColor(d.gender, gs) })
-    .attr('stroke', d => store.selectedPersonId === d.id ? '#6c8ef5' : 'rgba(255,255,255,0.18)')
-    .attr('stroke-width', d => store.selectedPersonId === d.id ? 3 : 1.5)
-    .attr('filter', d => store.selectedPersonId === d.id ? 'url(#glow)' : shadowFilter)
-
-  // Image element — show or hide based on primary_image
-  merged.select('.node-image')
-    .attr('width', gs.nodeRadius * 2).attr('height', gs.nodeRadius * 2)
-    .attr('x', -gs.nodeRadius).attr('y', -gs.nodeRadius)
-    .attr('href', d => {
-      const url = d.primary_image ? getImageUrl(d.primary_image) : null
-      return url || null
-    })
-    .attr('display', d => d.primary_image ? null : 'none')
-
-  // Selection ring on top
-  merged.select('.node-ring').attr('r', gs.nodeRadius)
-    .attr('stroke', d => store.selectedPersonId === d.id ? '#6c8ef5' : 'transparent')
-    .attr('stroke-width', d => store.selectedPersonId === d.id ? 3 : 0)
-
-  // Default human silhouette — framed-avatar look: head in the upper half, shoulders fill
-  // the bottom of the circle and are clipped by it. Hidden when image present.
-  // Head circle is centred at (12,8) in the 24×24 viewBox; shoulders span x:[3,21].
-  const iconScale = gs.nodeRadius * 0.12
-  const iconHeadY = gs.nodeRadius * 0.22 // head centre sits this far above circle centre
-  merged.select('.node-person-icon')
-    .attr('clip-path', d => `url(#clip-${d.id.replace(/[^a-zA-Z0-9-]/g, '')})`)
-    .attr('display', d => d.primary_image ? 'none' : null)
-  merged.select('.node-person-path')
-    .attr('transform', `translate(${-12 * iconScale}, ${-iconHeadY - 8 * iconScale}) scale(${iconScale})`)
-    .attr('fill', 'rgba(255,255,255,0.92)')
-
-  // Name label (with optional age shown dimmer, just to the right of the name)
-  const ageFill = isLightTheme ? '#9099b8' : 'rgba(158,163,184,0.85)'
-  merged.select('.node-label').attr('y', gs.nodeRadius + 14).attr('font-size', gs.labelSize)
-    .attr('display', gs.showLabels ? null : 'none')
-    .attr('fill', d => store.selectedPersonId === d.id ? '#6c8ef5' : (isLightTheme ? '#4a5068' : 'rgba(232,234,246,0.85)'))
-  merged.select('.node-name').text(d => d.name.split(' ')[0])
-  // Age tspan — fades in/out smoothly when the setting is toggled
-  merged.select('.node-age').attr('fill', ageFill).each(function (d) {
-    const sel = d3.select(this)
-    const age = ageOf(d)
-    const show = gs.showAge && age != null
-    if (show) {
-      sel.text(age).attr('dx', 4)
-      sel.transition('age').duration(260).attr('opacity', 1)
-    } else {
-      sel.transition('age').duration(220).attr('opacity', 0)
-        .on('end', function () { d3.select(this).text('').attr('dx', 0) })
-    }
-  })
-  applyDrag(merged)
-}
-
-// ── Drag ────────────────────────────────────────────────────────────────────
-function applyDrag(sel) {
-  sel.on('.drag', null)
-  const mode = currentMode.value
-  const filterDrag = () => !store.lockNodes
-
-  if (mode === 'auto') {
-    sel.call(d3.drag().filter(filterDrag)
-      .on('start', (e, d) => { if (!e.active) ctx.simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y })
-      .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y })
-      .on('end', (e, d) => { if (!e.active) ctx.simulation.alphaTarget(0); d.fx = null; d.fy = null }))
-  } else if (mode === 'custom') {
-    sel.call(d3.drag().filter(filterDrag)
-      .on('start', (e, d) => { d.fx = d.x; d.fy = d.y })
-      .on('drag', (e, d) => { d.x = e.x; d.y = e.y; d.fx = e.x; d.fy = e.y; ticked() })
-      .on('end', () => { snapshotMode('custom') }))
-  } else if (mode === 'age') {
-    sel.call(d3.drag().filter(filterDrag)
-      .on('start', (e, d) => { d.fx = d.x })
-      .on('drag', (e, d) => { d.x = e.x; d.fx = e.x; ticked() })
-      .on('end', () => { snapshotMode('age') }))
-  } else if (mode === 'generation') {
-    sel.call(d3.drag().filter(filterDrag)
-      .on('start', (e, d) => { d.fx = d.x; d.fy = d.y; removeGenPreview(ctx) })
-      .on('drag', (e, d) => { d.x = e.x; d.y = e.y; d.fx = e.x; d.fy = e.y; ticked(); updateGenPreview(d.y, ctx) })
-      .on('end', (e, d) => {
-        removeGenPreview(ctx)
-        const ty = resolveGenTarget(d.y, ctx); d.fx = d.x; d.fy = ty; d.y = ty; ticked()
-        cleanupEmptyGenRows(ctx, snapshotGenMode, ticked)
-      }))
+function onPointerDown(e) {
+  if (e.button !== 0) return
+  const w = clientToWorld(e.clientX, e.clientY)
+  const node = ctx.renderer?.pickNode(w.x, w.y, hitRadius())
+  if (node && !store.lockNodes) {
+    drag = { node, moved: false, downX: e.clientX, downY: e.clientY }
+    grab = { dx: w.x - node.x, dy: w.y - node.y }
+    try { overlayEl.value.setPointerCapture(e.pointerId) } catch {}
+    const m = currentMode.value
+    if (m === 'auto') { ctx.simulation.alphaTarget(0.3).restart(); node.fx = node.x; node.fy = node.y }
+    else if (m === 'custom') { node.fx = node.x; node.fy = node.y }
+    else if (m === 'age') { node.fx = node.x }
+    else if (m === 'generation') { node.fx = node.x; node.fy = node.y; removeGenPreview(ctx) }
+  } else {
+    pending = { downX: e.clientX, downY: e.clientY, moved: false }
   }
 }
-function reapplyDrag() { if (ctx.rootGroup) applyDrag(ctx.rootGroup.selectAll('g.graph-node')) }
+
+function onPointerMove(e) {
+  if (drag) {
+    if (!drag.moved && Math.hypot(e.clientX - drag.downX, e.clientY - drag.downY) > 3) drag.moved = true
+    const w = clientToWorld(e.clientX, e.clientY)
+    const tx = w.x - grab.dx, ty = w.y - grab.dy
+    const d = drag.node, m = currentMode.value
+    if (m === 'auto') { d.fx = tx; d.fy = ty }
+    else if (m === 'custom') { d.x = tx; d.y = ty; d.fx = tx; d.fy = ty; ticked() }
+    else if (m === 'age') { d.x = tx; d.fx = tx; ticked() }
+    else if (m === 'generation') { d.x = tx; d.y = ty; d.fx = tx; d.fy = ty; ticked(); updateGenPreview(d.y, ctx) }
+  } else if (pending) {
+    if (Math.hypot(e.clientX - pending.downX, e.clientY - pending.downY) > 3) pending.moved = true
+  }
+}
+
+function onPointerUp(e) {
+  if (drag) {
+    const d = drag.node, m = currentMode.value
+    if (m === 'auto') { ctx.simulation.alphaTarget(0); d.fx = null; d.fy = null }
+    else if (m === 'custom') { snapshotMode('custom') }
+    else if (m === 'age') { snapshotMode('age') }
+    else if (m === 'generation') {
+      removeGenPreview(ctx)
+      const ty = resolveGenTarget(d.y, ctx); d.fx = d.x; d.fy = ty; d.y = ty; ticked()
+      cleanupEmptyGenRows(ctx, snapshotGenMode, ticked)
+    }
+    ctx.renderer.invalidatePicker()
+    drag = null
+    return
+  }
+  // Click (press with no meaningful movement) → select node / open rel popup / deselect.
+  if (pending && !pending.moved) {
+    const w = clientToWorld(pending.downX, pending.downY)
+    const node = ctx.renderer?.pickNode(w.x, w.y, hitRadius())
+    if (node) {
+      if (!store.lockNodes) { store.relPopup = null; store.selectPerson(node.id) }
+    } else {
+      const link = store.lockLines ? null : ctx.renderer?.pickLink(w.x, w.y, store.graphSettings)
+      if (link) {
+        const rect = ctx.containerRef.getBoundingClientRect()
+        store.relPopup = { rel: link, x: pending.downX - rect.left, y: pending.downY - rect.top - 10 }
+      } else {
+        store.selectPerson(null); store.relPopup = null
+      }
+    }
+  }
+  pending = null
+}
+
+// Hover glow (only meaningful when not dragging).
+function onHoverMove(e) {
+  if (drag) return
+  const w = clientToWorld(e.clientX, e.clientY)
+  const node = ctx.renderer?.pickNode(w.x, w.y, hitRadius())
+  const id = node ? node.id : null
+  if (id !== hoverId) { hoverId = id; markNodeStyles() }
+}
+
+// Positions/handlers are global now; kept as a no-op hook so mode-enter code is unchanged.
+function reapplyDrag() { ctx.renderer?.invalidatePicker() }
 
 // ── Mode switching ──────────────────────────────────────────────────────────
 function switchMode(newMode) {
@@ -1017,7 +933,7 @@ function enterAgeMode() {
 
 // Re-position the Age-mode "current year" line (e.g. when the current year is set/changed/theme).
 function refreshCurrentYearLine(animate) {
-  if (currentMode.value !== 'age' || !ctx.rootGroup || !ctx.containerRef) return
+  if (currentMode.value !== 'age' || !ctx.renderer || !ctx.containerRef) return
   const { height } = ctx.containerRef.getBoundingClientRect()
   const ageInfo = computeAgeYPositions(ctx.nodesData, height)
   drawCurrentYearLine(ctx, ageInfo, store.currentDate?.year ?? null, animate)
@@ -1092,35 +1008,9 @@ function snapshotGenMode() {
 }
 
 // ── Emphasis ────────────────────────────────────────────────────────────────
-function applyEmphasis() {
-  if (!ctx.rootGroup || !ctx.svgSelection) return
-  const emph = emphVisual(), gs = store.graphSettings, persons = store.persons
-
-  ctx.rootGroup.selectAll('g.graph-link-group').select('.graph-link')
-    .transition().duration(250).ease(d3.easeCubicOut)
-    .attr('stroke', d => getLinkStroke(d, emph, gs, persons))
-    .attr('stroke-width', d => getLinkWidth(d, emph, gs, persons))
-    .attr('opacity', d => getLinkEmphOpacity(d, emph, gs, persons))
-    .attr('marker-end', d => getLinkMarker(d, emph, persons))
-
-  // Animate paternal/maternal marker sizes
-  const isEmphPat = emph === 'paternal'
-  const isEmphMat = emph === 'maternal'
-  const patSize = isEmphPat ? 16 : 10
-  const matSize = isEmphMat ? 16 : 10
-  const nodeR = gs.nodeRadius
-
-  ;['#arr-pat', '#arr-pat-ad'].forEach(id => {
-    ctx.svgSelection.select(id).transition().duration(250).ease(d3.easeCubicOut)
-      .attr('markerWidth', patSize).attr('markerHeight', patSize)
-      .attr('refX', nodeR + (isEmphPat ? 14 : 10))
-  })
-  ;['#arr-mat', '#arr-mat-ad'].forEach(id => {
-    ctx.svgSelection.select(id).transition().duration(250).ease(d3.easeCubicOut)
-      .attr('markerWidth', matSize).attr('markerHeight', matSize)
-      .attr('refX', nodeR + (isEmphMat ? 14 : 10))
-  })
-}
+// Lineage emphasis (paternal/maternal) only affects links + arrowheads, all computed in
+// linkVisual(); switching it just re-syncs link styles and repaints.
+function applyEmphasis() { markLinkStyles() }
 
 function cycleEmphasis(which) {
   const mode = currentMode.value
@@ -1132,14 +1022,16 @@ function cycleEmphasis(which) {
 }
 
 // ── Zoom / search ───────────────────────────────────────────────────────────
-function zoomIn() { ctx.svgSelection?.transition().duration(300).call(ctx.zoomBehavior.scaleBy, 1.3) }
-function zoomOut() { ctx.svgSelection?.transition().duration(300).call(ctx.zoomBehavior.scaleBy, 0.77) }
+// These call the zoom behaviour on the overlay selection, so the 'zoom' handler drives the
+// camera transform for us (with d3's transition for smooth zoom buttons / fit / reset).
+function zoomIn() { ctx.zoomSelection?.transition().duration(300).call(ctx.zoomBehavior.scaleBy, 1.3) }
+function zoomOut() { ctx.zoomSelection?.transition().duration(300).call(ctx.zoomBehavior.scaleBy, 0.77) }
 function resetZoom() {
-  if (!ctx.nodesData.length || !ctx.containerRef) { ctx.svgSelection?.transition().duration(400).call(ctx.zoomBehavior.transform, d3.zoomIdentity); return }
+  if (!ctx.nodesData.length || !ctx.containerRef) { ctx.zoomSelection?.transition().duration(400).call(ctx.zoomBehavior.transform, d3.zoomIdentity); return }
   const { width, height } = ctx.containerRef.getBoundingClientRect()
   const xs = ctx.nodesData.map(d => d.x), ys = ctx.nodesData.map(d => d.y)
   const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2
-  ctx.svgSelection?.transition().duration(400).call(ctx.zoomBehavior.transform, d3.zoomIdentity.translate(width / 2 - cx, height / 2 - cy))
+  ctx.zoomSelection?.transition().duration(400).call(ctx.zoomBehavior.transform, d3.zoomIdentity.translate(width / 2 - cx, height / 2 - cy))
 }
 function fitAll() {
   if (!ctx.nodesData.length || !ctx.containerRef) return
@@ -1147,13 +1039,9 @@ function fitAll() {
   const xs = ctx.nodesData.map(d => d.x), ys = ctx.nodesData.map(d => d.y)
   const x0 = Math.min(...xs) - 60, x1 = Math.max(...xs) + 60, y0 = Math.min(...ys) - 60, y1 = Math.max(...ys) + 60
   const scale = Math.min(0.9 * width / (x1 - x0), 0.9 * height / (y1 - y0), 2)
-  ctx.svgSelection?.transition().duration(600).call(ctx.zoomBehavior.transform, d3.zoomIdentity.translate(width / 2 - scale * (x0 + x1) / 2, height / 2 - scale * (y0 + y1) / 2).scale(scale))
+  ctx.zoomSelection?.transition().duration(600).call(ctx.zoomBehavior.transform, d3.zoomIdentity.translate(width / 2 - scale * (x0 + x1) / 2, height / 2 - scale * (y0 + y1) / 2).scale(scale))
 }
-function highlightSearch() {
-  if (!ctx.rootGroup) return
-  const q = searchQuery.value.toLowerCase().trim()
-  ctx.rootGroup.selectAll('g.graph-node').attr('opacity', d => !q || d.name.toLowerCase().includes(q) ? 1 : 0.2)
-}
+function highlightSearch() { markNodeStyles() }
 
 // ── Lifecycle & watchers ────────────────────────────────────────────────────
 // ── Save / Load graph layout ────────────────────────────────────────────────
@@ -1224,7 +1112,10 @@ onMounted(() => {
   initGraph()
   updateGraph()
 })
-onUnmounted(() => { ctx.simulation?.stop(); ctx.resizeObserver?.disconnect(); cancelAnimation() })
+onUnmounted(() => {
+  ctx.simulation?.stop(); ctx.resizeObserver?.disconnect(); cancelAnimation(); cancelGuideTimers(ctx)
+  removePointerHandlers(); ctx.renderer?.dispose()
+})
 
 watch([() => store.persons, () => store.relationships], async () => {
   updateGraph()
@@ -1236,42 +1127,33 @@ watch([() => store.persons, () => store.relationships], async () => {
     store.clearGraphDirty()
   }
 }, { deep: true })
-watch(() => store.selectedPersonId, () => { if (ctx.rootGroup) renderNodes() })
+watch(() => store.selectedPersonId, () => markNodeStyles())
 watch(() => store.lockNodes, () => reapplyDrag())
 watch(() => store.currentDate, () => {
   if (!store.currentDate && activeDeceased.value !== 'normal') {
     activeDeceased.value = 'normal'
     applyDeceasedHighlight()
   }
-  if (ctx.rootGroup && store.graphSettings.showAge) renderNodes()
+  if (store.graphSettings.showAge) markNodeStyles()
   refreshCurrentYearLine(true)
 })
 watch(() => store.theme, () => {
-  ctx.theme = store.theme
-  if (!ctx.rootGroup) return
-  renderNodes(); renderLinks()
-  // Update guide line colors for new theme
-  const light = store.theme === 'light'
-  const guideStroke = light ? 'rgba(0, 0, 0, 0.10)' : 'rgba(232, 234, 246, 0.12)'
-  const guideFill = light ? 'rgba(0, 0, 0, 0.22)' : 'rgba(232, 234, 246, 0.25)'
-  ctx.rootGroup.selectAll('.mode-guides line').attr('stroke', guideStroke)
-  ctx.rootGroup.selectAll('.mode-guides text').attr('fill', guideFill)
+  if (!ctx.renderer) return
+  ctx.renderer.setTheme(store.theme === 'light') // marks node+link dirty + redraws; overlay recolours
   refreshCurrentYearLine(false)
 })
 watch(() => store.graphSettings, () => {
-  if (!ctx.rootGroup || !ctx.simulation) return
-  const gs = store.graphSettings, refX = gs.nodeRadius + 10
-  ;['#arr', '#arr-a', '#arr-pat', '#arr-mat', '#arr-pat-ad', '#arr-mat-ad'].forEach(id => ctx.svgSelection?.select(id).attr('refX', refX))
-  ctx.svgSelection?.select('#arr path').attr('fill', gs.parentChildColor)
-  ctx.svgSelection?.select('#arr-a path').attr('fill', gs.adoptedColor)
+  if (!ctx.renderer || !ctx.simulation) return
+  const gs = store.graphSettings
   if (currentMode.value === 'auto') { ctx.simulation.force('link').distance(gs.linkDistance); ctx.simulation.force('charge').strength(gs.chargeStrength); ctx.simulation.force('collide').radius(gs.nodeRadius + 30); ctx.simulation.alpha(0.2).restart() }
-  renderLinks(); renderNodes()
+  markNodeStyles(); markLinkStyles()
 }, { deep: true })
 </script>
 
 <style scoped>
 .graph-area { position: relative; background: var(--bg); overflow: hidden; }
-.graph-svg { display: block; width: 100%; height: 100%; }
+.graph-gl { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.graph-overlay { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
 .graph-search { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 7px 14px; min-width: 260px; z-index: 5; box-shadow: var(--shadow); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; }
 .graph-search input { background: none; border: none; outline: none; font: inherit; font-size: 13px; color: var(--t1); flex: 1; padding: 0; box-shadow: none; width: auto; }
 .graph-search input::placeholder { color: var(--t3); }

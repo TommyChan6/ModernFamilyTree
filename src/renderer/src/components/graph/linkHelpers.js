@@ -22,6 +22,33 @@ export function linkPath(d, lineCurvature) {
   return `M${sx},${sy} Q${mx},${my} ${tx},${ty}`
 }
 
+// Same quadratic Bézier as linkPath(), but sampled into `segments+1` points for WebGL
+// tessellation. Returns { points:[{x,y},...], control:{x,y} } so the caller can also
+// derive the end tangent (for arrowhead orientation). Deterministic per-edge bend.
+export function linkCurvePoints(d, lineCurvature, segments = 14) {
+  const sx = d.source.x, sy = d.source.y, tx = d.target.x, ty = d.target.y
+  const dx = tx - sx, dy = ty - sy
+  const dist = Math.sqrt(dx * dx + dy * dy) || 1
+  let hash = 0
+  const idStr = d.id || ''
+  for (let i = 0; i < idStr.length; i++) hash = ((hash << 5) - hash + idStr.charCodeAt(i)) | 0
+  const sign = (hash & 1) ? 1 : -1
+  const bendFactor = lineCurvature + (Math.abs(hash % 100) / 100) * (lineCurvature * 0.6)
+  const offset = dist * bendFactor * sign
+  const px = -dy / dist, py = dx / dist
+  const mx = (sx + tx) / 2 + px * offset
+  const my = (sy + ty) / 2 + py * offset
+  const points = []
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments, u = 1 - t
+    // Quadratic Bézier B(t) = u²·S + 2ut·C + t²·T
+    const x = u * u * sx + 2 * u * t * mx + t * t * tx
+    const y = u * u * sy + 2 * u * t * my + t * t * ty
+    points.push({ x, y })
+  }
+  return { points, control: { x: mx, y: my } }
+}
+
 export function isPaternal(d, persons) {
   if (d.type !== 'parent_child' && d.type !== 'adopted') return false
   const parent = persons.find(p => p.id === d.person_a_id)

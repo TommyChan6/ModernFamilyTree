@@ -48,7 +48,7 @@ export function useGraphAnimation(ctx) {
     const endCy = endYs.length ? (Math.min(...endYs) + Math.max(...endYs)) / 2 : h / 2
     const endTx = w / 2 - endCx, endTy = h / 2 - endCy
 
-    ctx.svgSelection.call(ctx.zoomBehavior.transform, d3.zoomIdentity.translate(startTx, startTy))
+    ctx.zoomSelection.call(ctx.zoomBehavior.transform, d3.zoomIdentity.translate(startTx, startTy))
 
     ctx.animTimer = d3.timer((elapsed) => {
       const t = Math.min(1, ease(elapsed / duration))
@@ -62,7 +62,7 @@ export function useGraphAnimation(ctx) {
       ctx.ticked()
       const tx = startTx + (endTx - startTx) * t
       const ty = startTy + (endTy - startTy) * t
-      ctx.svgSelection.call(ctx.zoomBehavior.transform, d3.zoomIdentity.translate(tx, ty))
+      ctx.zoomSelection.call(ctx.zoomBehavior.transform, d3.zoomIdentity.translate(tx, ty))
       if (t >= 1) { ctx.animTimer.stop(); ctx.animTimer = null; if (onDone) onDone() }
     })
   }
