@@ -8,6 +8,7 @@ const EMPTY_DB = () => ({
   activeTreeId: null,
   persons: {},     // { personId: { ...fields, tree_id } }
   relationships: {},
+  factions: {},    // { factionId: { id, tree_id, name, color, icon, description, member_ids, x, y, visible } }
   images: {},
   settings: {},    // { `${treeId}:key`: value } for per-tree settings, or global keys
   globalSettings: {} // theme, etc.
@@ -41,6 +42,7 @@ export function initDB() {
   _db.trees = _db.trees || {}
   _db.persons = _db.persons || {}
   _db.relationships = _db.relationships || {}
+  _db.factions = _db.factions || {}
   _db.images = _db.images || {}
   _db.settings = _db.settings || {}
   _db.globalSettings = _db.globalSettings || {}
@@ -122,6 +124,7 @@ export function getDB() {
     activeTreeId: _db.activeTreeId,
     persons: _db.persons,
     relationships: _db.relationships,
+    factions: _db.factions,
     images: _db.images,
     settings: _db.settings,
     globalSettings: _db.globalSettings,

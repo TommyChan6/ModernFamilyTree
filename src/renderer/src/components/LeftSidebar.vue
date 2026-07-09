@@ -27,6 +27,7 @@
       >
         <span class="nav-icon">🔗</span>
         <span>Relationships</span>
+        <span class="badge" style="margin-left: auto;">{{ store.relationships.length }}</span>
       </button>
       <button
         class="nav-item"
@@ -35,6 +36,15 @@
       >
         <span class="nav-icon">📅</span>
         <span>Timeline</span>
+      </button>
+      <button
+        class="nav-item"
+        :class="{ active: store.activeView === 'factions' }"
+        @click="store.activeView = 'factions'"
+      >
+        <span class="nav-icon">⬡</span>
+        <span>Factions</span>
+        <span v-if="store.factions.length" class="badge" style="margin-left: auto;">{{ store.factions.length }}</span>
       </button>
     </nav>
 

@@ -73,6 +73,9 @@ export function registerHandlers(ipcMain, _app, dialog) {
       for (const [rid, r] of Object.entries(db.relationships)) {
         if (r.tree_id === tid) delete db.relationships[rid]
       }
+      for (const [fid, f] of Object.entries(db.factions)) {
+        if (f.tree_id === tid) delete db.factions[fid]
+      }
       for (const [iid, img] of Object.entries(db.images)) {
         if (img.tree_id === tid) {
           try { fs.unlinkSync(img.file_path) } catch (_) { /* ignore */ }
@@ -181,10 +184,15 @@ export function registerHandlers(ipcMain, _app, dialog) {
   // ── persons:delete ─────────────────────────────────────────────────────────
   ipcMain.handle('persons:delete', async (_event, data) => {
     try {
-      const { persons, relationships, images, save } = getDB()
+      const { persons, relationships, images, factions, save } = getDB()
       for (const [rid, rel] of Object.entries(relationships)) {
         if (rel.person_a_id === data.id || rel.person_b_id === data.id) {
           delete relationships[rid]
+        }
+      }
+      for (const f of Object.values(factions)) {
+        if (Array.isArray(f.member_ids) && f.member_ids.includes(data.id)) {
+          f.member_ids = f.member_ids.filter(pid => pid !== data.id)
         }
       }
       for (const [iid, img] of Object.entries(images)) {
@@ -242,6 +250,9 @@ export function registerHandlers(ipcMain, _app, dialog) {
       if (!existing) return { success: false, error: 'Relationship not found' }
       if (data.status !== undefined) existing.status = data.status
       if (data.formed_date !== undefined) existing.formed_date = data.formed_date
+      if (data.type !== undefined) existing.type = data.type
+      if (data.person_a_id !== undefined) existing.person_a_id = data.person_a_id
+      if (data.person_b_id !== undefined) existing.person_b_id = data.person_b_id
       save()
       return { success: true, data: existing }
     } catch (err) {
@@ -254,6 +265,78 @@ export function registerHandlers(ipcMain, _app, dialog) {
     try {
       const { relationships, save } = getDB()
       delete relationships[data.id]
+      save()
+      return { success: true, data: { id: data.id } }
+    } catch (err) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // ── factions:getAll ────────────────────────────────────────────────────────
+  ipcMain.handle('factions:getAll', async () => {
+    try {
+      const { factions } = getDB()
+      return { success: true, data: sortByDate(forTree(factions)) }
+    } catch (err) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // ── factions:create ────────────────────────────────────────────────────────
+  ipcMain.handle('factions:create', async (_event, data) => {
+    try {
+      const { factions, save, nowStr } = getDB()
+      const id = randomUUID()
+      const now = nowStr()
+      const faction = {
+        id,
+        tree_id: activeTree(),
+        name: data?.name || 'New Faction',
+        description: data?.description || '',
+        color: data?.color || '#6c8ef5',
+        icon: data?.icon || '⚑',
+        member_ids: Array.isArray(data?.member_ids) ? data.member_ids : [],
+        x: data?.x ?? 0,
+        y: data?.y ?? 0,
+        visible: data?.visible !== false,
+        created_at: now,
+        updated_at: now
+      }
+      factions[id] = faction
+      save()
+      return { success: true, data: faction }
+    } catch (err) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // ── factions:update ────────────────────────────────────────────────────────
+  ipcMain.handle('factions:update', async (_event, data) => {
+    try {
+      const { factions, save, nowStr } = getDB()
+      const existing = factions[data.id]
+      if (!existing) return { success: false, error: 'Faction not found' }
+      if (data.name !== undefined) existing.name = data.name
+      if (data.description !== undefined) existing.description = data.description
+      if (data.color !== undefined) existing.color = data.color
+      if (data.icon !== undefined) existing.icon = data.icon
+      if (data.member_ids !== undefined) existing.member_ids = data.member_ids
+      if (data.x !== undefined) existing.x = data.x
+      if (data.y !== undefined) existing.y = data.y
+      if (data.visible !== undefined) existing.visible = data.visible
+      existing.updated_at = nowStr()
+      save()
+      return { success: true, data: existing }
+    } catch (err) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // ── factions:delete ────────────────────────────────────────────────────────
+  ipcMain.handle('factions:delete', async (_event, data) => {
+    try {
+      const { factions, save } = getDB()
+      delete factions[data.id]
       save()
       return { success: true, data: { id: data.id } }
     } catch (err) {

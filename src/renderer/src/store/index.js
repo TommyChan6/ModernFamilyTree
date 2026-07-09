@@ -10,6 +10,7 @@ export const useMainStore = defineStore('main', () => {
   // ── State ──────────────────────────────────────────────────────────────────
   const persons = ref([])
   const relationships = ref([])
+  const factions = ref([])
   const selectedPersonId = ref(null)
   const modalOpen = ref(false)
   const formOpen = ref(false)
@@ -22,7 +23,7 @@ export const useMainStore = defineStore('main', () => {
   const cleanTree = ref(false)
   const currentDate = ref(null)
   const graphDirty = ref(false)
-  const activeView = ref('tree') // 'tree' | 'people' | 'relationships' | 'timeline'
+  const activeView = ref('tree') // 'tree' | 'people' | 'relationships' | 'timeline' | 'factions'
 
   // Graph visual settings
   const graphSettings = ref({
@@ -114,12 +115,14 @@ export const useMainStore = defineStore('main', () => {
 
   // ── Data actions ──────────────────────────────────────────────────────────
   async function loadAll() {
-    const [personsRes, relsRes] = await Promise.all([
+    const [personsRes, relsRes, factionsRes] = await Promise.all([
       api.invoke('persons:getAll'),
-      api.invoke('relationships:getAll')
+      api.invoke('relationships:getAll'),
+      api.invoke('factions:getAll')
     ])
     if (personsRes.success) persons.value = personsRes.data
     if (relsRes.success) relationships.value = relsRes.data
+    if (factionsRes.success) factions.value = factionsRes.data
   }
 
   async function createPerson(data) {
@@ -144,6 +147,11 @@ export const useMainStore = defineStore('main', () => {
       relationships.value = relationships.value.filter(
         r => r.person_a_id !== id && r.person_b_id !== id
       )
+      factions.value.forEach(f => {
+        if (f.member_ids?.includes(id)) {
+          f.member_ids = f.member_ids.filter(pid => pid !== id)
+        }
+      })
       if (selectedPersonId.value === id) {
         selectedPersonId.value = null
         modalOpen.value = false
@@ -171,6 +179,40 @@ export const useMainStore = defineStore('main', () => {
     const res = await api.invoke('relationships:delete', { id })
     if (res.success) relationships.value = relationships.value.filter(r => r.id !== id)
     return res
+  }
+
+  // ── Faction actions ───────────────────────────────────────────────────────
+  async function createFaction(data) {
+    const res = await api.invoke('factions:create', data)
+    if (res.success) factions.value.push(res.data)
+    return res
+  }
+
+  async function updateFaction(data) {
+    const res = await api.invoke('factions:update', data)
+    if (res.success) {
+      const idx = factions.value.findIndex(f => f.id === data.id)
+      if (idx !== -1) factions.value[idx] = res.data
+    }
+    return res
+  }
+
+  async function deleteFaction(id) {
+    const res = await api.invoke('factions:delete', { id })
+    if (res.success) factions.value = factions.value.filter(f => f.id !== id)
+    return res
+  }
+
+  async function addPersonToFaction(personId, factionId) {
+    const f = factions.value.find(x => x.id === factionId)
+    if (!f || f.member_ids?.includes(personId)) return null
+    return updateFaction({ id: factionId, member_ids: [...(f.member_ids || []), personId] })
+  }
+
+  async function removePersonFromFaction(personId, factionId) {
+    const f = factions.value.find(x => x.id === factionId)
+    if (!f || !f.member_ids?.includes(personId)) return null
+    return updateFaction({ id: factionId, member_ids: f.member_ids.filter(pid => pid !== personId) })
   }
 
   function selectPerson(id) {
@@ -214,7 +256,7 @@ export const useMainStore = defineStore('main', () => {
     trees, activeTreeId, activeTree,
     loadTrees, createTree, renameTree, deleteTree, switchTree,
     // state
-    persons, relationships, selectedPersonId, modalOpen, formOpen,
+    persons, relationships, factions, selectedPersonId, modalOpen, formOpen,
     editingPerson, theme, settingsOpen, graphSettings,
     lockNodes, cleanTree, currentDate, lockLines, relPopup, activeView,
     // computed
@@ -222,6 +264,8 @@ export const useMainStore = defineStore('main', () => {
     // actions
     loadAll, createPerson, updatePerson, deletePerson,
     createRelationship, updateRelationship, deleteRelationship,
+    createFaction, updateFaction, deleteFaction,
+    addPersonToFaction, removePersonFromFaction,
     selectPerson, openForm, closeModal, closeForm,
     setTheme, toggleSettings, updateGraphSetting, resetGraphSettings,
     graphDirty,

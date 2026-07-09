@@ -49,14 +49,20 @@
       <div class="resize-handle resize-handle-left" @mousedown="startResizeLeft"></div>
       <div class="canvas-stack">
         <!-- Graph stays mounted (tucked away) so its layout & simulation state persist -->
-        <div class="canvas-layer" v-show="store.activeView !== 'people' && store.activeView !== 'timeline'">
+        <div class="canvas-layer" v-show="store.activeView === 'tree'">
           <GraphCanvas ref="graphRef" :key="store.activeTreeId" />
         </div>
         <Transition name="people-view">
           <PeopleView v-if="store.activeView === 'people'" :key="store.activeTreeId" />
         </Transition>
         <Transition name="people-view">
+          <RelationshipsView v-if="store.activeView === 'relationships'" :key="store.activeTreeId" />
+        </Transition>
+        <Transition name="people-view">
           <TimelineView v-if="store.activeView === 'timeline'" :key="store.activeTreeId" />
+        </Transition>
+        <Transition name="people-view">
+          <FactionsView v-if="store.activeView === 'factions'" :key="store.activeTreeId" />
         </Transition>
       </div>
       <div class="resize-handle resize-handle-right" @mousedown="startResizeRight"></div>
@@ -74,7 +80,9 @@ import { useMainStore } from './store/index.js'
 import LeftSidebar from './components/LeftSidebar.vue'
 import GraphCanvas from './components/GraphCanvas.vue'
 import PeopleView from './components/PeopleView.vue'
+import RelationshipsView from './components/RelationshipsView.vue'
 import TimelineView from './components/TimelineView.vue'
+import FactionsView from './components/FactionsView.vue'
 import RightSidebar from './components/RightSidebar.vue'
 import PersonModal from './components/PersonModal.vue'
 import PersonForm from './components/PersonForm.vue'

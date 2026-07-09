@@ -37,6 +37,7 @@ describe('Database initialization', () => {
     expect(data).toHaveProperty('trees')
     expect(data).toHaveProperty('persons')
     expect(data).toHaveProperty('relationships')
+    expect(data).toHaveProperty('factions')
     expect(data).toHaveProperty('settings')
     expect(data).toHaveProperty('globalSettings')
   })
@@ -320,6 +321,75 @@ describe('Graph state persistence (per-tree)', () => {
 
     expect(JSON.parse(raw.settings[`${activeTreeId}:graphState`]).currentMode).toBe('auto')
     expect(JSON.parse(raw.settings[`${tree2Id}:graphState`]).currentMode).toBe('generation')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Factions', () => {
+  it('adds an empty factions table when loading an older database', () => {
+    // Old-format database written before factions existed
+    const dbDir = path.join(tmpDir, 'db')
+    fs.mkdirSync(dbDir, { recursive: true })
+    fs.writeFileSync(path.join(dbDir, 'familytree.json'), JSON.stringify({
+      trees: { t1: { id: 't1', name: 'T', created_at: '2024-01-01', updated_at: '2024-01-01' } },
+      activeTreeId: 't1',
+      persons: {}, relationships: {}, images: {}, settings: {}, globalSettings: {}
+    }))
+
+    initDB()
+    const { factions } = getDB()
+    expect(factions).toEqual({})
+  })
+
+  it('faction fields survive a save/load cycle', () => {
+    initDB()
+    const { factions, persons, activeTreeId, save, nowStr } = getDB()
+    const memberIds = Object.values(persons).filter(p => p.tree_id === activeTreeId).slice(0, 2).map(p => p.id)
+    factions['f1'] = {
+      id: 'f1', tree_id: activeTreeId,
+      name: 'House Anderson', description: 'The founding family',
+      color: '#f5a623', icon: '🏰',
+      member_ids: memberIds, x: 120, y: -40, visible: true,
+      created_at: nowStr(), updated_at: nowStr()
+    }
+    save()
+
+    const dbPath = path.join(tmpDir, 'db', 'familytree.json')
+    const raw = JSON.parse(fs.readFileSync(dbPath, 'utf8'))
+    expect(raw.factions['f1'].name).toBe('House Anderson')
+    expect(raw.factions['f1'].member_ids).toEqual(memberIds)
+    expect(raw.factions['f1'].x).toBe(120)
+    expect(raw.factions['f1'].tree_id).toBe(activeTreeId)
+  })
+
+  it('factions are scoped to their tree via tree_id', () => {
+    initDB()
+    const { factions, trees, activeTreeId, save, nowStr } = getDB()
+    const tree2Id = 'tree-fx'
+    trees[tree2Id] = { id: tree2Id, name: 'Other', created_at: nowStr(), updated_at: nowStr() }
+    factions['fa'] = { id: 'fa', tree_id: activeTreeId, name: 'A', description: '', color: '#6c8ef5', icon: '⚑', member_ids: [], x: 0, y: 0, visible: true, created_at: nowStr(), updated_at: nowStr() }
+    factions['fb'] = { id: 'fb', tree_id: tree2Id, name: 'B', description: '', color: '#f06292', icon: '⚑', member_ids: [], x: 0, y: 0, visible: true, created_at: nowStr(), updated_at: nowStr() }
+    save()
+
+    expect(Object.values(factions).filter(f => f.tree_id === activeTreeId)).toHaveLength(1)
+    expect(Object.values(factions).filter(f => f.tree_id === tree2Id)).toHaveLength(1)
+  })
+
+  it('removing a deleted person from member lists keeps other members intact', () => {
+    initDB()
+    const { factions, persons, activeTreeId, save, nowStr } = getDB()
+    const ids = Object.values(persons).filter(p => p.tree_id === activeTreeId).map(p => p.id)
+    factions['f1'] = { id: 'f1', tree_id: activeTreeId, name: 'F', description: '', color: '#6c8ef5', icon: '⚑', member_ids: [ids[0], ids[1]], x: 0, y: 0, visible: true, created_at: nowStr(), updated_at: nowStr() }
+
+    // Mirror the persons:delete cascade
+    delete persons[ids[0]]
+    for (const f of Object.values(factions)) {
+      if (f.member_ids.includes(ids[0])) f.member_ids = f.member_ids.filter(pid => pid !== ids[0])
+    }
+    save()
+
+    const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, 'db', 'familytree.json'), 'utf8'))
+    expect(raw.factions['f1'].member_ids).toEqual([ids[1]])
   })
 })
 

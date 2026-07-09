@@ -1,50 +1,84 @@
 # FamilyTree Desktop App
 
+A desktop application for building and exploring family trees — for your own family,
+historical figures, or fictional casts. Add people and relationships, arrange them in
+an interactive graph, and view them as cards, a relationships table, or a timeline.
+
+Built with **Electron**, **Vue 3**, **Pinia**, and **D3**.
+
 ## Requirements
+
 - **Node.js 18+** — [nodejs.org](https://nodejs.org)
-- **Windows Build Tools** — needed to compile the SQLite native module
 
-### Install Windows Build Tools (one-time setup)
-Open PowerShell as Administrator and run:
-```powershell
-npm install --global windows-build-tools
-```
-Or install "Desktop development with C++" from Visual Studio Build Tools 2022.
+No native build tools are required — the app stores data as a plain JSON file and has
+no compiled dependencies.
 
-## Setup & Run
+## Setup & run
 
 ```bash
 # 1. Install dependencies
 npm install
 
-# 2. Rebuild better-sqlite3 for Electron
-npm run rebuild
-
-# 3. Start the app in development mode
+# 2. Start the app in development mode (hot reload)
 npm run dev
 ```
 
-## Build for distribution
+## Build
+
 ```bash
-npm run build
+npm run build      # bundles main, preload, and renderer into out/
 ```
+
+> `build` produces the app bundle in `out/`; packaging into a distributable installer
+> is not yet configured.
+
+## Test
+
+```bash
+npm test           # run the Vitest suite once
+npm run test:watch # watch mode
+```
+
+## Features
+
+- Interactive family tree graph with physics-based animation (D3 force simulation)
+- Four layout modes — **Custom** (free drag), **Auto** (force-directed), **Age** (by
+  birth year), and **Generation** (hierarchical) — each with multiple saved arrangements
+- Add / edit / delete family members with photos, bio, occupation, and location
+- Relationships: parent/child, spouse (with divorce), and adopted
+- Non-destructive highlights: lineage (paternal/maternal), gender, marriage, deceased
+- Multiple family trees, switchable via tabs
+- Alternate views: **People** cards, **Relationships** table (with issue detection),
+  and a **Timeline**
+- Photo uploads stored locally in your user-data folder
+- Dark and light themes; search, zoom, pan, and fit-all
+- JSON export
 
 ## Troubleshooting
 
-**`npm run rebuild` fails with "python not found"**
-Install Python 3.x and make sure it's in PATH, then retry.
+**App shows a blank window** — open DevTools (`Ctrl+Shift+I`) and check the console
+for renderer errors.
 
-**`npm run rebuild` fails with "MSBuild not found"**
-Install Visual Studio Build Tools 2022 with "Desktop development with C++" workload.
+**Want to reset to a clean state** — close the app and delete the `db/` folder in the
+app's user-data directory (see below); it re-seeds sample data on next launch.
 
-**App shows blank window**
-Check the DevTools console (Ctrl+Shift+I) for errors.
+## Where your data is stored
 
-## Features
-- Family tree graph with physics-based animations (D3 force simulation)
-- Add/edit/delete family members
-- Relationships: spouse, parent/child, adopted
-- Photo uploads stored locally in your user data folder
-- Dark and light themes
-- Search and filter family members
-- Zoom, pan, and fit-all on the graph
+The app writes to Electron's per-user data directory:
+
+| OS | Path |
+|----|------|
+| Windows | `%APPDATA%\family-tree\` |
+| macOS | `~/Library/Application Support/family-tree/` |
+| Linux | `~/.config/family-tree/` |
+
+with `db/familytree.json` for data and `images/` for copied photos.
+
+## Documentation
+
+Full developer and design documentation lives in [`docs/`](./docs/README.md):
+
+- [Architecture](./docs/architecture.md) · [Data model](./docs/data-model.md) ·
+  [IPC API](./docs/ipc-api.md) · [Graph engine](./docs/graph.md)
+- [Conventions](./docs/conventions.md) · [Developer guide](./docs/developer.md) ·
+  [Contributing](./docs/contributing.md) · [Design](./docs/design.md)
