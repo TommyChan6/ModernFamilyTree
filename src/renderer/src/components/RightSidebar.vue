@@ -23,7 +23,10 @@
         :key="person.id"
         class="person-card"
         :class="{ selected: store.selectedPersonId === person.id }"
+        draggable="true"
         @click="store.selectPerson(person.id)"
+        @dragstart="onDragStart(person, $event)"
+        @dragend="store.draggingPersonId = null"
       >
         <div
           class="avatar"
@@ -82,6 +85,20 @@ const PERSON_ICON_PATH = 'M12 12.5c2.49 0 4.5-2.01 4.5-4.5S14.49 3.5 12 3.5 7.5 
 
 function imageUrl(filename) {
   return api.getImageUrl(filename) || ''
+}
+
+// Dragging a member onto the Factions stage assigns them to the ring they
+// are dropped on. The store carries the dragged id (dataTransfer is not
+// readable during dragover); a transparent drag image lets the stage draw
+// its own ghost.
+const BLANK_DRAG_IMG = new Image()
+BLANK_DRAG_IMG.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
+
+function onDragStart(person, e) {
+  store.draggingPersonId = person.id
+  e.dataTransfer.setData('text/plain', person.id)
+  e.dataTransfer.effectAllowed = 'copy'
+  e.dataTransfer.setDragImage(BLANK_DRAG_IMG, 0, 0)
 }
 
 const filteredPersons = computed(() => {

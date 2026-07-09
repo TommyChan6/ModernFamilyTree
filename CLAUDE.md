@@ -82,7 +82,8 @@ close-confirmation prompt (wired from main via `window.__isGraphDirty` /
 **Views:** the workspace shows one of five views (`store.activeView`): tree
 (`GraphCanvas`), people (`PeopleView`), relationships (`RelationshipsView`), timeline
 (`TimelineView`), factions (`FactionsView` — drag-and-drop clustering of people into
-user-defined groups; pure layout math in `components/factions/factionLayout.js`).
+user-defined groups, organized into switchable per-tree "scenarios"; pure layout
+math in `components/factions/factionLayout.js`).
 The graph stays mounted (hidden) when another view is active so its
 simulation/layout survive view switches.
 

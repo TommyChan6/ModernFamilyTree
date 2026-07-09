@@ -129,8 +129,12 @@ The graph is one of five views; the others also read the store's persons/relatio
 - **Factions**
   ([`FactionsView.vue`](../src/renderer/src/components/FactionsView.vue)) — people
   clustered into user-defined groups (families, companies, houses, …) by a small
-  d3-force simulation; members of several factions settle between them. Membership
-  is edited by drag-and-drop; pure layout math lives in
+  d3-force simulation; members of several factions settle between them (tether
+  threads, orbiting ring segments, and a count badge mark them). Membership is
+  edited by drag-and-drop (from the stage, the unassigned tray, or the member
+  list). A bottom bar switches between **scenarios** — alternative faction
+  configurations over the same people; same-name factions glide between
+  scenarios while people shift with the simulation. Pure layout math lives in
   [`components/factions/factionLayout.js`](../src/renderer/src/components/factions/factionLayout.js).
 
 The graph stays mounted (hidden) when another view is active, so its simulation and

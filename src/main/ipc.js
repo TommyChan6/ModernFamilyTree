@@ -76,6 +76,9 @@ export function registerHandlers(ipcMain, _app, dialog) {
       for (const [fid, f] of Object.entries(db.factions)) {
         if (f.tree_id === tid) delete db.factions[fid]
       }
+      for (const [sid, s] of Object.entries(db.scenarios)) {
+        if (s.tree_id === tid) delete db.scenarios[sid]
+      }
       for (const [iid, img] of Object.entries(db.images)) {
         if (img.tree_id === tid) {
           try { fs.unlinkSync(img.file_path) } catch (_) { /* ignore */ }
@@ -291,6 +294,7 @@ export function registerHandlers(ipcMain, _app, dialog) {
       const faction = {
         id,
         tree_id: activeTree(),
+        scenario_id: data?.scenario_id || null,
         name: data?.name || 'New Faction',
         description: data?.description || '',
         color: data?.color || '#6c8ef5',
@@ -337,6 +341,79 @@ export function registerHandlers(ipcMain, _app, dialog) {
     try {
       const { factions, save } = getDB()
       delete factions[data.id]
+      save()
+      return { success: true, data: { id: data.id } }
+    } catch (err) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // ── scenarios:getAll ───────────────────────────────────────────────────────
+  ipcMain.handle('scenarios:getAll', async () => {
+    try {
+      const { scenarios } = getDB()
+      return { success: true, data: sortByDate(forTree(scenarios)) }
+    } catch (err) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // ── scenarios:create ───────────────────────────────────────────────────────
+  // With clone_from: duplicates that scenario's factions into the new one, so
+  // the client gets scenario + factions in a single round-trip.
+  ipcMain.handle('scenarios:create', async (_event, data) => {
+    try {
+      const { scenarios, factions, save, nowStr } = getDB()
+      const id = randomUUID()
+      const now = nowStr()
+      const scenario = {
+        id,
+        tree_id: activeTree(),
+        name: data?.name || 'New Scenario',
+        created_at: now,
+        updated_at: now
+      }
+      scenarios[id] = scenario
+      const cloned = []
+      if (data?.clone_from) {
+        for (const f of Object.values(factions)) {
+          if (f.scenario_id !== data.clone_from) continue
+          const fid = randomUUID()
+          const copy = { ...f, id: fid, scenario_id: id, member_ids: [...(f.member_ids || [])], created_at: now, updated_at: now }
+          factions[fid] = copy
+          cloned.push(copy)
+        }
+      }
+      save()
+      return { success: true, data: { scenario, factions: cloned } }
+    } catch (err) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // ── scenarios:rename ───────────────────────────────────────────────────────
+  ipcMain.handle('scenarios:rename', async (_event, data) => {
+    try {
+      const { scenarios, save, nowStr } = getDB()
+      const scenario = scenarios[data.id]
+      if (!scenario) return { success: false, error: 'Scenario not found' }
+      scenario.name = data.name
+      scenario.updated_at = nowStr()
+      save()
+      return { success: true, data: scenario }
+    } catch (err) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // ── scenarios:delete ───────────────────────────────────────────────────────
+  ipcMain.handle('scenarios:delete', async (_event, data) => {
+    try {
+      const { scenarios, factions, save } = getDB()
+      for (const [fid, f] of Object.entries(factions)) {
+        if (f.scenario_id === data.id) delete factions[fid]
+      }
+      delete scenarios[data.id]
       save()
       return { success: true, data: { id: data.id } }
     } catch (err) {

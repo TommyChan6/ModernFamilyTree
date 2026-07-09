@@ -14,6 +14,7 @@ in-memory object and rewrites the whole file on every mutation. See
   "persons":        { "<personId>": { /* Person */ } },
   "relationships":  { "<relId>":   { /* Relationship */ } },
   "factions":       { "<factionId>": { /* Faction */ } },
+  "scenarios":      { "<scenarioId>": { /* Scenario */ } },
   "images":         { "<imageId>": { /* Image */ } },
   "settings":       { "<treeId>:<key>": "<value>" },   // per-tree
   "globalSettings": { "theme": "dark" }                // app-wide
@@ -81,19 +82,35 @@ Deleting a person cascades: all relationships referencing it and all its images
 
 A user-defined group shown in the **Factions** view — a family, company, school,
 house, elemental affinity, or any other camp. Membership is a plain ID list on the
-faction (people may belong to any number of factions).
+faction (people may belong to any number of factions). Every faction belongs to a
+**scenario**; the view shows one scenario at a time.
 
 | Field | Type | Notes |
 |-------|------|-------|
 | `id` | string (UUID) | |
 | `tree_id` | string | |
-| `name` | string | Defaults to `"New Faction"`. |
+| `scenario_id` | string | Owning scenario. |
+| `name` | string | Defaults to `"New Faction"`. Same-name factions in different scenarios are treated as "the same faction" when animating scenario switches. |
 | `description` | string | Free text shown as a tooltip in the manager panel. |
 | `color` | string | Hex color; drives the zone ring and membership arcs. |
 | `icon` | string | Emoji shown in the zone header. |
 | `member_ids` | string[] | Person IDs belonging to the faction. |
 | `x` / `y` | number | Zone centre in the Factions view's world space. |
 | `visible` | boolean | Hidden factions don't render or attract members. |
+| `created_at` / `updated_at` | string | |
+
+### Scenario
+
+A named configuration of factions in the **Factions** view. Scenarios share the
+tree's people but each holds its own faction set (e.g. "By family" vs. "By
+company"). Deleting a scenario cascades its factions; people are untouched. The
+per-tree setting `activeScenarioId` remembers which scenario is open.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | string (UUID) | |
+| `tree_id` | string | |
+| `name` | string | Defaults to `"New Scenario"`. |
 | `created_at` / `updated_at` | string | |
 
 ### Image
@@ -131,9 +148,11 @@ Two distinct scopes:
    trees, it creates a default tree, tags any pre-existing persons/relationships/
    images with the new `tree_id`, migrates the old flat `theme` setting into
    `globalSettings`, and re-scopes remaining settings under the `"<treeId>:"` prefix.
-3. **First-run seeding:** a fresh install with no data seeds a sample three-
+3. **Scenario adoption:** factions created before scenarios existed (no
+   `scenario_id`) are adopted into a default `"Scenario 1"` created per tree.
+4. **First-run seeding:** a fresh install with no data seeds a sample three-
    generation Anderson family (6 persons, 8 relationships) so the graph is not empty.
-4. Falls back to the first available tree if `activeTreeId` is missing.
+5. Falls back to the first available tree if `activeTreeId` is missing.
 
 These paths are covered by [`tests/db.test.js`](../tests/db.test.js) — see
 [developer.md](./developer.md#testing).

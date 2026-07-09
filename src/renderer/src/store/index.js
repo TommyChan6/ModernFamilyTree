@@ -10,7 +10,10 @@ export const useMainStore = defineStore('main', () => {
   // ── State ──────────────────────────────────────────────────────────────────
   const persons = ref([])
   const relationships = ref([])
-  const factions = ref([])
+  const factions = ref([])          // all factions of the tree, across scenarios
+  const scenarios = ref([])
+  const activeScenarioId = ref(null)
+  const draggingPersonId = ref(null) // person being dragged from the member list
   const selectedPersonId = ref(null)
   const modalOpen = ref(false)
   const formOpen = ref(false)
@@ -58,6 +61,12 @@ export const useMainStore = defineStore('main', () => {
   )
   const activeTree = computed(() =>
     trees.value.find(t => t.id === activeTreeId.value) || null
+  )
+  const activeScenario = computed(() =>
+    scenarios.value.find(s => s.id === activeScenarioId.value) || null
+  )
+  const activeFactions = computed(() =>
+    factions.value.filter(f => f.scenario_id === activeScenarioId.value)
   )
 
   // ── Tree actions ──────────────────────────────────────────────────────────
@@ -115,14 +124,21 @@ export const useMainStore = defineStore('main', () => {
 
   // ── Data actions ──────────────────────────────────────────────────────────
   async function loadAll() {
-    const [personsRes, relsRes, factionsRes] = await Promise.all([
+    const [personsRes, relsRes, factionsRes, scenariosRes, settingsRes] = await Promise.all([
       api.invoke('persons:getAll'),
       api.invoke('relationships:getAll'),
-      api.invoke('factions:getAll')
+      api.invoke('factions:getAll'),
+      api.invoke('scenarios:getAll'),
+      api.invoke('settings:getAll')
     ])
     if (personsRes.success) persons.value = personsRes.data
     if (relsRes.success) relationships.value = relsRes.data
     if (factionsRes.success) factions.value = factionsRes.data
+    if (scenariosRes.success) scenarios.value = scenariosRes.data
+    // Restore the tree's active scenario; fall back to the first one
+    const savedId = settingsRes.success ? settingsRes.data.activeScenarioId : null
+    activeScenarioId.value =
+      scenarios.value.find(s => s.id === savedId)?.id ?? scenarios.value[0]?.id ?? null
   }
 
   async function createPerson(data) {
@@ -181,9 +197,67 @@ export const useMainStore = defineStore('main', () => {
     return res
   }
 
+  // ── Scenario actions ──────────────────────────────────────────────────────
+  /** Create the default scenario if the tree has none yet. Concurrent callers
+   *  share one in-flight request so only a single default is ever created. */
+  let ensureScenarioPromise = null
+  async function ensureScenario() {
+    if (activeScenarioId.value) return activeScenarioId.value
+    if (!ensureScenarioPromise) {
+      ensureScenarioPromise = api.invoke('scenarios:create', { name: 'Scenario 1' })
+        .then(res => {
+          if (res.success) {
+            scenarios.value.push(res.data.scenario)
+            activeScenarioId.value = res.data.scenario.id
+          }
+          return activeScenarioId.value
+        })
+        .finally(() => { ensureScenarioPromise = null })
+    }
+    return ensureScenarioPromise
+  }
+
+  async function createScenario(name, cloneFromId = null) {
+    const res = await api.invoke('scenarios:create', { name, clone_from: cloneFromId })
+    if (res.success) {
+      scenarios.value.push(res.data.scenario)
+      factions.value.push(...res.data.factions)
+    }
+    return res
+  }
+
+  async function renameScenario(id, name) {
+    const res = await api.invoke('scenarios:rename', { id, name })
+    if (res.success) {
+      const idx = scenarios.value.findIndex(s => s.id === id)
+      if (idx !== -1) scenarios.value[idx] = res.data
+    }
+    return res
+  }
+
+  async function deleteScenario(id) {
+    const res = await api.invoke('scenarios:delete', { id })
+    if (res.success) {
+      scenarios.value = scenarios.value.filter(s => s.id !== id)
+      factions.value = factions.value.filter(f => f.scenario_id !== id)
+      if (activeScenarioId.value === id) {
+        setActiveScenario(scenarios.value[0]?.id ?? null)
+      }
+    }
+    return res
+  }
+
+  function setActiveScenario(id) {
+    if (id === activeScenarioId.value) return
+    activeScenarioId.value = id
+    // Fire-and-forget persistence — switching stays instant
+    if (id) api.invoke('settings:set', { key: 'activeScenarioId', value: id })
+  }
+
   // ── Faction actions ───────────────────────────────────────────────────────
   async function createFaction(data) {
-    const res = await api.invoke('factions:create', data)
+    const scenarioId = await ensureScenario()
+    const res = await api.invoke('factions:create', { ...data, scenario_id: scenarioId })
     if (res.success) factions.value.push(res.data)
     return res
   }
@@ -256,16 +330,18 @@ export const useMainStore = defineStore('main', () => {
     trees, activeTreeId, activeTree,
     loadTrees, createTree, renameTree, deleteTree, switchTree,
     // state
-    persons, relationships, factions, selectedPersonId, modalOpen, formOpen,
+    persons, relationships, factions, scenarios, activeScenarioId,
+    draggingPersonId, selectedPersonId, modalOpen, formOpen,
     editingPerson, theme, settingsOpen, graphSettings,
     lockNodes, cleanTree, currentDate, lockLines, relPopup, activeView,
     // computed
-    selectedPerson, personCount, coupleCount,
+    selectedPerson, personCount, coupleCount, activeScenario, activeFactions,
     // actions
     loadAll, createPerson, updatePerson, deletePerson,
     createRelationship, updateRelationship, deleteRelationship,
     createFaction, updateFaction, deleteFaction,
     addPersonToFaction, removePersonFromFaction,
+    createScenario, renameScenario, deleteScenario, setActiveScenario,
     selectPerson, openForm, closeModal, closeForm,
     setTheme, toggleSettings, updateGraphSetting, resetGraphSettings,
     graphDirty,

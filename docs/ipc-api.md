@@ -45,7 +45,7 @@ tagged with the current `activeTreeId`, and `getAll` handlers filter by it.
 | `trees:getAll` | — | `{ trees: Tree[], activeTreeId }` |
 | `trees:create` | `{ name? }` | the new `Tree` |
 | `trees:rename` | `{ id, name }` | the updated `Tree` |
-| `trees:delete` | `{ id }` | `{ id, newActiveTreeId }` — cascades persons, relationships, factions, images (files unlinked) and tree-scoped settings; switches active tree if needed |
+| `trees:delete` | `{ id }` | `{ id, newActiveTreeId }` — cascades persons, relationships, factions, scenarios, images (files unlinked) and tree-scoped settings; switches active tree if needed |
 | `trees:setActive` | `{ id }` | `{ activeTreeId }` |
 
 ### Persons
@@ -70,10 +70,19 @@ tagged with the current `activeTreeId`, and `getAll` handlers filter by it.
 
 | Channel | Payload | Returns |
 |---------|---------|---------|
-| `factions:getAll` | — | `Faction[]` (active tree) |
-| `factions:create` | `{ name?, description?, color?, icon?, member_ids?, x?, y?, visible? }` | the new `Faction` (defaults filled in) |
+| `factions:getAll` | — | `Faction[]` (active tree, all scenarios — the renderer filters by active scenario) |
+| `factions:create` | `{ scenario_id, name?, description?, color?, icon?, member_ids?, x?, y?, visible? }` | the new `Faction` (defaults filled in) |
 | `factions:update` | `{ id, ...partial }` | the updated `Faction` (only provided fields change) |
 | `factions:delete` | `{ id }` | `{ id }` — members are untouched |
+
+### Scenarios
+
+| Channel | Payload | Returns |
+|---------|---------|---------|
+| `scenarios:getAll` | — | `Scenario[]` (active tree) |
+| `scenarios:create` | `{ name?, clone_from? }` | `{ scenario, factions }` — with `clone_from`, the source scenario's factions are duplicated into the new one and returned |
+| `scenarios:rename` | `{ id, name }` | the updated `Scenario` |
+| `scenarios:delete` | `{ id }` | `{ id }` — cascades the scenario's factions; people are untouched |
 
 ### Images
 

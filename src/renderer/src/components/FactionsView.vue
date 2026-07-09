@@ -4,7 +4,7 @@
     <div class="fx-toolbar">
       <div class="fx-heading">
         <span class="fx-title">Factions</span>
-        <span class="fx-count">{{ store.factions.length }}</span>
+        <span class="fx-count">{{ activeFactions.length }}</span>
       </div>
       <div class="fx-actions">
         <span class="fx-hint">Drag people into rings · Drag rings to arrange · Click a person to manage</span>
@@ -22,6 +22,9 @@
       @pointerdown="onStageDown"
       @wheel.prevent="onWheel"
       @click="onStageClick"
+      @dragover.prevent="onSidebarDragOver"
+      @dragleave="onSidebarDragLeave"
+      @drop.prevent="onSidebarDrop"
     >
       <svg class="fx-svg" :width="stageW" :height="stageH">
         <defs>
@@ -31,35 +34,48 @@
 
         <g :transform="`translate(${tx}, ${ty}) scale(${k})`">
           <!-- Faction zones -->
-          <g
-            v-for="z in zones"
-            :key="z.id"
-            class="fx-zone"
-            :class="{ dim: zoneDimmed(z.id), lit: zoneLit(z.id), droppable: z.id === dropTargetId }"
-            @pointerenter="hoverFactionId = z.id"
-            @pointerleave="hoverFactionId = null"
-          >
-            <circle
-              class="fx-zone-fill"
-              :cx="z.x" :cy="z.y" :r="z.r"
-              :fill="z.color"
-              @pointerdown.stop="onZoneDown(z.id, $event)"
-            />
-            <circle class="fx-zone-ring" :cx="z.x" :cy="z.y" :r="z.r" :stroke="z.color" />
-            <circle v-if="z.id === dropTargetId" class="fx-zone-drop-ring" :cx="z.x" :cy="z.y" :r="z.r + 8" :stroke="z.color" />
-            <!-- Header pill -->
-            <g class="fx-zone-header" @pointerdown.stop="onZoneDown(z.id, $event)">
-              <rect
-                :x="z.x - z.headerW / 2" :y="z.y - z.r - 30"
-                :width="z.headerW" height="26" rx="13"
-                :stroke="z.color"
+          <TransitionGroup tag="g" name="fxzone">
+            <g
+              v-for="z in zones"
+              :key="z.id"
+              class="fx-zone"
+              :class="{ dim: zoneDimmed(z.id), lit: zoneLit(z.id), droppable: z.id === dropTargetId }"
+              @pointerenter="hoverFactionId = z.id"
+              @pointerleave="hoverFactionId = null"
+            >
+              <circle
+                class="fx-zone-fill"
+                :cx="z.x" :cy="z.y" :r="z.r"
+                :fill="z.color"
+                @pointerdown.stop="onZoneDown(z.id, $event)"
               />
-              <text class="fx-zone-name" :x="z.x - z.headerW / 2 + 12" :y="z.y - z.r - 12">{{ z.icon }} {{ z.label }}</text>
-              <text class="fx-zone-count" :x="z.x + z.headerW / 2 - 12" :y="z.y - z.r - 12" text-anchor="end" :fill="z.color">{{ z.count }}</text>
+              <circle class="fx-zone-ring" :cx="z.x" :cy="z.y" :r="z.r" :stroke="z.color" />
+              <circle v-if="z.id === dropTargetId" class="fx-zone-drop-ring" :cx="z.x" :cy="z.y" :r="z.r + 8" :stroke="z.color" />
+              <!-- Header pill -->
+              <g class="fx-zone-header" @pointerdown.stop="onZoneDown(z.id, $event)">
+                <rect
+                  :x="z.x - z.headerW / 2" :y="z.y - z.r - 30"
+                  :width="z.headerW" height="26" rx="13"
+                  :stroke="z.color"
+                />
+                <text class="fx-zone-name" :x="z.x - z.headerW / 2 + 12" :y="z.y - z.r - 12">{{ z.icon }} {{ z.label }}</text>
+                <text class="fx-zone-count" :x="z.x + z.headerW / 2 - 12" :y="z.y - z.r - 12" text-anchor="end" :fill="z.color">{{ z.count }}</text>
+              </g>
             </g>
+          </TransitionGroup>
+
+          <!-- Tether threads: always-on hint that a person spans several camps -->
+          <g v-for="t in tethers" :key="`th-${t.id}`" class="fx-tethers" :class="{ dim: personDimmed(t) }">
+            <line
+              v-for="(l, i) in t.lines"
+              :key="i"
+              class="fx-tether"
+              :x1="t.x" :y1="t.y" :x2="l.x2" :y2="l.y2"
+              :stroke="l.color"
+            />
           </g>
 
-          <!-- Membership links for the hovered / dragged person -->
+          <!-- Bright membership links for the hovered / dragged person -->
           <g class="fx-links">
             <line
               v-for="(l, i) in hoverLinks"
@@ -71,34 +87,42 @@
           </g>
 
           <!-- People -->
-          <g
-            v-for="(n, i) in renderNodes"
-            :key="n.id"
-            class="fx-person"
-            :class="{ dim: personDimmed(n), lit: personLit(n), grabbed: dragNode && dragNode.id === n.id }"
-            :transform="`translate(${n.x}, ${n.y})`"
-            @pointerdown.stop="onNodeDown(n.id, $event)"
-            @pointerenter="hoverPersonId = n.id"
-            @pointerleave="hoverPersonId = null"
-            @dblclick.stop="pPop = null; store.selectPerson(n.id)"
-          >
-            <g class="fx-person-inner" :style="{ '--i': i }">
-              <path v-for="(a, j) in n.arcs" :key="j" class="fx-arc" :d="a.d" :stroke="a.color" />
-              <circle class="fx-node-bg" cx="0" cy="0" :r="NODE_R" :fill="n.color" />
-              <image
-                v-if="n.img"
-                :href="n.img"
-                :x="-(NODE_R - 2.5)" :y="-(NODE_R - 2.5)"
-                :width="(NODE_R - 2.5) * 2" :height="(NODE_R - 2.5) * 2"
-                clip-path="url(#fx-avatar-clip)"
-                preserveAspectRatio="xMidYMid slice"
-              />
-              <path v-else class="fx-node-icon" :d="PERSON_ICON_PATH" transform="translate(-10, -10.5) scale(0.86)" />
-              <text class="fx-node-name" x="0" :y="NODE_R + 16" text-anchor="middle">{{ n.label }}</text>
+          <TransitionGroup tag="g" name="fxp">
+            <g
+              v-for="(n, i) in renderNodes"
+              :key="n.id"
+              class="fx-person"
+              :class="{ dim: personDimmed(n), lit: personLit(n), grabbed: dragNode && dragNode.id === n.id }"
+              :transform="`translate(${n.x}, ${n.y})`"
+              @pointerdown.stop="onNodeDown(n.id, $event)"
+              @pointerenter="hoverPersonId = n.id"
+              @pointerleave="hoverPersonId = null"
+              @dblclick.stop="pPop = null; store.selectPerson(n.id)"
+            >
+              <g class="fx-person-inner" :style="{ '--i': i }">
+                <g class="fx-arcs" :class="{ spin: n.multi }">
+                  <path v-for="(a, j) in n.arcs" :key="j" class="fx-arc" :class="{ thick: n.multi }" :d="a.d" :stroke="a.color" />
+                </g>
+                <circle class="fx-node-bg" cx="0" cy="0" :r="NODE_R" :fill="n.color" />
+                <image
+                  v-if="n.img"
+                  :href="n.img"
+                  :x="-(NODE_R - 2.5)" :y="-(NODE_R - 2.5)"
+                  :width="(NODE_R - 2.5) * 2" :height="(NODE_R - 2.5) * 2"
+                  clip-path="url(#fx-avatar-clip)"
+                  preserveAspectRatio="xMidYMid slice"
+                />
+                <path v-else class="fx-node-icon" :d="PERSON_ICON_PATH" transform="translate(-10, -10.5) scale(0.86)" />
+                <g v-if="n.multi" class="fx-multi-badge" :transform="`translate(${NODE_R - 2}, ${-(NODE_R - 2)})`">
+                  <circle r="7.5" />
+                  <text y="3">{{ n.count }}</text>
+                </g>
+                <text class="fx-node-name" x="0" :y="NODE_R + 16" text-anchor="middle">{{ n.label }}</text>
+              </g>
             </g>
-          </g>
+          </TransitionGroup>
 
-          <!-- Ghost while dragging someone out of the tray -->
+          <!-- Ghost while dragging someone in from the tray or member list -->
           <g v-if="ghost && ghost.over" class="fx-ghost" :transform="`translate(${ghost.x}, ${ghost.y})`">
             <circle cx="0" cy="0" :r="NODE_R" :fill="ghost.color" />
             <path class="fx-node-icon" :d="PERSON_ICON_PATH" transform="translate(-10, -10.5) scale(0.86)" />
@@ -108,18 +132,18 @@
       </svg>
 
       <!-- Empty state -->
-      <div v-if="!store.factions.length" class="fx-empty">
+      <div v-if="!activeFactions.length" class="fx-empty">
         <div class="fx-empty-icon">⬡</div>
-        <div class="fx-empty-title">No factions yet</div>
+        <div class="fx-empty-title">{{ store.scenarios.length > 1 ? 'No factions in this scenario' : 'No factions yet' }}</div>
         <div class="fx-empty-text">
           Group your people into families, companies, schools, guilds — any camps you like.
           People in several factions settle in the middle ground between them.
         </div>
-        <button class="btn btn-primary" @click="handleCreateFaction">＋ Create your first faction</button>
+        <button class="btn btn-primary" @click="handleCreateFaction">＋ Create {{ store.scenarios.length > 1 ? 'a' : 'your first' }} faction</button>
       </div>
 
       <!-- Zoom controls -->
-      <div v-if="store.factions.length" class="fx-controls" @pointerdown.stop @click.stop>
+      <div v-if="activeFactions.length" class="fx-controls" @pointerdown.stop @click.stop>
         <button class="fx-ctrl-btn" title="Zoom in" @click="zoomBy(1.3333)">＋</button>
         <button class="fx-ctrl-btn" title="Zoom out" @click="zoomBy(0.75)">－</button>
         <div class="fx-ctrl-sep"></div>
@@ -129,10 +153,10 @@
       </div>
 
       <!-- Faction manager panel -->
-      <div v-if="store.factions.length" class="fx-manager" @pointerdown.stop @wheel.stop @click.stop>
+      <div v-if="activeFactions.length" class="fx-manager" @pointerdown.stop @wheel.stop @click.stop>
         <div class="fx-panel-title">Factions</div>
         <div
-          v-for="f in store.factions"
+          v-for="f in activeFactions"
           :key="f.id"
           class="fx-mrow"
           :class="{ off: f.visible === false }"
@@ -153,7 +177,7 @@
       </div>
 
       <!-- Unassigned tray -->
-      <div v-if="unassigned.length && store.factions.length" class="fx-tray" @wheel.stop @click.stop>
+      <div v-if="unassigned.length && activeFactions.length" class="fx-tray" @wheel.stop @click.stop>
         <div class="fx-tray-title">Unassigned <span class="fx-tray-count">{{ unassigned.length }}</span></div>
         <div class="fx-tray-hint">drag onto a ring</div>
         <div class="fx-tray-chips">
@@ -233,6 +257,46 @@
         </div>
       </Transition>
     </div>
+
+    <!-- Scenario bar -->
+    <div class="fx-scenarios" @wheel.stop>
+      <span class="fx-sc-label">Scenarios</span>
+      <div class="fx-sc-chips">
+        <TransitionGroup name="scpill">
+          <button
+            v-for="s in store.scenarios"
+            :key="s.id"
+            class="fx-sc-chip"
+            :class="{ active: s.id === store.activeScenarioId }"
+            :title="scenarioTooltip(s)"
+            @click="switchScenario(s.id)"
+            @dblclick="startRenameScenario(s)"
+          >
+            <input
+              v-if="renamingScenarioId === s.id"
+              ref="scRenameRef"
+              v-model="scRenameValue"
+              class="fx-sc-rename"
+              @keydown.enter="confirmRenameScenario"
+              @keydown.escape="renamingScenarioId = null"
+              @blur="confirmRenameScenario"
+              @click.stop
+            />
+            <span v-else class="fx-sc-name">{{ s.name }}</span>
+            <span class="fx-sc-badge">{{ peopleInScenario(s.id) }}</span>
+            <span
+              v-if="store.scenarios.length > 1 && renamingScenarioId !== s.id"
+              class="fx-sc-x"
+              title="Delete scenario"
+              @click.stop="handleDeleteScenario(s)"
+            >×</span>
+          </button>
+        </TransitionGroup>
+        <button class="fx-sc-add" title="New empty scenario" @click="addScenario(false)">＋</button>
+        <button v-if="store.activeScenarioId" class="fx-sc-add" title="Duplicate current scenario" @click="addScenario(true)">⧉</button>
+      </div>
+      <span class="fx-sc-hint">Each scenario keeps its own factions — people carry over</span>
+    </div>
   </div>
 </template>
 
@@ -241,7 +305,10 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { forceSimulation, forceCollide, forceManyBody } from 'd3'
 import { useMainStore } from '../store/index.js'
 import { api } from '../api.js'
-import { factionRadius, computeTargets, nextFactionPosition, arrangeInRing, membershipArcs } from './factions/factionLayout.js'
+import {
+  factionRadius, computeTargets, nextFactionPosition, arrangeInRing,
+  membershipArcs, matchFactionsByName
+} from './factions/factionLayout.js'
 
 const store = useMainStore()
 
@@ -252,6 +319,7 @@ const PRESET_COLORS = ['#6c8ef5', '#f06292', '#f5a623', '#4caf72', '#a06cf5', '#
 const ICON_PRESETS = ['⚑', '🏰', '🛡', '⚔', '👑', '🎓', '🏢', '⚡', '🔥', '💧', '🌿', '🌙']
 const MIN_K = 0.2
 const MAX_K = 3
+const GLIDE_MS = 480
 
 // ── Viewport ────────────────────────────────────────────────────────────────
 const stageEl = ref(null)
@@ -266,11 +334,70 @@ const panning = ref(false)
 const hoverPersonId = ref(null)
 const hoverFactionId = ref(null)
 const dragNode = ref(null)      // sim node being dragged
-const ghost = ref(null)         // tray chip being dragged: { id, label, color, x, y, over }
+const ghost = ref(null)         // incoming person drag: { id, label, color, x, y, over }
 const dropTargetId = ref(null)  // faction ring under the current drag
 const fEdit = ref(null)         // faction edit popup model
 const pPop = ref(null)          // person popup: { id, px, py }
 const fEditNameRef = ref(null)
+const renamingScenarioId = ref(null)
+const scRenameValue = ref('')
+const scRenameRef = ref(null)
+
+const activeFactions = computed(() => store.activeFactions)
+const visibleFactions = computed(() => activeFactions.value.filter(f => f.visible !== false))
+
+// ── Zone display positions (outside Vue reactivity; `tick` drives renders) ──
+// zonePos is what the stage draws and what the simulation steers toward; it
+// tracks the persisted faction x/y except while a glide tween or a ring drag
+// is animating it. Data coordinates are never mutated for animation.
+let zonePos = new Map()          // factionId -> { x, y }
+const getZonePos = (f) => (f && zonePos.get(f.id)) || f
+
+function syncZonePos() {
+  const seen = new Set()
+  for (const f of activeFactions.value) {
+    seen.add(f.id)
+    if (!zonePos.has(f.id)) zonePos.set(f.id, { x: f.x, y: f.y })
+  }
+  for (const id of [...zonePos.keys()]) {
+    if (!seen.has(id)) zonePos.delete(id)
+  }
+}
+
+// Glide tweens (scenario switch, auto-arrange). New tweens snapshot the
+// current display position, so overlapping animations hand over smoothly
+// instead of jumping.
+let zoneTweens = new Map()       // factionId -> { from: {x,y}, to: {x,y} }
+let glideRaf = 0
+let glideT0 = 0
+
+function startZoneTweens(entries) {
+  if (!entries.length) return
+  for (const e of entries) {
+    zoneTweens.set(e.id, { from: { ...e.from }, to: { ...e.to } })
+  }
+  glideT0 = performance.now()
+  sim?.alpha(0.6).restart() // members chase the moving rings
+  if (!glideRaf) glideRaf = requestAnimationFrame(glideStep)
+}
+
+function glideStep(now) {
+  const t = Math.min(1, (now - glideT0) / GLIDE_MS)
+  const e = 1 - Math.pow(1 - t, 3)
+  for (const [id, tw] of zoneTweens) {
+    const p = zonePos.get(id)
+    if (!p) { zoneTweens.delete(id); continue }
+    p.x = tw.from.x + (tw.to.x - tw.from.x) * e
+    p.y = tw.from.y + (tw.to.y - tw.from.y) * e
+  }
+  tick.value++
+  if (t < 1 && zoneTweens.size) {
+    glideRaf = requestAnimationFrame(glideStep)
+  } else {
+    zoneTweens.clear()
+    glideRaf = 0
+  }
+}
 
 // ── Simulation (positions live outside Vue; `tick` triggers re-render) ─────
 const tick = ref(0)
@@ -280,7 +407,7 @@ let nodeById = new Map()
 let pendingSpawn = null // { id, x, y } — where a freshly dropped person materialises
 
 function forceAttract(alpha) {
-  const targets = computeTargets(store.factions)
+  const targets = computeTargets(activeFactions.value, getZonePos)
   for (const n of simNodes) {
     const t = targets[n.id]
     if (!t) continue
@@ -290,7 +417,8 @@ function forceAttract(alpha) {
 }
 
 function rebuildNodes() {
-  const targets = computeTargets(store.factions)
+  syncZonePos()
+  const targets = computeTargets(activeFactions.value, getZonePos)
   const next = []
   const nextMap = new Map()
   for (const p of store.persons) {
@@ -318,14 +446,34 @@ function rebuildNodes() {
   tick.value++
 }
 
-// Rebuild only when membership / visibility / the roster changes — not on
-// every faction x/y mutation during a ring drag (the attract force reads
-// positions live each tick anyway).
+// Rebuild only when membership / visibility / the roster / the scenario
+// changes — not on every faction x/y mutation during a ring drag (the attract
+// force reads display positions live each tick anyway).
 const membershipKey = computed(() =>
   store.persons.map(p => p.id).join(',') + '|' +
-  store.factions.map(f => `${f.id}:${f.visible === false ? 0 : 1}:${(f.member_ids || []).join('.')}`).join(';')
+  activeFactions.value.map(f => `${f.id}:${f.visible === false ? 0 : 1}:${(f.member_ids || []).join('.')}`).join(';')
 )
 watch(membershipKey, rebuildNodes)
+
+// ── Scenario switching: same-name zones glide, everyone else pops ──────────
+watch(() => store.activeScenarioId, (newId, oldId) => {
+  fEdit.value = null
+  pPop.value = null
+  dropTargetId.value = null
+  const oldFactions = store.factions.filter(f => f.scenario_id === oldId)
+  const newFactions = store.factions.filter(f => f.scenario_id === newId)
+  const matches = matchFactionsByName(oldFactions, newFactions)
+  const tweens = []
+  for (const f of newFactions) {
+    const old = matches.get(f.id)
+    if (!old) continue
+    const from = zonePos.get(old.id) ? { ...zonePos.get(old.id) } : { x: old.x, y: old.y }
+    zonePos.set(f.id, { ...from })
+    tweens.push({ id: f.id, from, to: { x: f.x, y: f.y } })
+  }
+  startZoneTweens(tweens)
+  if (newFactions.some(f => f.visible !== false)) fitAll(true)
+})
 
 // ── Derived display data ────────────────────────────────────────────────────
 function genderColor(g) {
@@ -341,19 +489,19 @@ function trunc(s, n) {
 
 const factionById = computed(() => {
   const m = new Map()
-  store.factions.forEach(f => m.set(f.id, f))
+  activeFactions.value.forEach(f => m.set(f.id, f))
   return m
 })
 
-const visibleFactions = computed(() => store.factions.filter(f => f.visible !== false))
-
-const zones = computed(() =>
-  visibleFactions.value.map(f => {
+const zones = computed(() => {
+  tick.value // display positions animate outside reactivity
+  return visibleFactions.value.map(f => {
+    const p = getZonePos(f)
     const count = (f.member_ids || []).length
     const label = trunc(f.name, 18)
     return {
       id: f.id,
-      x: f.x, y: f.y,
+      x: p.x, y: p.y,
       r: factionRadius(count),
       color: f.color,
       icon: f.icon,
@@ -362,7 +510,7 @@ const zones = computed(() =>
       headerW: label.length * 7.2 + String(count).length * 7 + 44,
     }
   })
-)
+})
 
 const personById = computed(() => {
   const m = new Map()
@@ -370,26 +518,62 @@ const personById = computed(() => {
   return m
 })
 
-/** Visible-faction ids for a person */
+/** Visible-faction ids for a person (active scenario) */
 function factionIdsOf(personId) {
   return visibleFactions.value.filter(f => (f.member_ids || []).includes(personId)).map(f => f.id)
 }
 
+// Static per-person display data — recomputed on membership changes only,
+// never per simulation tick (arc path math stays off the hot path).
+const nodeMeta = computed(() => {
+  const m = new Map()
+  for (const p of store.persons) {
+    const ids = factionIdsOf(p.id)
+    if (!ids.length) continue
+    const colors = ids.map(fid => factionById.value.get(fid)?.color).filter(Boolean)
+    const multi = ids.length > 1
+    m.set(p.id, {
+      color: genderColor(p.gender),
+      img: p.primary_image ? (api.getImageUrl(p.primary_image) || null) : null,
+      label: trunc(p.name, 14),
+      factionIds: ids,
+      multi,
+      count: ids.length,
+      arcs: membershipArcs(0, 0, multi ? ARC_R + 1.5 : ARC_R, colors),
+    })
+  }
+  return m
+})
+
 const renderNodes = computed(() => {
   tick.value // re-render on every simulation tick
-  return simNodes.map(n => {
-    const p = personById.value.get(n.id)
-    const colors = factionIdsOf(n.id).map(fid => factionById.value.get(fid)?.color).filter(Boolean)
-    return {
-      id: n.id,
-      x: n.x, y: n.y,
-      color: genderColor(p?.gender),
-      img: p?.primary_image ? (api.getImageUrl(p.primary_image) || null) : null,
-      label: trunc(p?.name, 14),
-      factionIds: factionIdsOf(n.id),
-      arcs: membershipArcs(0, 0, ARC_R, colors),
+  const metas = nodeMeta.value
+  const out = []
+  for (const n of simNodes) {
+    const meta = metas.get(n.id)
+    if (meta) out.push({ id: n.id, x: n.x, y: n.y, ...meta })
+  }
+  return out
+})
+
+// Faint threads from every multi-faction person to each of their camps
+const tethers = computed(() => {
+  tick.value
+  const metas = nodeMeta.value
+  const out = []
+  for (const n of simNodes) {
+    const meta = metas.get(n.id)
+    if (!meta?.multi) continue
+    const lines = []
+    for (const fid of meta.factionIds) {
+      const f = factionById.value.get(fid)
+      if (!f) continue
+      const p = getZonePos(f)
+      lines.push({ x2: p.x, y2: p.y, color: f.color })
     }
-  })
+    out.push({ id: n.id, x: n.x, y: n.y, factionIds: meta.factionIds, lines })
+  }
+  return out
 })
 
 const unassigned = computed(() => {
@@ -449,10 +633,14 @@ const hoverLinks = computed(() => {
   if (!pid) return []
   const n = nodeById.get(pid)
   if (!n) return []
-  return factionIdsOf(pid).map(fid => {
+  const out = []
+  for (const fid of factionIdsOf(pid)) {
     const f = factionById.value.get(fid)
-    return { x1: n.x, y1: n.y, x2: f.x, y2: f.y, color: f.color }
-  })
+    if (!f) continue
+    const p = getZonePos(f)
+    out.push({ x1: n.x, y1: n.y, x2: p.x, y2: p.y, color: f.color })
+  }
+  return out
 })
 
 // ── Coordinate helpers ──────────────────────────────────────────────────────
@@ -561,19 +749,23 @@ function zoomBy(factor) {
   tweenView(nk, cx - (cx - tx.value) * (nk / k.value), cy - (cy - ty.value) * (nk / k.value))
 }
 
+// Fit uses the persisted (target) faction positions, so fitting during a
+// glide frames the final layout rather than a mid-animation snapshot.
 function fitAll(animate = false) {
   if (!stageW.value) return
-  if (!zones.value.length) {
+  const fs = visibleFactions.value
+  if (!fs.length) {
     if (animate) tweenView(1, stageW.value / 2, stageH.value / 2)
     else { k.value = 1; tx.value = stageW.value / 2; ty.value = stageH.value / 2 }
     return
   }
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const z of zones.value) {
-    minX = Math.min(minX, z.x - z.r)
-    minY = Math.min(minY, z.y - z.r - 44) // room for the header pill
-    maxX = Math.max(maxX, z.x + z.r)
-    maxY = Math.max(maxY, z.y + z.r)
+  for (const f of fs) {
+    const r = factionRadius((f.member_ids || []).length)
+    minX = Math.min(minX, f.x - r)
+    minY = Math.min(minY, f.y - r - 44) // room for the header pill
+    maxX = Math.max(maxX, f.x + r)
+    maxY = Math.max(maxY, f.y + r)
   }
   const w = Math.max(200, maxX - minX)
   const h = Math.max(200, maxY - minY)
@@ -591,8 +783,10 @@ function onZoneDown(fid, e) {
   if (e.button !== 0) return
   const f = factionById.value.get(fid)
   if (!f) return
+  zoneTweens.delete(fid) // a grab overrides any running glide for this ring
+  const p = getZonePos(f)
   const w = toWorld(e)
-  zoneDrag = { f, offX: w.x - f.x, offY: w.y - f.y, moved: false, e }
+  zoneDrag = { f, offX: w.x - p.x, offY: w.y - p.y, startX: p.x, startY: p.y, moved: false }
   sim?.alphaTarget(0.35).restart()
   window.addEventListener('pointermove', onZoneMove)
   window.addEventListener('pointerup', onZoneUp)
@@ -601,13 +795,14 @@ function onZoneDown(fid, e) {
 function onZoneMove(e) {
   if (!zoneDrag) return
   const w = toWorld(e)
-  if (!zoneDrag.moved && Math.hypot(w.x - zoneDrag.offX - zoneDrag.f.x, w.y - zoneDrag.offY - zoneDrag.f.y) > 3 / k.value) {
+  const nx = w.x - zoneDrag.offX
+  const ny = w.y - zoneDrag.offY
+  if (!zoneDrag.moved && Math.hypot(nx - zoneDrag.startX, ny - zoneDrag.startY) > 3 / k.value) {
     zoneDrag.moved = true
   }
   if (!zoneDrag.moved) return
-  // Optimistic move; persisted once on release
-  zoneDrag.f.x = w.x - zoneDrag.offX
-  zoneDrag.f.y = w.y - zoneDrag.offY
+  const p = zonePos.get(zoneDrag.f.id)
+  if (p) { p.x = nx; p.y = ny }
 }
 
 function onZoneUp(e) {
@@ -621,7 +816,8 @@ function onZoneUp(e) {
   // close whatever we just opened — suppress it either way
   suppressClick = true
   if (moved) {
-    store.updateFaction({ id: f.id, x: f.x, y: f.y })
+    const p = zonePos.get(f.id)
+    if (p) store.updateFaction({ id: f.id, x: Math.round(p.x), y: Math.round(p.y) })
   } else {
     openFactionEdit(f.id, e)
   }
@@ -729,15 +925,65 @@ function onTrayUp(e) {
   }
 }
 
+// ── Member-list drag-in (HTML5 dnd from the right sidebar) ─────────────────
+function onSidebarDragOver(e) {
+  const pid = store.draggingPersonId
+  if (!pid) return
+  e.dataTransfer.dropEffect = 'copy'
+  const w = toWorld(e)
+  // Only ghost people who aren't already on stage — assigned people get the
+  // drop-ring highlight without a duplicate avatar
+  if (!nodeById.has(pid)) {
+    const p = personById.value.get(pid)
+    if (p) {
+      ghost.value = {
+        id: pid,
+        label: trunc(p.name, 14),
+        color: genderColor(p.gender),
+        x: w.x, y: w.y, over: true,
+      }
+    }
+  }
+  dropTargetId.value = zoneAt(w)?.id || null
+}
+
+function onSidebarDragLeave(e) {
+  if (!store.draggingPersonId) return
+  if (e.relatedTarget && stageEl.value?.contains(e.relatedTarget)) return
+  ghost.value = null
+  dropTargetId.value = null
+}
+
+function onSidebarDrop(e) {
+  const pid = store.draggingPersonId || e.dataTransfer.getData('text/plain')
+  ghost.value = null
+  const target = dropTargetId.value
+  dropTargetId.value = null
+  if (!pid || !target) return
+  const f = factionById.value.get(target)
+  if (!f || (f.member_ids || []).includes(pid)) return
+  const w = toWorld(e)
+  if (!nodeById.has(pid)) pendingSpawn = { id: pid, x: w.x, y: w.y }
+  store.addPersonToFaction(pid, target)
+}
+
+// Ghost/highlight must not outlive an aborted sidebar drag (Esc, drop outside)
+watch(() => store.draggingPersonId, (pid) => {
+  if (!pid && !trayDrag) {
+    ghost.value = null
+    dropTargetId.value = null
+  }
+})
+
 // ── Faction create / edit / arrange ─────────────────────────────────────────
 async function handleCreateFaction() {
   const cx = (stageW.value / 2 - tx.value) / k.value
   const cy = (stageH.value / 2 - ty.value) / k.value
-  const pos = nextFactionPosition(store.factions, cx, cy)
+  const pos = nextFactionPosition(activeFactions.value, cx, cy)
   const res = await store.createFaction({
-    name: `Faction ${store.factions.length + 1}`,
-    color: PRESET_COLORS[store.factions.length % PRESET_COLORS.length],
-    icon: ICON_PRESETS[store.factions.length % ICON_PRESETS.length],
+    name: `Faction ${activeFactions.value.length + 1}`,
+    color: PRESET_COLORS[activeFactions.value.length % PRESET_COLORS.length],
+    icon: ICON_PRESETS[activeFactions.value.length % ICON_PRESETS.length],
     x: Math.round(pos.x),
     y: Math.round(pos.y),
   })
@@ -790,9 +1036,11 @@ async function autoArrange() {
   const cx = (stageW.value / 2 - tx.value) / k.value
   const cy = (stageH.value / 2 - ty.value) / k.value
   const placed = arrangeInRing(visibleFactions.value, cx, cy)
-  sim?.alphaTarget(0.4).restart()
+  startZoneTweens(placed.map(p => {
+    const cur = zonePos.get(p.id) || { x: p.x, y: p.y }
+    return { id: p.id, from: cur, to: { x: p.x, y: p.y } }
+  }))
   await Promise.all(placed.map(p => store.updateFaction({ id: p.id, x: Math.round(p.x), y: Math.round(p.y) })))
-  sim?.alphaTarget(0)
   fitAll(true)
 }
 
@@ -806,16 +1054,75 @@ function openPersonPopup(id, e) {
 
 const pPopPerson = computed(() => pPop.value ? personById.value.get(pPop.value.id) : null)
 const pPopMemberships = computed(() =>
-  pPop.value ? store.factions.filter(f => (f.member_ids || []).includes(pPop.value.id)) : []
+  pPop.value ? activeFactions.value.filter(f => (f.member_ids || []).includes(pPop.value.id)) : []
 )
 const pPopAddable = computed(() =>
-  pPop.value ? store.factions.filter(f => !(f.member_ids || []).includes(pPop.value.id)) : []
+  pPop.value ? activeFactions.value.filter(f => !(f.member_ids || []).includes(pPop.value.id)) : []
 )
 
 function onAddToFaction(e) {
   const fid = e.target.value
   e.target.value = ''
   if (fid && pPop.value) store.addPersonToFaction(pPop.value.id, fid)
+}
+
+// ── Scenario bar ────────────────────────────────────────────────────────────
+const peopleByScenario = computed(() => {
+  const m = new Map()
+  for (const f of store.factions) {
+    if (f.visible === false) continue
+    let set = m.get(f.scenario_id)
+    if (!set) m.set(f.scenario_id, (set = new Set()))
+    for (const pid of f.member_ids || []) set.add(pid)
+  }
+  return m
+})
+
+function peopleInScenario(sid) {
+  return peopleByScenario.value.get(sid)?.size || 0
+}
+
+function scenarioTooltip(s) {
+  const fCount = store.factions.filter(f => f.scenario_id === s.id).length
+  return `${fCount} faction${fCount === 1 ? '' : 's'} · ${peopleInScenario(s.id)} people in scene`
+}
+
+function switchScenario(id) {
+  if (renamingScenarioId.value) return
+  store.setActiveScenario(id)
+}
+
+async function addScenario(duplicate) {
+  const name = `Scenario ${store.scenarios.length + 1}`
+  const res = await store.createScenario(name, duplicate ? store.activeScenarioId : null)
+  if (res?.success) {
+    store.setActiveScenario(res.data.scenario.id)
+    startRenameScenario(res.data.scenario)
+  }
+}
+
+function startRenameScenario(s) {
+  renamingScenarioId.value = s.id
+  scRenameValue.value = s.name
+  nextTick(() => {
+    const el = Array.isArray(scRenameRef.value) ? scRenameRef.value[0] : scRenameRef.value
+    el?.focus()
+    el?.select()
+  })
+}
+
+async function confirmRenameScenario() {
+  const id = renamingScenarioId.value
+  renamingScenarioId.value = null
+  if (id && scRenameValue.value.trim()) {
+    await store.renameScenario(id, scRenameValue.value.trim())
+  }
+}
+
+async function handleDeleteScenario(s) {
+  const fCount = store.factions.filter(f => f.scenario_id === s.id).length
+  const ok = confirm(`Delete scenario "${s.name}"${fCount ? ` and its ${fCount} faction${fCount === 1 ? '' : 's'}` : ''}? People stay in your tree.`)
+  if (ok) await store.deleteScenario(s.id)
 }
 
 // ── Lifecycle ───────────────────────────────────────────────────────────────
@@ -844,6 +1151,8 @@ onBeforeUnmount(() => {
   sim = null
   if (ro) ro.disconnect()
   cancelTween()
+  if (glideRaf) { cancelAnimationFrame(glideRaf); glideRaf = 0 }
+  zoneTweens.clear()
   window.removeEventListener('pointermove', onPanMove)
   window.removeEventListener('pointerup', onPanUp)
   window.removeEventListener('pointermove', onZoneMove)
@@ -958,6 +1267,23 @@ onBeforeUnmount(() => {
 .fx-zone-name { font-size: 12px; font-weight: 700; fill: var(--t1); }
 .fx-zone-count { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
+/* Zone leave (scenario switch / delete): fade out in place.
+   Opacity only — a transform here would override the ring's position. */
+.fxzone-leave-active { transition: opacity 0.28s ease; }
+.fxzone-leave-to { opacity: 0 !important; }
+
+/* ── Tether threads (multi-faction people) ───────────────── */
+.fx-tethers { transition: opacity 0.25s ease; }
+.fx-tethers.dim { opacity: 0.15; }
+.fx-tether {
+  stroke-width: 1.3;
+  stroke-dasharray: 2 7;
+  stroke-linecap: round;
+  opacity: 0.3;
+  pointer-events: none;
+  animation: fx-flow 1.8s linear infinite;
+}
+
 /* ── Membership links (hover only) ───────────────────────── */
 .fx-link {
   stroke-width: 1.6;
@@ -975,6 +1301,11 @@ onBeforeUnmount(() => {
 }
 .fx-person.dim { opacity: 0.22; }
 .fx-person.grabbed { cursor: grabbing; }
+
+/* Person leave (removed from scene): fade only — never transform, the group
+   is positioned by its transform attribute. */
+.fxp-leave-active { transition: opacity 0.25s ease; }
+.fxp-leave-to { opacity: 0 !important; }
 
 .fx-person-inner {
   animation: fx-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
@@ -996,11 +1327,34 @@ onBeforeUnmount(() => {
 .fx-node-icon { fill: rgba(255, 255, 255, 0.92); pointer-events: none; }
 .fx-person image { pointer-events: none; }
 
+.fx-arcs {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+/* Multi-faction rings slowly orbit — the segments read as "spanning camps" */
+.fx-arcs.spin { animation: fx-spin 14s linear infinite; }
+
 .fx-arc {
   fill: none;
   stroke-width: 3;
   stroke-linecap: round;
   opacity: 0.95;
+}
+.fx-arc.thick { stroke-width: 3.8; }
+
+/* Membership-count badge on multi-faction people */
+.fx-multi-badge circle {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3));
+}
+.fx-multi-badge text {
+  font-size: 9px;
+  font-weight: 800;
+  fill: var(--accent);
+  text-anchor: middle;
+  pointer-events: none;
 }
 
 .fx-node-name {
@@ -1016,7 +1370,7 @@ onBeforeUnmount(() => {
 .fx-person:hover .fx-node-name,
 .fx-person.lit .fx-node-name { fill: var(--t1); }
 
-/* ── Ghost (tray drag) ───────────────────────────────────── */
+/* ── Ghost (incoming drag) ───────────────────────────────── */
 .fx-ghost { pointer-events: none; opacity: 0.85; }
 .fx-ghost circle {
   stroke: var(--accent);
@@ -1210,6 +1564,108 @@ onBeforeUnmount(() => {
 .fxpop-leave-active { transition: opacity 0.12s ease, transform 0.12s ease; }
 .fxpop-enter-from, .fxpop-leave-to { opacity: 0; transform: translateY(6px) scale(0.96); }
 
+/* ── Scenario bar ────────────────────────────────────────── */
+.fx-scenarios {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--glass-soft);
+  backdrop-filter: blur(10px);
+  z-index: 2;
+  min-height: 46px;
+}
+.fx-sc-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: var(--t3);
+  flex-shrink: 0;
+}
+.fx-sc-chips {
+  display: flex; align-items: center; gap: 6px;
+  flex: 1; min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.fx-sc-chips::-webkit-scrollbar { display: none; }
+
+.fx-sc-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 11px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--t2);
+  font-family: var(--font); font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.15s;
+}
+.fx-sc-chip:hover { background: var(--hover); color: var(--t1); transform: translateY(-1px); }
+.fx-sc-chip.active {
+  background: var(--adim);
+  color: var(--accent);
+  border-color: rgba(108, 142, 245, 0.35);
+}
+.fx-sc-name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+.fx-sc-badge {
+  font-size: 10px; font-weight: 700;
+  background: var(--surface);
+  color: var(--t3);
+  padding: 0 6px; border-radius: 9px;
+  font-variant-numeric: tabular-nums;
+}
+.fx-sc-chip.active .fx-sc-badge { color: var(--accent); }
+.fx-sc-x {
+  display: none;
+  font-size: 13px; line-height: 1;
+  color: var(--t3);
+  border-radius: 4px;
+  padding: 0 2px;
+  transition: color 0.12s;
+}
+.fx-sc-chip:hover .fx-sc-x { display: inline; }
+.fx-sc-x:hover { color: #ef5350; }
+.fx-sc-rename {
+  width: 110px;
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--t1);
+  font-family: var(--font); font-size: 12px; font-weight: 600;
+  padding: 1px 6px;
+  outline: none;
+  box-shadow: none;
+}
+.fx-sc-add {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--t3);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.18s ease;
+}
+.fx-sc-add:hover {
+  background: var(--hover);
+  color: var(--accent);
+  border-color: var(--accent);
+  border-style: solid;
+}
+.fx-sc-hint { font-size: 10.5px; color: var(--t3); flex-shrink: 0; }
+@media (max-width: 1100px) { .fx-sc-hint { display: none; } }
+
+/* Scenario chip enter/leave */
+.scpill-enter-active { transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
+.scpill-leave-active { transition: all 0.18s ease; }
+.scpill-enter-from { opacity: 0; transform: translateY(6px) scale(0.9); }
+.scpill-leave-to { opacity: 0; transform: scale(0.9); }
+
 /* ── Empty state ─────────────────────────────────────────── */
 .fx-empty {
   position: absolute; inset: 0;
@@ -1229,6 +1685,12 @@ onBeforeUnmount(() => {
 }
 @keyframes fx-ants {
   to { stroke-dashoffset: -18; }
+}
+@keyframes fx-flow {
+  to { stroke-dashoffset: -18; }
+}
+@keyframes fx-spin {
+  to { transform: rotate(360deg); }
 }
 @keyframes fx-zone-in {
   from { opacity: 0; transform: scale(0.85); }

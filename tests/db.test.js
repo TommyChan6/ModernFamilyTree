@@ -38,6 +38,7 @@ describe('Database initialization', () => {
     expect(data).toHaveProperty('persons')
     expect(data).toHaveProperty('relationships')
     expect(data).toHaveProperty('factions')
+    expect(data).toHaveProperty('scenarios')
     expect(data).toHaveProperty('settings')
     expect(data).toHaveProperty('globalSettings')
   })
@@ -390,6 +391,81 @@ describe('Factions', () => {
 
     const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, 'db', 'familytree.json'), 'utf8'))
     expect(raw.factions['f1'].member_ids).toEqual([ids[1]])
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Scenarios', () => {
+  it('adopts pre-scenario factions into a default scenario per tree', () => {
+    // Database written before scenarios existed: factions with no scenario_id
+    const dbDir = path.join(tmpDir, 'db')
+    fs.mkdirSync(dbDir, { recursive: true })
+    fs.writeFileSync(path.join(dbDir, 'familytree.json'), JSON.stringify({
+      trees: {
+        t1: { id: 't1', name: 'A', created_at: '2024-01-01', updated_at: '2024-01-01' },
+        t2: { id: 't2', name: 'B', created_at: '2024-01-01', updated_at: '2024-01-01' }
+      },
+      activeTreeId: 't1',
+      persons: {}, relationships: {}, images: {}, settings: {}, globalSettings: {},
+      factions: {
+        f1: { id: 'f1', tree_id: 't1', name: 'F1', member_ids: [], x: 0, y: 0, visible: true, created_at: '2024-01-01', updated_at: '2024-01-01' },
+        f2: { id: 'f2', tree_id: 't1', name: 'F2', member_ids: [], x: 0, y: 0, visible: true, created_at: '2024-01-01', updated_at: '2024-01-01' },
+        f3: { id: 'f3', tree_id: 't2', name: 'F3', member_ids: [], x: 0, y: 0, visible: true, created_at: '2024-01-01', updated_at: '2024-01-01' }
+      }
+    }))
+
+    initDB()
+    const { factions, scenarios } = getDB()
+
+    // One default scenario per tree that had factions
+    const t1Scenarios = Object.values(scenarios).filter(s => s.tree_id === 't1')
+    const t2Scenarios = Object.values(scenarios).filter(s => s.tree_id === 't2')
+    expect(t1Scenarios).toHaveLength(1)
+    expect(t2Scenarios).toHaveLength(1)
+    expect(t1Scenarios[0].name).toBe('Scenario 1')
+
+    // Factions adopted into their tree's scenario
+    expect(factions.f1.scenario_id).toBe(t1Scenarios[0].id)
+    expect(factions.f2.scenario_id).toBe(t1Scenarios[0].id)
+    expect(factions.f3.scenario_id).toBe(t2Scenarios[0].id)
+  })
+
+  it('migration is idempotent — a second init creates no extra scenarios', () => {
+    initDB()
+    const { factions, scenarios, activeTreeId, save, nowStr } = getDB()
+    scenarios['s1'] = { id: 's1', tree_id: activeTreeId, name: 'S', created_at: nowStr(), updated_at: nowStr() }
+    factions['f1'] = { id: 'f1', tree_id: activeTreeId, scenario_id: 's1', name: 'F', description: '', color: '#6c8ef5', icon: '⚑', member_ids: [], x: 0, y: 0, visible: true, created_at: nowStr(), updated_at: nowStr() }
+    save()
+
+    vi.resetModules()
+    return import('../src/main/db.js').then(mod2 => {
+      mod2.initDB()
+      const db2 = mod2.getDB()
+      expect(Object.keys(db2.scenarios)).toHaveLength(1)
+      expect(db2.factions.f1.scenario_id).toBe('s1')
+    })
+  })
+
+  it('deleting a scenario cascades its factions but not other scenarios’ factions', () => {
+    initDB()
+    const { factions, scenarios, activeTreeId, save, nowStr } = getDB()
+    scenarios['sA'] = { id: 'sA', tree_id: activeTreeId, name: 'A', created_at: nowStr(), updated_at: nowStr() }
+    scenarios['sB'] = { id: 'sB', tree_id: activeTreeId, name: 'B', created_at: nowStr(), updated_at: nowStr() }
+    factions['fA'] = { id: 'fA', tree_id: activeTreeId, scenario_id: 'sA', name: 'FA', description: '', color: '#6c8ef5', icon: '⚑', member_ids: [], x: 0, y: 0, visible: true, created_at: nowStr(), updated_at: nowStr() }
+    factions['fB'] = { id: 'fB', tree_id: activeTreeId, scenario_id: 'sB', name: 'FB', description: '', color: '#f06292', icon: '⚑', member_ids: [], x: 0, y: 0, visible: true, created_at: nowStr(), updated_at: nowStr() }
+
+    // Mirror the scenarios:delete cascade
+    for (const [fid, f] of Object.entries(factions)) {
+      if (f.scenario_id === 'sA') delete factions[fid]
+    }
+    delete scenarios['sA']
+    save()
+
+    const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, 'db', 'familytree.json'), 'utf8'))
+    expect(raw.factions.fA).toBeUndefined()
+    expect(raw.factions.fB).toBeDefined()
+    expect(raw.scenarios.sA).toBeUndefined()
+    expect(raw.scenarios.sB).toBeDefined()
   })
 })
 

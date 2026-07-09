@@ -8,7 +8,8 @@ const EMPTY_DB = () => ({
   activeTreeId: null,
   persons: {},     // { personId: { ...fields, tree_id } }
   relationships: {},
-  factions: {},    // { factionId: { id, tree_id, name, color, icon, description, member_ids, x, y, visible } }
+  factions: {},    // { factionId: { id, tree_id, scenario_id, name, color, icon, description, member_ids, x, y, visible } }
+  scenarios: {},   // { scenarioId: { id, tree_id, name } } — each holds its own set of factions
   images: {},
   settings: {},    // { `${treeId}:key`: value } for per-tree settings, or global keys
   globalSettings: {} // theme, etc.
@@ -43,9 +44,30 @@ export function initDB() {
   _db.persons = _db.persons || {}
   _db.relationships = _db.relationships || {}
   _db.factions = _db.factions || {}
+  _db.scenarios = _db.scenarios || {}
   _db.images = _db.images || {}
   _db.settings = _db.settings || {}
   _db.globalSettings = _db.globalSettings || {}
+
+  // Migration: adopt factions created before scenarios existed into a default
+  // scenario per tree (idempotent — only touches factions with no scenario_id)
+  const orphanFactions = Object.values(_db.factions).filter(f => !f.scenario_id)
+  if (orphanFactions.length > 0) {
+    const now = nowStr()
+    const defaultScenarioByTree = {}
+    for (const s of Object.values(_db.scenarios)) {
+      defaultScenarioByTree[s.tree_id] = defaultScenarioByTree[s.tree_id] || s.id
+    }
+    for (const f of orphanFactions) {
+      if (!defaultScenarioByTree[f.tree_id]) {
+        const sid = randomUUID()
+        _db.scenarios[sid] = { id: sid, tree_id: f.tree_id, name: 'Scenario 1', created_at: now, updated_at: now }
+        defaultScenarioByTree[f.tree_id] = sid
+      }
+      f.scenario_id = defaultScenarioByTree[f.tree_id]
+    }
+    save()
+  }
 
   // Migration: convert old single-tree DB to multi-tree
   if (!_db.activeTreeId && Object.keys(_db.trees).length === 0) {
@@ -125,6 +147,7 @@ export function getDB() {
     persons: _db.persons,
     relationships: _db.relationships,
     factions: _db.factions,
+    scenarios: _db.scenarios,
     images: _db.images,
     settings: _db.settings,
     globalSettings: _db.globalSettings,

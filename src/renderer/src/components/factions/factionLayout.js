@@ -9,16 +9,19 @@ export function factionRadius(memberCount) {
  * Cluster target for every person that belongs to at least one visible
  * faction: the average of their factions' centres, so people in several
  * factions settle in the middle ground between their camps.
+ * `getPos` lets callers substitute animated display positions for the
+ * persisted faction coordinates (e.g. while zones glide between scenarios).
  * Returns { [personId]: { x, y, factionIds } }.
  */
-export function computeTargets(factions) {
+export function computeTargets(factions, getPos = (f) => f) {
   const acc = {}
   for (const f of factions) {
     if (f.visible === false) continue
+    const p = getPos(f) || f
     for (const pid of f.member_ids || []) {
       const t = acc[pid] || (acc[pid] = { x: 0, y: 0, n: 0, factionIds: [] })
-      t.x += f.x
-      t.y += f.y
+      t.x += p.x
+      t.y += p.y
       t.n++
       t.factionIds.push(f.id)
     }
@@ -28,6 +31,29 @@ export function computeTargets(factions) {
     targets[pid] = { x: t.x / t.n, y: t.y / t.n, factionIds: t.factionIds }
   }
   return targets
+}
+
+/**
+ * Match factions across two scenarios by (case-insensitive) name — "the same
+ * faction is present" continuity when switching scenarios. Duplicate names
+ * match first-come-first-served. Returns Map<newFactionId, oldFaction>.
+ */
+export function matchFactionsByName(oldFactions, newFactions) {
+  const byName = new Map()
+  for (const f of oldFactions) {
+    const key = (f.name || '').trim().toLowerCase()
+    if (key && !byName.has(key)) byName.set(key, f)
+  }
+  const matches = new Map()
+  for (const f of newFactions) {
+    const key = (f.name || '').trim().toLowerCase()
+    const old = key ? byName.get(key) : null
+    if (old) {
+      matches.set(f.id, old)
+      byName.delete(key)
+    }
+  }
+  return matches
 }
 
 /**
