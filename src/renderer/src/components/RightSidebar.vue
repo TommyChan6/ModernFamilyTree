@@ -16,45 +16,48 @@
       />
     </div>
 
-    <!-- Person List -->
-    <div class="person-list">
-      <div
-        v-for="person in filteredPersons"
-        :key="person.id"
-        class="person-card"
-        :class="{ selected: store.selectedPersonId === person.id }"
-        draggable="true"
-        @click="store.selectPerson(person.id)"
-        @dragstart="onDragStart(person, $event)"
-        @dragend="store.draggingPersonId = null"
-      >
+    <!-- Person List (virtualized: only rows near the viewport are in the DOM) -->
+    <div ref="listEl" class="person-list" @scroll.passive="onScroll">
+      <div class="person-list-body" :style="{ height: totalH + 'px' }">
         <div
-          class="avatar"
-          :style="{ background: avatarGradient(person.gender) }"
+          v-for="row in visiblePersons"
+          :key="row.p.id"
+          class="person-card"
+          :class="{ selected: store.selectedPersonId === row.p.id }"
+          :style="{ transform: `translateY(${row.y}px)`, height: row.h + 'px' }"
+          draggable="true"
+          @click="store.selectPerson(row.p.id)"
+          @dragstart="onDragStart(row.p, $event)"
+          @dragend="store.draggingPersonId = null"
         >
-          <img
-            v-if="person.primary_image && imageUrl(person.primary_image)"
-            class="avatar-img"
-            :src="imageUrl(person.primary_image)"
-            alt=""
-          />
-          <svg v-else class="avatar-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path :d="PERSON_ICON_PATH" transform="translate(-5.28 -2.16) scale(1.44)" />
-          </svg>
-        </div>
-        <div class="person-info">
-          <div class="person-name">{{ person.name }}</div>
-          <div class="person-meta">
-            <span v-if="person.birth_year">b. {{ person.birth_year }}</span>
-            <span v-if="person.birth_year && person.occupation"> · </span>
-            <span v-if="person.occupation" class="person-occ">{{ person.occupation }}</span>
+          <div
+            class="avatar"
+            :style="{ background: avatarGradient(row.p.gender) }"
+          >
+            <img
+              v-if="row.p.primary_image && imageUrl(row.p.primary_image)"
+              class="avatar-img"
+              :src="imageUrl(row.p.primary_image)"
+              alt=""
+            />
+            <svg v-else class="avatar-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path :d="PERSON_ICON_PATH" transform="translate(-5.28 -2.16) scale(1.44)" />
+            </svg>
           </div>
-          <div v-if="person.location" class="person-location">📍 {{ person.location }}</div>
+          <div class="person-info">
+            <div class="person-name">{{ row.p.name }}</div>
+            <div class="person-meta">
+              <span v-if="row.p.birth_year">b. {{ row.p.birth_year }}</span>
+              <span v-if="row.p.birth_year && row.p.occupation"> · </span>
+              <span v-if="row.p.occupation" class="person-occ">{{ row.p.occupation }}</span>
+            </div>
+            <div v-if="row.p.location" class="person-location">📍 {{ row.p.location }}</div>
+          </div>
+          <div
+            class="gender-dot"
+            :style="{ background: genderColor(row.p.gender) }"
+          ></div>
         </div>
-        <div
-          class="gender-dot"
-          :style="{ background: genderColor(person.gender) }"
-        ></div>
       </div>
 
       <div v-if="filteredPersons.length === 0" class="empty-state">
@@ -73,7 +76,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { api } from '../api.js'
 
@@ -109,6 +112,66 @@ const filteredPersons = computed(() => {
     (p.occupation || '').toLowerCase().includes(q) ||
     (p.location || '').toLowerCase().includes(q)
   )
+})
+
+// ── Virtual window (rows with a location line are taller) ───────────────────
+const ROW_PLAIN = 57
+const ROW_LOC = 71
+const OVERSCAN = 200
+
+const listEl = ref(null)
+const scrollTop = ref(0)
+const viewH = ref(600)
+
+let scrollRaf = 0
+function onScroll() {
+  if (scrollRaf) return
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0
+    scrollTop.value = listEl.value?.scrollTop || 0
+  })
+}
+
+// Prefix offsets so variable row heights stay O(log n) to search.
+const offsets = computed(() => {
+  const list = filteredPersons.value
+  const offs = new Float64Array(list.length + 1)
+  for (let i = 0; i < list.length; i++) {
+    offs[i + 1] = offs[i] + (list[i].location ? ROW_LOC : ROW_PLAIN)
+  }
+  return offs
+})
+const totalH = computed(() => offsets.value[filteredPersons.value.length] || 0)
+
+const visiblePersons = computed(() => {
+  const list = filteredPersons.value
+  const offs = offsets.value
+  const n = list.length
+  const top = Math.max(0, scrollTop.value - OVERSCAN)
+  const bottom = scrollTop.value + viewH.value + OVERSCAN
+  let lo = 0, hi = n
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (offs[mid + 1] <= top) lo = mid + 1
+    else hi = mid
+  }
+  const out = []
+  for (let i = lo; i < n && offs[i] < bottom; i++) {
+    out.push({ p: list[i], y: offs[i], h: (list[i].location ? ROW_LOC : ROW_PLAIN) - 3 })
+  }
+  return out
+})
+
+let ro = null
+onMounted(() => {
+  const measure = () => { viewH.value = listEl.value?.clientHeight || 600 }
+  measure()
+  ro = new ResizeObserver(measure)
+  if (listEl.value) ro.observe(listEl.value)
+})
+onBeforeUnmount(() => {
+  if (ro) ro.disconnect()
+  if (scrollRaf) cancelAnimationFrame(scrollRaf)
 })
 
 function genderColor(gender) {
@@ -187,7 +250,15 @@ function avatarGradient(gender) {
   padding: 8px;
 }
 
+.person-list-body {
+  position: relative;
+}
+
 .person-card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -195,8 +266,6 @@ function avatarGradient(gender) {
   border-radius: 10px;
   cursor: pointer;
   transition: background 0.13s;
-  margin-bottom: 3px;
-  position: relative;
 }
 
 .person-card:hover {

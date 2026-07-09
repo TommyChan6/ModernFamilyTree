@@ -67,25 +67,42 @@ Actions do the IPC round-trip and optimistically update reactive arrays only aft
 `res.success`.
 
 **The graph engine** is the most complex area — see [docs/graph.md](docs/graph.md).
-`GraphCanvas.vue` drives D3 (SVG + force simulation) and deliberately steps **outside
-Vue reactivity** for the 60fps hot path: a plain `ctx` object holds the simulation,
-selections, and node data; nodes are mutated in place (`n.x/y/fx/fy`); `ticked()` is
-the single render function. Layout math is kept in **pure functions** under
-`components/graph/` (`layoutAge.js`, `layoutGeneration.js`, `linkHelpers.js`) with no
-D3 or store dependency; `guideLines.js` and `useGraphAnimation.js` handle overlays and
-tweening. Four layout modes (custom/auto/age/generation), each with multiple saved
-"states" (position snapshots). The full arrangement serializes to the per-tree
-`graphState` setting; a `graphDirty` flag drives the Save Layout button and the
-close-confirmation prompt (wired from main via `window.__isGraphDirty` /
-`window.__saveGraphLayout`).
+`GraphCanvas.vue` keeps the d3-force simulation and all interaction logic and hands
+drawing to a **Three.js/WebGL renderer** (`components/graph/webgl/`) that draws every
+node and link in a handful of instanced draw calls, with an on-demand frame loop
+(idles at 0% CPU) and tweened style changes. The hot path deliberately steps
+**outside Vue reactivity**: a plain `ctx` object holds the simulation and node data;
+nodes are mutated in place (`n.x/y/fx/fy`); `ticked()` just pokes the renderer.
+Layout math is kept in **pure functions** under `components/graph/` (`layoutAge.js`,
+`layoutGeneration.js`, `linkHelpers.js`) with no D3/Three or store dependency. Four
+layout modes (custom/auto/age/generation), each with multiple saved "states"
+(position snapshots). The full arrangement serializes to the per-tree `graphState`
+setting; a `graphDirty` flag drives the Save Layout button and the close-confirmation
+prompt (wired from main via `window.__isGraphDirty` / `window.__saveGraphLayout`).
 
-**Views:** the workspace shows one of five views (`store.activeView`): tree
-(`GraphCanvas`), people (`PeopleView`), relationships (`RelationshipsView`), timeline
-(`TimelineView`), factions (`FactionsView` — drag-and-drop clustering of people into
-user-defined groups, organized into switchable per-tree "scenarios"; pure layout
-math in `components/factions/factionLayout.js`).
-The graph stays mounted (hidden) when another view is active so its
-simulation/layout survive view switches.
+**Views:** the workspace shows one of five views (`store.activeView`), all built to
+stay smooth with thousands of people:
+- tree (`GraphCanvas`) — WebGL, see above; stays mounted (hidden) when another view
+  is active so its simulation/layout survive view switches.
+- timeline (`TimelineView`) — WebGL. Pure layout in
+  `components/timeline/timelineLayout.js` (world units, recomputed on data changes
+  only); drawing in `components/timeline/TimelineRenderer.js` — instanced lifelines,
+  pulsing dots, marriage/birth ribbons and avatar pins, with a bg canvas for the year
+  grid and an fg canvas for viewport-culled labels/badges/gutter. Hit tests are
+  analytic; style changes tween.
+- factions (`FactionsView`) — WebGL. Drag-and-drop clustering into switchable
+  per-tree "scenarios"; pure math in `components/factions/factionLayout.js`, drawing
+  in `components/factions/webgl/FactionsRenderer.js` (zone discs, dash-flow tethers,
+  membership arcs, person nodes; overlay canvas for header pills/labels/ghost). The
+  d3-force simulation stays in the view and pokes the renderer per tick.
+- people (`PeopleView`) and relationships (`RelationshipsView`) — DOM, but
+  **virtualized**: only cards/rows near the viewport exist in the DOM. The right
+  sidebar member list is virtualized the same way.
+
+Generic instanced draw layers shared by the WebGL views (capsules, dots, ribbons,
+arcs) and the overlay-canvas helpers live in `components/webgl/`. Ambient animations
+(pulsing dots, orbiting arcs, dash flow, marching ants) run off a `uTime` uniform —
+no per-frame buffer writes — and each renderer releases its GL context on unmount.
 
 ## Conventions
 
@@ -93,15 +110,19 @@ simulation/layout survive view switches.
 - Vue: Composition API + `<script setup>`, scoped styles. All colors come from CSS
   variable design tokens in `src/renderer/src/styles/global.css` (never hard-code) so
   both dark/light themes work.
-- Keep graph layout math pure and testable; confine D3 DOM mutation to `GraphCanvas.vue`.
+- Keep view layout math pure and testable (`components/graph/`, `components/timeline/
+  timelineLayout.js`, `components/factions/factionLayout.js`); keep Three.js/canvas
+  drawing inside the renderer modules and interaction/state in the view components.
 - Preserve the sandbox: expose new capability via explicit preload + IPC, not by
   widening renderer privileges.
 - IDs via `crypto.randomUUID()`; timestamps via the store's `nowStr()`.
 
 ## Testing
 
-Vitest, focused on the data layer (`tests/db.test.js`), which mocks Electron's `app`
-module to point `userData` at a temp dir and exercises `db.js` directly (migrations,
-tree scoping, cascade deletes, graph-state persistence, field integrity). Update these
-when changing `db.js` or the data shape. UI/graph logic has no automated coverage —
+Vitest. `tests/db.test.js` covers the data layer (mocks Electron's `app` module to
+point `userData` at a temp dir and exercises `db.js` directly: migrations, tree
+scoping, cascade deletes, graph-state persistence, field integrity) — update it when
+changing `db.js` or the data shape. `tests/graphMath.test.js` and
+`tests/viewMath.test.js` cover the pure view math (camera transforms, link curves,
+timeline layout, faction arc spans). Rendering/interaction has no automated coverage —
 verify manually with `npm run dev` (test both themes for visual changes).

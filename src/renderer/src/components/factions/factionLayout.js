@@ -95,24 +95,19 @@ export function arrangeInRing(factions, cx, cy) {
 }
 
 /**
- * SVG arc segments around a node showing its memberships: the ring is split
- * into one arc per faction, in faction colours. A single membership renders
- * as a (near-)full circle. Returns [{ color, d }].
+ * Arc segments around a node showing its memberships: the ring is split into
+ * one arc per faction. A single membership renders as a (near-)full circle.
+ * Angles are radians in atan2 space (0 = +x, clockwise on a y-down canvas),
+ * ready for the WebGL ArcLayer. Returns [{ a0, a1 }], one per membership.
  */
-export function membershipArcs(cx, cy, r, colors) {
-  const k = colors.length
-  if (k === 0) return []
-  const gapDeg = k === 1 ? 0 : Math.min(18, 100 / k)
-  const span = 360 / k
-  const pt = (deg) => {
-    const a = ((deg - 90) * Math.PI) / 180
-    return `${(cx + r * Math.cos(a)).toFixed(2)} ${(cy + r * Math.sin(a)).toFixed(2)}`
-  }
-  return colors.map((color, i) => {
-    const a0 = i * span + gapDeg / 2
-    // 359.9° for a lone arc — a true 360° SVG arc collapses to nothing
-    const a1 = (i + 1) * span - gapDeg / 2 - (k === 1 ? 0.1 : 0)
-    const large = a1 - a0 > 180 ? 1 : 0
-    return { color, d: `M ${pt(a0)} A ${r} ${r} 0 ${large} 1 ${pt(a1)}` }
-  })
+export function membershipArcSpans(count) {
+  if (count <= 0) return []
+  const gapDeg = count === 1 ? 0 : Math.min(18, 100 / count)
+  const span = 360 / count
+  const rad = (deg) => ((deg - 90) * Math.PI) / 180 // 0° = 12 o'clock, clockwise
+  return Array.from({ length: count }, (_, i) => ({
+    a0: rad(i * span + gapDeg / 2),
+    // shave a sliver off a lone arc so the seam doesn't z-fight with itself
+    a1: rad((i + 1) * span - gapDeg / 2 - (count === 1 ? 0.1 : 0)),
+  }))
 }

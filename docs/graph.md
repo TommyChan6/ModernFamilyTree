@@ -118,7 +118,21 @@ from the main process via `window.__isGraphDirty` / `window.__saveGraphLayout`
 The graph is one of five views; the others also read the store's persons/relationships:
 
 - **People** ([`PeopleView.vue`](../src/renderer/src/components/PeopleView.vue)) —
-  searchable, sortable card grid on a pan/zoom canvas.
+  searchable, sortable card grid. A native-scroll, responsive CSS grid that windows
+  to the visible rows (pure math in [`people/peopleLayout.js`](../src/renderer/src/components/people/peopleLayout.js),
+  scroll/resize glue in [`people/useVirtualGrid.js`](../src/renderer/src/components/people/useVirtualGrid.js),
+  the card in [`people/PersonCard.vue`](../src/renderer/src/components/people/PersonCard.vue)).
+  Only one transform (a `translateY` on the grid) moves per scroll frame — never per
+  card. Wheel/trackpad and grab-and-drag ([`people/useDragScroll.js`](../src/renderer/src/components/people/useDragScroll.js))
+  both navigate. Avatars render **downscaled thumbnails**, never the full-resolution
+  photo: [`people/useThumbnail.js`](../src/renderer/src/components/people/useThumbnail.js)
+  fetches the file's bytes (`images:bytes`), decodes them off-thread with
+  `createImageBitmap` (Chromium handles WebP — the app's photo format — which
+  `nativeImage` can't), paints a 144px cover-crop to a canvas, and caches the small
+  data URL. Generation is idle-gated (`requestIdleCallback`) so it never competes
+  with an active fling, and a skeleton shimmer shows until each resolves. Net effect:
+  scrolling a large tree never decodes or GPU-uploads multi-megapixel images —
+  measured at a steady 1440p scroll with zero dropped frames.
 - **Relationships**
   ([`RelationshipsView.vue`](../src/renderer/src/components/RelationshipsView.vue)) —
   editable table with data-integrity issue detection.

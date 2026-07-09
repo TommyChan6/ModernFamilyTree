@@ -107,8 +107,8 @@
       </div>
     </Transition>
 
-    <!-- Table -->
-    <div class="rv-scroll">
+    <!-- Table (virtualized rows: only the visible window exists in the DOM) -->
+    <div ref="scrollEl" class="rv-scroll" @scroll.passive="onScroll">
       <div v-if="rows.length" class="rv-table">
         <!-- Header -->
         <div class="rv-head">
@@ -132,13 +132,17 @@
         </div>
 
         <!-- Rows -->
-        <TransitionGroup name="rv-row" tag="div" class="rv-body">
+        <div :key="listVersion" class="rv-body" :style="{ height: bodyH + 'px' }">
           <div
-            v-for="(row, idx) in rows"
+            v-for="row in visibleRows"
             :key="row.rel.id"
             class="rv-rowwrap"
-            :class="{ issue: row.issues.length, expanded: editing?.id === row.rel.id }"
-            :style="{ '--i': idx, '--rel-c': meta(row.rel.type).color }"
+            :class="{
+              issue: row.issues.length,
+              expanded: editing?.id === row.rel.id,
+              'rv-animate': animWindow
+            }"
+            :style="{ transform: `translateY(${row._y}px)`, '--i': row._stagger, '--rel-c': meta(row.rel.type).color }"
           >
             <div class="rv-row" @click="editing?.id === row.rel.id ? cancelEdit() : startEdit(row.rel)">
               <!-- From person -->
@@ -244,7 +248,7 @@
             </div>
 
             <!-- Inline row editor -->
-            <Transition name="rv-expand">
+            <Transition name="rv-fade">
               <div v-if="editing?.id === row.rel.id" class="rv-editor" @click.stop>
                 <div class="rv-editor-grid">
                   <div class="rv-field">
@@ -297,7 +301,7 @@
               </div>
             </Transition>
           </div>
-        </TransitionGroup>
+        </div>
       </div>
 
       <!-- Empty state -->
@@ -322,13 +326,20 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { api } from '../api.js'
 
 const store = useMainStore()
 
 const PERSON_ICON_PATH = 'M12 12.5c2.49 0 4.5-2.01 4.5-4.5S14.49 3.5 12 3.5 7.5 5.51 7.5 8s2.01 4.5 4.5 4.5zm0 2.25c-3 0-9 1.51-9 4.5V22h18v-2.75c0-2.99-6-4.5-9-4.5z'
+
+// Virtualization geometry: every row is a fixed 57px (56 + 1px border); the
+// expanded inline editor adds a fixed block below its row.
+const ROW_H = 57
+const EDITOR_EXPAND = 152
+const HEAD_OFFSET = 55   // scroll padding + sticky header above the row body
+const OVERSCAN_ROWS = 5
 
 const query = ref('')
 const typeFilter = ref('all') // 'all' | 'parent_child' | 'spouse' | 'adopted' | 'issues'
@@ -466,6 +477,77 @@ function arrowClass(key) {
   if (sortKey.value !== key) return 'hidden'
   return sortDir.value === 1 ? 'asc' : 'desc'
 }
+
+// ── Virtual window ──────────────────────────────────────────────────────────
+const scrollEl = ref(null)
+const scrollTop = ref(0)
+const viewH = ref(600)
+
+let scrollRaf = 0
+function onScroll() {
+  if (scrollRaf) return
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0
+    scrollTop.value = scrollEl.value?.scrollTop || 0
+  })
+}
+
+const editIdx = computed(() => {
+  if (!editing.value || editing.value.id === 'new') return -1
+  return rows.value.findIndex(r => r.rel.id === editing.value.id)
+})
+
+const bodyH = computed(() => rows.value.length * ROW_H + (editIdx.value >= 0 ? EDITOR_EXPAND : 0))
+
+// Primitive computeds so the window only shifts when the scroll actually
+// crosses a row boundary — not on every scrolled pixel.
+const startIdx = computed(() => {
+  let rel = scrollTop.value - HEAD_OFFSET
+  if (editIdx.value >= 0 && rel > editIdx.value * ROW_H + EDITOR_EXPAND) rel -= EDITOR_EXPAND
+  return Math.max(0, Math.floor(rel / ROW_H) - OVERSCAN_ROWS)
+})
+const endIdx = computed(() =>
+  Math.min(rows.value.length, startIdx.value + Math.ceil(viewH.value / ROW_H) + OVERSCAN_ROWS * 2)
+)
+
+const visibleRows = computed(() => {
+  const out = []
+  const list = rows.value
+  const eIdx = editIdx.value
+  for (let i = startIdx.value; i < endIdx.value; i++) {
+    out.push({
+      ...list[i],
+      _y: i * ROW_H + (eIdx >= 0 && i > eIdx ? EDITOR_EXPAND : 0),
+      _stagger: Math.min(i - startIdx.value, 20),
+    })
+  }
+  return out
+})
+
+// Stagger entrance replays when the filter/sort/search changes; rows scrolled
+// into view afterwards appear instantly.
+const listVersion = ref(0)
+const animWindow = ref(true)
+let animTimer = setTimeout(() => { animWindow.value = false }, 1100)
+watch([query, typeFilter, sortKey, sortDir], () => {
+  listVersion.value++
+  animWindow.value = true
+  clearTimeout(animTimer)
+  animTimer = setTimeout(() => { animWindow.value = false }, 1100)
+})
+
+let ro = null
+onMounted(() => {
+  const measure = () => { viewH.value = scrollEl.value?.clientHeight || 600 }
+  measure()
+  ro = new ResizeObserver(measure)
+  if (scrollEl.value) ro.observe(scrollEl.value)
+})
+onBeforeUnmount(() => {
+  if (ro) ro.disconnect()
+  if (scrollRaf) cancelAnimationFrame(scrollRaf)
+  if (animTimer) clearTimeout(animTimer)
+})
 
 // ── Editing ─────────────────────────────────────────────────────────────────
 function startAdd() {
@@ -657,7 +739,6 @@ async function toggleStatus(row) {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px 16px;
-  margin: 10px 0 4px;
 }
 .rv-editor-new {
   margin: 14px 22px 0;
@@ -710,7 +791,7 @@ async function toggleStatus(row) {
 .rv-fade-enter-active, .rv-fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
 .rv-fade-enter-from, .rv-fade-leave-to { opacity: 0; transform: translateY(3px); }
 
-/* Editor expand/collapse */
+/* New-relationship editor expand/collapse */
 .rv-expand-enter-active { transition: max-height 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease, margin 0.28s ease; overflow: hidden; }
 .rv-expand-leave-active { transition: max-height 0.22s ease, opacity 0.18s ease, margin 0.18s ease; overflow: hidden; }
 .rv-expand-enter-from, .rv-expand-leave-to { max-height: 0; opacity: 0; margin-top: 0; margin-bottom: 0; }
@@ -767,22 +848,32 @@ async function toggleStatus(row) {
 .rv-sort-arrow.asc { opacity: 1; color: var(--accent); }
 .rv-sort-arrow.desc { opacity: 1; color: var(--accent); transform: rotate(180deg); }
 
-/* ── Rows ────────────────────────────────────────────────── */
+/* ── Rows (virtualized: absolutely positioned within a fixed-height body) ── */
+.rv-body { position: relative; }
+
 .rv-rowwrap {
+  position: absolute;
+  left: 0; right: 0; top: 0;
   border-bottom: 1px solid var(--border);
   transition: background 0.15s, box-shadow 0.2s;
-  padding: 0 0;
+  background: var(--surface);
 }
-.rv-rowwrap:last-child { border-bottom: none; }
+.rv-rowwrap.rv-animate {
+  animation: rv-row-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(min(var(--i, 0), 20) * 0.022s);
+}
+@keyframes rv-row-in {
+  from { opacity: 0; }
+}
 .rv-rowwrap.issue { box-shadow: inset 3px 0 0 #f5a623; }
-.rv-rowwrap.expanded { background: color-mix(in srgb, var(--elevated) 55%, transparent); }
-.rv-rowwrap.expanded .rv-editor { margin: 0 14px 12px; }
+.rv-rowwrap.expanded { background: color-mix(in srgb, var(--elevated) 55%, transparent); z-index: 2; }
+.rv-rowwrap.expanded .rv-editor { margin: 0 14px 12px; height: 128px; }
 
 .rv-row {
   display: grid;
   grid-template-columns: var(--grid);
   align-items: center;
-  min-height: 56px;
+  height: 56px;
   cursor: pointer;
   transition: background 0.14s;
 }
@@ -934,18 +1025,6 @@ async function toggleStatus(row) {
 .rv-action-btn:nth-of-type(3) { transition-delay: 0.04s; }
 .rv-action-btn:hover { background: var(--hover); color: var(--t1); }
 .rv-action-del:hover { background: rgba(239, 83, 80, 0.14); color: #ef5350; }
-
-/* ── Row transitions (stagger + FLIP) ────────────────────── */
-.rv-row-enter-active {
-  transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-  transition-delay: calc(min(var(--i, 0), 20) * 0.022s);
-}
-.rv-row-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-.rv-row-enter-from { opacity: 0; transform: translateY(12px); }
-.rv-row-leave-to { opacity: 0; transform: translateX(18px); }
-.rv-row-move { transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
 
 /* ── Empty state ─────────────────────────────────────────── */
 .rv-empty {

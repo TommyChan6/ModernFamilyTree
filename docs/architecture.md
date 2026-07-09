@@ -124,9 +124,12 @@ cannot pre-parse. See [developer.md](./developer.md) for commands.
 | App shell | [`App.vue`](../src/renderer/src/App.vue) | Tree tabs, resizable sidebars, view routing, JSON export. |
 | Global state | [`store/index.js`](../src/renderer/src/store/index.js) | Pinia store `main`. |
 | IPC wrapper | [`api.js`](../src/renderer/src/api.js) | Thin `invoke` / `getImageUrl` façade. |
-| Views | `components/{GraphCanvas,PeopleView,RelationshipsView,TimelineView,FactionsView}.vue` | Five main workspace views. |
-| Panels & modals | `components/{LeftSidebar,RightSidebar,PersonModal,PersonForm,GraphSettings}.vue` | |
-| Graph engine | [`components/graph/`](../src/renderer/src/components/graph/) | Pure layout/style helpers + the animation composable. |
+| Views | `components/{GraphCanvas,PeopleView,RelationshipsView,TimelineView,FactionsView}.vue` | Five main workspace views. Tree/timeline/factions draw with Three.js; people/relationships virtualize their DOM lists. |
+| Panels & modals | `components/{LeftSidebar,RightSidebar,PersonModal,PersonForm,GraphSettings}.vue` | Right sidebar member list is virtualized. |
+| Graph engine | [`components/graph/`](../src/renderer/src/components/graph/) | Pure layout/style helpers + the animation composable + the tree's WebGL renderer (`graph/webgl/`). |
+| Shared WebGL layers | [`components/webgl/`](../src/renderer/src/components/webgl/) | Instanced capsule/dot/ribbon/arc draw layers + overlay-canvas helpers, shared by the timeline and factions renderers. |
+| Timeline engine | [`components/timeline/`](../src/renderer/src/components/timeline/) | Pure layout math (`timelineLayout.js`) + Three.js renderer (`TimelineRenderer.js`). |
+| Factions engine | [`components/factions/`](../src/renderer/src/components/factions/) | Pure layout math (`factionLayout.js`) + Three.js renderer (`webgl/`). |
 | Styling | [`styles/global.css`](../src/renderer/src/styles/global.css) | Design tokens (CSS variables) and shared component classes. |
 
 See also: [graph.md](./graph.md) · [data-model.md](./data-model.md) · [ipc-api.md](./ipc-api.md) · [design.md](./design.md)

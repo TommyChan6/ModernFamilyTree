@@ -433,6 +433,22 @@ export function registerHandlers(ipcMain, _app, dialog) {
     }
   })
 
+  // ── images:bytes ───────────────────────────────────────────────────────────
+  // Returns the raw bytes of an image file. The renderer wraps these in a
+  // (same-origin) Blob and downscales via createImageBitmap → a tiny cached
+  // thumbnail, so card/list views never decode or GPU-upload the full-resolution
+  // photo while scrolling. Done in the renderer because Electron's nativeImage
+  // can't decode WebP (the app's photo format) — Chromium can decode everything.
+  ipcMain.handle('images:bytes', async (_event, data) => {
+    try {
+      const { filePath } = data
+      if (!filePath || !fs.existsSync(filePath)) return { success: false, error: 'missing' }
+      return { success: true, data: fs.readFileSync(filePath) } // Buffer → Uint8Array in renderer
+    } catch (err) {
+      return { success: false, error: err.message }
+    }
+  })
+
   // ── images:openDialog ──────────────────────────────────────────────────────
   ipcMain.handle('images:openDialog', async () => {
     try {

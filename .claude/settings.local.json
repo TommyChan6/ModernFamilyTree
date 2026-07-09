@@ -69,7 +69,30 @@
       "Bash(node set-ages.mjs)",
       "PowerShell(npm install three@^0.169.0 --save)",
       "PowerShell(npm test 2>&1)",
-      "PowerShell(npm run build 2>&1)"
+      "PowerShell(npm run build 2>&1)",
+      "Bash(npx vitest *)",
+      "Bash(node -e \"try{require.resolve\\('playwright-core'\\);console.log\\('playwright-core OK'\\)}catch\\(e\\){console.log\\('no playwright-core'\\)}\")",
+      "Bash(cp \"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/0c823b68-1180-4750-85fb-9d46261536b8/scratchpad/drive.mjs\" \"c:/Users/tommy/OneDrive/Desktop/newFamilyTree/.drive-tmp.mjs\")",
+      "Bash(SCRATCH=\"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/0c823b68-1180-4750-85fb-9d46261536b8/scratchpad\" node .drive-tmp.mjs)",
+      "Bash(./node_modules/electron/dist/electron.exe . --no-sandbox)",
+      "Bash(tasklist //FI \"IMAGENAME eq electron.exe\")",
+      "Bash(env)",
+      "Bash(./node_modules/electron/dist/electron.exe .)",
+      "Bash(SCRATCH=\"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/0c823b68-1180-4750-85fb-9d46261536b8/scratchpad\" node .drive-tmp2.mjs)",
+      "Bash(SCRATCH=\"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/0c823b68-1180-4750-85fb-9d46261536b8/scratchpad\" node .drive-tmp3.mjs)",
+      "Bash(npm test *)",
+      "Bash(node \"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/f1930b4d-3418-45a5-9857-8dd19e53af58/scratchpad/drivePeople.mjs\")",
+      "Bash(cp \"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/f1930b4d-3418-45a5-9857-8dd19e53af58/scratchpad/drivePeople.mjs\" \"c:/Users/tommy/OneDrive/Desktop/newFamilyTree/__drivePeople.mjs\")",
+      "Bash(node __drivePeople.mjs)",
+      "Bash(rm -f __drivePeople.mjs people-top.png people-mid.png people-bottom.png people-search.png)",
+      "Bash(npm uninstall *)",
+      "Bash(node __drivePeople2.mjs)",
+      "Bash(node __driveImg.mjs)",
+      "Bash(node __driveImg2.mjs)",
+      "Bash(node __cleanup.mjs)",
+      "Bash(node __perf.mjs)",
+      "Bash(node __diag.mjs)",
+      "Bash(rm -f __perf.mjs __diag.mjs)"
     ]
   }
 }
