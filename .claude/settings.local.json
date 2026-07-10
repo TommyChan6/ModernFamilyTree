@@ -92,7 +92,8 @@
       "Bash(node __cleanup.mjs)",
       "Bash(node __perf.mjs)",
       "Bash(node __diag.mjs)",
-      "Bash(rm -f __perf.mjs __diag.mjs)"
+      "Bash(rm -f __perf.mjs __diag.mjs)",
+      "Bash(xargs wc -l)"
     ]
   }
 }
