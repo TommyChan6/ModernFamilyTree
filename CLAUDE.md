@@ -110,7 +110,7 @@ node and link in a handful of instanced draw calls, with an on-demand frame loop
 **outside Vue reactivity**: a plain `ctx` object holds the simulation and node data;
 nodes are mutated in place (`n.x/y/fx/fy`); `ticked()` just pokes the renderer.
 Layout math is kept in **pure functions** under `components/graph/` (`layoutAge.js`,
-`layoutGeneration.js`, `linkHelpers.js`) with no D3/Three or store dependency. Four
+`familyTreeLayout.ts`, `linkHelpers.js`) with no D3/Three or store dependency. Four
 layout modes (custom/auto/age/generation), each with multiple saved "states"
 (position snapshots). The full arrangement serializes to the per-tree `graphState`
 setting; a `graphDirty` flag drives the Save Layout button and the close-confirmation

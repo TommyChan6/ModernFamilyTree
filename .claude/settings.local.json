@@ -119,7 +119,14 @@
       "Bash(node smoke-web.tmp.mjs)",
       "Bash(node smoke-electron.tmp.mjs)",
       "Bash(powershell -Command 'Get-NetTCPConnection -LocalPort 4173 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }')",
-      "Bash(grep -v 'ms$')"
+      "Bash(grep -v 'ms$')",
+      "Bash(npx prettier *)",
+      "Bash(python -)",
+      "Bash(node -e \"console.log\\(Object.keys\\(require\\('./package.json'\\).devDependencies\\)\\)\")",
+      "Bash(node -e \"console.log\\(require\\('./package.json'\\).main\\)\")",
+      "Bash(node drive.mjs)",
+      "Bash(taskkill //F //IM electron.exe)",
+      "Bash(node drive-web.mjs)"
     ]
   }
 }

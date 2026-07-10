@@ -51,6 +51,7 @@ export class TimelineRenderer {
     this._pAnim = new Map() // person id -> { op, w, s, top, tw, ts, start }
     this._mAnim = new Map() // marriage id -> { op, w, top, tw }
     this._bAnim = new Map() // birth id -> { op, w, top, tw }
+    this._laneX = new Map() // person id -> { x, tx } — lanes glide on re-layout
     this._pVis = [] // cached visuals, index-aligned with layout.people
     this._mVis = []
     this._bVis = []
@@ -180,8 +181,26 @@ export class TimelineRenderer {
     }
     const alive = new Set(layout.people.map((p) => p.id))
     for (const id of this._pAnim.keys()) if (!alive.has(id)) this._pAnim.delete(id)
+
+    // Lane glide: people already on screen tween to their (possibly re-ordered)
+    // lane; new people start on theirs directly (the entrance covers them).
+    for (const p of layout.people) {
+      const a = this._laneX.get(p.id)
+      if (!a) this._laneX.set(p.id, { x: p.laneX, tx: p.laneX })
+      else if (a.tx !== p.laneX) {
+        a.tx = p.laneX
+        this._tweening = true
+      }
+    }
+    for (const id of this._laneX.keys()) if (!alive.has(id)) this._laneX.delete(id)
     this.markAllDirty()
     this.requestRedraw()
+  }
+
+  // Current (possibly mid-glide) lane x for a person id.
+  _lane(id, fallback) {
+    const a = this._laneX.get(id)
+    return a ? a.x : fallback
   }
 
   markStylesDirty() {
@@ -294,6 +313,13 @@ export class TimelineRenderer {
     }
     for (const a of this._mAnim.values()) step2(a)
     for (const a of this._bAnim.values()) step2(a)
+    for (const a of this._laneX.values()) {
+      a.x = approach(a.x, a.tx, dt, 0.18)
+      // Lanes travel ~150px; snap well before the sub-pixel tail so the
+      // full-geometry frames stop as soon as the glide is invisible.
+      if (Math.abs(a.x - a.tx) < 0.05) a.x = a.tx
+      else moving = true
+    }
     if (this.hoverBadgeId != null) {
       this._badgeHoverS = approach(this._badgeHoverS, 1.08, dt)
       if (Math.abs(this._badgeHoverS - 1.08) > TWEEN_EPS) moving = true
@@ -331,7 +357,7 @@ export class TimelineRenderer {
       const a = this._pAnim.get(p.id)
       const ent = this._entrance(a)
       const op = a.op * ent.e
-      const x = this.sx(p.laneX)
+      const x = this.sx(this._lane(p.id, p.laneX))
       const y0 = this.sy(p.birthYear) + ent.yOff
       const y1 = Math.max(this.sy(p.endYear), this.sy(p.birthYear) + 8) + ent.yOff
       this.lines.set(i, x, y0, x, y1, a.w, v.fillRGB, op * 0.85)
@@ -361,8 +387,10 @@ export class TimelineRenderer {
       const m = L.marriages[j]
       const v = this._mVis[j]
       const a = this._mAnim.get(m.id)
-      const x1 = this.sx(m.laneX1),
-        x2 = this.sx(m.laneX2)
+      const la = this._lane(m.ids[0], m.laneX1)
+      const lb = this._lane(m.ids[1], m.laneX2)
+      const x1 = this.sx(Math.min(la, lb)),
+        x2 = this.sx(Math.max(la, lb))
       const y = this.sy(m.year)
       const sag = Math.min(34, 12 + (x2 - x1) * 0.05)
       sampleQuadratic(scratch, SEG, x1, y, (x1 + x2) / 2, y + sag * 2, x2, y)
@@ -378,8 +406,8 @@ export class TimelineRenderer {
       const b = L.births[j]
       const v = this._bVis[j]
       const a = this._bAnim.get(b.id)
-      const px = this.sx(b.laneXp),
-        cx = this.sx(b.laneXc)
+      const px = this.sx(this._lane(b.ids[0], b.laneXp)),
+        cx = this.sx(this._lane(b.ids[1], b.laneXc))
       const y = this.sy(b.year)
       const dx = cx - px
       const arc = Math.min(30, 12 + Math.abs(dx) * 0.045)
@@ -476,8 +504,10 @@ export class TimelineRenderer {
         const a = this._mAnim.get(m.id)
         const alpha = v.badgeOpacity * Math.min(1, a.op / Math.max(v.lineOpacity, 0.001))
         if (alpha <= 0.02) continue
-        const x1 = this.sx(m.laneX1),
-          x2 = this.sx(m.laneX2)
+        const la = this._lane(m.ids[0], m.laneX1)
+        const lb = this._lane(m.ids[1], m.laneX2)
+        const x1 = this.sx(Math.min(la, lb)),
+          x2 = this.sx(Math.max(la, lb))
         const cx = (x1 + x2) / 2
         const sag = Math.min(34, 12 + (x2 - x1) * 0.05)
         const midY = this.sy(m.year) + sag
@@ -514,7 +544,7 @@ export class TimelineRenderer {
       ctx.lineJoin = 'round'
       for (let i = 0; i < L.people.length; i++) {
         const p = L.people[i]
-        const x = this.sx(p.laneX)
+        const x = this.sx(this._lane(p.id, p.laneX))
         if (x < -160 || x > this.width + 40) continue
         const v = this._pVis[i]
         const a = this._pAnim.get(p.id)

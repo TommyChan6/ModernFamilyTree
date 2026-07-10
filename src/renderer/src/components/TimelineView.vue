@@ -61,6 +61,14 @@
         <button class="tl-ctrl-btn" title="Zoom out" @click="zoomBy(0.75)">－</button>
         <div class="tl-ctrl-sep"></div>
         <button class="tl-ctrl-btn" title="Fit all" @click="fitAll(true)">⊡</button>
+        <button
+          class="tl-ctrl-btn tl-ctrl-refresh"
+          :class="{ 'tl-ctrl-refreshing': refreshSpinning }"
+          title="Refresh layout — re-run the family tree algorithm"
+          @click="refreshLayout"
+        >
+          <span class="tl-refresh-icon">⟳</span>
+        </button>
         <div class="tl-ctrl-sep"></div>
         <span class="tl-zoom-label">{{ zoomLabel }}</span>
       </div>
@@ -141,7 +149,12 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { api } from '../api'
-import { computeTimelineLayout, GUTTER, Y_PAD } from './timeline/timelineLayout.js'
+import {
+  computeTimelineLayout,
+  computeLaneOrder,
+  GUTTER,
+  Y_PAD
+} from './timeline/timelineLayout.js'
 import { TimelineRenderer } from './timeline/TimelineRenderer.js'
 
 const store = useMainStore()
@@ -228,9 +241,40 @@ function genderColor(g) {
 }
 
 // ── Layout (world units; recomputed on data changes only, never on zoom) ────
+// Lane order is frozen once data arrives, so day-to-day edits never shuffle the
+// lanes (new people simply append on the right). The refresh button re-runs the
+// family-tree layout algorithm on demand and the lanes glide into place.
 const refYear = computed(() => store.currentDate?.year ?? new Date().getFullYear())
+const laneOrder = ref(null)
+watch(
+  () => store.activeTreeId,
+  () => {
+    laneOrder.value = null
+  }
+)
+watch(
+  () => store.persons,
+  () => {
+    if (store.persons.length && !laneOrder.value)
+      laneOrder.value = computeLaneOrder(store.persons, store.relationships)
+  },
+  { immediate: true, deep: true }
+)
+
+const refreshSpinning = ref(false)
+let refreshSpinTimer = 0
+function refreshLayout() {
+  laneOrder.value = computeLaneOrder(store.persons, store.relationships)
+  refreshSpinning.value = true
+  if (refreshSpinTimer) clearTimeout(refreshSpinTimer)
+  refreshSpinTimer = setTimeout(() => {
+    refreshSpinning.value = false
+    refreshSpinTimer = 0
+  }, 700)
+}
+
 const layout = computed(() =>
-  computeTimelineLayout(store.persons, store.relationships, refYear.value)
+  computeTimelineLayout(store.persons, store.relationships, refYear.value, laneOrder.value)
 )
 const placedCount = computed(() => layout.value.people.length)
 const undatedCount = computed(() => layout.value.undatedCount)
@@ -610,6 +654,7 @@ watch(
 onBeforeUnmount(() => {
   if (ro) ro.disconnect()
   cancelTween()
+  if (refreshSpinTimer) clearTimeout(refreshSpinTimer)
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerup', onPointerUp)
   renderer?.dispose()
@@ -813,6 +858,24 @@ onBeforeUnmount(() => {
   align-self: stretch;
   background: var(--border);
   margin: 3px 2px;
+}
+.tl-ctrl-refresh .tl-refresh-icon {
+  display: inline-block;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.tl-ctrl-refresh:hover .tl-refresh-icon {
+  transform: rotate(45deg);
+}
+.tl-ctrl-refreshing .tl-refresh-icon {
+  animation: tl-refresh-spin 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes tl-refresh-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ── Legend panel (tree-view style) ──────────────────────── */

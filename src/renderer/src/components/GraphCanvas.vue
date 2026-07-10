@@ -26,6 +26,15 @@
         </button>
         <div class="ctrl-sep"></div>
         <button
+          class="ctrl-btn ctrl-btn-refresh"
+          :class="{ 'ctrl-btn-refreshing': refreshSpinning }"
+          title="Refresh layout — re-run the family tree algorithm"
+          @click="refreshLayout"
+        >
+          <span class="refresh-icon">⟳</span>
+        </button>
+        <div class="ctrl-sep"></div>
+        <button
           class="ctrl-btn"
           :class="{ 'ctrl-btn-lock': store.lockNodes }"
           title="Lock/unlock node clicks"
@@ -220,7 +229,7 @@ import {
   getDashArray
 } from './graph/linkHelpers.js'
 import { computeAgeYPositions } from './graph/layoutAge.js'
-import { computeGenLayout } from './graph/layoutGeneration.js'
+import { computeGenLayout } from './graph/familyTreeLayout'
 import {
   drawYearGuides,
   drawGenGuides,
@@ -1346,6 +1355,79 @@ function snapshotGenMode() {
   store.markGraphDirty()
 }
 
+// ── Refresh layout ──────────────────────────────────────────────────────────
+// Re-runs the family-tree layout algorithm on the current data and animates the
+// nodes into the fresh arrangement. Mode-aware: Generation rebuilds its rows,
+// Age keeps the year axis and only re-orders horizontally, Auto uses the
+// arrangement as a seed and lets the simulation relax from it.
+const refreshSpinning = ref(false)
+let refreshSpinTimer = null
+
+function refreshLayout() {
+  if (!ctx.nodesData.length || !ctx.containerRef) return
+  cancelAnimation()
+  ctx.simulation.stop()
+  refreshSpinning.value = true
+  if (refreshSpinTimer) clearTimeout(refreshSpinTimer)
+  refreshSpinTimer = setTimeout(() => {
+    refreshSpinning.value = false
+    refreshSpinTimer = null
+  }, 700)
+
+  const { width, height } = ctx.containerRef.getBoundingClientRect()
+  const mode = currentMode.value
+  const genInfo = computeGenLayout(ctx.nodesData, store.relationships, width, height)
+
+  if (mode === 'age') {
+    const ageInfo = computeAgeYPositions(ctx.nodesData, height)
+    const targets = {}
+    ctx.nodesData.forEach((n) => {
+      targets[n.id] = { x: genInfo.targets[n.id]?.x ?? n.x, y: ageInfo.yMap[n.id] }
+    })
+    animateToPositionsWithReset(targets, () => {
+      ctx.nodesData.forEach((n) => {
+        n.fx = n.x
+        n.fy = ageInfo.yMap[n.id]
+      })
+      snapshotMode('age')
+      reapplyDrag()
+    })
+  } else if (mode === 'generation') {
+    removeGenPreview(ctx)
+    ctx.genRowYValues = genInfo.genLabels.map((g) => g.y)
+    ctx.genRowSpacing = genInfo.rowHeight || 140
+    drawGenGuides(ctx, genInfo)
+    animateToPositionsWithReset(genInfo.targets, () => {
+      ctx.nodesData.forEach((n) => {
+        n.fx = n.x
+        n.fy = n.y
+      })
+      snapshotGenMode()
+      reapplyDrag()
+    })
+  } else if (mode === 'auto') {
+    animateToPositionsWithReset(genInfo.targets, () => {
+      ctx.nodesData.forEach((n) => {
+        n.fx = null
+        n.fy = null
+        n.vx = 0
+        n.vy = 0
+      })
+      ctx.simulation.alpha(0.12).restart()
+      reapplyDrag()
+    })
+  } else {
+    animateToPositionsWithReset(genInfo.targets, () => {
+      ctx.nodesData.forEach((n) => {
+        n.fx = n.x
+        n.fy = n.y
+      })
+      snapshotMode('custom')
+      reapplyDrag()
+    })
+  }
+}
+
 // ── Emphasis ────────────────────────────────────────────────────────────────
 // Lineage emphasis (paternal/maternal) only affects links + arrowheads, all computed in
 // linkVisual(); switching it just re-syncs link styles and repaints.
@@ -1487,6 +1569,7 @@ onUnmounted(() => {
   ctx.simulation?.stop()
   ctx.resizeObserver?.disconnect()
   cancelAnimation()
+  if (refreshSpinTimer) clearTimeout(refreshSpinTimer)
   cancelGuideTimers(ctx)
   removePointerHandlers()
   ctx.renderer?.dispose()
@@ -1668,6 +1751,24 @@ watch(
   width: 1px;
   background: var(--border);
   margin: 3px 2px;
+}
+.ctrl-btn-refresh .refresh-icon {
+  display: inline-block;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ctrl-btn-refresh:hover .refresh-icon {
+  transform: rotate(45deg);
+}
+.ctrl-btn-refreshing .refresh-icon {
+  animation: refresh-spin 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes refresh-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 .graph-legend {
   position: absolute;

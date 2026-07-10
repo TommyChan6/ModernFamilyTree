@@ -406,7 +406,7 @@ Do these *around* the web migration, not as a separate stop-the-world project.
 - **Extract shared code** — **first slice done 2026-07-10:** `src/shared/` now holds the
   data types and the whole channel-handler core (`dbCore.ts`), consumed by both the
   Electron main process and the browser backend. The pure layout math
-  (`layoutAge`, `layoutGeneration`, `linkHelpers`, `timelineLayout`, `factionLayout`)
+  (`layoutAge`, `familyTreeLayout`, `linkHelpers`, `timelineLayout`, `factionLayout`)
   stays where it is for now; a monorepo split (`packages/core`, `apps/web`,
   `apps/desktop`) only if the repos ever split.
 - **Server-side validation** — you currently trust the client (fine for single-user). On the

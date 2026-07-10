@@ -5,7 +5,7 @@
 // screen via pxPerYear + translate). Everything zoom-dependent stays out of here
 // so the layout only recomputes when the data changes.
 
-import { computeGenLayout } from '../graph/layoutGeneration.js'
+import { computeTreeOrder } from '../graph/familyTreeLayout'
 
 export const GUTTER = 64 // fixed year-axis gutter width (screen px)
 export const LANE_W = 150 // horizontal distance between lifelines (unscaled px)
@@ -16,17 +16,25 @@ export function lifeEnd(p, refYear) {
   return p.death_year && p.death_year <= refYear ? p.death_year : refYear
 }
 
-export function computeTimelineLayout(persons, relationships, refYear) {
+// Lane order comes from the same family-tree layout algorithm the Tree View
+// uses: couples sit in neighbouring lanes and children land near their parents,
+// so marriage/birth connectors stay short and cross as little as possible.
+export function computeLaneOrder(persons, relationships) {
+  return computeTreeOrder(persons, relationships)
+}
+
+export function computeTimelineLayout(persons, relationships, refYear, laneOrder = null) {
   const dated = persons.filter((p) => p.birth_year)
 
-  // Lane order comes from the same family-tree layout the Tree View's Generation
-  // mode uses: spouses sit side by side and children are placed with their
-  // parents, so marriage/birth connectors stay short and readable.
-  const { targets } = computeGenLayout(persons, relationships, 2000, 1000)
+  // Use the caller's (frozen) lane order when given; people missing from it —
+  // e.g. added since the last "refresh layout" — append on the right in a
+  // stable birth-year order.
+  const order = laneOrder || computeLaneOrder(persons, relationships)
+  const orderIdx = new Map(order.map((id, i) => [id, i]))
   dated.sort((a, b) => {
-    const xa = targets[a.id]?.x ?? Infinity
-    const xb = targets[b.id]?.x ?? Infinity
-    if (xa !== xb) return xa - xb
+    const ia = orderIdx.has(a.id) ? orderIdx.get(a.id) : Infinity
+    const ib = orderIdx.has(b.id) ? orderIdx.get(b.id) : Infinity
+    if (ia !== ib) return ia - ib
     return a.birth_year - b.birth_year || (a.name || '').localeCompare(b.name || '')
   })
 

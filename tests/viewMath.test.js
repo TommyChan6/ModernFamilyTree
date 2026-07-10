@@ -106,6 +106,15 @@ describe('computeTimelineLayout', () => {
     const L = computeTimelineLayout(persons, rels, REF)
     expect(L.births).toHaveLength(0)
   })
+
+  it('respects a frozen lane order and appends people missing from it', () => {
+    // 'b' is not in the frozen order → appended after the ordered lanes
+    const L = computeTimelineLayout(persons, relationships, REF, ['c', 'a'])
+    expect(L.people.map((p) => p.id)).toEqual(['c', 'a', 'b'])
+    const xs = L.people.map((p) => p.laneX)
+    expect(xs[1] - xs[0]).toBe(LANE_W)
+    expect(xs[2] - xs[1]).toBe(LANE_W)
+  })
 })
 
 describe('lifeEnd', () => {

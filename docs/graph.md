@@ -34,7 +34,7 @@ composable.
 | ✋ Custom | `custom` | Nodes are pinned (`fx`/`fy`); the user drags them freely and positions persist. |
 | ⚡ Auto | `auto` | D3 force-directed layout (`forceLink`, `forceManyBody`, `forceCenter`, `forceCollide`). Dragging perturbs the simulation. |
 | 📅 Age | `age` | Y position is fixed by birth year (older = higher); X is free to drag. Draws year guide lines and a "Now" line. See [`layoutAge.js`](../src/renderer/src/components/graph/layoutAge.js). |
-| 🏛 Generation | `generation` | Hierarchical top-down layout computed from parent/child + spouse relationships. Nodes snap to generation rows; dragging between rows previews and creates new rows. See [`layoutGeneration.js`](../src/renderer/src/components/graph/layoutGeneration.js). |
+| 🏛 Generation | `generation` | Hierarchical top-down layout computed from parent/child + spouse relationships. Nodes snap to generation rows; dragging between rows previews and creates new rows. See [`familyTreeLayout.ts`](../src/renderer/src/components/graph/familyTreeLayout.ts). |
 
 Layout math lives in **pure functions** (`computeAgeYPositions`, `computeGenLayout`)
 that take data and dimensions and return target positions — no D3, no store, so they
@@ -138,7 +138,8 @@ The graph is one of five views; the others also read the store's persons/relatio
   editable table with data-integrity issue detection.
 - **Timeline**
   ([`TimelineView.vue`](../src/renderer/src/components/TimelineView.vue)) — vertical
-  lifelines on a year axis, ordered into lanes by `computeGenLayout`, with birth and
+  lifelines on a year axis, ordered into lanes by the family-tree layout algorithm
+  (`computeTreeOrder`), with birth and
   marriage connectors and independent time/width zoom.
 - **Factions**
   ([`FactionsView.vue`](../src/renderer/src/components/FactionsView.vue)) — people
