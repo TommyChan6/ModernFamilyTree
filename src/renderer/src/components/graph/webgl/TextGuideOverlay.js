@@ -8,20 +8,27 @@ export class TextGuideOverlay {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d')
     this.dpr = 1
-    this.w = 0; this.h = 0
+    this.w = 0
+    this.h = 0
     this.transform = { x: 0, y: 0, k: 1 }
     this.light = false
     // Descriptors set by GraphCanvas/guideLines (all in WORLD coords).
-    this.guides = []          // [{ y, label, kind:'year'|'gen', opacity }]
-    this.currentYear = null   // { y, label, opacity }
-    this.genPreview = null    // { y, label, opacity }
+    this.guides = [] // [{ y, label, kind:'year'|'gen', opacity }]
+    this.currentYear = null // { y, label, opacity }
+    this.genPreview = null // { y, label, opacity }
   }
 
-  setCamera(t) { this.transform = t }
-  setTheme(isLight) { this.light = isLight }
+  setCamera(t) {
+    this.transform = t
+  }
+  setTheme(isLight) {
+    this.light = isLight
+  }
 
   resize(w, h, dpr) {
-    this.w = w; this.h = h; this.dpr = dpr
+    this.w = w
+    this.h = h
+    this.dpr = dpr
     this.canvas.width = Math.round(w * dpr)
     this.canvas.height = Math.round(h * dpr)
     this.canvas.style.width = w + 'px'
@@ -41,22 +48,34 @@ export class TextGuideOverlay {
       cyStroke: l ? 'rgba(108,142,245,0.75)' : 'rgba(108,142,245,0.65)',
       cyFill: l ? 'rgba(108,142,245,0.9)' : 'rgba(108,142,245,0.85)',
       pvStroke: l ? 'rgba(108,142,245,0.45)' : 'rgba(108,142,245,0.35)',
-      pvFill: l ? 'rgba(108,142,245,0.55)' : 'rgba(108,142,245,0.45)',
+      pvFill: l ? 'rgba(108,142,245,0.55)' : 'rgba(108,142,245,0.45)'
     }
   }
 
   // opts: { gs, nodes, showLabels, showAge, selectedId, labelOpacityOf(n), ageOf(n) }
   draw(opts) {
-    const ctx = this.ctx, t = this.transform, c = this._colors()
+    const ctx = this.ctx,
+      t = this.transform,
+      c = this._colors()
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     ctx.clearRect(0, 0, this.w, this.h)
 
     // Guide lines span the horizontal extent of the nodes (± margin), like the old SVG.
-    let x1 = 30, x2 = 800
-    if ((this.guides.length || this.currentYear || this.genPreview) && opts.nodes && opts.nodes.length) {
-      let mn = Infinity, mx = -Infinity
-      for (const n of opts.nodes) { if (n.x < mn) mn = n.x; if (n.x > mx) mx = n.x }
-      x1 = mn - 120; x2 = mx + 120
+    let x1 = 30,
+      x2 = 800
+    if (
+      (this.guides.length || this.currentYear || this.genPreview) &&
+      opts.nodes &&
+      opts.nodes.length
+    ) {
+      let mn = Infinity,
+        mx = -Infinity
+      for (const n of opts.nodes) {
+        if (n.x < mn) mn = n.x
+        if (n.x > mx) mx = n.x
+      }
+      x1 = mn - 120
+      x2 = mx + 120
     }
 
     // ---- guides (behind labels) ----
@@ -64,13 +83,19 @@ export class TextGuideOverlay {
       const s1 = worldToScreen(x1, y, t)
       const s2 = worldToScreen(x2, y, t)
       ctx.save()
-      ctx.strokeStyle = stroke; ctx.lineWidth = lineW; ctx.setLineDash(dash)
-      ctx.beginPath(); ctx.moveTo(s1.x, s1.y); ctx.lineTo(s2.x, s2.y); ctx.stroke()
+      ctx.strokeStyle = stroke
+      ctx.lineWidth = lineW
+      ctx.setLineDash(dash)
+      ctx.beginPath()
+      ctx.moveTo(s1.x, s1.y)
+      ctx.lineTo(s2.x, s2.y)
+      ctx.stroke()
       ctx.setLineDash([])
       if (label != null) {
         ctx.fillStyle = fill
         ctx.font = `${weight} 10px system-ui, sans-serif`
-        ctx.textAlign = 'right'; ctx.textBaseline = 'middle'
+        ctx.textAlign = 'right'
+        ctx.textBaseline = 'middle'
         ctx.fillText(label, s1.x - 14, s1.y)
       }
       ctx.restore()
@@ -78,8 +103,15 @@ export class TextGuideOverlay {
     for (const g of this.guides) {
       const isYear = g.kind === 'year'
       ctx.globalAlpha = g.opacity ?? 1
-      drawGuide(g.y, g.label, isYear ? c.yearStroke : c.genStroke,
-        isYear ? c.yearFill : c.genFill, isYear ? [6, 4] : [8, 5], 1, 600)
+      drawGuide(
+        g.y,
+        g.label,
+        isYear ? c.yearStroke : c.genStroke,
+        isYear ? c.yearFill : c.genFill,
+        isYear ? [6, 4] : [8, 5],
+        1,
+        600
+      )
     }
     ctx.globalAlpha = 1
     if (this.currentYear) {
@@ -98,7 +130,8 @@ export class TextGuideOverlay {
     const gs = opts.gs
     const fontPx = gs.labelSize * t.k
     if (fontPx < 7) return // LOD: unreadable when zoomed far out -> skip entirely
-    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'alphabetic'
     const margin = 60
     for (const n of opts.nodes) {
       const s = worldToScreen(n.x, n.y, t)

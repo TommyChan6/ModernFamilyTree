@@ -4,14 +4,14 @@ import fs from 'fs'
 import { randomUUID } from 'crypto'
 
 const EMPTY_DB = () => ({
-  trees: {},       // { treeId: { id, name, created_at, updated_at } }
+  trees: {}, // { treeId: { id, name, created_at, updated_at } }
   activeTreeId: null,
-  persons: {},     // { personId: { ...fields, tree_id } }
+  persons: {}, // { personId: { ...fields, tree_id } }
   relationships: {},
-  factions: {},    // { factionId: { id, tree_id, scenario_id, name, color, icon, description, member_ids, x, y, visible } }
-  scenarios: {},   // { scenarioId: { id, tree_id, name } } — each holds its own set of factions
+  factions: {}, // { factionId: { id, tree_id, scenario_id, name, color, icon, description, member_ids, x, y, visible } }
+  scenarios: {}, // { scenarioId: { id, tree_id, name } } — each holds its own set of factions
   images: {},
-  settings: {},    // { `${treeId}:key`: value } for per-tree settings, or global keys
+  settings: {}, // { `${treeId}:key`: value } for per-tree settings, or global keys
   globalSettings: {} // theme, etc.
 })
 
@@ -35,9 +35,7 @@ export function initDB() {
   if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true })
 
   _dbPath = path.join(dbDir, 'familytree.json')
-  _db = fs.existsSync(_dbPath)
-    ? JSON.parse(fs.readFileSync(_dbPath, 'utf8'))
-    : EMPTY_DB()
+  _db = fs.existsSync(_dbPath) ? JSON.parse(fs.readFileSync(_dbPath, 'utf8')) : EMPTY_DB()
 
   // Migration: ensure all tables exist
   _db.trees = _db.trees || {}
@@ -51,7 +49,7 @@ export function initDB() {
 
   // Migration: adopt factions created before scenarios existed into a default
   // scenario per tree (idempotent — only touches factions with no scenario_id)
-  const orphanFactions = Object.values(_db.factions).filter(f => !f.scenario_id)
+  const orphanFactions = Object.values(_db.factions).filter((f) => !f.scenario_id)
   if (orphanFactions.length > 0) {
     const now = nowStr()
     const defaultScenarioByTree = {}
@@ -61,7 +59,13 @@ export function initDB() {
     for (const f of orphanFactions) {
       if (!defaultScenarioByTree[f.tree_id]) {
         const sid = randomUUID()
-        _db.scenarios[sid] = { id: sid, tree_id: f.tree_id, name: 'Scenario 1', created_at: now, updated_at: now }
+        _db.scenarios[sid] = {
+          id: sid,
+          tree_id: f.tree_id,
+          name: 'Scenario 1',
+          created_at: now,
+          updated_at: now
+        }
         defaultScenarioByTree[f.tree_id] = sid
       }
       f.scenario_id = defaultScenarioByTree[f.tree_id]
@@ -71,17 +75,28 @@ export function initDB() {
 
   // Migration: convert old single-tree DB to multi-tree
   if (!_db.activeTreeId && Object.keys(_db.trees).length === 0) {
-    const hasOldPersons = Object.values(_db.persons).some(p => !p.tree_id)
+    const hasOldPersons = Object.values(_db.persons).some((p) => !p.tree_id)
     const treeId = randomUUID()
     const now = nowStr()
-    _db.trees[treeId] = { id: treeId, name: 'Unnamed Family Tree', created_at: now, updated_at: now }
+    _db.trees[treeId] = {
+      id: treeId,
+      name: 'Unnamed Family Tree',
+      created_at: now,
+      updated_at: now
+    }
     _db.activeTreeId = treeId
 
     if (hasOldPersons) {
       // Tag existing persons/relationships/images with tree_id
-      for (const p of Object.values(_db.persons)) { p.tree_id = p.tree_id || treeId }
-      for (const r of Object.values(_db.relationships)) { r.tree_id = r.tree_id || treeId }
-      for (const img of Object.values(_db.images)) { img.tree_id = img.tree_id || treeId }
+      for (const p of Object.values(_db.persons)) {
+        p.tree_id = p.tree_id || treeId
+      }
+      for (const r of Object.values(_db.relationships)) {
+        r.tree_id = r.tree_id || treeId
+      }
+      for (const img of Object.values(_db.images)) {
+        img.tree_id = img.tree_id || treeId
+      }
     } else if (Object.keys(_db.persons).length === 0) {
       // Fresh install: seed sample data
       seedSampleData(treeId)
@@ -109,24 +124,96 @@ export function initDB() {
 
 function seedSampleData(treeId) {
   const now = nowStr()
-  const gp1 = randomUUID(), gp2 = randomUUID()
-  const p1 = randomUUID(), p2 = randomUUID()
-  const c1 = randomUUID(), c2 = randomUUID()
+  const gp1 = randomUUID(),
+    gp2 = randomUUID()
+  const p1 = randomUUID(),
+    p2 = randomUUID()
+  const c1 = randomUUID(),
+    c2 = randomUUID()
 
   const addP = (id, name, birth_year, gender, bio, occupation, location) => {
-    _db.persons[id] = { id, tree_id: treeId, name, birth_year, death_year: null, gender, bio, occupation, location, created_at: now, updated_at: now }
+    _db.persons[id] = {
+      id,
+      tree_id: treeId,
+      name,
+      birth_year,
+      death_year: null,
+      gender,
+      bio,
+      occupation,
+      location,
+      created_at: now,
+      updated_at: now
+    }
   }
   const addR = (a, b, type) => {
     const id = randomUUID()
-    _db.relationships[id] = { id, tree_id: treeId, person_a_id: a, person_b_id: b, type, status: 'active', formed_date: null, created_at: now }
+    _db.relationships[id] = {
+      id,
+      tree_id: treeId,
+      person_a_id: a,
+      person_b_id: b,
+      type,
+      status: 'active',
+      formed_date: null,
+      created_at: now
+    }
   }
 
-  addP(gp1, 'Robert Anderson', 1948, 'male', 'Retired civil engineer who loved woodworking and jazz.', 'Civil Engineer', 'Chicago, IL')
-  addP(gp2, 'Dorothy Anderson', 1950, 'female', 'Retired school teacher with a passion for gardening.', 'Teacher', 'Chicago, IL')
-  addP(p1, 'James Anderson', 1975, 'male', 'Architect running his own firm in New York.', 'Architect', 'New York, NY')
-  addP(p2, 'Sarah Anderson', 1977, 'female', 'Pediatrician at Brooklyn General Hospital.', 'Pediatrician', 'New York, NY')
-  addP(c1, 'Lucas Anderson', 2005, 'male', 'High school student and basketball enthusiast.', 'Student', 'New York, NY')
-  addP(c2, 'Olivia Anderson', 2008, 'female', 'Middle school student who loves reading and art.', 'Student', 'New York, NY')
+  addP(
+    gp1,
+    'Robert Anderson',
+    1948,
+    'male',
+    'Retired civil engineer who loved woodworking and jazz.',
+    'Civil Engineer',
+    'Chicago, IL'
+  )
+  addP(
+    gp2,
+    'Dorothy Anderson',
+    1950,
+    'female',
+    'Retired school teacher with a passion for gardening.',
+    'Teacher',
+    'Chicago, IL'
+  )
+  addP(
+    p1,
+    'James Anderson',
+    1975,
+    'male',
+    'Architect running his own firm in New York.',
+    'Architect',
+    'New York, NY'
+  )
+  addP(
+    p2,
+    'Sarah Anderson',
+    1977,
+    'female',
+    'Pediatrician at Brooklyn General Hospital.',
+    'Pediatrician',
+    'New York, NY'
+  )
+  addP(
+    c1,
+    'Lucas Anderson',
+    2005,
+    'male',
+    'High school student and basketball enthusiast.',
+    'Student',
+    'New York, NY'
+  )
+  addP(
+    c2,
+    'Olivia Anderson',
+    2008,
+    'female',
+    'Middle school student who loves reading and art.',
+    'Student',
+    'New York, NY'
+  )
 
   addR(gp1, gp2, 'spouse')
   addR(gp1, p1, 'parent_child')
@@ -151,7 +238,9 @@ export function getDB() {
     images: _db.images,
     settings: _db.settings,
     globalSettings: _db.globalSettings,
-    setActiveTree(id) { _db.activeTreeId = id },
+    setActiveTree(id) {
+      _db.activeTreeId = id
+    },
     save,
     nowStr
   }

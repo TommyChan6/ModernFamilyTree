@@ -17,7 +17,7 @@ function activeTree() {
 /** Filter objects by tree_id matching active tree */
 function forTree(obj) {
   const tid = activeTree()
-  return Object.values(obj).filter(item => item.tree_id === tid)
+  return Object.values(obj).filter((item) => item.tree_id === tid)
 }
 
 export function registerHandlers(ipcMain, _app, dialog) {
@@ -37,7 +37,12 @@ export function registerHandlers(ipcMain, _app, dialog) {
       const { trees, save, nowStr } = getDB()
       const id = randomUUID()
       const now = nowStr()
-      const tree = { id, name: data?.name || 'Unnamed Family Tree', created_at: now, updated_at: now }
+      const tree = {
+        id,
+        name: data?.name || 'Unnamed Family Tree',
+        created_at: now,
+        updated_at: now
+      }
       trees[id] = tree
       save()
       return { success: true, data: tree }
@@ -81,7 +86,11 @@ export function registerHandlers(ipcMain, _app, dialog) {
       }
       for (const [iid, img] of Object.entries(db.images)) {
         if (img.tree_id === tid) {
-          try { fs.unlinkSync(img.file_path) } catch (_) { /* ignore */ }
+          try {
+            fs.unlinkSync(img.file_path)
+          } catch (_) {
+            /* ignore */
+          }
           delete db.images[iid]
         }
       }
@@ -121,8 +130,10 @@ export function registerHandlers(ipcMain, _app, dialog) {
     try {
       const { persons, images } = getDB()
       const list = sortByDate(forTree(persons))
-      const enriched = list.map(p => {
-        const primary = Object.values(images).find(img => img.person_id === p.id && img.is_primary)
+      const enriched = list.map((p) => {
+        const primary = Object.values(images).find(
+          (img) => img.person_id === p.id && img.is_primary
+        )
         return { ...p, primary_image: primary ? primary.file_path : null }
       })
       return { success: true, data: enriched }
@@ -177,8 +188,13 @@ export function registerHandlers(ipcMain, _app, dialog) {
       }
       persons[data.id] = updated
       save()
-      const primary = Object.values(images).find(img => img.person_id === data.id && img.is_primary)
-      return { success: true, data: { ...updated, primary_image: primary ? primary.file_path : null } }
+      const primary = Object.values(images).find(
+        (img) => img.person_id === data.id && img.is_primary
+      )
+      return {
+        success: true,
+        data: { ...updated, primary_image: primary ? primary.file_path : null }
+      }
     } catch (err) {
       return { success: false, error: err.message }
     }
@@ -195,12 +211,16 @@ export function registerHandlers(ipcMain, _app, dialog) {
       }
       for (const f of Object.values(factions)) {
         if (Array.isArray(f.member_ids) && f.member_ids.includes(data.id)) {
-          f.member_ids = f.member_ids.filter(pid => pid !== data.id)
+          f.member_ids = f.member_ids.filter((pid) => pid !== data.id)
         }
       }
       for (const [iid, img] of Object.entries(images)) {
         if (img.person_id === data.id) {
-          try { fs.unlinkSync(img.file_path) } catch (_) { /* ignore */ }
+          try {
+            fs.unlinkSync(img.file_path)
+          } catch (_) {
+            /* ignore */
+          }
           delete images[iid]
         }
       }
@@ -379,7 +399,14 @@ export function registerHandlers(ipcMain, _app, dialog) {
         for (const f of Object.values(factions)) {
           if (f.scenario_id !== data.clone_from) continue
           const fid = randomUUID()
-          const copy = { ...f, id: fid, scenario_id: id, member_ids: [...(f.member_ids || [])], created_at: now, updated_at: now }
+          const copy = {
+            ...f,
+            id: fid,
+            scenario_id: id,
+            member_ids: [...(f.member_ids || [])],
+            created_at: now,
+            updated_at: now
+          }
           factions[fid] = copy
           cloned.push(copy)
         }
@@ -425,7 +452,9 @@ export function registerHandlers(ipcMain, _app, dialog) {
   ipcMain.handle('images:getByPerson', async (_event, data) => {
     try {
       const { images } = getDB()
-      const rows = sortByDate(Object.values(images).filter(img => img.person_id === data.personId))
+      const rows = sortByDate(
+        Object.values(images).filter((img) => img.person_id === data.personId)
+      )
       rows.sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0))
       return { success: true, data: rows }
     } catch (err) {
@@ -479,7 +508,14 @@ export function registerHandlers(ipcMain, _app, dialog) {
         }
       }
       const id = randomUUID()
-      const img = { id, tree_id: activeTree(), person_id: personId, file_path: destPath, is_primary: !!isPrimary, created_at: nowStr() }
+      const img = {
+        id,
+        tree_id: activeTree(),
+        person_id: personId,
+        file_path: destPath,
+        is_primary: !!isPrimary,
+        created_at: nowStr()
+      }
       images[id] = img
       save()
       return { success: true, data: img }
@@ -511,7 +547,11 @@ export function registerHandlers(ipcMain, _app, dialog) {
       const { imageId } = data
       const img = images[imageId]
       if (img) {
-        try { fs.unlinkSync(img.file_path) } catch (_) { /* gone */ }
+        try {
+          fs.unlinkSync(img.file_path)
+        } catch (_) {
+          /* gone */
+        }
         delete images[imageId]
         save()
       }

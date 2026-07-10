@@ -11,16 +11,21 @@ import { ZoneLayer } from './ZoneLayer.js'
 
 const NODE_R = 17
 const ARC_R = 22.5
-const SPIN = (Math.PI * 2) / 14   // multi-faction arc orbit: one turn per 14s
-const TETHER_FLOW = 10            // dash drift, world units/s (the old fx-flow)
-const PERSON_ICON_PATH = 'M12 12.5c2.49 0 4.5-2.01 4.5-4.5S14.49 3.5 12 3.5 7.5 5.51 7.5 8s2.01 4.5 4.5 4.5zm0 2.25c-3 0-9 1.51-9 4.5V22h18v-2.75c0-2.99-6-4.5-9-4.5z'
+const SPIN = (Math.PI * 2) / 14 // multi-faction arc orbit: one turn per 14s
+const TETHER_FLOW = 10 // dash drift, world units/s (the old fx-flow)
+const PERSON_ICON_PATH =
+  'M12 12.5c2.49 0 4.5-2.01 4.5-4.5S14.49 3.5 12 3.5 7.5 5.51 7.5 8s2.01 4.5 4.5 4.5zm0 2.25c-3 0-9 1.51-9 4.5V22h18v-2.75c0-2.99-6-4.5-9-4.5z'
 
 const _col = new THREE.Color()
-function rgb(hex) { _col.set(hex || '#888'); return [_col.r, _col.g, _col.b] }
+function rgb(hex) {
+  _col.set(hex || '#888')
+  return [_col.r, _col.g, _col.b]
+}
 
 // easeOutBack — the springy overshoot of the old fx-pop CSS entrance.
 function easeOutBack(t) {
-  const c1 = 1.70158, c3 = c1 + 1
+  const c1 = 1.70158,
+    c3 = c1 + 1
   return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
 }
 
@@ -50,10 +55,10 @@ export class FactionsRenderer {
     this._ambient = false
     this._entranceUntil = 0
     this._seen = new Set()
-    this._pAnim = new Map()   // person id -> { op, s, top, ts, start }
-    this._zAnim = new Map()   // zone id -> { op, s, fillA, ringA, ringW, dropA, ps, t* }
+    this._pAnim = new Map() // person id -> { op, s, top, ts, start }
+    this._zAnim = new Map() // zone id -> { op, s, fillA, ringA, ringW, dropA, ps, t* }
     this._pVis = new Map()
-    this._pillRects = []      // screen rects of the zone header pills, for hit tests
+    this._pillRects = [] // screen rects of the zone header pills, for hit tests
     this._css = createCssColorCache()
     this._icon = new Path2D(PERSON_ICON_PATH)
 
@@ -70,27 +75,42 @@ export class FactionsRenderer {
     this.world.matrixAutoUpdate = false
     this.scene.add(this.world)
 
-    this.atlas = new AvatarAtlas(() => { this._stylesDirty = true; this.requestRedraw() })
+    this.atlas = new AvatarAtlas(() => {
+      this._stylesDirty = true
+      this.requestRedraw()
+    })
     this.zones = new ZoneLayer({ renderOrder: 1 })
     this.threads = new CapsuleLayer({ renderOrder: 2 })
     this.arcs = new ArcLayer({ renderOrder: 3 })
     this.nodes = new NodeLayer({ atlasTexture: this.atlas.texture, pixelRatio: this.dpr })
     this.nodes.mesh.renderOrder = 4
-    this.world.add(this.zones.object3d, this.threads.object3d, this.arcs.object3d, this.nodes.object3d)
+    this.world.add(
+      this.zones.object3d,
+      this.threads.object3d,
+      this.arcs.object3d,
+      this.nodes.object3d
+    )
 
     this.picker = new Picker()
     this._frame = this._frame.bind(this)
     this._glCanvas = glCanvas
     this._onContextLost = (e) => e.preventDefault()
-    this._onContextRestored = () => { this.markAllDirty(); this.requestRedraw() }
+    this._onContextRestored = () => {
+      this.markAllDirty()
+      this.requestRedraw()
+    }
     glCanvas.addEventListener('webglcontextlost', this._onContextLost, false)
     glCanvas.addEventListener('webglcontextrestored', this._onContextRestored, false)
   }
 
   resize(w, h) {
-    this.width = w; this.height = h
+    this.width = w
+    this.height = h
     this.renderer.setSize(w, h, false)
-    this.camera.left = 0; this.camera.right = w; this.camera.top = 0; this.camera.bottom = h
+    this.camera.left = 0
+    this.camera.right = w
+    this.camera.top = 0
+    this.camera.bottom = h
     this.camera.updateProjectionMatrix()
     this._overlayCanvas.width = Math.round(w * this.dpr)
     this._overlayCanvas.height = Math.round(h * this.dpr)
@@ -100,7 +120,11 @@ export class FactionsRenderer {
     this.requestRedraw()
   }
 
-  setCamera(t) { this.transform = t; this._uiDirty = true; this.requestRedraw() }
+  setCamera(t) {
+    this.transform = t
+    this._uiDirty = true
+    this.requestRedraw()
+  }
 
   setTheme(isLight) {
     this._css.invalidate()
@@ -109,9 +133,19 @@ export class FactionsRenderer {
     this.requestRedraw()
   }
 
-  markGeomDirty() { this._geomDirty = true; this.picker.invalidate() }
-  markStylesDirty() { this._stylesDirty = true; this.requestRedraw() }
-  markAllDirty() { this._geomDirty = true; this._stylesDirty = true; this._uiDirty = true }
+  markGeomDirty() {
+    this._geomDirty = true
+    this.picker.invalidate()
+  }
+  markStylesDirty() {
+    this._stylesDirty = true
+    this.requestRedraw()
+  }
+  markAllDirty() {
+    this._geomDirty = true
+    this._stylesDirty = true
+    this._uiDirty = true
+  }
 
   // Register newly appearing people for the pop-in entrance (call after the
   // view rebuilds its simulation nodes).
@@ -159,8 +193,12 @@ export class FactionsRenderer {
       const v = this.hooks.personVisual(n.id)
       this._pVis.set(n.id, v)
       let a = this._pAnim.get(n.id)
-      if (!a) { a = { op: 0, s: v.scale }; this._pAnim.set(n.id, a) }
-      a.top = v.opacity; a.ts = v.scale
+      if (!a) {
+        a = { op: 0, s: v.scale }
+        this._pAnim.set(n.id, a)
+      }
+      a.top = v.opacity
+      a.ts = v.scale
     }
     const zonesArr = this.hooks.getZones()
     const seen = new Set()
@@ -172,8 +210,12 @@ export class FactionsRenderer {
         a = { op: 0, s: 0.85, fillA: v.fillA, ringA: v.ringA, ringW: v.ringW, dropA: 0, ps: 1 }
         this._zAnim.set(z.id, a)
       }
-      a.top = v.opacity; a.ts = 1
-      a.tFillA = v.fillA; a.tRingA = v.ringA; a.tRingW = v.ringW; a.tDropA = v.dropA
+      a.top = v.opacity
+      a.ts = 1
+      a.tFillA = v.fillA
+      a.tRingA = v.ringA
+      a.tRingW = v.ringW
+      a.tDropA = v.dropA
       a.tps = v.pillHover ? 1.05 : 1
     }
     for (const id of this._zAnim.keys()) if (!seen.has(id)) this._zAnim.delete(id)
@@ -185,11 +227,17 @@ export class FactionsRenderer {
       a[k] = approach(a[k], a[tk], dt)
       if (Math.abs(a[k] - a[tk]) > TWEEN_EPS) moving = true
     }
-    for (const a of this._pAnim.values()) { chase(a, 'op', 'top'); chase(a, 's', 'ts') }
+    for (const a of this._pAnim.values()) {
+      chase(a, 'op', 'top')
+      chase(a, 's', 'ts')
+    }
     for (const a of this._zAnim.values()) {
-      chase(a, 'op', 'top'); chase(a, 's', 'ts')
-      chase(a, 'fillA', 'tFillA'); chase(a, 'ringA', 'tRingA')
-      chase(a, 'ringW', 'tRingW'); chase(a, 'dropA', 'tDropA')
+      chase(a, 'op', 'top')
+      chase(a, 's', 'ts')
+      chase(a, 'fillA', 'tFillA')
+      chase(a, 'ringA', 'tRingA')
+      chase(a, 'ringW', 'tRingW')
+      chase(a, 'dropA', 'tDropA')
       chase(a, 'ps', 'tps')
     }
     return moving
@@ -200,7 +248,10 @@ export class FactionsRenderer {
   _entrance(a) {
     if (!a.start) return { e: 1, s: 1 }
     const t = (this._timeSec - a.start) / 0.45
-    if (t >= 1) { a.start = null; return { e: 1, s: 1 } }
+    if (t >= 1) {
+      a.start = null
+      return { e: 1, s: 1 }
+    }
     if (t <= 0) return { e: 0, s: 0.3 }
     return { e: Math.min(1, t * 2.5), s: easeOutBack(t) }
   }
@@ -223,8 +274,12 @@ export class FactionsRenderer {
       const a = this._zAnim.get(z.id)
       if (!a) continue
       this.zones.set(i, z.x, z.y, z.r, rgb(z.color), {
-        fillA: a.fillA, ringA: a.ringA, ringW: a.ringW, dropA: a.dropA,
-        scale: a.s, opacity: a.op,
+        fillA: a.fillA,
+        ringA: a.ringA,
+        ringW: a.ringW,
+        dropA: a.dropA,
+        scale: a.s,
+        opacity: a.op
       })
     }
     this.zones.commit()
@@ -256,14 +311,24 @@ export class FactionsRenderer {
         opacity: op,
         selected: false,
         glow: v.grabbed ? 0.5 : 0,
-        avatar: layer >= 1 ? layer : 0,
+        avatar: layer >= 1 ? layer : 0
       })
       const arcR = (meta.multi ? ARC_R + 1.5 : ARC_R) * scale
       const arcW = meta.multi ? 3.8 : 3
       for (let j = 0; j < meta.arcs.length; j++) {
         const arc = meta.arcs[j]
-        this.arcs.set(arcI++, n.x, n.y, arcR, arc.a0, arc.a1, arcW,
-          rgb(arc.color), op * 0.95, meta.multi ? SPIN : 0)
+        this.arcs.set(
+          arcI++,
+          n.x,
+          n.y,
+          arcR,
+          arc.a0,
+          arc.a1,
+          arcW,
+          rgb(arc.color),
+          op * 0.95,
+          meta.multi ? SPIN : 0
+        )
       }
       if (meta.multi) tetherCount += meta.arcs.length
     }
@@ -273,7 +338,7 @@ export class FactionsRenderer {
 
     // Threads: faint always-on tethers for multi-faction people + bright
     // membership links for the active (hovered / dragged) person.
-    const zoneById = new Map(zonesArr.map(z => [z.id, z]))
+    const zoneById = new Map(zonesArr.map((z) => [z.id, z]))
     this.threads.setCount(tetherCount + links.length)
     let ti = 0
     for (const n of nodesArr) {
@@ -284,8 +349,23 @@ export class FactionsRenderer {
       const groupOp = (v?.tetherOp ?? 1) * (a ? a.op * this._entrance(a).e : 1)
       for (const fid of meta.factionIds) {
         const z = zoneById.get(fid)
-        if (!z) { this.threads.set(ti++, n.x, n.y, n.x, n.y, 0, [0, 0, 0], 0); continue }
-        this.threads.set(ti++, n.x, n.y, z.x, z.y, 1.3, rgb(z.color), 0.3 * groupOp, 2, 7, TETHER_FLOW)
+        if (!z) {
+          this.threads.set(ti++, n.x, n.y, n.x, n.y, 0, [0, 0, 0], 0)
+          continue
+        }
+        this.threads.set(
+          ti++,
+          n.x,
+          n.y,
+          z.x,
+          z.y,
+          1.3,
+          rgb(z.color),
+          0.3 * groupOp,
+          2,
+          7,
+          TETHER_FLOW
+        )
       }
     }
     for (const l of links) {
@@ -303,7 +383,10 @@ export class FactionsRenderer {
 
   // ── Overlay: pills, labels, badges, ghost (screen space) ───────────────────
   _drawOverlay() {
-    const ctx = this.overlay, c = this._css.get(), t = this.transform, k = t.k
+    const ctx = this.overlay,
+      c = this._css.get(),
+      t = this.transform,
+      k = t.k
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     ctx.clearRect(0, 0, this.width, this.height)
     this._pillRects = []
@@ -314,7 +397,8 @@ export class FactionsRenderer {
     // Person name labels (culled + LOD).
     const nameFontPx = 10.5 * k
     if (nameFontPx >= 5) {
-      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'alphabetic'
       ctx.lineJoin = 'round'
       for (const n of nodesArr) {
         const meta = metas.get(n.id)
@@ -323,7 +407,7 @@ export class FactionsRenderer {
         if (s.x < -80 || s.x > this.width + 80 || s.y < -80 || s.y > this.height + 80) continue
         const v = this._pVis.get(n.id)
         const a = this._pAnim.get(n.id)
-        const alpha = (a ? a.op * this._entrance(a).e : 1)
+        const alpha = a ? a.op * this._entrance(a).e : 1
         if (alpha <= 0.02) continue
         ctx.globalAlpha = alpha
         ctx.font = `600 ${nameFontPx}px ${font}`
@@ -361,9 +445,11 @@ export class FactionsRenderer {
       const a = this._zAnim.get(z.id)
       if (!a || a.op <= 0.02) continue
       const ps = a.ps
-      const w = z.headerW * k * ps, h = 26 * k * ps
+      const w = z.headerW * k * ps,
+        h = 26 * k * ps
       const cs = worldToScreen(z.x, z.y - z.r - 30 + 13, t) // pill centre
-      const x = cs.x - w / 2, y = cs.y - h / 2
+      const x = cs.x - w / 2,
+        y = cs.y - h / 2
       if (x + w < -20 || x > this.width + 20 || y + h < -20 || y > this.height + 20) continue
       ctx.globalAlpha = a.op
       ctx.save()
@@ -431,7 +517,12 @@ export class FactionsRenderer {
     this._lastT = ts
     this._timeSec = ts / 1000
 
-    if (this._stylesDirty) { this._syncStyles(); this._stylesDirty = false; this._tweening = true; this._geomDirty = true }
+    if (this._stylesDirty) {
+      this._syncStyles()
+      this._stylesDirty = false
+      this._tweening = true
+      this._geomDirty = true
+    }
     if (this._tweening) {
       this._tweening = this._step(dt)
       this._geomDirty = true
@@ -451,7 +542,10 @@ export class FactionsRenderer {
 
     const t = this.transform
     this.world.matrix.compose(
-      new THREE.Vector3(t.x, t.y, 0), new THREE.Quaternion(), new THREE.Vector3(t.k, t.k, 1))
+      new THREE.Vector3(t.x, t.y, 0),
+      new THREE.Quaternion(),
+      new THREE.Vector3(t.k, t.k, 1)
+    )
     this.world.matrixWorldNeedsUpdate = true
 
     const time = this._timeSec
@@ -468,7 +562,10 @@ export class FactionsRenderer {
     this._glCanvas?.removeEventListener('webglcontextlost', this._onContextLost)
     this._glCanvas?.removeEventListener('webglcontextrestored', this._onContextRestored)
     this.atlas.dispose()
-    this.zones.dispose(); this.threads.dispose(); this.arcs.dispose(); this.nodes.dispose()
+    this.zones.dispose()
+    this.threads.dispose()
+    this.arcs.dispose()
+    this.nodes.dispose()
     this.renderer.dispose()
     // The view unmounts on every view switch — release the GL context eagerly so
     // rapid switching can't exhaust the browser's context pool before GC runs.

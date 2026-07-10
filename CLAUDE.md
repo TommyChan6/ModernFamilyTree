@@ -9,6 +9,10 @@ npm run dev          # run the app with hot reload (electron-vite)
 npm run build        # bundle main, preload, renderer into out/
 npm test             # run the Vitest suite once
 npm run test:watch   # Vitest watch mode
+npm run lint         # ESLint (flat config, eslint.config.js)
+npm run lint:fix     # ESLint with auto-fix
+npm run format       # Prettier write
+npm run format:check # Prettier check (CI runs this)
 ```
 
 Run a single test file or test:
@@ -18,10 +22,12 @@ npx vitest run tests/db.test.js
 npx vitest run -t "migrates an old single-tree database"   # by test name
 ```
 
-Requires Node 18+. There are **no native modules** — no SQLite, no rebuild step, no
-build tools. (Ignore any older notes mentioning `better-sqlite3` / `npm run rebuild`;
-`sql.js` is listed in package.json but is unused.) There is no linter or formatter
-configured.
+Requires Node 18.18+. There are **no native modules** — no SQLite, no rebuild step, no
+build tools. (Ignore any older notes mentioning `better-sqlite3` / `npm run rebuild` /
+`sql.js`.) ESLint + Prettier are configured; CI (`.github/workflows/ci.yml`) gates on
+lint, format check, and the Vitest suite. New source files should be TypeScript per the
+Step 0 decision in `docs/MID_DEVELOPMENT.md`; existing JS converts opportunistically
+(`api.js` + store first, during the web-migration seam cut).
 
 ## Architecture
 

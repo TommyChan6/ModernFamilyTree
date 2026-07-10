@@ -16,13 +16,17 @@ export class CapsuleLayer {
     this._allocate(16)
   }
 
-  get object3d() { return this.mesh }
+  get object3d() {
+    return this.mesh
+  }
 
   _allocate(capacity) {
     if (this.geometry) this.geometry.dispose()
     const g = new THREE.InstancedBufferGeometry()
-    g.setAttribute('position', new THREE.Float32BufferAttribute(
-      [-1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0], 3))
+    g.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute([-1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0], 3)
+    )
     g.setIndex([0, 1, 2, 2, 1, 3])
     const mk = (name, size) => {
       const arr = new Float32Array(capacity * size)
@@ -53,12 +57,17 @@ export class CapsuleLayer {
   }
 
   set(i, x0, y0, x1, y1, width, rgb, opacity, dashLen = 0, dashGap = 0, flow = 0) {
-    this.p0[i * 2] = x0; this.p0[i * 2 + 1] = y0
-    this.p1[i * 2] = x1; this.p1[i * 2 + 1] = y1
+    this.p0[i * 2] = x0
+    this.p0[i * 2 + 1] = y0
+    this.p1[i * 2] = x1
+    this.p1[i * 2 + 1] = y1
     this.width[i] = width
-    this.color[i * 3] = rgb[0]; this.color[i * 3 + 1] = rgb[1]; this.color[i * 3 + 2] = rgb[2]
+    this.color[i * 3] = rgb[0]
+    this.color[i * 3 + 1] = rgb[1]
+    this.color[i * 3 + 2] = rgb[2]
     this.opacity[i] = opacity
-    this.dash[i * 2] = dashLen; this.dash[i * 2 + 1] = dashGap
+    this.dash[i * 2] = dashLen
+    this.dash[i * 2 + 1] = dashGap
     this.flow[i] = flow
   }
 
@@ -68,7 +77,9 @@ export class CapsuleLayer {
       this._attr[k].needsUpdate = true
   }
 
-  setTime(t) { this.material.uniforms.uTime.value = t }
+  setTime(t) {
+    this.material.uniforms.uTime.value = t
+  }
 
   dispose() {
     this.geometry?.dispose()
@@ -144,6 +155,6 @@ function createCapsuleMaterial() {
         if (a < 0.003) discard;
         fragColor = vec4(vColor, a);
       }
-    `,
+    `
   })
 }

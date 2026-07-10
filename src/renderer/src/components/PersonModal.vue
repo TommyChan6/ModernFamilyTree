@@ -12,12 +12,24 @@
           <div class="hero-avatar">{{ initials(store.selectedPerson.name) }}</div>
           <div class="hero-name">{{ store.selectedPerson.name }}</div>
           <div class="hero-dates">
-            <span v-if="store.selectedPerson.birth_year">b. {{ store.selectedPerson.birth_year }}</span>
-            <span v-if="store.selectedPerson.birth_year && store.selectedPerson.death_year"> – </span>
-            <span v-if="store.selectedPerson.death_year">d. {{ store.selectedPerson.death_year }}</span>
-            <span v-if="!store.selectedPerson.birth_year && !store.selectedPerson.death_year" class="text-muted">No dates recorded</span>
+            <span v-if="store.selectedPerson.birth_year"
+              >b. {{ store.selectedPerson.birth_year }}</span
+            >
+            <span v-if="store.selectedPerson.birth_year && store.selectedPerson.death_year">
+              –
+            </span>
+            <span v-if="store.selectedPerson.death_year"
+              >d. {{ store.selectedPerson.death_year }}</span
+            >
+            <span
+              v-if="!store.selectedPerson.birth_year && !store.selectedPerson.death_year"
+              class="text-muted"
+              >No dates recorded</span
+            >
           </div>
-          <div v-if="store.selectedPerson.location" class="hero-location">📍 {{ store.selectedPerson.location }}</div>
+          <div v-if="store.selectedPerson.location" class="hero-location">
+            📍 {{ store.selectedPerson.location }}
+          </div>
         </div>
 
         <!-- Body -->
@@ -32,18 +44,22 @@
               <div class="field-label">Born – Died</div>
               <div class="field-value">
                 {{ store.selectedPerson.birth_year || '—' }}
-                <span v-if="store.selectedPerson.death_year"> – {{ store.selectedPerson.death_year }}</span>
+                <span v-if="store.selectedPerson.death_year">
+                  – {{ store.selectedPerson.death_year }}</span
+                >
               </div>
             </div>
             <div class="field-item">
               <div class="field-label">Gender</div>
-              <div class="field-value" style="text-transform: capitalize;">{{ store.selectedPerson.gender || '—' }}</div>
+              <div class="field-value" style="text-transform: capitalize">
+                {{ store.selectedPerson.gender || '—' }}
+              </div>
             </div>
             <div class="field-item">
               <div class="field-label">Occupation</div>
               <div class="field-value">{{ store.selectedPerson.occupation || '—' }}</div>
             </div>
-            <div class="field-item" style="grid-column: span 2;">
+            <div class="field-item" style="grid-column: span 2">
               <div class="field-label">Location</div>
               <div class="field-value">{{ store.selectedPerson.location || '—' }}</div>
             </div>
@@ -94,9 +110,7 @@
           <button class="btn btn-ghost" @click="store.openForm(store.selectedPerson)">
             ✏ Edit
           </button>
-          <button class="btn btn-danger" @click="handleDelete">
-            🗑 Delete
-          </button>
+          <button class="btn btn-danger" @click="handleDelete">🗑 Delete</button>
         </div>
       </div>
     </div>
@@ -112,16 +126,23 @@ const store = useMainStore()
 const images = ref([])
 
 async function loadImages(personId) {
-  if (!personId) { images.value = []; return }
+  if (!personId) {
+    images.value = []
+    return
+  }
   const res = await api.invoke('images:getByPerson', { personId })
   if (res.success) images.value = res.data
   else images.value = []
 }
 
-watch(() => store.selectedPerson, (p) => {
-  if (p) loadImages(p.id)
-  else images.value = []
-}, { immediate: true })
+watch(
+  () => store.selectedPerson,
+  (p) => {
+    if (p) loadImages(p.id)
+    else images.value = []
+  },
+  { immediate: true }
+)
 
 function imageUrl(filePath) {
   return api.getImageUrl(filePath) || ''
@@ -144,11 +165,11 @@ const relationshipChips = computed(() => {
   const pid = store.selectedPerson.id
   const chips = []
 
-  store.relationships.forEach(r => {
+  store.relationships.forEach((r) => {
     if (r.person_a_id !== pid && r.person_b_id !== pid) return
 
     const otherId = r.person_a_id === pid ? r.person_b_id : r.person_a_id
-    const other = store.persons.find(p => p.id === otherId)
+    const other = store.persons.find((p) => p.id === otherId)
     if (!other) return
 
     let role = ''
@@ -406,7 +427,9 @@ async function handleDelete() {
   font-size: 12px;
   font-family: var(--font);
   font-weight: 500;
-  transition: opacity 0.13s, transform 0.13s;
+  transition:
+    opacity 0.13s,
+    transform 0.13s;
 }
 
 .rel-chip:hover {

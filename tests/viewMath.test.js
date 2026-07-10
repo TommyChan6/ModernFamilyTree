@@ -1,9 +1,21 @@
 import { describe, it, expect } from 'vitest'
-import { computeTimelineLayout, lifeEnd, LANE_W, X0 } from '../src/renderer/src/components/timeline/timelineLayout.js'
+import {
+  computeTimelineLayout,
+  lifeEnd,
+  LANE_W,
+  X0
+} from '../src/renderer/src/components/timeline/timelineLayout.js'
 import { membershipArcSpans } from '../src/renderer/src/components/factions/factionLayout.js'
 import {
-  columnCount, gridHeight, rowWindow, ageOf, isDeceased,
-  CARD_W, GAP, PAD, ROW_H,
+  columnCount,
+  gridHeight,
+  rowWindow,
+  ageOf,
+  isDeceased,
+  CARD_W,
+  GAP,
+  PAD,
+  ROW_H
 } from '../src/renderer/src/components/people/peopleLayout.js'
 import { latestDataYear } from '../src/renderer/src/store/currentYear.js'
 
@@ -18,18 +30,25 @@ describe('computeTimelineLayout', () => {
     person('a', 'Alice', 1950),
     person('b', 'Bob', 1948, { death_year: 2000 }),
     person('c', 'Carol', 1975),
-    person('u', 'Undated', null),
+    person('u', 'Undated', null)
   ]
   const relationships = [
-    { id: 'm1', type: 'spouse', person_a_id: 'a', person_b_id: 'b', formed_date: '1970', status: 'active' },
-    { id: 'p1', type: 'parent_child', person_a_id: 'a', person_b_id: 'c' },
+    {
+      id: 'm1',
+      type: 'spouse',
+      person_a_id: 'a',
+      person_b_id: 'b',
+      formed_date: '1970',
+      status: 'active'
+    },
+    { id: 'p1', type: 'parent_child', person_a_id: 'a', person_b_id: 'c' }
   ]
 
   it('places only dated people, one lane apart', () => {
     const L = computeTimelineLayout(persons, relationships, REF)
     expect(L.people).toHaveLength(3)
     expect(L.undatedCount).toBe(1)
-    const xs = L.people.map(p => p.laneX).sort((x, y) => x - y)
+    const xs = L.people.map((p) => p.laneX).sort((x, y) => x - y)
     expect(xs[0]).toBe(X0)
     expect(xs[1] - xs[0]).toBe(LANE_W)
     expect(xs[2] - xs[1]).toBe(LANE_W)
@@ -37,10 +56,10 @@ describe('computeTimelineLayout', () => {
 
   it('caps a life at the death year and marks the person dead', () => {
     const L = computeTimelineLayout(persons, relationships, REF)
-    const bob = L.people.find(p => p.id === 'b')
+    const bob = L.people.find((p) => p.id === 'b')
     expect(bob.dead).toBe(true)
     expect(bob.endYear).toBe(2000)
-    const alice = L.people.find(p => p.id === 'a')
+    const alice = L.people.find((p) => p.id === 'a')
     expect(alice.dead).toBe(false)
     expect(alice.endYear).toBe(REF)
   })
@@ -63,7 +82,9 @@ describe('computeTimelineLayout', () => {
   })
 
   it('estimates a plausible year for undated marriages', () => {
-    const rels = [{ id: 'm2', type: 'spouse', person_a_id: 'a', person_b_id: 'c', status: 'active' }]
+    const rels = [
+      { id: 'm2', type: 'spouse', person_a_id: 'a', person_b_id: 'c', status: 'active' }
+    ]
     const L = computeTimelineLayout(persons, rels, REF)
     const m = L.marriages[0]
     expect(m.estimated).toBe(true)
@@ -125,7 +146,7 @@ describe('membershipArcSpans', () => {
 describe('People view — columnCount', () => {
   it('fits as many fixed-width cards + gaps as the width allows', () => {
     expect(columnCount(CARD_W)).toBe(1)
-    expect(columnCount(CARD_W * 2 + GAP)).toBe(2)         // exactly two + one gap
+    expect(columnCount(CARD_W * 2 + GAP)).toBe(2) // exactly two + one gap
     expect(columnCount(CARD_W * 3 + GAP * 2)).toBe(3)
     expect(columnCount(CARD_W * 3 + GAP * 2 - 1)).toBe(2) // one px short of a third
   })
@@ -142,7 +163,7 @@ describe('People view — gridHeight', () => {
   })
 
   it('accounts for rows, inter-row gaps and padding (no trailing gap)', () => {
-    expect(gridHeight(3, 3)).toBe(PAD * 2 + ROW_H - GAP)     // 1 row
+    expect(gridHeight(3, 3)).toBe(PAD * 2 + ROW_H - GAP) // 1 row
     expect(gridHeight(4, 3)).toBe(PAD * 2 + 2 * ROW_H - GAP) // 2 rows (partial)
     expect(gridHeight(6, 3)).toBe(PAD * 2 + 2 * ROW_H - GAP) // 2 full rows
   })
@@ -152,7 +173,7 @@ describe('People view — rowWindow', () => {
   it('renders from the top, row-aligned, at the scrolled-to-top position', () => {
     const w = rowWindow(0, 600, 100, 4)
     expect(w.startIndex).toBe(0)
-    expect(w.startIndex % 4).toBe(0)  // always starts a fresh grid row
+    expect(w.startIndex % 4).toBe(0) // always starts a fresh grid row
     expect(w.offsetY).toBe(PAD)
     expect(w.endIndex).toBeGreaterThan(0)
     expect(w.endIndex).toBeLessThan(100)
@@ -202,7 +223,7 @@ describe('latestDataYear (temporary current year)', () => {
     const persons = [
       { id: 'a', birth_year: 1950, death_year: 2001 },
       { id: 'b', birth_year: 1975 },
-      { id: 'c', birth_year: 1948, death_year: 1990 },
+      { id: 'c', birth_year: 1948, death_year: 1990 }
     ]
     expect(latestDataYear(persons, [])).toBe(2001)
   })
@@ -210,7 +231,7 @@ describe('latestDataYear (temporary current year)', () => {
   it('picks a later birth year over an earlier death year', () => {
     const persons = [
       { id: 'a', birth_year: 1950, death_year: 1990 },
-      { id: 'b', birth_year: 1995 },
+      { id: 'b', birth_year: 1995 }
     ]
     expect(latestDataYear(persons, [])).toBe(1995)
   })
@@ -225,9 +246,12 @@ describe('latestDataYear (temporary current year)', () => {
     const persons = [
       { id: 'a', birth_year: null, death_year: undefined },
       { id: 'b', birth_year: 0 },
-      { id: 'c', birth_year: 1960 },
+      { id: 'c', birth_year: 1960 }
     ]
-    const rels = [{ id: 'm', formed_date: '' }, { id: 'n', formed_date: 'unknown' }]
+    const rels = [
+      { id: 'm', formed_date: '' },
+      { id: 'n', formed_date: 'unknown' }
+    ]
     expect(latestDataYear(persons, rels)).toBe(1960)
   })
 })

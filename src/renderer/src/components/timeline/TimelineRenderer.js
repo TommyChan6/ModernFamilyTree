@@ -12,9 +12,12 @@ const SEG = 16
 const TICK_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000, 2000, 5000]
 
 const _col = new THREE.Color()
-function rgb(hex) { _col.set(hex || '#888'); return [_col.r, _col.g, _col.b] }
+function rgb(hex) {
+  _col.set(hex || '#888')
+  return [_col.r, _col.g, _col.b]
+}
 
-const easeOutCubic = t => 1 - Math.pow(1 - t, 3)
+const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
 
 // Draws the Timeline with Three.js: instanced lifelines/caps (CapsuleLayer), pulsing
 // end-of-life and connector dots (DotLayer), marriage/birth bezier ribbons
@@ -45,13 +48,13 @@ export class TimelineRenderer {
     this._tweening = false
     this._entranceUntil = 0
     this._seen = new Set()
-    this._pAnim = new Map()   // person id -> { op, w, s, top, tw, ts, start }
-    this._mAnim = new Map()   // marriage id -> { op, w, top, tw }
-    this._bAnim = new Map()   // birth id -> { op, w, top, tw }
-    this._pVis = []           // cached visuals, index-aligned with layout.people
+    this._pAnim = new Map() // person id -> { op, w, s, top, tw, ts, start }
+    this._mAnim = new Map() // marriage id -> { op, w, top, tw }
+    this._bAnim = new Map() // birth id -> { op, w, top, tw }
+    this._pVis = [] // cached visuals, index-aligned with layout.people
     this._mVis = []
     this._bVis = []
-    this._badgeRects = []     // screen rects of the badges drawn last frame
+    this._badgeRects = [] // screen rects of the badges drawn last frame
     this._curve = makeScratch(SEG)
 
     this.bg = bgCanvas.getContext('2d')
@@ -69,32 +72,51 @@ export class TimelineRenderer {
     this.camera = new THREE.OrthographicCamera(0, 1, 0, 1, 0.1, 1000)
     this.camera.position.z = 100
 
-    this.atlas = new AvatarAtlas(() => { this._stylesDirty = true; this.requestRedraw() })
+    this.atlas = new AvatarAtlas(() => {
+      this._stylesDirty = true
+      this.requestRedraw()
+    })
     this.ribbons = new RibbonLayer({ segments: SEG, renderOrder: 1 })
     this.connDots = new DotLayer({ renderOrder: 2 })
     this.lines = new CapsuleLayer({ renderOrder: 3 })
     this.aliveDots = new DotLayer({ renderOrder: 4 })
     this.avatars = new NodeLayer({ atlasTexture: this.atlas.texture, pixelRatio: this.dpr })
     this.avatars.mesh.renderOrder = 5
-    this.scene.add(this.ribbons.object3d, this.connDots.object3d, this.lines.object3d,
-      this.aliveDots.object3d, this.avatars.object3d)
+    this.scene.add(
+      this.ribbons.object3d,
+      this.connDots.object3d,
+      this.lines.object3d,
+      this.aliveDots.object3d,
+      this.avatars.object3d
+    )
 
     this._frame = this._frame.bind(this)
     this._glCanvas = glCanvas
     this._onContextLost = (e) => e.preventDefault()
-    this._onContextRestored = () => { this.markAllDirty(); this.requestRedraw() }
+    this._onContextRestored = () => {
+      this.markAllDirty()
+      this.requestRedraw()
+    }
     glCanvas.addEventListener('webglcontextlost', this._onContextLost, false)
     glCanvas.addEventListener('webglcontextrestored', this._onContextRestored, false)
   }
 
   // ── Coordinate helpers ──────────────────────────────────────────────────────
-  sx(laneX) { return laneX * this.camera2.ls + this.camera2.tx }
-  sy(year) { return (year - this.layout.minYear) * this.camera2.px + Y_PAD + this.camera2.ty }
+  sx(laneX) {
+    return laneX * this.camera2.ls + this.camera2.tx
+  }
+  sy(year) {
+    return (year - this.layout.minYear) * this.camera2.px + Y_PAD + this.camera2.ty
+  }
 
   resize(w, h) {
-    this.width = w; this.height = h
+    this.width = w
+    this.height = h
     this.renderer.setSize(w, h, false)
-    this.camera.left = 0; this.camera.right = w; this.camera.top = 0; this.camera.bottom = h
+    this.camera.left = 0
+    this.camera.right = w
+    this.camera.top = 0
+    this.camera.bottom = h
     this.camera.updateProjectionMatrix()
     for (const c of [this._bgCanvas, this._fgCanvas]) {
       c.width = Math.round(w * this.dpr)
@@ -106,7 +128,11 @@ export class TimelineRenderer {
     this.requestRedraw()
   }
 
-  setCamera(cam) { this.camera2 = cam; this._geomDirty = true; this.requestRedraw() }
+  setCamera(cam) {
+    this.camera2 = cam
+    this._geomDirty = true
+    this.requestRedraw()
+  }
 
   setTheme(isLight) {
     this.light = isLight
@@ -152,14 +178,20 @@ export class TimelineRenderer {
       this._pAnim.set(p.id, { op: 0, w: 6, s: 1, start })
       this._entranceUntil = Math.max(this._entranceUntil, start + 0.55)
     }
-    const alive = new Set(layout.people.map(p => p.id))
+    const alive = new Set(layout.people.map((p) => p.id))
     for (const id of this._pAnim.keys()) if (!alive.has(id)) this._pAnim.delete(id)
     this.markAllDirty()
     this.requestRedraw()
   }
 
-  markStylesDirty() { this._stylesDirty = true; this.requestRedraw() }
-  markAllDirty() { this._geomDirty = true; this._stylesDirty = true }
+  markStylesDirty() {
+    this._stylesDirty = true
+    this.requestRedraw()
+  }
+  markAllDirty() {
+    this._geomDirty = true
+    this._stylesDirty = true
+  }
 
   requestRedraw() {
     if (this.disposed || this._scheduled) return
@@ -204,8 +236,13 @@ export class TimelineRenderer {
       v.fillRGB = rgb(v.color)
       this._pVis[i] = v
       let a = this._pAnim.get(p.id)
-      if (!a) { a = { op: 0, w: v.lineWidth, s: v.avatarScale }; this._pAnim.set(p.id, a) }
-      a.top = v.opacity; a.tw = v.lineWidth; a.ts = v.avatarScale
+      if (!a) {
+        a = { op: 0, w: v.lineWidth, s: v.avatarScale }
+        this._pAnim.set(p.id, a)
+      }
+      a.top = v.opacity
+      a.tw = v.lineWidth
+      a.ts = v.avatarScale
     }
     this._mVis.length = L.marriages.length
     const seenM = new Set()
@@ -216,8 +253,12 @@ export class TimelineRenderer {
       this._mVis[i] = v
       seenM.add(m.id)
       let a = this._mAnim.get(m.id)
-      if (!a) { a = { op: 0, w: v.width }; this._mAnim.set(m.id, a) }
-      a.top = v.lineOpacity; a.tw = v.width
+      if (!a) {
+        a = { op: 0, w: v.width }
+        this._mAnim.set(m.id, a)
+      }
+      a.top = v.lineOpacity
+      a.tw = v.width
     }
     for (const id of this._mAnim.keys()) if (!seenM.has(id)) this._mAnim.delete(id)
     this._bVis.length = L.births.length
@@ -229,8 +270,12 @@ export class TimelineRenderer {
       this._bVis[i] = v
       seenB.add(b.id)
       let a = this._bAnim.get(b.id)
-      if (!a) { a = { op: 0, w: v.width }; this._bAnim.set(b.id, a) }
-      a.top = v.lineOpacity; a.tw = v.width
+      if (!a) {
+        a = { op: 0, w: v.width }
+        this._bAnim.set(b.id, a)
+      }
+      a.top = v.lineOpacity
+      a.tw = v.width
     }
     for (const id of this._bAnim.keys()) if (!seenB.has(id)) this._bAnim.delete(id)
   }
@@ -238,7 +283,8 @@ export class TimelineRenderer {
   _step(dt) {
     let moving = false
     const step2 = (a) => {
-      a.op = approach(a.op, a.top, dt); a.w = approach(a.w, a.tw, dt)
+      a.op = approach(a.op, a.top, dt)
+      a.w = approach(a.w, a.tw, dt)
       if (Math.abs(a.op - a.top) > TWEEN_EPS || Math.abs(a.w - a.tw) > TWEEN_EPS) moving = true
     }
     for (const a of this._pAnim.values()) {
@@ -259,7 +305,10 @@ export class TimelineRenderer {
   _entrance(a) {
     if (!a.start) return { e: 1, yOff: 0 }
     const t = (this._timeSec - a.start) / 0.55
-    if (t >= 1) { a.start = null; return { e: 1, yOff: 0 } }
+    if (t >= 1) {
+      a.start = null
+      return { e: 1, yOff: 0 }
+    }
     const e = easeOutCubic(Math.max(0, t))
     return { e, yOff: (1 - e) * 16 }
   }
@@ -302,7 +351,7 @@ export class TimelineRenderer {
         opacity: op,
         selected: false,
         glow: v.glow || 0,
-        avatar: layer >= 1 ? layer : 0,
+        avatar: layer >= 1 ? layer : 0
       })
     }
 
@@ -312,7 +361,8 @@ export class TimelineRenderer {
       const m = L.marriages[j]
       const v = this._mVis[j]
       const a = this._mAnim.get(m.id)
-      const x1 = this.sx(m.laneX1), x2 = this.sx(m.laneX2)
+      const x1 = this.sx(m.laneX1),
+        x2 = this.sx(m.laneX2)
       const y = this.sy(m.year)
       const sag = Math.min(34, 12 + (x2 - x1) * 0.05)
       sampleQuadratic(scratch, SEG, x1, y, (x1 + x2) / 2, y + sag * 2, x2, y)
@@ -328,7 +378,8 @@ export class TimelineRenderer {
       const b = L.births[j]
       const v = this._bVis[j]
       const a = this._bAnim.get(b.id)
-      const px = this.sx(b.laneXp), cx = this.sx(b.laneXc)
+      const px = this.sx(b.laneXp),
+        cx = this.sx(b.laneXc)
       const y = this.sy(b.year)
       const dx = cx - px
       const arc = Math.min(30, 12 + Math.abs(dx) * 0.045)
@@ -348,20 +399,23 @@ export class TimelineRenderer {
   }
 
   // CSS-variable colours (cached per theme).
-  _colors() { return this._css.get() }
+  _colors() {
+    return this._css.get()
+  }
 
   // ── Year grid (bg canvas, screen space) ─────────────────────────────────────
   _tickInfo() {
     const { px, ty } = this.camera2
     const minYear = this.layout.minYear
-    const step = TICK_STEPS.find(s => s * px >= 46) || TICK_STEPS[TICK_STEPS.length - 1]
+    const step = TICK_STEPS.find((s) => s * px >= 46) || TICK_STEPS[TICK_STEPS.length - 1]
     const first = Math.floor(((0 - ty - Y_PAD) / px + minYear) / step) * step
     const last = Math.ceil(((this.height - ty - Y_PAD) / px + minYear) / step) * step
     return { step, first, last }
   }
 
   _drawBg() {
-    const ctx = this.bg, c = this._colors()
+    const ctx = this.bg,
+      c = this._colors()
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     ctx.clearRect(0, 0, this.width, this.height)
     if (!this.layout.people.length) return
@@ -379,7 +433,10 @@ export class TimelineRenderer {
       ctx.globalAlpha = 0.65
       ctx.strokeStyle = c.border
       ctx.lineWidth = 1
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(this.width, y); ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(0, y)
+      ctx.lineTo(this.width, y)
+      ctx.stroke()
       ctx.globalAlpha = 1
     }
 
@@ -390,7 +447,10 @@ export class TimelineRenderer {
       ctx.strokeStyle = c.accent
       ctx.lineWidth = 1.4
       ctx.setLineDash([7, 5])
-      ctx.beginPath(); ctx.moveTo(0, nowY); ctx.lineTo(this.width, nowY); ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(0, nowY)
+      ctx.lineTo(this.width, nowY)
+      ctx.stroke()
       ctx.setLineDash([])
       ctx.globalAlpha = 1
     }
@@ -398,7 +458,9 @@ export class TimelineRenderer {
 
   // ── Labels / badges / gutter (fg canvas) ────────────────────────────────────
   _drawFg() {
-    const ctx = this.fg, c = this._colors(), L = this.layout
+    const ctx = this.fg,
+      c = this._colors(),
+      L = this.layout
     const { ls, px } = this.camera2
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     ctx.clearRect(0, 0, this.width, this.height)
@@ -414,24 +476,29 @@ export class TimelineRenderer {
         const a = this._mAnim.get(m.id)
         const alpha = v.badgeOpacity * Math.min(1, a.op / Math.max(v.lineOpacity, 0.001))
         if (alpha <= 0.02) continue
-        const x1 = this.sx(m.laneX1), x2 = this.sx(m.laneX2)
+        const x1 = this.sx(m.laneX1),
+          x2 = this.sx(m.laneX2)
         const cx = (x1 + x2) / 2
         const sag = Math.min(34, 12 + (x2 - x1) * 0.05)
         const midY = this.sy(m.year) + sag
-        if (cx + m.bw < -20 || cx - m.bw > this.width + 20 || midY < -30 || midY > this.height + 30) continue
+        if (cx + m.bw < -20 || cx - m.bw > this.width + 20 || midY < -30 || midY > this.height + 30)
+          continue
         const s = m.id === this.hoverBadgeId ? this._badgeHoverS : 1
-        const bw = m.bw * s, bh = 22 * s
+        const bw = m.bw * s,
+          bh = 22 * s
         ctx.globalAlpha = alpha
         ctx.fillStyle = c.surface
         ctx.strokeStyle = v.color
         ctx.lineWidth = 1.2
         if (m.estimated) ctx.setLineDash([3, 3])
         roundRect(ctx, cx - bw / 2, midY - bh / 2, bw, bh, 11 * s)
-        ctx.fill(); ctx.stroke()
+        ctx.fill()
+        ctx.stroke()
         ctx.setLineDash([])
         ctx.fillStyle = m.estimated ? c.t3 : c.t1
         ctx.font = `700 ${10.5 * s}px ${font}`
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
         ctx.fillText(m.badge, cx, midY + 0.5)
         ctx.globalAlpha = 1
         this._badgeRects.push({ x: cx - bw / 2, y: midY - bh / 2, w: bw, h: bh, id: m.id, m })
@@ -442,7 +509,8 @@ export class TimelineRenderer {
     // skipped entirely once lanes are too close to read.
     if (150 * ls >= 14) {
       const nameLen = ls < 0.45 ? 6 : ls < 0.7 ? 10 : 17
-      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'alphabetic'
       ctx.lineJoin = 'round'
       for (let i = 0; i < L.people.length; i++) {
         const p = L.people[i]
@@ -481,7 +549,8 @@ export class TimelineRenderer {
     const { step, first, last } = this._tickInfo()
     ctx.font = `600 10.5px ${font}`
     ctx.fillStyle = c.t3
-    ctx.textAlign = 'right'; ctx.textBaseline = 'middle'
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'middle'
     for (let yr = first; yr <= last; yr += step) {
       ctx.fillText(String(yr), GUTTER - 12, this.sy(yr))
     }
@@ -494,7 +563,8 @@ export class TimelineRenderer {
       ctx.strokeStyle = c.accent
       ctx.lineWidth = 1
       roundRect(ctx, 6, nowY - 10, GUTTER - 14, 20, 7)
-      ctx.fill(); ctx.stroke()
+      ctx.fill()
+      ctx.stroke()
       ctx.globalAlpha = 1
       ctx.fillStyle = c.accent
       ctx.font = `700 10.5px ${font}`
@@ -503,18 +573,24 @@ export class TimelineRenderer {
     }
 
     if (this.mouseY != null) {
-      const year = Math.round((this.mouseY - this.camera2.ty - Y_PAD) / this.camera2.px + this.layout.minYear)
+      const year = Math.round(
+        (this.mouseY - this.camera2.ty - Y_PAD) / this.camera2.px + this.layout.minYear
+      )
       ctx.globalAlpha = 0.35
       ctx.strokeStyle = c.t3
       ctx.lineWidth = 1
       ctx.setLineDash([2, 5])
-      ctx.beginPath(); ctx.moveTo(GUTTER, this.mouseY); ctx.lineTo(this.width, this.mouseY); ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(GUTTER, this.mouseY)
+      ctx.lineTo(this.width, this.mouseY)
+      ctx.stroke()
       ctx.setLineDash([])
       ctx.globalAlpha = 1
       ctx.fillStyle = c.elevated
       ctx.strokeStyle = c.border
       roundRect(ctx, 6, this.mouseY - 10, GUTTER - 14, 20, 7)
-      ctx.fill(); ctx.stroke()
+      ctx.fill()
+      ctx.stroke()
       ctx.fillStyle = c.t1
       ctx.font = `700 10.5px ${font}`
       ctx.textAlign = 'center'
@@ -532,7 +608,12 @@ export class TimelineRenderer {
     this._lastT = ts
     this._timeSec = ts / 1000
 
-    if (this._stylesDirty) { this._syncStyles(); this._stylesDirty = false; this._tweening = true; this._geomDirty = true }
+    if (this._stylesDirty) {
+      this._syncStyles()
+      this._stylesDirty = false
+      this._tweening = true
+      this._geomDirty = true
+    }
     if (this._tweening) {
       this._tweening = this._step(dt)
       this._geomDirty = true
@@ -568,12 +649,14 @@ export class TimelineRenderer {
     this._glCanvas?.removeEventListener('webglcontextlost', this._onContextLost)
     this._glCanvas?.removeEventListener('webglcontextrestored', this._onContextRestored)
     this.atlas.dispose()
-    this.ribbons.dispose(); this.connDots.dispose(); this.lines.dispose()
-    this.aliveDots.dispose(); this.avatars.dispose()
+    this.ribbons.dispose()
+    this.connDots.dispose()
+    this.lines.dispose()
+    this.aliveDots.dispose()
+    this.avatars.dispose()
     this.renderer.dispose()
     // The view unmounts on every view switch — release the GL context eagerly so
     // rapid switching can't exhaust the browser's context pool before GC runs.
     this.renderer.forceContextLoss()
   }
 }
-

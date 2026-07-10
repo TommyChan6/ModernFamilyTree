@@ -5,13 +5,13 @@
 // truth — the view feeds them to CSS via custom properties, so the JS windowing
 // math and the CSS grid can never disagree about card size or spacing.
 
-export const CARD_W = 196          // card width (px)
-export const CARD_H = 330          // card height (px)
-export const GAP = 22              // gap between cards, both axes (px)
-export const PAD = 24              // padding around the grid (px)
-export const OVERSCAN_ROWS = 2     // extra card rows kept mounted above/below the viewport
+export const CARD_W = 196 // card width (px)
+export const CARD_H = 330 // card height (px)
+export const GAP = 22 // gap between cards, both axes (px)
+export const PAD = 24 // padding around the grid (px)
+export const OVERSCAN_ROWS = 2 // extra card rows kept mounted above/below the viewport
 
-export const ROW_H = CARD_H + GAP  // vertical distance between card rows (px)
+export const ROW_H = CARD_H + GAP // vertical distance between card rows (px)
 
 // How many columns of fixed-width cards fit in `availWidth` px of content box
 // (the grid's horizontal padding has already been subtracted). Always ≥ 1 so the
@@ -51,7 +51,7 @@ export function rowWindow(scrollTop, viewH, count, cols, opts = {}) {
     lastRow,
     startIndex: firstRow * cols,
     endIndex: Math.min(count, lastRow * cols),
-    offsetY: pad + firstRow * rowH,
+    offsetY: pad + firstRow * rowH
   }
 }
 

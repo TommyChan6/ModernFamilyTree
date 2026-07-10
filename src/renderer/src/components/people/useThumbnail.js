@@ -17,9 +17,9 @@ import { api } from '../../api.js'
 
 const SIZE = 144 // 2× the 72px avatar → crisp on HiDPI
 
-const resolved = new Map()  // filePath → final src (data URL or appimg URL)
-const inflight = new Map()  // filePath → Promise<string>
-const pending = new Map()   // filePath → [resolve, …]  (queued, not yet started)
+const resolved = new Map() // filePath → final src (data URL or appimg URL)
+const inflight = new Map() // filePath → Promise<string>
+const pending = new Map() // filePath → [resolve, …]  (queued, not yet started)
 
 // Fetch the file's bytes, decode them off the main thread (Chromium handles
 // WebP/PNG/JPEG/GIF alike), and paint a square cover-crop into a small canvas.
@@ -49,9 +49,9 @@ function kickOff(filePath) {
   if (inflight.has(filePath)) return inflight.get(filePath)
   const p = downscale(filePath)
     .catch(() => '')
-    .then(url => {
+    .then((url) => {
       // On any failure fall back to the full-resolution image so it still shows.
-      const finalUrl = url || (api.getImageUrl(filePath) || '')
+      const finalUrl = url || api.getImageUrl(filePath) || ''
       resolved.set(filePath, finalUrl)
       inflight.delete(filePath)
       return finalUrl
@@ -70,7 +70,7 @@ function scheduleDrain() {
       const filePath = pending.keys().next().value
       const waiters = pending.get(filePath)
       pending.delete(filePath)
-      kickOff(filePath).then(url => waiters.forEach(r => r(url)))
+      kickOff(filePath).then((url) => waiters.forEach((r) => r(url)))
     }
     if (pending.size) scheduleDrain()
   }
@@ -81,7 +81,7 @@ function scheduleDrain() {
 function request(filePath) {
   if (resolved.has(filePath)) return Promise.resolve(resolved.get(filePath))
   if (inflight.has(filePath)) return inflight.get(filePath)
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const waiters = pending.get(filePath)
     if (waiters) waiters.push(resolve)
     else pending.set(filePath, [resolve])
@@ -97,17 +97,29 @@ export function useThumbnail(getFilePath) {
   const src = ref('')
   const loading = ref(false)
   let token = 0
-  watch(getFilePath, (filePath) => {
-    const mine = ++token
-    if (!filePath) { src.value = ''; loading.value = false; return }
-    if (resolved.has(filePath)) { src.value = resolved.get(filePath); loading.value = false; return }
-    src.value = ''
-    loading.value = true
-    request(filePath).then(url => {
-      if (mine !== token) return // path changed out from under us
-      src.value = url
-      loading.value = false
-    })
-  }, { immediate: true })
+  watch(
+    getFilePath,
+    (filePath) => {
+      const mine = ++token
+      if (!filePath) {
+        src.value = ''
+        loading.value = false
+        return
+      }
+      if (resolved.has(filePath)) {
+        src.value = resolved.get(filePath)
+        loading.value = false
+        return
+      }
+      src.value = ''
+      loading.value = true
+      request(filePath).then((url) => {
+        if (mine !== token) return // path changed out from under us
+        src.value = url
+        loading.value = false
+      })
+    },
+    { immediate: true }
+  )
   return { src, loading }
 }

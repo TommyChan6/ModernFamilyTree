@@ -7,7 +7,8 @@ import * as THREE from 'three'
 const TILE = 96
 const CAP = 512
 // Material "person" silhouette (24×24 viewBox), baked into atlas layer 0 as the fallback.
-const PERSON_ICON_PATH = 'M12 12.5c2.49 0 4.5-2.01 4.5-4.5S14.49 3.5 12 3.5 7.5 5.51 7.5 8s2.01 4.5 4.5 4.5zm0 2.25c-3 0-9 1.51-9 4.5V22h18v-2.75c0-2.99-6-4.5-9-4.5z'
+const PERSON_ICON_PATH =
+  'M12 12.5c2.49 0 4.5-2.01 4.5-4.5S14.49 3.5 12 3.5 7.5 5.51 7.5 8s2.01 4.5 4.5 4.5zm0 2.25c-3 0-9 1.51-9 4.5V22h18v-2.75c0-2.99-6-4.5-9-4.5z'
 
 export class AvatarAtlas {
   constructor(onChange) {
@@ -20,12 +21,13 @@ export class AvatarAtlas {
     this.texture.minFilter = THREE.LinearFilter
     this.texture.magFilter = THREE.LinearFilter
 
-    this.layerOf = new Map()   // personId -> layer (>=1)
-    this.state = new Map()     // personId -> 'loading' | 'loaded' | 'error'
-    this.lru = []              // personIds, most-recent last
+    this.layerOf = new Map() // personId -> layer (>=1)
+    this.state = new Map() // personId -> 'loading' | 'loaded' | 'error'
+    this.lru = [] // personIds, most-recent last
     this._dirty = false
     this._canvas = document.createElement('canvas')
-    this._canvas.width = TILE; this._canvas.height = TILE
+    this._canvas.width = TILE
+    this._canvas.height = TILE
     this._cctx = this._canvas.getContext('2d', { willReadFrequently: true })
 
     this._bakeSilhouette() // layer 0
@@ -35,11 +37,13 @@ export class AvatarAtlas {
   // Draw the person glyph white-on-transparent into layer 0, matching the SVG framed avatar
   // (head in the upper half, shoulders at the bottom) computed for a tile of radius TILE/2.
   _bakeSilhouette() {
-    const c = this._cctx, r = TILE / 2
+    const c = this._cctx,
+      r = TILE / 2
     c.clearRect(0, 0, TILE, TILE)
     c.save()
     c.translate(r, r)
-    const iconScale = r * 0.12, iconHeadY = r * 0.22
+    const iconScale = r * 0.12,
+      iconHeadY = r * 0.22
     c.translate(-12 * iconScale, -iconHeadY - 8 * iconScale)
     c.scale(iconScale, iconScale)
     c.fillStyle = '#ffffff'
@@ -54,7 +58,10 @@ export class AvatarAtlas {
   request(personId, url) {
     if (!url || this.disposed) return -1
     const st = this.state.get(personId)
-    if (st === 'loaded') { this._touch(personId); return this.layerOf.get(personId) }
+    if (st === 'loaded') {
+      this._touch(personId)
+      return this.layerOf.get(personId)
+    }
     if (st === 'error') return -1
     if (st !== 'loading') this._load(personId, url)
     return -1
@@ -92,11 +99,15 @@ export class AvatarAtlas {
         c.clearRect(0, 0, TILE, TILE)
         // cover-fit (crop to square), matching SVG preserveAspectRatio "slice"
         const s = Math.max(TILE / img.width, TILE / img.height)
-        const w = img.width * s, h = img.height * s
+        const w = img.width * s,
+          h = img.height * s
         c.drawImage(img, (TILE - w) / 2, (TILE - h) / 2, w, h)
         const px = c.getImageData(0, 0, TILE, TILE).data
         const layer = this._acquireLayer()
-        if (layer < 0) { this.state.set(personId, 'error'); return }
+        if (layer < 0) {
+          this.state.set(personId, 'error')
+          return
+        }
         this.data.set(px, layer * TILE * TILE * 4)
         this.layerOf.set(personId, layer)
         this.state.set(personId, 'loaded')
@@ -113,8 +124,14 @@ export class AvatarAtlas {
 
   // Called once per frame by the render loop; uploads at most once per frame.
   flush() {
-    if (this._dirty) { this.texture.needsUpdate = true; this._dirty = false }
+    if (this._dirty) {
+      this.texture.needsUpdate = true
+      this._dirty = false
+    }
   }
 
-  dispose() { this.disposed = true; this.texture?.dispose() }
+  dispose() {
+    this.disposed = true
+    this.texture?.dispose()
+  }
 }

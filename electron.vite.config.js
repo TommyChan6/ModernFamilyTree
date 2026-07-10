@@ -17,7 +17,7 @@ const stripCjsShim = {
 }
 
 export default defineConfig({
-  main:     { plugins: [externalizeDepsPlugin(), stripCjsShim] },
-  preload:  { plugins: [externalizeDepsPlugin(), stripCjsShim] },
+  main: { plugins: [externalizeDepsPlugin(), stripCjsShim] },
+  preload: { plugins: [externalizeDepsPlugin(), stripCjsShim] },
   renderer: { plugins: [vue()] }
 })

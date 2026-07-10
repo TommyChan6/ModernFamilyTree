@@ -18,48 +18,72 @@
               <div class="setting-item">
                 <label>Node Size</label>
                 <div class="slider-row">
-                  <input type="range" min="14" max="36" step="1"
+                  <input
+                    type="range"
+                    min="14"
+                    max="36"
+                    step="1"
                     :value="gs.nodeRadius"
-                    @input="set('nodeRadius', +$event.target.value)" />
+                    @input="set('nodeRadius', +$event.target.value)"
+                  />
                   <span class="slider-val">{{ gs.nodeRadius }}px</span>
                 </div>
               </div>
               <div class="setting-item">
                 <label>Node Opacity</label>
                 <div class="slider-row">
-                  <input type="range" min="0.3" max="1" step="0.05"
+                  <input
+                    type="range"
+                    min="0.3"
+                    max="1"
+                    step="0.05"
                     :value="gs.nodeOpacity"
-                    @input="set('nodeOpacity', +$event.target.value)" />
+                    @input="set('nodeOpacity', +$event.target.value)"
+                  />
                   <span class="slider-val">{{ Math.round(gs.nodeOpacity * 100) }}%</span>
                 </div>
               </div>
               <div class="setting-item">
                 <label>Label Size</label>
                 <div class="slider-row">
-                  <input type="range" min="7" max="16" step="1"
+                  <input
+                    type="range"
+                    min="7"
+                    max="16"
+                    step="1"
                     :value="gs.labelSize"
-                    @input="set('labelSize', +$event.target.value)" />
+                    @input="set('labelSize', +$event.target.value)"
+                  />
                   <span class="slider-val">{{ gs.labelSize }}px</span>
                 </div>
               </div>
               <div class="setting-item setting-toggle-row">
                 <label>Show Labels</label>
-                <button class="micro-toggle" :class="{ on: gs.showLabels }"
-                  @click="set('showLabels', !gs.showLabels)">
+                <button
+                  class="micro-toggle"
+                  :class="{ on: gs.showLabels }"
+                  @click="set('showLabels', !gs.showLabels)"
+                >
                   <span class="toggle-knob"></span>
                 </button>
               </div>
               <div class="setting-item setting-toggle-row">
                 <label>Show Age</label>
-                <button class="micro-toggle" :class="{ on: gs.showAge }"
-                  @click="set('showAge', !gs.showAge)">
+                <button
+                  class="micro-toggle"
+                  :class="{ on: gs.showAge }"
+                  @click="set('showAge', !gs.showAge)"
+                >
                   <span class="toggle-knob"></span>
                 </button>
               </div>
               <div class="setting-item setting-toggle-row">
                 <label>Glow on Hover</label>
-                <button class="micro-toggle" :class="{ on: gs.glowOnHover }"
-                  @click="set('glowOnHover', !gs.glowOnHover)">
+                <button
+                  class="micro-toggle"
+                  :class="{ on: gs.glowOnHover }"
+                  @click="set('glowOnHover', !gs.glowOnHover)"
+                >
                   <span class="toggle-knob"></span>
                 </button>
               </div>
@@ -78,24 +102,33 @@
               <div class="setting-item">
                 <label>Male</label>
                 <div class="color-row">
-                  <input type="color" :value="gs.maleColor"
-                    @input="set('maleColor', $event.target.value)" />
+                  <input
+                    type="color"
+                    :value="gs.maleColor"
+                    @input="set('maleColor', $event.target.value)"
+                  />
                   <span class="color-hex">{{ gs.maleColor }}</span>
                 </div>
               </div>
               <div class="setting-item">
                 <label>Female</label>
                 <div class="color-row">
-                  <input type="color" :value="gs.femaleColor"
-                    @input="set('femaleColor', $event.target.value)" />
+                  <input
+                    type="color"
+                    :value="gs.femaleColor"
+                    @input="set('femaleColor', $event.target.value)"
+                  />
                   <span class="color-hex">{{ gs.femaleColor }}</span>
                 </div>
               </div>
               <div class="setting-item">
                 <label>Unknown</label>
                 <div class="color-row">
-                  <input type="color" :value="gs.unknownColor"
-                    @input="set('unknownColor', $event.target.value)" />
+                  <input
+                    type="color"
+                    :value="gs.unknownColor"
+                    @input="set('unknownColor', $event.target.value)"
+                  />
                   <span class="color-hex">{{ gs.unknownColor }}</span>
                 </div>
               </div>
@@ -114,18 +147,28 @@
               <div class="setting-item">
                 <label>Line Opacity</label>
                 <div class="slider-row">
-                  <input type="range" min="0.2" max="1" step="0.05"
+                  <input
+                    type="range"
+                    min="0.2"
+                    max="1"
+                    step="0.05"
                     :value="gs.linkOpacity"
-                    @input="set('linkOpacity', +$event.target.value)" />
+                    @input="set('linkOpacity', +$event.target.value)"
+                  />
                   <span class="slider-val">{{ Math.round(gs.linkOpacity * 100) }}%</span>
                 </div>
               </div>
               <div class="setting-item">
                 <label>Line Curvature</label>
                 <div class="slider-row">
-                  <input type="range" min="0" max="0.15" step="0.005"
+                  <input
+                    type="range"
+                    min="0"
+                    max="0.15"
+                    step="0.005"
                     :value="gs.lineCurvature"
-                    @input="set('lineCurvature', +$event.target.value)" />
+                    @input="set('lineCurvature', +$event.target.value)"
+                  />
                   <span class="slider-val">{{ Math.round(gs.lineCurvature * 100) }}%</span>
                 </div>
               </div>
@@ -138,17 +181,25 @@
                 <div class="setting-item">
                   <label>Color</label>
                   <div class="color-row">
-                    <input type="color" :value="gs.parentChildColor"
-                      @input="set('parentChildColor', $event.target.value)" />
+                    <input
+                      type="color"
+                      :value="gs.parentChildColor"
+                      @input="set('parentChildColor', $event.target.value)"
+                    />
                     <span class="color-hex">{{ gs.parentChildColor }}</span>
                   </div>
                 </div>
                 <div class="setting-item">
                   <label>Width</label>
                   <div class="slider-row">
-                    <input type="range" min="0.5" max="5" step="0.1"
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="5"
+                      step="0.1"
                       :value="gs.parentChildWidth"
-                      @input="set('parentChildWidth', +$event.target.value)" />
+                      @input="set('parentChildWidth', +$event.target.value)"
+                    />
                     <span class="slider-val">{{ gs.parentChildWidth.toFixed(1) }}</span>
                   </div>
                 </div>
@@ -156,23 +207,34 @@
 
               <div class="line-type-section">
                 <div class="line-type-label">
-                  <span class="line-preview line-preview-dashed" :style="{ borderColor: gs.spouseColor }"></span>
+                  <span
+                    class="line-preview line-preview-dashed"
+                    :style="{ borderColor: gs.spouseColor }"
+                  ></span>
                   Spouse
                 </div>
                 <div class="setting-item">
                   <label>Color</label>
                   <div class="color-row">
-                    <input type="color" :value="gs.spouseColor"
-                      @input="set('spouseColor', $event.target.value)" />
+                    <input
+                      type="color"
+                      :value="gs.spouseColor"
+                      @input="set('spouseColor', $event.target.value)"
+                    />
                     <span class="color-hex">{{ gs.spouseColor }}</span>
                   </div>
                 </div>
                 <div class="setting-item">
                   <label>Width</label>
                   <div class="slider-row">
-                    <input type="range" min="0.5" max="5" step="0.1"
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="5"
+                      step="0.1"
                       :value="gs.spouseWidth"
-                      @input="set('spouseWidth', +$event.target.value)" />
+                      @input="set('spouseWidth', +$event.target.value)"
+                    />
                     <span class="slider-val">{{ gs.spouseWidth.toFixed(1) }}</span>
                   </div>
                 </div>
@@ -180,23 +242,34 @@
 
               <div class="line-type-section">
                 <div class="line-type-label">
-                  <span class="line-preview line-preview-dashed" :style="{ borderColor: gs.adoptedColor }"></span>
+                  <span
+                    class="line-preview line-preview-dashed"
+                    :style="{ borderColor: gs.adoptedColor }"
+                  ></span>
                   Adopted
                 </div>
                 <div class="setting-item">
                   <label>Color</label>
                   <div class="color-row">
-                    <input type="color" :value="gs.adoptedColor"
-                      @input="set('adoptedColor', $event.target.value)" />
+                    <input
+                      type="color"
+                      :value="gs.adoptedColor"
+                      @input="set('adoptedColor', $event.target.value)"
+                    />
                     <span class="color-hex">{{ gs.adoptedColor }}</span>
                   </div>
                 </div>
                 <div class="setting-item">
                   <label>Width</label>
                   <div class="slider-row">
-                    <input type="range" min="0.5" max="5" step="0.1"
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="5"
+                      step="0.1"
                       :value="gs.adoptedWidth"
-                      @input="set('adoptedWidth', +$event.target.value)" />
+                      @input="set('adoptedWidth', +$event.target.value)"
+                    />
                     <span class="slider-val">{{ gs.adoptedWidth.toFixed(1) }}</span>
                   </div>
                 </div>
@@ -216,18 +289,28 @@
               <div class="setting-item">
                 <label>Link Distance</label>
                 <div class="slider-row">
-                  <input type="range" min="60" max="300" step="5"
+                  <input
+                    type="range"
+                    min="60"
+                    max="300"
+                    step="5"
                     :value="gs.linkDistance"
-                    @input="set('linkDistance', +$event.target.value)" />
+                    @input="set('linkDistance', +$event.target.value)"
+                  />
                   <span class="slider-val">{{ gs.linkDistance }}</span>
                 </div>
               </div>
               <div class="setting-item">
                 <label>Repulsion</label>
                 <div class="slider-row">
-                  <input type="range" min="-800" max="-50" step="10"
+                  <input
+                    type="range"
+                    min="-800"
+                    max="-50"
+                    step="10"
                     :value="gs.chargeStrength"
-                    @input="set('chargeStrength', +$event.target.value)" />
+                    @input="set('chargeStrength', +$event.target.value)"
+                  />
                   <span class="slider-val">{{ Math.abs(gs.chargeStrength) }}</span>
                 </div>
               </div>
@@ -238,9 +321,7 @@
 
       <!-- Footer -->
       <div class="settings-footer">
-        <button class="btn btn-ghost btn-sm" @click="store.resetGraphSettings()">
-          Reset All
-        </button>
+        <button class="btn btn-ghost btn-sm" @click="store.resetGraphSettings()">Reset All</button>
       </div>
     </div>
   </Transition>
@@ -257,7 +338,7 @@ const expanded = reactive({
   nodes: true,
   colors: false,
   lines: true,
-  physics: false,
+  physics: false
 })
 
 function toggle(key) {
@@ -378,7 +459,7 @@ function set(key, value) {
   gap: 10px;
 }
 
-.slider-row input[type="range"] {
+.slider-row input[type='range'] {
   flex: 1;
   height: 4px;
   -webkit-appearance: none;
@@ -391,7 +472,7 @@ function set(key, value) {
   box-shadow: none;
 }
 
-.slider-row input[type="range"]::-webkit-slider-thumb {
+.slider-row input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 14px;
@@ -404,11 +485,11 @@ function set(key, value) {
   transition: transform 0.12s;
 }
 
-.slider-row input[type="range"]::-webkit-slider-thumb:hover {
+.slider-row input[type='range']::-webkit-slider-thumb:hover {
   transform: scale(1.2);
 }
 
-.slider-row input[type="range"]:focus {
+.slider-row input[type='range']:focus {
   box-shadow: none;
 }
 
@@ -428,7 +509,7 @@ function set(key, value) {
   gap: 10px;
 }
 
-.color-row input[type="color"] {
+.color-row input[type='color'] {
   width: 28px;
   height: 28px;
   border: 2px solid var(--border);
@@ -439,11 +520,11 @@ function set(key, value) {
   flex-shrink: 0;
 }
 
-.color-row input[type="color"]::-webkit-color-swatch-wrapper {
+.color-row input[type='color']::-webkit-color-swatch-wrapper {
   padding: 0;
 }
 
-.color-row input[type="color"]::-webkit-color-swatch {
+.color-row input[type='color']::-webkit-color-swatch {
   border: none;
   border-radius: 4px;
 }
@@ -532,10 +613,14 @@ function set(key, value) {
 
 /* Transition: settings panel slide */
 .settings-enter-active {
-  transition: transform 0.3s cubic-bezier(0.34, 1.1, 0.64, 1), opacity 0.2s ease;
+  transition:
+    transform 0.3s cubic-bezier(0.34, 1.1, 0.64, 1),
+    opacity 0.2s ease;
 }
 .settings-leave-active {
-  transition: transform 0.22s ease, opacity 0.18s ease;
+  transition:
+    transform 0.22s ease,
+    opacity 0.18s ease;
 }
 .settings-enter-from {
   transform: translateX(-100%);
@@ -548,11 +633,15 @@ function set(key, value) {
 
 /* Transition: expand group content */
 .expand-enter-active {
-  transition: max-height 0.3s ease, opacity 0.25s ease;
+  transition:
+    max-height 0.3s ease,
+    opacity 0.25s ease;
   max-height: 500px;
 }
 .expand-leave-active {
-  transition: max-height 0.2s ease, opacity 0.15s ease;
+  transition:
+    max-height 0.2s ease,
+    opacity 0.15s ease;
   max-height: 500px;
 }
 .expand-enter-from {

@@ -62,10 +62,11 @@ export function matchFactionsByName(oldFactions, newFactions) {
  * existing zone.
  */
 export function nextFactionPosition(factions, cx, cy) {
-  const existing = factions.filter(f => f.visible !== false)
-  const clear = (x, y) => existing.every(f =>
-    Math.hypot(f.x - x, f.y - y) > factionRadius((f.member_ids || []).length) + 160
-  )
+  const existing = factions.filter((f) => f.visible !== false)
+  const clear = (x, y) =>
+    existing.every(
+      (f) => Math.hypot(f.x - x, f.y - y) > factionRadius((f.member_ids || []).length) + 160
+    )
   if (clear(cx, cy)) return { x: cx, y: cy }
   for (let i = 1; i < 60; i++) {
     const a = i * 2.4 // golden-angle spiral: even spread, no overlapping rays
@@ -85,7 +86,7 @@ export function arrangeInRing(factions, cx, cy) {
   const n = factions.length
   if (n === 0) return []
   if (n === 1) return [{ id: factions[0].id, x: cx, y: cy }]
-  const maxR = Math.max(...factions.map(f => factionRadius((f.member_ids || []).length)))
+  const maxR = Math.max(...factions.map((f) => factionRadius((f.member_ids || []).length)))
   // Ring radius keeps neighbouring zones from touching
   const ring = Math.max(260, (maxR * 2 + 90) / (2 * Math.sin(Math.PI / n)))
   return factions.map((f, i) => {
@@ -108,6 +109,6 @@ export function membershipArcSpans(count) {
   return Array.from({ length: count }, (_, i) => ({
     a0: rad(i * span + gapDeg / 2),
     // shave a sliver off a lone arc so the seam doesn't z-fight with itself
-    a1: rad((i + 1) * span - gapDeg / 2 - (count === 1 ? 0.1 : 0)),
+    a1: rad((i + 1) * span - gapDeg / 2 - (count === 1 ? 0.1 : 0))
   }))
 }

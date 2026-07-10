@@ -19,8 +19,12 @@ export function screenToWorld(px, py, t) {
 // return the { x, y, k } that centres the box with a margin. `maxScale` caps zoom-in so a
 // tiny/one-node tree is not blown up absurdly (matches the old fitAll cap of 2).
 export function fitExtent(minX, minY, maxX, maxY, width, height, pad = 60, maxScale = 2) {
-  const x0 = minX - pad, x1 = maxX + pad, y0 = minY - pad, y1 = maxY + pad
-  const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0)
+  const x0 = minX - pad,
+    x1 = maxX + pad,
+    y0 = minY - pad,
+    y1 = maxY + pad
+  const w = Math.max(1, x1 - x0),
+    h = Math.max(1, y1 - y0)
   const k = Math.min((0.9 * width) / w, (0.9 * height) / h, maxScale)
   const x = width / 2 - (k * (x0 + x1)) / 2
   const y = height / 2 - (k * (y0 + y1)) / 2
@@ -30,7 +34,10 @@ export function fitExtent(minX, minY, maxX, maxY, width, height, pad = 60, maxSc
 // Bounding box of node positions (reads n.x / n.y). Returns null when empty.
 export function nodesExtent(nodes) {
   if (!nodes || !nodes.length) return null
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity
   for (const n of nodes) {
     if (n.x < minX) minX = n.x
     if (n.y < minY) minY = n.y

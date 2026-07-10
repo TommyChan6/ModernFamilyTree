@@ -37,7 +37,7 @@ export function createLinkMaterial() {
         }
         fragColor = vec4(vColor, vOpacity);
       }
-    `,
+    `
   })
 }
 
@@ -75,6 +75,6 @@ export function createArrowMaterial() {
         if (vAlpha < 0.01) discard;
         fragColor = vec4(vColor, vAlpha);
       }
-    `,
+    `
   })
 }

@@ -3,7 +3,7 @@ import * as THREE from 'three'
 // Instanced faction zones: translucent disc + ring stroke + optional dashed
 // "marching ants" drop-target halo, all in one draw call. Coordinates and widths
 // are in world units (the camera transform scales them, like the old SVG group).
-const DROP_OFFSET = 8   // halo sits this far outside the ring
+const DROP_OFFSET = 8 // halo sits this far outside the ring
 const ANTS_SPEED = 16.4 // world units/s ≈ the old 18-unit dash cycle per 1.1s
 
 export class ZoneLayer {
@@ -18,13 +18,17 @@ export class ZoneLayer {
     this._allocate(8)
   }
 
-  get object3d() { return this.mesh }
+  get object3d() {
+    return this.mesh
+  }
 
   _allocate(capacity) {
     if (this.geometry) this.geometry.dispose()
     const g = new THREE.InstancedBufferGeometry()
-    g.setAttribute('position', new THREE.Float32BufferAttribute(
-      [-1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0], 3))
+    g.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute([-1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0], 3)
+    )
     g.setIndex([0, 1, 2, 2, 1, 3])
     const mk = (name, size) => {
       const arr = new Float32Array(capacity * size)
@@ -57,9 +61,12 @@ export class ZoneLayer {
   }
 
   set(i, x, y, r, rgb, { fillA, ringA, ringW, dropA, scale, opacity }) {
-    this.center[i * 2] = x; this.center[i * 2 + 1] = y
+    this.center[i * 2] = x
+    this.center[i * 2 + 1] = y
     this.r[i] = r
-    this.color[i * 3] = rgb[0]; this.color[i * 3 + 1] = rgb[1]; this.color[i * 3 + 2] = rgb[2]
+    this.color[i * 3] = rgb[0]
+    this.color[i * 3 + 1] = rgb[1]
+    this.color[i * 3 + 2] = rgb[2]
     this.fillA[i] = fillA
     this.ringA[i] = ringA
     this.ringW[i] = ringW
@@ -70,11 +77,23 @@ export class ZoneLayer {
 
   commit() {
     if (!this._attr.iCenter) return
-    for (const k of ['iCenter', 'iR', 'iColor', 'iFillA', 'iRingA', 'iRingW', 'iDropA', 'iScale', 'iOpacity'])
+    for (const k of [
+      'iCenter',
+      'iR',
+      'iColor',
+      'iFillA',
+      'iRingA',
+      'iRingW',
+      'iDropA',
+      'iScale',
+      'iOpacity'
+    ])
       this._attr[k].needsUpdate = true
   }
 
-  setTime(t) { this.material.uniforms.uTime.value = t }
+  setTime(t) {
+    this.material.uniforms.uTime.value = t
+  }
 
   dispose() {
     this.geometry?.dispose()
@@ -151,6 +170,6 @@ function createZoneMaterial() {
         if (a < 0.003) discard;
         fragColor = vec4(vColor, a);
       }
-    `,
+    `
   })
 }

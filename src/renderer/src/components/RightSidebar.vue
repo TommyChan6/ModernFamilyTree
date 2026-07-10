@@ -9,11 +9,7 @@
     <!-- Search -->
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
-      <input
-        v-model="searchQuery"
-        class="search-input"
-        placeholder="Filter members…"
-      />
+      <input v-model="searchQuery" class="search-input" placeholder="Filter members…" />
     </div>
 
     <!-- Person List (virtualized: only rows near the viewport are in the DOM) -->
@@ -30,10 +26,7 @@
           @dragstart="onDragStart(row.p, $event)"
           @dragend="store.draggingPersonId = null"
         >
-          <div
-            class="avatar"
-            :style="{ background: avatarGradient(row.p.gender) }"
-          >
+          <div class="avatar" :style="{ background: avatarGradient(row.p.gender) }">
             <img
               v-if="row.p.primary_image && imageUrl(row.p.primary_image)"
               class="avatar-img"
@@ -53,10 +46,7 @@
             </div>
             <div v-if="row.p.location" class="person-location">📍 {{ row.p.location }}</div>
           </div>
-          <div
-            class="gender-dot"
-            :style="{ background: genderColor(row.p.gender) }"
-          ></div>
+          <div class="gender-dot" :style="{ background: genderColor(row.p.gender) }"></div>
         </div>
       </div>
 
@@ -68,7 +58,7 @@
 
     <!-- Add Person Footer -->
     <div class="sidebar-footer">
-      <button class="btn btn-primary" style="width:100%;" @click="store.openForm()">
+      <button class="btn btn-primary" style="width: 100%" @click="store.openForm()">
         ＋ Add Person
       </button>
     </div>
@@ -84,7 +74,8 @@ const store = useMainStore()
 const searchQuery = ref('')
 
 // Default human silhouette (Material "person" icon, 24×24 viewBox) — matches the graph nodes
-const PERSON_ICON_PATH = 'M12 12.5c2.49 0 4.5-2.01 4.5-4.5S14.49 3.5 12 3.5 7.5 5.51 7.5 8s2.01 4.5 4.5 4.5zm0 2.25c-3 0-9 1.51-9 4.5V22h18v-2.75c0-2.99-6-4.5-9-4.5z'
+const PERSON_ICON_PATH =
+  'M12 12.5c2.49 0 4.5-2.01 4.5-4.5S14.49 3.5 12 3.5 7.5 5.51 7.5 8s2.01 4.5 4.5 4.5zm0 2.25c-3 0-9 1.51-9 4.5V22h18v-2.75c0-2.99-6-4.5-9-4.5z'
 
 function imageUrl(filename) {
   return api.getImageUrl(filename) || ''
@@ -107,10 +98,11 @@ function onDragStart(person, e) {
 const filteredPersons = computed(() => {
   const q = searchQuery.value.toLowerCase().trim()
   if (!q) return store.persons
-  return store.persons.filter(p =>
-    p.name.toLowerCase().includes(q) ||
-    (p.occupation || '').toLowerCase().includes(q) ||
-    (p.location || '').toLowerCase().includes(q)
+  return store.persons.filter(
+    (p) =>
+      p.name.toLowerCase().includes(q) ||
+      (p.occupation || '').toLowerCase().includes(q) ||
+      (p.location || '').toLowerCase().includes(q)
   )
 })
 
@@ -149,7 +141,8 @@ const visiblePersons = computed(() => {
   const n = list.length
   const top = Math.max(0, scrollTop.value - OVERSCAN)
   const bottom = scrollTop.value + viewH.value + OVERSCAN
-  let lo = 0, hi = n
+  let lo = 0,
+    hi = n
   while (lo < hi) {
     const mid = (lo + hi) >> 1
     if (offs[mid + 1] <= top) lo = mid + 1
@@ -164,7 +157,9 @@ const visiblePersons = computed(() => {
 
 let ro = null
 onMounted(() => {
-  const measure = () => { viewH.value = listEl.value?.clientHeight || 600 }
+  const measure = () => {
+    viewH.value = listEl.value?.clientHeight || 600
+  }
   measure()
   ro = new ResizeObserver(measure)
   if (listEl.value) ro.observe(listEl.value)

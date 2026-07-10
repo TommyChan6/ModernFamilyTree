@@ -11,7 +11,7 @@ export const useMainStore = defineStore('main', () => {
   // ── State ──────────────────────────────────────────────────────────────────
   const persons = ref([])
   const relationships = ref([])
-  const factions = ref([])          // all factions of the tree, across scenarios
+  const factions = ref([]) // all factions of the tree, across scenarios
   const scenarios = ref([])
   const activeScenarioId = ref(null)
   const draggingPersonId = ref(null) // person being dragged from the member list
@@ -59,25 +59,21 @@ export const useMainStore = defineStore('main', () => {
     lineCurvature: 0.04,
     glowOnHover: true,
     nodeOpacity: 1.0,
-    linkOpacity: 0.6,
+    linkOpacity: 0.6
   })
 
   // ── Computed ───────────────────────────────────────────────────────────────
-  const selectedPerson = computed(() =>
-    persons.value.find(p => p.id === selectedPersonId.value) || null
+  const selectedPerson = computed(
+    () => persons.value.find((p) => p.id === selectedPersonId.value) || null
   )
   const personCount = computed(() => persons.value.length)
-  const coupleCount = computed(() =>
-    relationships.value.filter(r => r.type === 'spouse').length
-  )
-  const activeTree = computed(() =>
-    trees.value.find(t => t.id === activeTreeId.value) || null
-  )
-  const activeScenario = computed(() =>
-    scenarios.value.find(s => s.id === activeScenarioId.value) || null
+  const coupleCount = computed(() => relationships.value.filter((r) => r.type === 'spouse').length)
+  const activeTree = computed(() => trees.value.find((t) => t.id === activeTreeId.value) || null)
+  const activeScenario = computed(
+    () => scenarios.value.find((s) => s.id === activeScenarioId.value) || null
   )
   const activeFactions = computed(() =>
-    factions.value.filter(f => f.scenario_id === activeScenarioId.value)
+    factions.value.filter((f) => f.scenario_id === activeScenarioId.value)
   )
 
   // ── Tree actions ──────────────────────────────────────────────────────────
@@ -101,7 +97,7 @@ export const useMainStore = defineStore('main', () => {
   async function renameTree(id, name) {
     const res = await api.invoke('trees:rename', { id, name })
     if (res.success) {
-      const idx = trees.value.findIndex(t => t.id === id)
+      const idx = trees.value.findIndex((t) => t.id === id)
       if (idx !== -1) trees.value[idx] = res.data
     }
   }
@@ -109,7 +105,7 @@ export const useMainStore = defineStore('main', () => {
   async function deleteTree(id) {
     const res = await api.invoke('trees:delete', { id })
     if (res.success) {
-      trees.value = trees.value.filter(t => t.id !== id)
+      trees.value = trees.value.filter((t) => t.id !== id)
       if (res.data.newActiveTreeId) {
         await switchTree(res.data.newActiveTreeId)
       }
@@ -150,7 +146,7 @@ export const useMainStore = defineStore('main', () => {
     // Restore the tree's active scenario; fall back to the first one
     const savedId = settingsRes.success ? settingsRes.data.activeScenarioId : null
     activeScenarioId.value =
-      scenarios.value.find(s => s.id === savedId)?.id ?? scenarios.value[0]?.id ?? null
+      scenarios.value.find((s) => s.id === savedId)?.id ?? scenarios.value[0]?.id ?? null
   }
 
   async function createPerson(data) {
@@ -162,7 +158,7 @@ export const useMainStore = defineStore('main', () => {
   async function updatePerson(data) {
     const res = await api.invoke('persons:update', data)
     if (res.success) {
-      const idx = persons.value.findIndex(p => p.id === data.id)
+      const idx = persons.value.findIndex((p) => p.id === data.id)
       if (idx !== -1) persons.value[idx] = res.data
     }
     return res
@@ -171,13 +167,13 @@ export const useMainStore = defineStore('main', () => {
   async function deletePerson(id) {
     const res = await api.invoke('persons:delete', { id })
     if (res.success) {
-      persons.value = persons.value.filter(p => p.id !== id)
+      persons.value = persons.value.filter((p) => p.id !== id)
       relationships.value = relationships.value.filter(
-        r => r.person_a_id !== id && r.person_b_id !== id
+        (r) => r.person_a_id !== id && r.person_b_id !== id
       )
-      factions.value.forEach(f => {
+      factions.value.forEach((f) => {
         if (f.member_ids?.includes(id)) {
-          f.member_ids = f.member_ids.filter(pid => pid !== id)
+          f.member_ids = f.member_ids.filter((pid) => pid !== id)
         }
       })
       if (selectedPersonId.value === id) {
@@ -197,7 +193,7 @@ export const useMainStore = defineStore('main', () => {
   async function updateRelationship(data) {
     const res = await api.invoke('relationships:update', data)
     if (res.success) {
-      const idx = relationships.value.findIndex(r => r.id === data.id)
+      const idx = relationships.value.findIndex((r) => r.id === data.id)
       if (idx !== -1) relationships.value[idx] = res.data
     }
     return res
@@ -205,7 +201,7 @@ export const useMainStore = defineStore('main', () => {
 
   async function deleteRelationship(id) {
     const res = await api.invoke('relationships:delete', { id })
-    if (res.success) relationships.value = relationships.value.filter(r => r.id !== id)
+    if (res.success) relationships.value = relationships.value.filter((r) => r.id !== id)
     return res
   }
 
@@ -216,15 +212,18 @@ export const useMainStore = defineStore('main', () => {
   async function ensureScenario() {
     if (activeScenarioId.value) return activeScenarioId.value
     if (!ensureScenarioPromise) {
-      ensureScenarioPromise = api.invoke('scenarios:create', { name: 'Scenario 1' })
-        .then(res => {
+      ensureScenarioPromise = api
+        .invoke('scenarios:create', { name: 'Scenario 1' })
+        .then((res) => {
           if (res.success) {
             scenarios.value.push(res.data.scenario)
             activeScenarioId.value = res.data.scenario.id
           }
           return activeScenarioId.value
         })
-        .finally(() => { ensureScenarioPromise = null })
+        .finally(() => {
+          ensureScenarioPromise = null
+        })
     }
     return ensureScenarioPromise
   }
@@ -241,7 +240,7 @@ export const useMainStore = defineStore('main', () => {
   async function renameScenario(id, name) {
     const res = await api.invoke('scenarios:rename', { id, name })
     if (res.success) {
-      const idx = scenarios.value.findIndex(s => s.id === id)
+      const idx = scenarios.value.findIndex((s) => s.id === id)
       if (idx !== -1) scenarios.value[idx] = res.data
     }
     return res
@@ -250,8 +249,8 @@ export const useMainStore = defineStore('main', () => {
   async function deleteScenario(id) {
     const res = await api.invoke('scenarios:delete', { id })
     if (res.success) {
-      scenarios.value = scenarios.value.filter(s => s.id !== id)
-      factions.value = factions.value.filter(f => f.scenario_id !== id)
+      scenarios.value = scenarios.value.filter((s) => s.id !== id)
+      factions.value = factions.value.filter((f) => f.scenario_id !== id)
       if (activeScenarioId.value === id) {
         setActiveScenario(scenarios.value[0]?.id ?? null)
       }
@@ -277,7 +276,7 @@ export const useMainStore = defineStore('main', () => {
   async function updateFaction(data) {
     const res = await api.invoke('factions:update', data)
     if (res.success) {
-      const idx = factions.value.findIndex(f => f.id === data.id)
+      const idx = factions.value.findIndex((f) => f.id === data.id)
       if (idx !== -1) factions.value[idx] = res.data
     }
     return res
@@ -285,20 +284,23 @@ export const useMainStore = defineStore('main', () => {
 
   async function deleteFaction(id) {
     const res = await api.invoke('factions:delete', { id })
-    if (res.success) factions.value = factions.value.filter(f => f.id !== id)
+    if (res.success) factions.value = factions.value.filter((f) => f.id !== id)
     return res
   }
 
   async function addPersonToFaction(personId, factionId) {
-    const f = factions.value.find(x => x.id === factionId)
+    const f = factions.value.find((x) => x.id === factionId)
     if (!f || f.member_ids?.includes(personId)) return null
     return updateFaction({ id: factionId, member_ids: [...(f.member_ids || []), personId] })
   }
 
   async function removePersonFromFaction(personId, factionId) {
-    const f = factions.value.find(x => x.id === factionId)
+    const f = factions.value.find((x) => x.id === factionId)
     if (!f || !f.member_ids?.includes(personId)) return null
-    return updateFaction({ id: factionId, member_ids: f.member_ids.filter(pid => pid !== personId) })
+    return updateFaction({
+      id: factionId,
+      member_ids: f.member_ids.filter((pid) => pid !== personId)
+    })
   }
 
   function selectPerson(id) {
@@ -311,8 +313,13 @@ export const useMainStore = defineStore('main', () => {
     formOpen.value = true
   }
 
-  function closeModal() { modalOpen.value = false }
-  function closeForm() { formOpen.value = false; editingPerson.value = null }
+  function closeModal() {
+    modalOpen.value = false
+  }
+  function closeForm() {
+    formOpen.value = false
+    editingPerson.value = null
+  }
 
   function setTheme(t) {
     theme.value = t
@@ -320,14 +327,16 @@ export const useMainStore = defineStore('main', () => {
     api.invoke('globalSettings:set', { key: 'theme', value: t })
   }
 
-  function toggleSettings() { settingsOpen.value = !settingsOpen.value }
+  function toggleSettings() {
+    settingsOpen.value = !settingsOpen.value
+  }
 
   // Set (or clear, with a falsy value) the explicit current year. Clearing
   // reverts to auto-tracking the latest year in the data. Part of the saved
   // layout, so an explicit change lights up the unsaved-layout indicator.
   function setCurrentYear(year) {
     const y = parseInt(year)
-    userCurrentYear.value = (Number.isFinite(y) && y > 0) ? y : null
+    userCurrentYear.value = Number.isFinite(y) && y > 0 ? y : null
     graphDirty.value = true
   }
 
@@ -338,36 +347,99 @@ export const useMainStore = defineStore('main', () => {
 
   function resetGraphSettings() {
     graphSettings.value = {
-      nodeRadius: 22, parentChildColor: '#8b6cc5', parentChildWidth: 1.8,
-      spouseColor: '#f06292', spouseWidth: 2, adoptedColor: '#f5a623', adoptedWidth: 1.8,
-      maleColor: '#3a7bd5', femaleColor: '#c95fa0', unknownColor: '#5c6bc0',
-      linkDistance: 160, chargeStrength: -380, labelSize: 10, showLabels: true, showAge: false,
-      lineCurvature: 0.04, glowOnHover: true, nodeOpacity: 1.0, linkOpacity: 0.6,
+      nodeRadius: 22,
+      parentChildColor: '#8b6cc5',
+      parentChildWidth: 1.8,
+      spouseColor: '#f06292',
+      spouseWidth: 2,
+      adoptedColor: '#f5a623',
+      adoptedWidth: 1.8,
+      maleColor: '#3a7bd5',
+      femaleColor: '#c95fa0',
+      unknownColor: '#5c6bc0',
+      linkDistance: 160,
+      chargeStrength: -380,
+      labelSize: 10,
+      showLabels: true,
+      showAge: false,
+      lineCurvature: 0.04,
+      glowOnHover: true,
+      nodeOpacity: 1.0,
+      linkOpacity: 0.6
     }
   }
 
   return {
     // tree
-    trees, activeTreeId, activeTree,
-    loadTrees, createTree, renameTree, deleteTree, switchTree,
+    trees,
+    activeTreeId,
+    activeTree,
+    loadTrees,
+    createTree,
+    renameTree,
+    deleteTree,
+    switchTree,
     // state
-    persons, relationships, factions, scenarios, activeScenarioId,
-    draggingPersonId, selectedPersonId, modalOpen, formOpen,
-    editingPerson, theme, settingsOpen, graphSettings,
-    lockNodes, cleanTree, currentDate, userCurrentYear, autoCurrentYear, lockLines, relPopup, activeView,
+    persons,
+    relationships,
+    factions,
+    scenarios,
+    activeScenarioId,
+    draggingPersonId,
+    selectedPersonId,
+    modalOpen,
+    formOpen,
+    editingPerson,
+    theme,
+    settingsOpen,
+    graphSettings,
+    lockNodes,
+    cleanTree,
+    currentDate,
+    userCurrentYear,
+    autoCurrentYear,
+    lockLines,
+    relPopup,
+    activeView,
     // computed
-    selectedPerson, personCount, coupleCount, activeScenario, activeFactions,
+    selectedPerson,
+    personCount,
+    coupleCount,
+    activeScenario,
+    activeFactions,
     // actions
-    loadAll, createPerson, updatePerson, deletePerson,
-    createRelationship, updateRelationship, deleteRelationship,
-    createFaction, updateFaction, deleteFaction,
-    addPersonToFaction, removePersonFromFaction,
-    createScenario, renameScenario, deleteScenario, setActiveScenario,
-    selectPerson, openForm, closeModal, closeForm,
-    setTheme, toggleSettings, setCurrentYear, updateGraphSetting, resetGraphSettings,
+    loadAll,
+    createPerson,
+    updatePerson,
+    deletePerson,
+    createRelationship,
+    updateRelationship,
+    deleteRelationship,
+    createFaction,
+    updateFaction,
+    deleteFaction,
+    addPersonToFaction,
+    removePersonFromFaction,
+    createScenario,
+    renameScenario,
+    deleteScenario,
+    setActiveScenario,
+    selectPerson,
+    openForm,
+    closeModal,
+    closeForm,
+    setTheme,
+    toggleSettings,
+    setCurrentYear,
+    updateGraphSetting,
+    resetGraphSettings,
     graphDirty,
-    markGraphDirty() { graphDirty.value = true },
-    clearGraphDirty() { graphDirty.value = false },
+    markGraphDirty() {
+      graphDirty.value = true
+    },
+    clearGraphDirty() {
+      graphDirty.value = false
+    },
     async saveGraphState(graphState) {
       await api.invoke('settings:set', { key: 'graphState', value: JSON.stringify(graphState) })
       graphDirty.value = false
@@ -375,9 +447,13 @@ export const useMainStore = defineStore('main', () => {
     async loadGraphState() {
       const res = await api.invoke('settings:getAll')
       if (res.success && res.data.graphState) {
-        try { return JSON.parse(res.data.graphState) } catch { return null }
+        try {
+          return JSON.parse(res.data.graphState)
+        } catch {
+          return null
+        }
       }
       return null
-    },
+    }
   }
 })

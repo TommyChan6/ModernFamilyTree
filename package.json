@@ -8,19 +8,27 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.4",
     "d3": "^7.9.0",
     "electron": "^31.1.0",
     "electron-vite": "^2.3.0",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^9.1.2",
+    "eslint-plugin-vue": "^9.33.0",
+    "globals": "^17.7.0",
     "pinia": "^2.1.7",
+    "prettier": "^3.9.5",
     "vitest": "^1.6.0",
     "vue": "^3.4.0"
   },
   "dependencies": {
-    "sql.js": "^1.14.1",
     "three": "^0.169.0"
   }
 }

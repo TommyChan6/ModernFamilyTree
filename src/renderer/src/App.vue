@@ -25,12 +25,14 @@
             <button
               v-if="store.trees.length > 1 && renamingId !== tree.id"
               class="tab-close"
-              @click.stop="handleDeleteTree(tree.id)"
               title="Close tree"
-            >×</button>
+              @click.stop="handleDeleteTree(tree.id)"
+            >
+              ×
+            </button>
           </div>
         </TransitionGroup>
-        <button class="tab-add" @click="handleAddTree" title="New family tree">
+        <button class="tab-add" title="New family tree" @click="handleAddTree">
           <span class="tab-add-icon">+</span>
         </button>
       </div>
@@ -38,8 +40,8 @@
       <button class="btn btn-ghost btn-sm" @click="handleExport">Export</button>
       <button
         class="icon-btn"
-        @click="store.setTheme(store.theme === 'dark' ? 'light' : 'dark')"
         :title="store.theme === 'dark' ? 'Light mode' : 'Dark mode'"
+        @click="store.setTheme(store.theme === 'dark' ? 'light' : 'dark')"
       >
         {{ store.theme === 'dark' ? '☀' : '🌙' }}
       </button>
@@ -49,14 +51,17 @@
       <div class="resize-handle resize-handle-left" @mousedown="startResizeLeft"></div>
       <div class="canvas-stack">
         <!-- Graph stays mounted (tucked away) so its layout & simulation state persist -->
-        <div class="canvas-layer" v-show="store.activeView === 'tree'">
+        <div v-show="store.activeView === 'tree'" class="canvas-layer">
           <GraphCanvas ref="graphRef" :key="store.activeTreeId" />
         </div>
         <Transition name="people-view">
           <PeopleView v-if="store.activeView === 'people'" :key="store.activeTreeId" />
         </Transition>
         <Transition name="people-view">
-          <RelationshipsView v-if="store.activeView === 'relationships'" :key="store.activeTreeId" />
+          <RelationshipsView
+            v-if="store.activeView === 'relationships'"
+            :key="store.activeTreeId"
+          />
         </Transition>
         <!-- WebGL views stay mounted (toggled with v-show) so their GL context is
              never torn down mid-switch — tearing it down flashes the window white.
@@ -64,15 +69,15 @@
         <Transition name="people-view">
           <TimelineView
             v-show="store.activeView === 'timeline'"
-            :active="store.activeView === 'timeline'"
             :key="store.activeTreeId"
+            :active="store.activeView === 'timeline'"
           />
         </Transition>
         <Transition name="people-view">
           <FactionsView
             v-show="store.activeView === 'factions'"
-            :active="store.activeView === 'factions'"
             :key="store.activeTreeId"
+            :active="store.activeView === 'factions'"
           />
         </Transition>
       </div>
@@ -132,9 +137,11 @@ async function handleAddTree() {
 }
 
 async function handleDeleteTree(id) {
-  const tree = store.trees.find(t => t.id === id)
+  const tree = store.trees.find((t) => t.id === id)
   if (!tree) return
-  const confirmed = confirm(`Delete "${tree.name}"? All persons, relationships, and images in this tree will be permanently deleted.`)
+  const confirmed = confirm(
+    `Delete "${tree.name}"? All persons, relationships, and images in this tree will be permanently deleted.`
+  )
   if (confirmed) {
     await store.deleteTree(id)
   }
@@ -171,15 +178,23 @@ let startX = 0
 let startW = 0
 
 function startResizeLeft(e) {
-  resizing = 'left'; startX = e.clientX; startW = leftWidth.value
-  document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'
-  window.addEventListener('mousemove', onResizeMove); window.addEventListener('mouseup', onResizeEnd)
+  resizing = 'left'
+  startX = e.clientX
+  startW = leftWidth.value
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  window.addEventListener('mousemove', onResizeMove)
+  window.addEventListener('mouseup', onResizeEnd)
 }
 
 function startResizeRight(e) {
-  resizing = 'right'; startX = e.clientX; startW = rightWidth.value
-  document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'
-  window.addEventListener('mousemove', onResizeMove); window.addEventListener('mouseup', onResizeEnd)
+  resizing = 'right'
+  startX = e.clientX
+  startW = rightWidth.value
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  window.addEventListener('mousemove', onResizeMove)
+  window.addEventListener('mouseup', onResizeEnd)
 }
 
 function onResizeMove(e) {
@@ -190,8 +205,11 @@ function onResizeMove(e) {
 }
 
 function onResizeEnd() {
-  resizing = null; document.body.style.cursor = ''; document.body.style.userSelect = ''
-  window.removeEventListener('mousemove', onResizeMove); window.removeEventListener('mouseup', onResizeEnd)
+  resizing = null
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+  window.removeEventListener('mousemove', onResizeMove)
+  window.removeEventListener('mouseup', onResizeEnd)
 }
 
 const workspaceStyle = computed(() => ({
@@ -199,12 +217,18 @@ const workspaceStyle = computed(() => ({
 }))
 
 function handleExport() {
-  const data = { persons: store.persons, relationships: store.relationships, exportedAt: new Date().toISOString() }
+  const data = {
+    persons: store.persons,
+    relationships: store.relationships,
+    exportedAt: new Date().toISOString()
+  }
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
-  const a = document.createElement('a'); a.href = url
+  const a = document.createElement('a')
+  a.href = url
   a.download = `${store.activeTree?.name || 'family-tree'}-export.json`
-  a.click(); URL.revokeObjectURL(url)
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 onMounted(async () => {
@@ -453,10 +477,14 @@ onUnmounted(() => {
 
 /* People view cross-fade / rise */
 .people-view-enter-active {
-  transition: opacity 0.32s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    opacity 0.32s ease,
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .people-view-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
   position: absolute;
   inset: 0;
 }

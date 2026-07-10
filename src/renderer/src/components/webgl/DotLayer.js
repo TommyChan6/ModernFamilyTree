@@ -17,13 +17,17 @@ export class DotLayer {
     this._allocate(16)
   }
 
-  get object3d() { return this.mesh }
+  get object3d() {
+    return this.mesh
+  }
 
   _allocate(capacity) {
     if (this.geometry) this.geometry.dispose()
     const g = new THREE.InstancedBufferGeometry()
-    g.setAttribute('position', new THREE.Float32BufferAttribute(
-      [-1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0], 3))
+    g.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute([-1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0], 3)
+    )
     g.setIndex([0, 1, 2, 2, 1, 3])
     const mk = (name, size) => {
       const arr = new Float32Array(capacity * size)
@@ -52,9 +56,12 @@ export class DotLayer {
   }
 
   set(i, x, y, radius, rgb, opacity, pulse = 0) {
-    this.pos[i * 2] = x; this.pos[i * 2 + 1] = y
+    this.pos[i * 2] = x
+    this.pos[i * 2 + 1] = y
     this.radius[i] = radius
-    this.color[i * 3] = rgb[0]; this.color[i * 3 + 1] = rgb[1]; this.color[i * 3 + 2] = rgb[2]
+    this.color[i * 3] = rgb[0]
+    this.color[i * 3 + 1] = rgb[1]
+    this.color[i * 3 + 2] = rgb[2]
     this.opacity[i] = opacity
     this.pulse[i] = pulse
   }
@@ -65,7 +72,9 @@ export class DotLayer {
       this._attr[k].needsUpdate = true
   }
 
-  setTime(t) { this.material.uniforms.uTime.value = t }
+  setTime(t) {
+    this.material.uniforms.uTime.value = t
+  }
 
   dispose() {
     this.geometry?.dispose()
@@ -123,6 +132,6 @@ function createDotMaterial() {
         if (a < 0.003) discard;
         fragColor = vec4(vColor, a);
       }
-    `,
+    `
   })
 }

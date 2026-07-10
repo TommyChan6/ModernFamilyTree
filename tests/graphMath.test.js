@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { screenToWorld, worldToScreen, fitExtent, nodesExtent } from '../src/renderer/src/components/graph/webgl/coords.js'
+import {
+  screenToWorld,
+  worldToScreen,
+  fitExtent,
+  nodesExtent
+} from '../src/renderer/src/components/graph/webgl/coords.js'
 import { linkCurvePoints, linkPath } from '../src/renderer/src/components/graph/linkHelpers.js'
 
 describe('webgl coords', () => {
@@ -19,7 +24,8 @@ describe('webgl coords', () => {
   it('fitExtent centres the bounding box within the viewport', () => {
     const { x, y, k } = fitExtent(0, 0, 100, 100, 800, 600)
     // centre of the (padded) box maps to the centre of the viewport
-    const cx = 50, cy = 50
+    const cx = 50,
+      cy = 50
     expect(cx * k + x).toBeCloseTo(400, 6)
     expect(cy * k + y).toBeCloseTo(300, 6)
     expect(k).toBeLessThanOrEqual(2)
@@ -27,7 +33,12 @@ describe('webgl coords', () => {
 
   it('nodesExtent returns the bounding box, or null when empty', () => {
     expect(nodesExtent([])).toBeNull()
-    expect(nodesExtent([{ x: 1, y: 2 }, { x: 5, y: -3 }])).toEqual({ minX: 1, minY: -3, maxX: 5, maxY: 2 })
+    expect(
+      nodesExtent([
+        { x: 1, y: 2 },
+        { x: 5, y: -3 }
+      ])
+    ).toEqual({ minX: 1, minY: -3, maxX: 5, maxY: 2 })
   })
 })
 

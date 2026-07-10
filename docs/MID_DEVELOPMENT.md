@@ -69,10 +69,12 @@ A genuinely substantial, high-quality core. This is well past prototype.
 
 **Honest gaps (all expected at this stage)**
 - No packaging/installer, no auth, no server, no sharing, no network at all.
-- No TypeScript, no linter/formatter, no CI, no error tracking.
+- No TypeScript yet (adoption decided — see Step 0). ~~No linter/formatter, no CI, no
+  error tracking~~ — ESLint + Prettier + GitHub Actions CI and Sentry/PostHog stubs added
+  2026-07-10 (Step 0).
 - JSON import is a stub; export is one-way. No GEDCOM.
 - Rendering/interaction has no automated coverage. Light mode needs polish (per draft).
-- Unused `sql.js` dependency lingering in `package.json`.
+- ~~Unused `sql.js` dependency lingering in `package.json`.~~ Removed 2026-07-10.
 
 ---
 
@@ -404,10 +406,21 @@ not nice-to-haves, the moment real-people data goes on a server.
 A pragmatic sequence. Each phase ends shippable; don't let the migration become a
 year-long branch.
 
-**Step 0 — Tooling & hygiene (days)**
-1. Add ESLint + Prettier; remove `sql.js`; set up GitHub Actions running lint + vitest.
-2. Add Sentry + PostHog stubs (no-op in dev).
-3. Decide: TypeScript adoption start point (recommend: new files TS, `api.js` + store first).
+**Step 0 — Tooling & hygiene (days)** — ✅ **done 2026-07-10**
+1. ~~Add ESLint + Prettier; remove `sql.js`; set up GitHub Actions running lint + vitest.~~
+   Done: flat-config ESLint (`eslint.config.js`) + Prettier (matching the existing
+   no-semi/single-quote style, one-time whole-repo reformat applied), `npm run lint` /
+   `format` scripts, CI at `.github/workflows/ci.yml` (lint + format check + vitest).
+2. ~~Add Sentry + PostHog stubs (no-op in dev).~~ Done:
+   `src/renderer/src/lib/observability.js` — `sentry` / `posthog` stub objects plus
+   `initObservability(app)` wired in `main.js` (Vue `errorHandler`, `window` error +
+   unhandledrejection). No-ops until `VITE_SENTRY_DSN` / `VITE_POSTHOG_KEY` are set in a
+   prod build; swap real SDKs in behind the same API during Phase A.
+3. ~~Decide: TypeScript adoption start point.~~ **Decided (2026-07-10): gradual adoption,
+   new files in TS.** Convert `api.js` + the Pinia store first — but *during* Step 2 (the
+   seam cut), when their signatures become the client↔server contract and types can be
+   generated from the Supabase schema. Add `vue-tsc` to CI at that point. No big-bang
+   conversion of existing files.
 
 **Step 1 — Backend spike (1–2 weeks)**
 4. Stand up Supabase: schema (§5), RLS policies, Auth, Storage bucket.

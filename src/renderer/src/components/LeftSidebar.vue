@@ -18,7 +18,7 @@
       >
         <span class="nav-icon">👥</span>
         <span>All People</span>
-        <span class="badge" style="margin-left: auto;">{{ store.personCount }}</span>
+        <span class="badge" style="margin-left: auto">{{ store.personCount }}</span>
       </button>
       <button
         class="nav-item"
@@ -27,7 +27,7 @@
       >
         <span class="nav-icon">🔗</span>
         <span>Relationships</span>
-        <span class="badge" style="margin-left: auto;">{{ store.relationships.length }}</span>
+        <span class="badge" style="margin-left: auto">{{ store.relationships.length }}</span>
       </button>
       <button
         class="nav-item"
@@ -44,7 +44,9 @@
       >
         <span class="nav-icon">⬡</span>
         <span>Factions</span>
-        <span v-if="store.activeFactions.length" class="badge" style="margin-left: auto;">{{ store.activeFactions.length }}</span>
+        <span v-if="store.activeFactions.length" class="badge" style="margin-left: auto">{{
+          store.activeFactions.length
+        }}</span>
       </button>
     </nav>
 
@@ -99,7 +101,11 @@
     <!-- Data -->
     <div class="sidebar-section">
       <div class="nav-section-label">Data</div>
-      <button class="nav-item save-btn" :class="{ 'save-dirty': store.graphDirty }" @click="$emit('save')">
+      <button
+        class="nav-item save-btn"
+        :class="{ 'save-dirty': store.graphDirty }"
+        @click="$emit('save')"
+      >
         <span class="nav-icon">💾</span>
         <span>Save Layout</span>
         <span v-if="store.graphDirty" class="save-badge">unsaved</span>
@@ -136,24 +142,24 @@
           type="number"
           class="sidebar-date-input"
           :value="store.currentDate?.year || ''"
-          @change="setCurrentDate($event.target.value)"
           placeholder="Enter year…"
           min="1"
           max="2200"
+          @change="setCurrentDate($event.target.value)"
         />
         <button
           v-if="store.userCurrentYear"
           class="date-clear-btn"
-          @click="setCurrentDate('')"
           title="Reset to latest year in data"
-        >✕</button>
+          @click="setCurrentDate('')"
+        >
+          ✕
+        </button>
       </div>
-      <div class="date-hint" v-if="!store.userCurrentYear && store.currentDate">
+      <div v-if="!store.userCurrentYear && store.currentDate" class="date-hint">
         Auto · latest year in data
       </div>
-      <div class="date-hint" v-else-if="!store.currentDate">
-        No dates yet
-      </div>
+      <div v-else-if="!store.currentDate" class="date-hint">No dates yet</div>
     </div>
 
     <div class="sidebar-divider"></div>
@@ -183,6 +189,8 @@
 import { computed } from 'vue'
 import { useMainStore } from '../store/index.js'
 
+defineEmits(['save'])
+
 const store = useMainStore()
 
 function setCurrentDate(val) {
@@ -191,9 +199,7 @@ function setCurrentDate(val) {
 
 const generationCount = computed(() => {
   // Simple heuristic: number of distinct birth decade groups
-  const years = store.persons
-    .filter(p => p.birth_year)
-    .map(p => Math.floor(p.birth_year / 20))
+  const years = store.persons.filter((p) => p.birth_year).map((p) => Math.floor(p.birth_year / 20))
   return new Set(years).size || 0
 })
 
@@ -255,7 +261,9 @@ function handleImport() {
   font-family: var(--font);
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
   text-align: left;
   border-radius: 0;
 }
@@ -374,8 +382,13 @@ function handleImport() {
 }
 
 @keyframes pulse-badge {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .date-row {
@@ -398,7 +411,9 @@ function handleImport() {
   outline: none;
   width: 100%;
   min-width: 0;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
 .sidebar-date-input:focus {
@@ -423,7 +438,9 @@ function handleImport() {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
 .date-clear-btn:hover {

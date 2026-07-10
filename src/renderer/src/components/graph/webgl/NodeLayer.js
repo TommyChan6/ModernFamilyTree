@@ -16,14 +16,18 @@ export class NodeLayer {
     this._allocate(16) // ensure attributes always exist (empty tree, first frame)
   }
 
-  get object3d() { return this.mesh }
+  get object3d() {
+    return this.mesh
+  }
 
   _allocate(capacity) {
     if (this.geometry) this.geometry.dispose()
     const g = new THREE.InstancedBufferGeometry()
     // Unit quad, corners in [-1,1]; reused for every instance.
-    g.setAttribute('position', new THREE.Float32BufferAttribute(
-      [-1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0], 3))
+    g.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute([-1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0], 3)
+    )
     g.setIndex([0, 1, 2, 2, 1, 3])
 
     const mk = (name, size) => {
@@ -66,8 +70,12 @@ export class NodeLayer {
   // s: { radius, fill:[r,g,b], border:[r,g,b], borderPx, opacity, selected, glow, avatar }
   setStyle(i, s) {
     this.radius[i] = s.radius
-    this.fill[i * 3] = s.fill[0]; this.fill[i * 3 + 1] = s.fill[1]; this.fill[i * 3 + 2] = s.fill[2]
-    this.border[i * 3] = s.border[0]; this.border[i * 3 + 1] = s.border[1]; this.border[i * 3 + 2] = s.border[2]
+    this.fill[i * 3] = s.fill[0]
+    this.fill[i * 3 + 1] = s.fill[1]
+    this.fill[i * 3 + 2] = s.fill[2]
+    this.border[i * 3] = s.border[0]
+    this.border[i * 3 + 1] = s.border[1]
+    this.border[i * 3 + 2] = s.border[2]
     this.borderPx[i] = s.borderPx
     this.borderA[i] = s.borderA == null ? 1 : s.borderA
     this.opacity[i] = s.opacity
@@ -84,7 +92,17 @@ export class NodeLayer {
 
   commitStyles() {
     if (!this._attr.iRadius) return
-    for (const k of ['iRadius', 'iFill', 'iBorder', 'iBorderPx', 'iBorderA', 'iOpacity', 'iSelected', 'iGlow', 'iAvatar'])
+    for (const k of [
+      'iRadius',
+      'iFill',
+      'iBorder',
+      'iBorderPx',
+      'iBorderA',
+      'iOpacity',
+      'iSelected',
+      'iGlow',
+      'iAvatar'
+    ])
       this._attr[k].needsUpdate = true
   }
 

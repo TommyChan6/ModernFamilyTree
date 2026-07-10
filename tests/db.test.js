@@ -55,28 +55,32 @@ describe('Database initialization', () => {
   it('seeds 6 sample persons tagged with the default tree', () => {
     initDB()
     const { persons, activeTreeId } = getDB()
-    const treePersons = Object.values(persons).filter(p => p.tree_id === activeTreeId)
+    const treePersons = Object.values(persons).filter((p) => p.tree_id === activeTreeId)
     expect(treePersons).toHaveLength(6)
   })
 
   it('seeds 8 relationships tagged with the default tree', () => {
     initDB()
     const { relationships, activeTreeId } = getDB()
-    const treeRels = Object.values(relationships).filter(r => r.tree_id === activeTreeId)
+    const treeRels = Object.values(relationships).filter((r) => r.tree_id === activeTreeId)
     expect(treeRels).toHaveLength(8)
   })
 
   it('does not re-seed when database already exists', () => {
     initDB()
     const { persons, activeTreeId } = getDB()
-    const ids = Object.values(persons).filter(p => p.tree_id === activeTreeId).map(p => p.id)
+    const ids = Object.values(persons)
+      .filter((p) => p.tree_id === activeTreeId)
+      .map((p) => p.id)
     expect(ids).toHaveLength(6)
 
     vi.resetModules()
-    return import('../src/main/db.js').then(mod2 => {
+    return import('../src/main/db.js').then((mod2) => {
       mod2.initDB()
       const db2 = mod2.getDB()
-      const ids2 = Object.values(db2.persons).filter(p => p.tree_id === db2.activeTreeId).map(p => p.id)
+      const ids2 = Object.values(db2.persons)
+        .filter((p) => p.tree_id === db2.activeTreeId)
+        .map((p) => p.id)
       expect(ids2).toHaveLength(6)
       expect(ids2.sort()).toEqual(ids.sort())
     })
@@ -104,20 +108,32 @@ describe('Multi-tree support', () => {
 
     // Create second tree
     const tree2Id = 'tree-second'
-    trees[tree2Id] = { id: tree2Id, name: 'Other Family', created_at: nowStr(), updated_at: nowStr() }
+    trees[tree2Id] = {
+      id: tree2Id,
+      name: 'Other Family',
+      created_at: nowStr(),
+      updated_at: nowStr()
+    }
 
     // Add person to second tree
     persons['p-other'] = {
-      id: 'p-other', tree_id: tree2Id, name: 'Other Person',
-      birth_year: 2000, death_year: null, gender: 'female',
-      bio: '', occupation: '', location: '',
-      created_at: nowStr(), updated_at: nowStr()
+      id: 'p-other',
+      tree_id: tree2Id,
+      name: 'Other Person',
+      birth_year: 2000,
+      death_year: null,
+      gender: 'female',
+      bio: '',
+      occupation: '',
+      location: '',
+      created_at: nowStr(),
+      updated_at: nowStr()
     }
     save()
 
     // Filter by tree
-    const tree1Persons = Object.values(persons).filter(p => p.tree_id === activeTreeId)
-    const tree2Persons = Object.values(persons).filter(p => p.tree_id === tree2Id)
+    const tree1Persons = Object.values(persons).filter((p) => p.tree_id === activeTreeId)
+    const tree2Persons = Object.values(persons).filter((p) => p.tree_id === tree2Id)
     expect(tree1Persons).toHaveLength(6) // seed data
     expect(tree2Persons).toHaveLength(1)
     expect(tree2Persons[0].name).toBe('Other Person')
@@ -158,23 +174,48 @@ describe('Multi-tree support', () => {
     // Create second tree with data
     const tree2Id = 'tree-del'
     trees[tree2Id] = { id: tree2Id, name: 'Delete Me', created_at: nowStr(), updated_at: nowStr() }
-    persons['dp1'] = { id: 'dp1', tree_id: tree2Id, name: 'Del Person', birth_year: 1990, death_year: null, gender: 'male', bio: '', occupation: '', location: '', created_at: nowStr(), updated_at: nowStr() }
-    relationships['dr1'] = { id: 'dr1', tree_id: tree2Id, person_a_id: 'dp1', person_b_id: 'dp1', type: 'spouse', status: 'active', formed_date: null, created_at: nowStr() }
+    persons['dp1'] = {
+      id: 'dp1',
+      tree_id: tree2Id,
+      name: 'Del Person',
+      birth_year: 1990,
+      death_year: null,
+      gender: 'male',
+      bio: '',
+      occupation: '',
+      location: '',
+      created_at: nowStr(),
+      updated_at: nowStr()
+    }
+    relationships['dr1'] = {
+      id: 'dr1',
+      tree_id: tree2Id,
+      person_a_id: 'dp1',
+      person_b_id: 'dp1',
+      type: 'spouse',
+      status: 'active',
+      formed_date: null,
+      created_at: nowStr()
+    }
     save()
 
-    expect(Object.values(persons).filter(p => p.tree_id === tree2Id)).toHaveLength(1)
+    expect(Object.values(persons).filter((p) => p.tree_id === tree2Id)).toHaveLength(1)
 
     // Delete tree
-    for (const [pid, p] of Object.entries(persons)) { if (p.tree_id === tree2Id) delete persons[pid] }
-    for (const [rid, r] of Object.entries(relationships)) { if (r.tree_id === tree2Id) delete relationships[rid] }
+    for (const [pid, p] of Object.entries(persons)) {
+      if (p.tree_id === tree2Id) delete persons[pid]
+    }
+    for (const [rid, r] of Object.entries(relationships)) {
+      if (r.tree_id === tree2Id) delete relationships[rid]
+    }
     delete trees[tree2Id]
     save()
 
-    expect(Object.values(persons).filter(p => p.tree_id === tree2Id)).toHaveLength(0)
-    expect(Object.values(relationships).filter(r => r.tree_id === tree2Id)).toHaveLength(0)
+    expect(Object.values(persons).filter((p) => p.tree_id === tree2Id)).toHaveLength(0)
+    expect(Object.values(relationships).filter((r) => r.tree_id === tree2Id)).toHaveLength(0)
     expect(trees[tree2Id]).toBeUndefined()
     // Original tree untouched
-    expect(Object.values(persons).filter(p => p.tree_id === activeTreeId)).toHaveLength(6)
+    expect(Object.values(persons).filter((p) => p.tree_id === activeTreeId)).toHaveLength(6)
   })
 })
 
@@ -186,10 +227,27 @@ describe('Migration from single-tree to multi-tree', () => {
     fs.mkdirSync(dbDir, { recursive: true })
     const oldDb = {
       persons: {
-        'p1': { id: 'p1', name: 'Old Person', birth_year: 1980, death_year: null, gender: 'male', bio: '', occupation: '', location: '', created_at: '2024-01-01', updated_at: '2024-01-01' }
+        p1: {
+          id: 'p1',
+          name: 'Old Person',
+          birth_year: 1980,
+          death_year: null,
+          gender: 'male',
+          bio: '',
+          occupation: '',
+          location: '',
+          created_at: '2024-01-01',
+          updated_at: '2024-01-01'
+        }
       },
       relationships: {
-        'r1': { id: 'r1', person_a_id: 'p1', person_b_id: 'p1', type: 'spouse', created_at: '2024-01-01' }
+        r1: {
+          id: 'r1',
+          person_a_id: 'p1',
+          person_b_id: 'p1',
+          type: 'spouse',
+          created_at: '2024-01-01'
+        }
       },
       images: {},
       settings: { theme: 'dark', graphState: '{"mode":"auto"}' }
@@ -225,10 +283,17 @@ describe('Person CRUD', () => {
     const { persons, activeTreeId, save, nowStr } = getDB()
     const id = 'test-person-1'
     persons[id] = {
-      id, tree_id: activeTreeId,
-      name: 'Test Person', birth_year: 1990, death_year: null,
-      gender: 'male', bio: 'A test person', occupation: 'Tester', location: 'Test City',
-      created_at: nowStr(), updated_at: nowStr()
+      id,
+      tree_id: activeTreeId,
+      name: 'Test Person',
+      birth_year: 1990,
+      death_year: null,
+      gender: 'male',
+      bio: 'A test person',
+      occupation: 'Tester',
+      location: 'Test City',
+      created_at: nowStr(),
+      updated_at: nowStr()
     }
     save()
 
@@ -242,11 +307,13 @@ describe('Person CRUD', () => {
   it('deletes a person and cascades relationships', () => {
     initDB()
     const { persons, relationships, activeTreeId, save } = getDB()
-    const personIds = Object.values(persons).filter(p => p.tree_id === activeTreeId).map(p => p.id)
+    const personIds = Object.values(persons)
+      .filter((p) => p.tree_id === activeTreeId)
+      .map((p) => p.id)
     const targetId = personIds[2]
 
     const relsBefore = Object.values(relationships).filter(
-      r => r.person_a_id === targetId || r.person_b_id === targetId
+      (r) => r.person_a_id === targetId || r.person_b_id === targetId
     )
     expect(relsBefore.length).toBeGreaterThan(0)
 
@@ -260,7 +327,7 @@ describe('Person CRUD', () => {
     const raw = JSON.parse(fs.readFileSync(dbPath, 'utf8'))
     expect(raw.persons[targetId]).toBeUndefined()
     const relsAfter = Object.values(raw.relationships).filter(
-      r => r.person_a_id === targetId || r.person_b_id === targetId
+      (r) => r.person_a_id === targetId || r.person_b_id === targetId
     )
     expect(relsAfter).toHaveLength(0)
   })
@@ -271,23 +338,39 @@ describe('Graph state persistence (per-tree)', () => {
   it('saves and restores graph state scoped to tree', () => {
     initDB()
     const { persons, settings, activeTreeId, save } = getDB()
-    const personIds = Object.values(persons).filter(p => p.tree_id === activeTreeId).map(p => p.id)
+    const personIds = Object.values(persons)
+      .filter((p) => p.tree_id === activeTreeId)
+      .map((p) => p.id)
 
     const graphState = {
       currentMode: 'generation',
       activeEmphasis: 'paternal',
       modeEmphasis: { custom: 'default', auto: 'default', age: 'default', generation: 'paternal' },
-      modeStateNames: { custom: ['State 1'], auto: ['State 1'], age: ['State 1'], generation: ['State 1', 'State 2'] },
+      modeStateNames: {
+        custom: ['State 1'],
+        auto: ['State 1'],
+        age: ['State 1'],
+        generation: ['State 1', 'State 2']
+      },
       modeActiveStateIdx: { custom: 0, auto: 0, age: 0, generation: 0 },
       modeStateSnapshots: {
         custom: [Object.fromEntries(personIds.map((id, i) => [id, { x: 100 + i * 50, y: 200 }]))],
         auto: [Object.fromEntries(personIds.map((id, i) => [id, { x: 150 + i * 40, y: 300 }]))],
-        age: [Object.fromEntries(personIds.map((id, i) => [id, { x: 120 + i * 60, y: 100 + i * 80 }]))],
-        generation: [{
-          ...Object.fromEntries(personIds.map((id, i) => [id, { x: 100 + i * 70, y: [100, 100, 250, 250, 400, 400][i] }])),
-          _genRowYValues: [100, 250, 400],
-          _genRowSpacing: 150
-        }]
+        age: [
+          Object.fromEntries(personIds.map((id, i) => [id, { x: 120 + i * 60, y: 100 + i * 80 }]))
+        ],
+        generation: [
+          {
+            ...Object.fromEntries(
+              personIds.map((id, i) => [
+                id,
+                { x: 100 + i * 70, y: [100, 100, 250, 250, 400, 400][i] }
+              ])
+            ),
+            _genRowYValues: [100, 250, 400],
+            _genRowSpacing: 150
+          }
+        ]
       },
       genRowSpacing: 150
     }
@@ -331,11 +414,18 @@ describe('Factions', () => {
     // Old-format database written before factions existed
     const dbDir = path.join(tmpDir, 'db')
     fs.mkdirSync(dbDir, { recursive: true })
-    fs.writeFileSync(path.join(dbDir, 'familytree.json'), JSON.stringify({
-      trees: { t1: { id: 't1', name: 'T', created_at: '2024-01-01', updated_at: '2024-01-01' } },
-      activeTreeId: 't1',
-      persons: {}, relationships: {}, images: {}, settings: {}, globalSettings: {}
-    }))
+    fs.writeFileSync(
+      path.join(dbDir, 'familytree.json'),
+      JSON.stringify({
+        trees: { t1: { id: 't1', name: 'T', created_at: '2024-01-01', updated_at: '2024-01-01' } },
+        activeTreeId: 't1',
+        persons: {},
+        relationships: {},
+        images: {},
+        settings: {},
+        globalSettings: {}
+      })
+    )
 
     initDB()
     const { factions } = getDB()
@@ -345,13 +435,23 @@ describe('Factions', () => {
   it('faction fields survive a save/load cycle', () => {
     initDB()
     const { factions, persons, activeTreeId, save, nowStr } = getDB()
-    const memberIds = Object.values(persons).filter(p => p.tree_id === activeTreeId).slice(0, 2).map(p => p.id)
+    const memberIds = Object.values(persons)
+      .filter((p) => p.tree_id === activeTreeId)
+      .slice(0, 2)
+      .map((p) => p.id)
     factions['f1'] = {
-      id: 'f1', tree_id: activeTreeId,
-      name: 'House Anderson', description: 'The founding family',
-      color: '#f5a623', icon: '🏰',
-      member_ids: memberIds, x: 120, y: -40, visible: true,
-      created_at: nowStr(), updated_at: nowStr()
+      id: 'f1',
+      tree_id: activeTreeId,
+      name: 'House Anderson',
+      description: 'The founding family',
+      color: '#f5a623',
+      icon: '🏰',
+      member_ids: memberIds,
+      x: 120,
+      y: -40,
+      visible: true,
+      created_at: nowStr(),
+      updated_at: nowStr()
     }
     save()
 
@@ -368,24 +468,65 @@ describe('Factions', () => {
     const { factions, trees, activeTreeId, save, nowStr } = getDB()
     const tree2Id = 'tree-fx'
     trees[tree2Id] = { id: tree2Id, name: 'Other', created_at: nowStr(), updated_at: nowStr() }
-    factions['fa'] = { id: 'fa', tree_id: activeTreeId, name: 'A', description: '', color: '#6c8ef5', icon: '⚑', member_ids: [], x: 0, y: 0, visible: true, created_at: nowStr(), updated_at: nowStr() }
-    factions['fb'] = { id: 'fb', tree_id: tree2Id, name: 'B', description: '', color: '#f06292', icon: '⚑', member_ids: [], x: 0, y: 0, visible: true, created_at: nowStr(), updated_at: nowStr() }
+    factions['fa'] = {
+      id: 'fa',
+      tree_id: activeTreeId,
+      name: 'A',
+      description: '',
+      color: '#6c8ef5',
+      icon: '⚑',
+      member_ids: [],
+      x: 0,
+      y: 0,
+      visible: true,
+      created_at: nowStr(),
+      updated_at: nowStr()
+    }
+    factions['fb'] = {
+      id: 'fb',
+      tree_id: tree2Id,
+      name: 'B',
+      description: '',
+      color: '#f06292',
+      icon: '⚑',
+      member_ids: [],
+      x: 0,
+      y: 0,
+      visible: true,
+      created_at: nowStr(),
+      updated_at: nowStr()
+    }
     save()
 
-    expect(Object.values(factions).filter(f => f.tree_id === activeTreeId)).toHaveLength(1)
-    expect(Object.values(factions).filter(f => f.tree_id === tree2Id)).toHaveLength(1)
+    expect(Object.values(factions).filter((f) => f.tree_id === activeTreeId)).toHaveLength(1)
+    expect(Object.values(factions).filter((f) => f.tree_id === tree2Id)).toHaveLength(1)
   })
 
   it('removing a deleted person from member lists keeps other members intact', () => {
     initDB()
     const { factions, persons, activeTreeId, save, nowStr } = getDB()
-    const ids = Object.values(persons).filter(p => p.tree_id === activeTreeId).map(p => p.id)
-    factions['f1'] = { id: 'f1', tree_id: activeTreeId, name: 'F', description: '', color: '#6c8ef5', icon: '⚑', member_ids: [ids[0], ids[1]], x: 0, y: 0, visible: true, created_at: nowStr(), updated_at: nowStr() }
+    const ids = Object.values(persons)
+      .filter((p) => p.tree_id === activeTreeId)
+      .map((p) => p.id)
+    factions['f1'] = {
+      id: 'f1',
+      tree_id: activeTreeId,
+      name: 'F',
+      description: '',
+      color: '#6c8ef5',
+      icon: '⚑',
+      member_ids: [ids[0], ids[1]],
+      x: 0,
+      y: 0,
+      visible: true,
+      created_at: nowStr(),
+      updated_at: nowStr()
+    }
 
     // Mirror the persons:delete cascade
     delete persons[ids[0]]
     for (const f of Object.values(factions)) {
-      if (f.member_ids.includes(ids[0])) f.member_ids = f.member_ids.filter(pid => pid !== ids[0])
+      if (f.member_ids.includes(ids[0])) f.member_ids = f.member_ids.filter((pid) => pid !== ids[0])
     }
     save()
 
@@ -400,26 +541,63 @@ describe('Scenarios', () => {
     // Database written before scenarios existed: factions with no scenario_id
     const dbDir = path.join(tmpDir, 'db')
     fs.mkdirSync(dbDir, { recursive: true })
-    fs.writeFileSync(path.join(dbDir, 'familytree.json'), JSON.stringify({
-      trees: {
-        t1: { id: 't1', name: 'A', created_at: '2024-01-01', updated_at: '2024-01-01' },
-        t2: { id: 't2', name: 'B', created_at: '2024-01-01', updated_at: '2024-01-01' }
-      },
-      activeTreeId: 't1',
-      persons: {}, relationships: {}, images: {}, settings: {}, globalSettings: {},
-      factions: {
-        f1: { id: 'f1', tree_id: 't1', name: 'F1', member_ids: [], x: 0, y: 0, visible: true, created_at: '2024-01-01', updated_at: '2024-01-01' },
-        f2: { id: 'f2', tree_id: 't1', name: 'F2', member_ids: [], x: 0, y: 0, visible: true, created_at: '2024-01-01', updated_at: '2024-01-01' },
-        f3: { id: 'f3', tree_id: 't2', name: 'F3', member_ids: [], x: 0, y: 0, visible: true, created_at: '2024-01-01', updated_at: '2024-01-01' }
-      }
-    }))
+    fs.writeFileSync(
+      path.join(dbDir, 'familytree.json'),
+      JSON.stringify({
+        trees: {
+          t1: { id: 't1', name: 'A', created_at: '2024-01-01', updated_at: '2024-01-01' },
+          t2: { id: 't2', name: 'B', created_at: '2024-01-01', updated_at: '2024-01-01' }
+        },
+        activeTreeId: 't1',
+        persons: {},
+        relationships: {},
+        images: {},
+        settings: {},
+        globalSettings: {},
+        factions: {
+          f1: {
+            id: 'f1',
+            tree_id: 't1',
+            name: 'F1',
+            member_ids: [],
+            x: 0,
+            y: 0,
+            visible: true,
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01'
+          },
+          f2: {
+            id: 'f2',
+            tree_id: 't1',
+            name: 'F2',
+            member_ids: [],
+            x: 0,
+            y: 0,
+            visible: true,
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01'
+          },
+          f3: {
+            id: 'f3',
+            tree_id: 't2',
+            name: 'F3',
+            member_ids: [],
+            x: 0,
+            y: 0,
+            visible: true,
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01'
+          }
+        }
+      })
+    )
 
     initDB()
     const { factions, scenarios } = getDB()
 
     // One default scenario per tree that had factions
-    const t1Scenarios = Object.values(scenarios).filter(s => s.tree_id === 't1')
-    const t2Scenarios = Object.values(scenarios).filter(s => s.tree_id === 't2')
+    const t1Scenarios = Object.values(scenarios).filter((s) => s.tree_id === 't1')
+    const t2Scenarios = Object.values(scenarios).filter((s) => s.tree_id === 't2')
     expect(t1Scenarios).toHaveLength(1)
     expect(t2Scenarios).toHaveLength(1)
     expect(t1Scenarios[0].name).toBe('Scenario 1')
@@ -433,12 +611,32 @@ describe('Scenarios', () => {
   it('migration is idempotent — a second init creates no extra scenarios', () => {
     initDB()
     const { factions, scenarios, activeTreeId, save, nowStr } = getDB()
-    scenarios['s1'] = { id: 's1', tree_id: activeTreeId, name: 'S', created_at: nowStr(), updated_at: nowStr() }
-    factions['f1'] = { id: 'f1', tree_id: activeTreeId, scenario_id: 's1', name: 'F', description: '', color: '#6c8ef5', icon: '⚑', member_ids: [], x: 0, y: 0, visible: true, created_at: nowStr(), updated_at: nowStr() }
+    scenarios['s1'] = {
+      id: 's1',
+      tree_id: activeTreeId,
+      name: 'S',
+      created_at: nowStr(),
+      updated_at: nowStr()
+    }
+    factions['f1'] = {
+      id: 'f1',
+      tree_id: activeTreeId,
+      scenario_id: 's1',
+      name: 'F',
+      description: '',
+      color: '#6c8ef5',
+      icon: '⚑',
+      member_ids: [],
+      x: 0,
+      y: 0,
+      visible: true,
+      created_at: nowStr(),
+      updated_at: nowStr()
+    }
     save()
 
     vi.resetModules()
-    return import('../src/main/db.js').then(mod2 => {
+    return import('../src/main/db.js').then((mod2) => {
       mod2.initDB()
       const db2 = mod2.getDB()
       expect(Object.keys(db2.scenarios)).toHaveLength(1)
@@ -449,10 +647,50 @@ describe('Scenarios', () => {
   it('deleting a scenario cascades its factions but not other scenarios’ factions', () => {
     initDB()
     const { factions, scenarios, activeTreeId, save, nowStr } = getDB()
-    scenarios['sA'] = { id: 'sA', tree_id: activeTreeId, name: 'A', created_at: nowStr(), updated_at: nowStr() }
-    scenarios['sB'] = { id: 'sB', tree_id: activeTreeId, name: 'B', created_at: nowStr(), updated_at: nowStr() }
-    factions['fA'] = { id: 'fA', tree_id: activeTreeId, scenario_id: 'sA', name: 'FA', description: '', color: '#6c8ef5', icon: '⚑', member_ids: [], x: 0, y: 0, visible: true, created_at: nowStr(), updated_at: nowStr() }
-    factions['fB'] = { id: 'fB', tree_id: activeTreeId, scenario_id: 'sB', name: 'FB', description: '', color: '#f06292', icon: '⚑', member_ids: [], x: 0, y: 0, visible: true, created_at: nowStr(), updated_at: nowStr() }
+    scenarios['sA'] = {
+      id: 'sA',
+      tree_id: activeTreeId,
+      name: 'A',
+      created_at: nowStr(),
+      updated_at: nowStr()
+    }
+    scenarios['sB'] = {
+      id: 'sB',
+      tree_id: activeTreeId,
+      name: 'B',
+      created_at: nowStr(),
+      updated_at: nowStr()
+    }
+    factions['fA'] = {
+      id: 'fA',
+      tree_id: activeTreeId,
+      scenario_id: 'sA',
+      name: 'FA',
+      description: '',
+      color: '#6c8ef5',
+      icon: '⚑',
+      member_ids: [],
+      x: 0,
+      y: 0,
+      visible: true,
+      created_at: nowStr(),
+      updated_at: nowStr()
+    }
+    factions['fB'] = {
+      id: 'fB',
+      tree_id: activeTreeId,
+      scenario_id: 'sB',
+      name: 'FB',
+      description: '',
+      color: '#f06292',
+      icon: '⚑',
+      member_ids: [],
+      x: 0,
+      y: 0,
+      visible: true,
+      created_at: nowStr(),
+      updated_at: nowStr()
+    }
 
     // Mirror the scenarios:delete cascade
     for (const [fid, f] of Object.entries(factions)) {
@@ -473,14 +711,20 @@ describe('Scenarios', () => {
 describe('Data integrity', () => {
   it('person fields are all preserved through save/load cycle', () => {
     initDB()
-    const { persons, activeTreeId, save, nowStr } = getDB()
+    const { persons, activeTreeId, save } = getDB()
     const id = 'integrity-test'
     persons[id] = {
-      id, tree_id: activeTreeId,
-      name: 'Full Field Test', birth_year: 1985, death_year: 2050,
-      gender: 'female', bio: 'Bio with special chars: "quotes", <tags>, & ampersand',
-      occupation: 'Engineer & Designer', location: 'New York, NY',
-      created_at: '2026-01-15 10:30:00', updated_at: '2026-03-31 12:00:00'
+      id,
+      tree_id: activeTreeId,
+      name: 'Full Field Test',
+      birth_year: 1985,
+      death_year: 2050,
+      gender: 'female',
+      bio: 'Bio with special chars: "quotes", <tags>, & ampersand',
+      occupation: 'Engineer & Designer',
+      location: 'New York, NY',
+      created_at: '2026-01-15 10:30:00',
+      updated_at: '2026-03-31 12:00:00'
     }
     save()
 
@@ -496,10 +740,17 @@ describe('Data integrity', () => {
     initDB()
     const { persons, activeTreeId, save, nowStr } = getDB()
     persons['null-test'] = {
-      id: 'null-test', tree_id: activeTreeId,
-      name: '', birth_year: null, death_year: null, gender: 'unknown',
-      bio: '', occupation: '', location: '',
-      created_at: nowStr(), updated_at: nowStr()
+      id: 'null-test',
+      tree_id: activeTreeId,
+      name: '',
+      birth_year: null,
+      death_year: null,
+      gender: 'unknown',
+      bio: '',
+      occupation: '',
+      location: '',
+      created_at: nowStr(),
+      updated_at: nowStr()
     }
     save()
     expect(() => getDB()).not.toThrow()

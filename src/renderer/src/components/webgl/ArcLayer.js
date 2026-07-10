@@ -16,13 +16,17 @@ export class ArcLayer {
     this._allocate(16)
   }
 
-  get object3d() { return this.mesh }
+  get object3d() {
+    return this.mesh
+  }
 
   _allocate(capacity) {
     if (this.geometry) this.geometry.dispose()
     const g = new THREE.InstancedBufferGeometry()
-    g.setAttribute('position', new THREE.Float32BufferAttribute(
-      [-1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0], 3))
+    g.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute([-1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0], 3)
+    )
     g.setIndex([0, 1, 2, 2, 1, 3])
     const mk = (name, size) => {
       const arr = new Float32Array(capacity * size)
@@ -54,11 +58,15 @@ export class ArcLayer {
   }
 
   set(i, cx, cy, radius, a0, a1, width, rgb, opacity, spin = 0) {
-    this.center[i * 2] = cx; this.center[i * 2 + 1] = cy
+    this.center[i * 2] = cx
+    this.center[i * 2 + 1] = cy
     this.radius[i] = radius
-    this.a0[i] = a0; this.a1[i] = a1
+    this.a0[i] = a0
+    this.a1[i] = a1
     this.width[i] = width
-    this.color[i * 3] = rgb[0]; this.color[i * 3 + 1] = rgb[1]; this.color[i * 3 + 2] = rgb[2]
+    this.color[i * 3] = rgb[0]
+    this.color[i * 3 + 1] = rgb[1]
+    this.color[i * 3 + 2] = rgb[2]
     this.opacity[i] = opacity
     this.spin[i] = spin
   }
@@ -69,7 +77,9 @@ export class ArcLayer {
       this._attr[k].needsUpdate = true
   }
 
-  setTime(t) { this.material.uniforms.uTime.value = t }
+  setTime(t) {
+    this.material.uniforms.uTime.value = t
+  }
 
   dispose() {
     this.geometry?.dispose()
@@ -143,6 +153,6 @@ function createArcMaterial() {
         if (a < 0.003) discard;
         fragColor = vec4(vColor, a);
       }
-    `,
+    `
   })
 }

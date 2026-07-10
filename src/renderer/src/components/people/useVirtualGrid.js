@@ -1,5 +1,14 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { columnCount, gridHeight, rowWindow, CARD_W, GAP, PAD, ROW_H, OVERSCAN_ROWS } from './peopleLayout.js'
+import {
+  columnCount,
+  gridHeight,
+  rowWindow,
+  CARD_W,
+  GAP,
+  PAD,
+  ROW_H,
+  OVERSCAN_ROWS
+} from './peopleLayout.js'
 
 // Windowed CSS-grid virtualization over a native scroll container.
 //
@@ -61,8 +70,14 @@ export function useVirtualGrid(scrollEl, count, opts = {}) {
     if (scrollEl.value) ro.observe(scrollEl.value)
   })
   onBeforeUnmount(() => {
-    if (ro) { ro.disconnect(); ro = null }
-    if (raf) { cancelAnimationFrame(raf); raf = 0 }
+    if (ro) {
+      ro.disconnect()
+      ro = null
+    }
+    if (raf) {
+      cancelAnimationFrame(raf)
+      raf = 0
+    }
   })
 
   return { cols, totalHeight, win, onScroll, remeasure }

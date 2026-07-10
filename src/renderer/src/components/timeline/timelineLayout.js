@@ -7,17 +7,17 @@
 
 import { computeGenLayout } from '../graph/layoutGeneration.js'
 
-export const GUTTER = 64   // fixed year-axis gutter width (screen px)
-export const LANE_W = 150  // horizontal distance between lifelines (unscaled px)
-export const X0 = 110      // x of the first lane (unscaled px)
-export const Y_PAD = 40    // screen-space padding above the first year
+export const GUTTER = 64 // fixed year-axis gutter width (screen px)
+export const LANE_W = 150 // horizontal distance between lifelines (unscaled px)
+export const X0 = 110 // x of the first lane (unscaled px)
+export const Y_PAD = 40 // screen-space padding above the first year
 
 export function lifeEnd(p, refYear) {
-  return (p.death_year && p.death_year <= refYear) ? p.death_year : refYear
+  return p.death_year && p.death_year <= refYear ? p.death_year : refYear
 }
 
 export function computeTimelineLayout(persons, relationships, refYear) {
-  const dated = persons.filter(p => p.birth_year)
+  const dated = persons.filter((p) => p.birth_year)
 
   // Lane order comes from the same family-tree layout the Tree View's Generation
   // mode uses: spouses sit side by side and children are placed with their
@@ -27,13 +27,15 @@ export function computeTimelineLayout(persons, relationships, refYear) {
     const xa = targets[a.id]?.x ?? Infinity
     const xb = targets[b.id]?.x ?? Infinity
     if (xa !== xb) return xa - xb
-    return (a.birth_year - b.birth_year) || (a.name || '').localeCompare(b.name || '')
+    return a.birth_year - b.birth_year || (a.name || '').localeCompare(b.name || '')
   })
 
-  const minYear = dated.length ? Math.min(...dated.map(p => p.birth_year)) : refYear - 50
+  const minYear = dated.length ? Math.min(...dated.map((p) => p.birth_year)) : refYear - 50
   let maxYear = minYear + 10
-  dated.forEach(p => { maxYear = Math.max(maxYear, lifeEnd(p, refYear)) })
-  relationships.forEach(r => {
+  dated.forEach((p) => {
+    maxYear = Math.max(maxYear, lifeEnd(p, refYear))
+  })
+  relationships.forEach((r) => {
     const y = parseInt(r.formed_date)
     if (y) maxYear = Math.max(maxYear, y)
   })
@@ -55,11 +57,11 @@ export function computeTimelineLayout(persons, relationships, refYear) {
       image: p.primary_image || null,
       yearsLabel: dead
         ? `${p.birth_year}–${p.death_year} · ${age} yr`
-        : `b. ${p.birth_year} · ${age} yr`,
+        : `b. ${p.birth_year} · ${age} yr`
     }
   })
-  const laneById = new Map(people.map(p => [p.id, p]))
-  const personById = new Map(persons.map(p => [p.id, p]))
+  const laneById = new Map(people.map((p) => [p.id, p]))
+  const personById = new Map(persons.map((p) => [p.id, p]))
 
   const marriages = []
   const births = []
@@ -94,7 +96,7 @@ export function computeTimelineLayout(persons, relationships, refYear) {
         divorced,
         estimated,
         badge,
-        bw: badge.length * 6.6 + 20,
+        bw: badge.length * 6.6 + 20
       })
     } else if (r.type === 'parent_child' || r.type === 'adopted') {
       const parent = laneById.get(r.person_a_id)
@@ -106,15 +108,19 @@ export function computeTimelineLayout(persons, relationships, refYear) {
         laneXp: parent.laneX,
         laneXc: child.laneX,
         year: child.birthYear,
-        adopted: r.type === 'adopted',
+        adopted: r.type === 'adopted'
       })
     }
   }
 
   return {
-    people, marriages, births,
-    minYear, maxYear, yearSpan,
+    people,
+    marriages,
+    births,
+    minYear,
+    maxYear,
+    yearSpan,
     worldWBase: X0 + Math.max(0, people.length - 1) * LANE_W + 220,
-    undatedCount: persons.length - people.length,
+    undatedCount: persons.length - people.length
   }
 }

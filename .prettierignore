@@ -1,0 +1,9 @@
+node_modules/
+out/
+dist/
+package-lock.json
+*.md
+designDraft.txt
+preview.html
+test_main.js
+test_main2.js

@@ -1,10 +1,6 @@
 <template>
   <Transition name="slide">
-    <div
-      v-if="store.formOpen"
-      class="form-backdrop"
-      @click.self="store.closeForm()"
-    >
+    <div v-if="store.formOpen" class="form-backdrop" @click.self="store.closeForm()">
       <div class="form-panel">
         <!-- Header -->
         <div class="form-header">
@@ -92,11 +88,7 @@
 
             <!-- Existing relationships (edit mode) -->
             <div v-if="store.editingPerson && existingRels.length > 0" class="existing-rels">
-              <div
-                v-for="rel in existingRels"
-                :key="rel.id"
-                class="rel-card"
-              >
+              <div v-for="rel in existingRels" :key="rel.id" class="rel-card">
                 <div class="rel-card-top">
                   <span class="chip-rel-type">{{ rel.roleLabel }}</span>
                   <span class="chip-person-name">{{ rel.otherName }}</span>
@@ -106,14 +98,28 @@
                 <div class="rel-card-fields">
                   <div v-if="rel.relType === 'spouse'" class="rel-inline-field">
                     <label class="rel-field-label">Status</label>
-                    <select :value="rel.status" @change="updateExistingRelStatus(rel.id, $event.target.value)" class="rel-mini-select">
+                    <select
+                      :value="rel.status"
+                      class="rel-mini-select"
+                      @change="updateExistingRelStatus(rel.id, $event.target.value)"
+                    >
                       <option value="active">Married</option>
                       <option value="divorced">Divorced</option>
                     </select>
                   </div>
                   <div class="rel-inline-field">
-                    <label class="rel-field-label">{{ rel.relType === 'spouse' ? 'Married' : 'Since' }}</label>
-                    <input type="number" :value="rel.formedDate" @change="updateExistingRelDate(rel.id, $event.target.value)" class="rel-mini-input" placeholder="Year" min="1" max="2100" />
+                    <label class="rel-field-label">{{
+                      rel.relType === 'spouse' ? 'Married' : 'Since'
+                    }}</label>
+                    <input
+                      type="number"
+                      :value="rel.formedDate"
+                      class="rel-mini-input"
+                      placeholder="Year"
+                      min="1"
+                      max="2100"
+                      @change="updateExistingRelDate(rel.id, $event.target.value)"
+                    />
                   </div>
                 </div>
               </div>
@@ -123,7 +129,7 @@
             <div v-if="pendingLinks.length > 0" class="existing-rels">
               <div
                 v-for="(link, idx) in pendingLinks"
-                :key="'p'+idx"
+                :key="'p' + idx"
                 class="rel-card rel-card-new"
               >
                 <div class="rel-card-top">
@@ -140,8 +146,17 @@
                     </select>
                   </div>
                   <div class="rel-inline-field">
-                    <label class="rel-field-label">{{ link.relType === 'spouse_of' ? 'Married' : 'Since' }}</label>
-                    <input type="number" v-model.number="link.formedDate" class="rel-mini-input" placeholder="Year" min="1" max="2100" />
+                    <label class="rel-field-label">{{
+                      link.relType === 'spouse_of' ? 'Married' : 'Since'
+                    }}</label>
+                    <input
+                      v-model.number="link.formedDate"
+                      type="number"
+                      class="rel-mini-input"
+                      placeholder="Year"
+                      min="1"
+                      max="2100"
+                    />
                   </div>
                 </div>
               </div>
@@ -150,11 +165,9 @@
             <div class="link-add-row">
               <select v-model="newLink.personId" class="link-select">
                 <option value="">Select person…</option>
-                <option
-                  v-for="p in availablePersons"
-                  :key="p.id"
-                  :value="p.id"
-                >{{ p.name }}</option>
+                <option v-for="p in availablePersons" :key="p.id" :value="p.id">
+                  {{ p.name }}
+                </option>
               </select>
               <select v-model="newLink.relType" class="link-select">
                 <option value="child_of">Is child of</option>
@@ -162,11 +175,7 @@
                 <option value="spouse_of">Is spouse of</option>
                 <option value="adopted_by">Was adopted by</option>
               </select>
-              <button
-                class="btn btn-ghost btn-sm"
-                :disabled="!newLink.personId"
-                @click="addLink"
-              >
+              <button class="btn btn-ghost btn-sm" :disabled="!newLink.personId" @click="addLink">
                 ＋ Add
               </button>
             </div>
@@ -193,18 +202,22 @@
                       class="photo-action-btn photo-star-btn"
                       title="Set as primary"
                       @click="setPrimary(photo)"
-                    >★</button>
+                    >
+                      ★
+                    </button>
                     <span v-else class="photo-primary-icon">★</span>
                     <button
                       class="photo-action-btn photo-delete-btn"
                       title="Delete photo"
                       @click="deletePhoto(photo)"
-                    >✕</button>
+                    >
+                      ✕
+                    </button>
                   </div>
                   <div v-if="photo.is_primary" class="primary-badge">Primary</div>
                 </div>
               </div>
-              <button class="btn btn-ghost btn-sm" style="margin-top: 8px;" @click="addPhoto">
+              <button class="btn btn-ghost btn-sm" style="margin-top: 8px" @click="addPhoto">
                 + Add Photo
               </button>
             </div>
@@ -215,7 +228,7 @@
         <div class="form-footer">
           <button class="btn btn-ghost" @click="store.closeForm()">Cancel</button>
           <button class="btn btn-primary" :disabled="submitting" @click="handleSubmit">
-            {{ submitting ? 'Saving…' : (store.editingPerson ? 'Save Changes' : 'Create Person') }}
+            {{ submitting ? 'Saving…' : store.editingPerson ? 'Save Changes' : 'Create Person' }}
           </button>
         </div>
       </div>
@@ -259,18 +272,18 @@ const availablePersons = computed(() => {
   const editId = store.editingPerson?.id
   const linkedIds = new Set()
   if (editId) {
-    existingRels.value.forEach(r => linkedIds.add(r.otherId))
+    existingRels.value.forEach((r) => linkedIds.add(r.otherId))
   }
-  pendingLinks.value.forEach(l => linkedIds.add(l.personId))
-  return store.persons.filter(p => p.id !== editId && !linkedIds.has(p.id))
+  pendingLinks.value.forEach((l) => linkedIds.add(l.personId))
+  return store.persons.filter((p) => p.id !== editId && !linkedIds.has(p.id))
 })
 
 function buildExistingRels(personId) {
   const rels = []
-  store.relationships.forEach(r => {
+  store.relationships.forEach((r) => {
     if (r.person_a_id !== personId && r.person_b_id !== personId) return
     const otherId = r.person_a_id === personId ? r.person_b_id : r.person_a_id
-    const other = store.persons.find(p => p.id === otherId)
+    const other = store.persons.find((p) => p.id === otherId)
     if (!other) return
     let roleLabel = ''
     if (r.type === 'spouse') {
@@ -281,10 +294,13 @@ function buildExistingRels(personId) {
       roleLabel = r.person_a_id === personId ? 'Adoptive parent of' : 'Adopted by'
     }
     rels.push({
-      id: r.id, otherId, otherName: other.name, roleLabel,
+      id: r.id,
+      otherId,
+      otherName: other.name,
+      roleLabel,
       relType: r.type,
       status: r.status || 'active',
-      formedDate: r.formed_date || null,
+      formedDate: r.formed_date || null
     })
   })
   return rels
@@ -292,60 +308,64 @@ function buildExistingRels(personId) {
 
 async function removeExistingRel(relId) {
   await store.deleteRelationship(relId)
-  existingRels.value = existingRels.value.filter(r => r.id !== relId)
+  existingRels.value = existingRels.value.filter((r) => r.id !== relId)
 }
 
 async function updateExistingRelStatus(relId, status) {
   await store.updateRelationship({ id: relId, status })
-  const rel = existingRels.value.find(r => r.id === relId)
+  const rel = existingRels.value.find((r) => r.id === relId)
   if (rel) rel.status = status
 }
 
 async function updateExistingRelDate(relId, val) {
   const formedDate = val ? +val : null
   await store.updateRelationship({ id: relId, formed_date: formedDate })
-  const rel = existingRels.value.find(r => r.id === relId)
+  const rel = existingRels.value.find((r) => r.id === relId)
   if (rel) rel.formedDate = formedDate
 }
 
 // Populate form when editing
-watch(() => store.editingPerson, async (person) => {
-  if (person) {
-    const parts = person.name.trim().split(/\s+/)
-    form.value = {
-      firstName: parts.slice(0, -1).join(' ') || parts[0] || '',
-      lastName: parts.length > 1 ? parts[parts.length - 1] : '',
-      gender: person.gender || 'unknown',
-      birthYear: person.birth_year || null,
-      deathYear: person.death_year || null,
-      occupation: person.occupation || '',
-      location: person.location || '',
-      bio: person.bio || ''
+watch(
+  () => store.editingPerson,
+  async (person) => {
+    if (person) {
+      const parts = person.name.trim().split(/\s+/)
+      form.value = {
+        firstName: parts.slice(0, -1).join(' ') || parts[0] || '',
+        lastName: parts.length > 1 ? parts[parts.length - 1] : '',
+        gender: person.gender || 'unknown',
+        birthYear: person.birth_year || null,
+        deathYear: person.death_year || null,
+        occupation: person.occupation || '',
+        location: person.location || '',
+        bio: person.bio || ''
+      }
+      errors.value.firstName = ''
+      existingRels.value = buildExistingRels(person.id)
+      pendingLinks.value = []
+      // Load photos
+      const res = await api.invoke('images:getByPerson', { personId: person.id })
+      if (res.success) photos.value = res.data
+      else photos.value = []
+    } else {
+      form.value = {
+        firstName: '',
+        lastName: '',
+        gender: 'unknown',
+        birthYear: null,
+        deathYear: null,
+        occupation: '',
+        location: '',
+        bio: ''
+      }
+      errors.value.firstName = ''
+      pendingLinks.value = []
+      existingRels.value = []
+      photos.value = []
     }
-    errors.value.firstName = ''
-    existingRels.value = buildExistingRels(person.id)
-    pendingLinks.value = []
-    // Load photos
-    const res = await api.invoke('images:getByPerson', { personId: person.id })
-    if (res.success) photos.value = res.data
-    else photos.value = []
-  } else {
-    form.value = {
-      firstName: '',
-      lastName: '',
-      gender: 'unknown',
-      birthYear: null,
-      deathYear: null,
-      occupation: '',
-      location: '',
-      bio: ''
-    }
-    errors.value.firstName = ''
-    pendingLinks.value = []
-    existingRels.value = []
-    photos.value = []
-  }
-}, { immediate: true })
+  },
+  { immediate: true }
+)
 
 function fullName() {
   const first = form.value.firstName.trim()
@@ -364,7 +384,7 @@ function relTypeLabel(relType) {
 }
 
 function personName(pid) {
-  const p = store.persons.find(x => x.id === pid)
+  const p = store.persons.find((x) => x.id === pid)
   return p ? p.name : pid
 }
 
@@ -396,8 +416,9 @@ async function addPhoto() {
   if (addRes.success) {
     photos.value.push(addRes.data)
     if (isPrimary) {
-      const idx = store.persons.findIndex(p => p.id === store.editingPerson.id)
-      if (idx !== -1) store.persons[idx] = { ...store.persons[idx], primary_image: addRes.data.file_path }
+      const idx = store.persons.findIndex((p) => p.id === store.editingPerson.id)
+      if (idx !== -1)
+        store.persons[idx] = { ...store.persons[idx], primary_image: addRes.data.file_path }
     }
   }
 }
@@ -405,21 +426,23 @@ async function addPhoto() {
 async function setPrimary(photo) {
   if (!store.editingPerson) return
   await api.invoke('images:setPrimary', { imageId: photo.id, personId: store.editingPerson.id })
-  photos.value.forEach(p => { p.is_primary = p.id === photo.id ? 1 : 0 })
+  photos.value.forEach((p) => {
+    p.is_primary = p.id === photo.id ? 1 : 0
+  })
   // Update person's primary_image in the store so the graph node updates
-  const idx = store.persons.findIndex(p => p.id === store.editingPerson.id)
+  const idx = store.persons.findIndex((p) => p.id === store.editingPerson.id)
   if (idx !== -1) store.persons[idx] = { ...store.persons[idx], primary_image: photo.file_path }
 }
 
 async function deletePhoto(photo) {
   await api.invoke('images:delete', { imageId: photo.id })
-  photos.value = photos.value.filter(p => p.id !== photo.id)
+  photos.value = photos.value.filter((p) => p.id !== photo.id)
   if (photo.is_primary && store.editingPerson) {
     // If remaining photos exist, make the first one primary
     if (photos.value.length > 0) {
       await setPrimary(photos.value[0])
     } else {
-      const idx = store.persons.findIndex(p => p.id === store.editingPerson.id)
+      const idx = store.persons.findIndex((p) => p.id === store.editingPerson.id)
       if (idx !== -1) store.persons[idx] = { ...store.persons[idx], primary_image: null }
     }
   }
@@ -456,14 +479,29 @@ async function handleSubmit() {
       for (const link of pendingLinks.value) {
         let person_a_id, person_b_id, type
         const editId = store.editingPerson.id
-        if (link.relType === 'child_of') { person_a_id = link.personId; person_b_id = editId; type = 'parent_child' }
-        else if (link.relType === 'parent_of') { person_a_id = editId; person_b_id = link.personId; type = 'parent_child' }
-        else if (link.relType === 'spouse_of') { person_a_id = editId; person_b_id = link.personId; type = 'spouse' }
-        else if (link.relType === 'adopted_by') { person_a_id = link.personId; person_b_id = editId; type = 'adopted' }
+        if (link.relType === 'child_of') {
+          person_a_id = link.personId
+          person_b_id = editId
+          type = 'parent_child'
+        } else if (link.relType === 'parent_of') {
+          person_a_id = editId
+          person_b_id = link.personId
+          type = 'parent_child'
+        } else if (link.relType === 'spouse_of') {
+          person_a_id = editId
+          person_b_id = link.personId
+          type = 'spouse'
+        } else if (link.relType === 'adopted_by') {
+          person_a_id = link.personId
+          person_b_id = editId
+          type = 'adopted'
+        }
         await store.createRelationship({
-          person_a_id, person_b_id, type,
+          person_a_id,
+          person_b_id,
+          type,
           status: link.divorced ? 'divorced' : 'active',
-          formed_date: link.formedDate || null,
+          formed_date: link.formedDate || null
         })
       }
     } else {
@@ -494,9 +532,11 @@ async function handleSubmit() {
           }
 
           await store.createRelationship({
-            person_a_id, person_b_id, type,
+            person_a_id,
+            person_b_id,
+            type,
             status: link.divorced ? 'divorced' : 'active',
-            formed_date: link.formedDate || null,
+            formed_date: link.formedDate || null
           })
         }
       }

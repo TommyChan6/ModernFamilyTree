@@ -25,7 +25,7 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
       uShadowStrength: { value: 0.35 },
       uShadowOffset: { value: new THREE.Vector2(0.09, 0.135) }, // corner units (dx2,dy3 @ r22)
       uGlowColor: { value: new THREE.Color(0x6c8ef5) },
-      uSilhouetteColor: { value: new THREE.Color(1, 1, 1) },
+      uSilhouetteColor: { value: new THREE.Color(1, 1, 1) }
     },
     vertexShader: /* glsl */ `
       // Three injects: in vec3 position; (the quad corner in [-1,1]) + matrices.
@@ -145,6 +145,6 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
         if (col.a < 0.002) discard;
         fragColor = col;
       }
-    `,
+    `
   })
 }

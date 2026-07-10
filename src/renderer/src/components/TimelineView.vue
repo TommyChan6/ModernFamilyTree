@@ -9,10 +9,13 @@
           v-if="undatedCount"
           class="tl-undated"
           :title="'People without a birth year cannot be placed on the timeline. Add a birth year in their profile to include them.'"
-        >{{ undatedCount }} undated</span>
+          >{{ undatedCount }} undated</span
+        >
       </div>
 
-      <span class="tl-hint">Drag to pan · Scroll to zoom · Ctrl: time only · Shift: width only</span>
+      <span class="tl-hint"
+        >Drag to pan · Scroll to zoom · Ctrl: time only · Shift: width only</span
+      >
     </div>
 
     <!-- Stage: three stacked canvases (grid · WebGL world · gutter/labels) -->
@@ -37,9 +40,11 @@
           {{ store.persons.length ? 'No datable people' : 'No people yet' }}
         </div>
         <div class="tl-empty-text">
-          {{ store.persons.length
-            ? 'Add birth years to your family members to see their lives unfold on the timeline.'
-            : 'Add family members from the tree view to see them here.' }}
+          {{
+            store.persons.length
+              ? 'Add birth years to your family members to see their lives unfold on the timeline.'
+              : 'Add family members from the tree view to see them here.'
+          }}
         </div>
       </div>
 
@@ -65,15 +70,32 @@
         <div class="tl-panel-title">Legend</div>
         <div class="tl-leg-section">
           <div class="tl-leg-label">People</div>
-          <div class="tl-leg-row"><span class="tl-leg-dot" :style="{ background: colors.male }"></span>Male</div>
-          <div class="tl-leg-row"><span class="tl-leg-dot" :style="{ background: colors.female }"></span>Female</div>
+          <div class="tl-leg-row">
+            <span class="tl-leg-dot" :style="{ background: colors.male }"></span>Male
+          </div>
+          <div class="tl-leg-row">
+            <span class="tl-leg-dot" :style="{ background: colors.female }"></span>Female
+          </div>
         </div>
         <div class="tl-leg-section">
           <div class="tl-leg-label">Lines</div>
-          <div class="tl-leg-row"><span class="tl-leg-line" :style="{ background: colors.spouse }"></span>Marriage</div>
-          <div class="tl-leg-row"><span class="tl-leg-line tl-leg-dashed" :style="{ borderColor: colors.spouse }"></span>Divorced</div>
-          <div class="tl-leg-row"><span class="tl-leg-line" :style="{ background: colors.parentChild }"></span>Birth</div>
-          <div class="tl-leg-row"><span class="tl-leg-line tl-leg-dashed" :style="{ borderColor: colors.parentChild }"></span>Adopted</div>
+          <div class="tl-leg-row">
+            <span class="tl-leg-line" :style="{ background: colors.spouse }"></span>Marriage
+          </div>
+          <div class="tl-leg-row">
+            <span class="tl-leg-line tl-leg-dashed" :style="{ borderColor: colors.spouse }"></span
+            >Divorced
+          </div>
+          <div class="tl-leg-row">
+            <span class="tl-leg-line" :style="{ background: colors.parentChild }"></span>Birth
+          </div>
+          <div class="tl-leg-row">
+            <span
+              class="tl-leg-line tl-leg-dashed"
+              :style="{ borderColor: colors.parentChild }"
+            ></span
+            >Adopted
+          </div>
         </div>
       </div>
 
@@ -129,12 +151,12 @@ const store = useMainStore()
 const props = defineProps({ active: { type: Boolean, default: true } })
 
 // ── Zoom constants ──────────────────────────────────────────────────────────
-const MIN_PX = 0.02      // min pixels per year (near-boundless zoom out)
-const MAX_PX = 64        // max pixels per year (zoomed all the way in)
-const BASE_PX = 8        // "100%" zoom reference
-const MIN_LS = 0.05      // min horizontal lane scale
-const MAX_LS = 3         // max horizontal lane scale
-const KEEP = 100         // min pixels of world that must stay in view
+const MIN_PX = 0.02 // min pixels per year (near-boundless zoom out)
+const MAX_PX = 64 // max pixels per year (zoomed all the way in)
+const BASE_PX = 8 // "100%" zoom reference
+const MIN_LS = 0.05 // min horizontal lane scale
+const MAX_LS = 3 // max horizontal lane scale
+const KEEP = 100 // min pixels of world that must stay in view
 
 // ── Viewport state ──────────────────────────────────────────────────────────
 const stageEl = ref(null)
@@ -161,10 +183,13 @@ const searchSet = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   const s = new Set()
   if (!q) return s
-  store.persons.forEach(p => {
-    if ((p.name || '').toLowerCase().includes(q) ||
-        (p.occupation || '').toLowerCase().includes(q) ||
-        (p.location || '').toLowerCase().includes(q)) s.add(p.id)
+  store.persons.forEach((p) => {
+    if (
+      (p.name || '').toLowerCase().includes(q) ||
+      (p.occupation || '').toLowerCase().includes(q) ||
+      (p.location || '').toLowerCase().includes(q)
+    )
+      s.add(p.id)
   })
   return s
 })
@@ -176,11 +201,11 @@ function isDimmed(id) {
 }
 function connDimmed(ids) {
   if (hoverId.value) return !ids.includes(hoverId.value)
-  if (searchOn.value) return !ids.some(id => searchSet.value.has(id))
+  if (searchOn.value) return !ids.some((id) => searchSet.value.has(id))
   return false
 }
 
-const fmtPct = (v) => v >= 10 ? `${Math.round(v)}` : `${Math.max(0.1, Math.round(v * 10) / 10)}`
+const fmtPct = (v) => (v >= 10 ? `${Math.round(v)}` : `${Math.max(0.1, Math.round(v * 10) / 10)}`)
 const zoomLabel = computed(() => {
   const v = fmtPct((pxPerYear.value / BASE_PX) * 100)
   const h = fmtPct(laneScale.value * 100)
@@ -193,7 +218,7 @@ const colors = computed(() => ({
   female: store.graphSettings.femaleColor,
   unknown: store.graphSettings.unknownColor,
   spouse: store.graphSettings.spouseColor,
-  parentChild: store.graphSettings.parentChildColor,
+  parentChild: store.graphSettings.parentChildColor
 }))
 
 function genderColor(g) {
@@ -215,7 +240,7 @@ const relatedSet = computed(() => {
   const s = new Set()
   if (!hoverId.value) return s
   s.add(hoverId.value)
-  store.relationships.forEach(r => {
+  store.relationships.forEach((r) => {
     if (r.person_a_id === hoverId.value) s.add(r.person_b_id)
     if (r.person_b_id === hoverId.value) s.add(r.person_a_id)
   })
@@ -229,12 +254,12 @@ function personVisual(p) {
   const selected = store.selectedPersonId === p.id
   return {
     opacity: isDimmed(p.id) ? 0.22 : 1,
-    lineWidth: (hovered || lit || selected) ? 9 : 6,
+    lineWidth: hovered || lit || selected ? 9 : 6,
     avatarScale: hovered ? 1.15 : 1,
     glow: hovered ? 0.5 : 0,
     selected,
     color: genderColor(p.gender),
-    imageUrl: p.image ? (api.getImageUrl(p.image) || null) : null,
+    imageUrl: p.image ? api.getImageUrl(p.image) || null : null
   }
 }
 
@@ -246,10 +271,11 @@ function marriageVisual(m) {
   return {
     lineOpacity: (lit ? 1 : base) * group,
     width: lit ? 2.5 : 2.4,
-    dashLen: dash[0], dashGap: dash[1],
+    dashLen: dash[0],
+    dashGap: dash[1],
     dotOpacity: (m.estimated ? 0.4 : 1) * group,
     badgeOpacity: group,
-    color: colors.value.spouse,
+    color: colors.value.spouse
   }
 }
 
@@ -259,14 +285,20 @@ function birthVisual(b) {
   return {
     lineOpacity: (lit ? 0.95 : 0.55) * group,
     width: lit ? 2.2 : 1.8,
-    dashLen: b.adopted ? 4 : 0, dashGap: b.adopted ? 4 : 0,
+    dashLen: b.adopted ? 4 : 0,
+    dashGap: b.adopted ? 4 : 0,
     dotOpacity: 0.8 * group,
-    color: colors.value.parentChild,
+    color: colors.value.parentChild
   }
 }
 
 // ── Pan / zoom mechanics ────────────────────────────────────────────────────
-let startX = 0, startY = 0, startTx = 0, startTy = 0, moved = false, suppressClick = false
+let startX = 0,
+  startY = 0,
+  startTx = 0,
+  startTy = 0,
+  moved = false,
+  suppressClick = false
 
 function syncCamera() {
   renderer?.setCamera({ px: pxPerYear.value, ls: laneScale.value, tx: tx.value, ty: ty.value })
@@ -296,13 +328,16 @@ function onPointerDown(e) {
   panning.value = true
   moved = false
   cancelTween()
-  startX = e.clientX; startY = e.clientY
-  startTx = tx.value; startTy = ty.value
+  startX = e.clientX
+  startY = e.clientY
+  startTx = tx.value
+  startTy = ty.value
   window.addEventListener('pointermove', onPointerMove)
   window.addEventListener('pointerup', onPointerUp)
 }
 function onPointerMove(e) {
-  const dx = e.clientX - startX, dy = e.clientY - startY
+  const dx = e.clientX - startX,
+    dy = e.clientY - startY
   if (!moved && Math.hypot(dx, dy) > 4) moved = true
   if (!moved) return
   tx.value = startTx + dx
@@ -332,12 +367,13 @@ function onWheel(e) {
   const vertical = !e.shiftKey
   const horizontal = !e.ctrlKey && !e.metaKey
 
-  const oldPx = pxPerYear.value, oldLs = laneScale.value
+  const oldPx = pxPerYear.value,
+    oldLs = laneScale.value
   const newPx = vertical ? Math.min(MAX_PX, Math.max(MIN_PX, oldPx * factor)) : oldPx
   const newLs = horizontal ? Math.min(MAX_LS, Math.max(MIN_LS, oldLs * factor)) : oldLs
   // Keep the point under the cursor fixed on each zoomed axis
   if (vertical) ty.value = anchorTy(my, ty.value, newPx / oldPx)
-  if (horizontal) tx.value = mx - ((mx - tx.value) * (newLs / oldLs))
+  if (horizontal) tx.value = mx - (mx - tx.value) * (newLs / oldLs)
   pxPerYear.value = newPx
   laneScale.value = newLs
   clampPan()
@@ -375,17 +411,26 @@ function onStageMove(e) {
 
 function onStageLeave() {
   renderer?.setMouseY(null)
-  if (hoverId.value) { hoverId.value = null; renderer?.markStylesDirty() }
+  if (hoverId.value) {
+    hoverId.value = null
+    renderer?.markStylesDirty()
+  }
   hoverBadge.value = null
   renderer?.setHoverBadge(null)
 }
 
 function onStageClick(e) {
-  if (suppressClick) { suppressClick = false; return }
+  if (suppressClick) {
+    suppressClick = false
+    return
+  }
   if (!stageEl.value || !renderer) return
   const p = stagePoint(e)
   const badge = renderer?.badgeAt(p.x, p.y)
-  if (badge) { openMarriageEdit(badge.m, e); return }
+  if (badge) {
+    openMarriageEdit(badge.m, e)
+    return
+  }
   const person = renderer?.personAt(p.x, p.y)
   if (person) {
     mEdit.value = null
@@ -397,7 +442,12 @@ function onStageClick(e) {
 
 // ── Smooth tween for zoom buttons / fit ─────────────────────────────────────
 let tweenRaf = 0
-function cancelTween() { if (tweenRaf) { cancelAnimationFrame(tweenRaf); tweenRaf = 0 } }
+function cancelTween() {
+  if (tweenRaf) {
+    cancelAnimationFrame(tweenRaf)
+    tweenRaf = 0
+  }
+}
 
 function tweenTo(targetPx, targetLs, targetTx, targetTy, ms = 320) {
   cancelTween()
@@ -405,7 +455,7 @@ function tweenTo(targetPx, targetLs, targetTx, targetTy, ms = 320) {
   const s = { px: pxPerYear.value, ls: laneScale.value, tx: tx.value, ty: ty.value }
   const d = { px: targetPx, ls: targetLs, tx: c.x, ty: c.y }
   const t0 = performance.now()
-  const ease = t => 1 - Math.pow(1 - t, 3)
+  const ease = (t) => 1 - Math.pow(1 - t, 3)
   const step = (now) => {
     const t = Math.min(1, (now - t0) / ms)
     const k = ease(t)
@@ -422,11 +472,12 @@ function tweenTo(targetPx, targetLs, targetTx, targetTy, ms = 320) {
 function zoomBy(factor) {
   const cx = stageW.value / 2
   const cy = stageH.value / 2
-  const oldPx = pxPerYear.value, oldLs = laneScale.value
+  const oldPx = pxPerYear.value,
+    oldLs = laneScale.value
   const newPx = Math.min(MAX_PX, Math.max(MIN_PX, oldPx * factor))
   const newLs = Math.min(MAX_LS, Math.max(MIN_LS, oldLs * factor))
   const newTy = anchorTy(cy, ty.value, newPx / oldPx)
-  const newTx = cx - ((cx - tx.value) * (newLs / oldLs))
+  const newTx = cx - (cx - tx.value) * (newLs / oldLs)
   tweenTo(newPx, newLs, newTx, newTy)
 }
 
@@ -464,7 +515,7 @@ function openMarriageEdit(m, e) {
     year: m.realYear,
     status: m.status,
     px: Math.min(Math.max(8, p.x - 110), stageW.value - 230),
-    py: Math.min(Math.max(8, p.y + 14), stageH.value - 140),
+    py: Math.min(Math.max(8, p.y + 14), stageH.value - 140)
   }
   nextTick(() => meditInputRef.value?.focus())
 }
@@ -474,8 +525,8 @@ async function saveMarriageEdit() {
   const year = mEdit.value.year
   await store.updateRelationship({
     id: mEdit.value.relId,
-    formed_date: (year && year > 0) ? year : null,
-    status: mEdit.value.status,
+    formed_date: year && year > 0 ? year : null,
+    status: mEdit.value.status
   })
   mEdit.value = null
 }
@@ -497,45 +548,64 @@ onMounted(() => {
       personVisual,
       marriageVisual,
       birthVisual,
-      getRefYear: () => refYear.value,
-    },
+      getRefYear: () => refYear.value
+    }
   })
   renderer.setTheme(store.theme === 'light')
   renderer.setData(layout.value)
   measure()
   nextTick(() => {
     measure()
-    if (props.active && stageW.value) { fitAll(false); hasFitted = true }
+    if (props.active && stageW.value) {
+      fitAll(false)
+      hasFitted = true
+    }
   })
   // Ignore size reports while hidden (display:none reports 0×0, which would
   // corrupt the pan/zoom state); re-measure only when actually laid out.
   ro = new ResizeObserver(() => {
     if (!stageEl.value?.clientWidth) return
-    measure(); clampPan(); syncCamera()
+    measure()
+    clampPan()
+    syncCamera()
   })
   if (stageEl.value) ro.observe(stageEl.value)
 
   // Coming back into view: fit once (first reveal), otherwise keep the user's
   // pan/zoom and just re-sync to the current stage size.
-  watch(() => props.active, (on) => {
-    if (!on) return
-    nextTick(() => {
-      measure()
-      if (!stageW.value) return
-      if (!hasFitted) { fitAll(false); hasFitted = true }
-      else { clampPan(); syncCamera() }
-    })
-  })
+  watch(
+    () => props.active,
+    (on) => {
+      if (!on) return
+      nextTick(() => {
+        measure()
+        if (!stageW.value) return
+        if (!hasFitted) {
+          fitAll(false)
+          hasFitted = true
+        } else {
+          clampPan()
+          syncCamera()
+        }
+      })
+    }
+  )
 })
 
 watch(layout, (L) => {
   if (!renderer) return
-  if (hoverId.value && !L.people.some(p => p.id === hoverId.value)) hoverId.value = null
+  if (hoverId.value && !L.people.some((p) => p.id === hoverId.value)) hoverId.value = null
   renderer.setData(L)
-  nextTick(() => { clampPan(); syncCamera() })
+  nextTick(() => {
+    clampPan()
+    syncCamera()
+  })
 })
 watch([hoverId, searchSet, () => store.selectedPersonId, colors], () => renderer?.markStylesDirty())
-watch(() => store.theme, () => renderer?.setTheme(store.theme === 'light'))
+watch(
+  () => store.theme,
+  () => renderer?.setTheme(store.theme === 'light')
+)
 
 onBeforeUnmount(() => {
   if (ro) ro.disconnect()
@@ -556,8 +626,7 @@ onBeforeUnmount(() => {
   height: 100%;
   width: 100%;
   background:
-    radial-gradient(1200px 600px at 20% -10%, rgba(139, 108, 197, 0.08), transparent 60%),
-    var(--bg);
+    radial-gradient(1200px 600px at 20% -10%, rgba(139, 108, 197, 0.08), transparent 60%), var(--bg);
   min-height: 0;
 }
 
@@ -575,19 +644,40 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   z-index: 2;
 }
-.tl-heading { display: flex; align-items: center; gap: 10px; }
-.tl-title { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; color: var(--t1); }
+.tl-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tl-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--t1);
+}
 .tl-count {
-  font-size: 12px; font-weight: 700; color: var(--accent);
-  background: var(--adim); padding: 2px 9px; border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--adim);
+  padding: 2px 9px;
+  border-radius: 20px;
 }
 .tl-undated {
-  font-size: 11px; font-weight: 600; color: #f5a623;
-  background: rgba(245, 166, 35, 0.12); padding: 2px 9px; border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #f5a623;
+  background: rgba(245, 166, 35, 0.12);
+  padding: 2px 9px;
+  border-radius: 20px;
   cursor: help;
 }
 
-.tl-hint { font-size: 11px; color: var(--t3); font-weight: 500; }
+.tl-hint {
+  font-size: 11px;
+  color: var(--t3);
+  font-weight: 500;
+}
 
 /* ── Stage ───────────────────────────────────────────────── */
 .tl-stage {
@@ -598,138 +688,328 @@ onBeforeUnmount(() => {
   cursor: grab;
   touch-action: none;
 }
-.tl-stage.dragging { cursor: grabbing; }
-.tl-stage.hoverable:not(.dragging) { cursor: pointer; }
-.tl-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.tl-stage.dragging {
+  cursor: grabbing;
+}
+.tl-stage.hoverable:not(.dragging) {
+  cursor: pointer;
+}
+.tl-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 
 /* ── Floating search (tree-view style) ───────────────────── */
 .tl-search {
-  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 8px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 7px 14px; min-width: 260px; z-index: 5;
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 7px 14px;
+  min-width: 260px;
+  z-index: 5;
   box-shadow: var(--shadow);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
   cursor: default;
 }
-.tl-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108, 142, 245, 0.15); }
-.tl-search-icon { font-size: 13px; flex-shrink: 0; }
+.tl-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(108, 142, 245, 0.15);
+}
+.tl-search-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
 .tl-search input {
-  background: none; border: none; outline: none; font: inherit;
-  font-size: 13px; color: var(--t1); flex: 1; padding: 0; box-shadow: none; width: auto;
+  background: none;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--t1);
+  flex: 1;
+  padding: 0;
+  box-shadow: none;
+  width: auto;
 }
-.tl-search input::placeholder { color: var(--t3); }
+.tl-search input::placeholder {
+  color: var(--t3);
+}
 .tl-search-clear {
-  border: none; background: transparent; color: var(--t3); cursor: pointer;
-  font-size: 11px; padding: 2px; border-radius: 4px; transition: color 0.12s;
+  border: none;
+  background: transparent;
+  color: var(--t3);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px;
+  border-radius: 4px;
+  transition: color 0.12s;
 }
-.tl-search-clear:hover { color: var(--t1); }
+.tl-search-clear:hover {
+  color: var(--t1);
+}
 
 /* ── Zoom controls (tree-view control bar style) ─────────── */
 .tl-controls {
-  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 5;
-  display: flex; align-items: center; gap: 4px;
-  background: var(--surface); border: 1px solid var(--border);
-  padding: 5px; border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 5px;
+  border-radius: 12px;
   box-shadow: var(--shadow);
   cursor: default;
 }
 .tl-ctrl-btn {
-  border: none; background: transparent; color: var(--t2);
-  font-family: var(--font); font-size: 15px;
-  width: 30px; height: 30px; border-radius: 7px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: background 0.12s, color 0.12s;
+  border: none;
+  background: transparent;
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 15px;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
-.tl-ctrl-btn:hover { background: var(--hover); color: var(--t1); }
+.tl-ctrl-btn:hover {
+  background: var(--hover);
+  color: var(--t1);
+}
 .tl-zoom-label {
-  font-size: 11px; font-weight: 600; color: var(--t3);
-  min-width: 42px; text-align: center; font-variant-numeric: tabular-nums;
-  white-space: nowrap; padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t3);
+  min-width: 42px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  padding: 0 6px;
 }
-.tl-ctrl-sep { width: 1px; align-self: stretch; background: var(--border); margin: 3px 2px; }
+.tl-ctrl-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 3px 2px;
+}
 
 /* ── Legend panel (tree-view style) ──────────────────────── */
 .tl-legend-panel {
-  position: absolute; bottom: 18px; right: 16px; z-index: 5;
+  position: absolute;
+  bottom: 18px;
+  right: 16px;
+  z-index: 5;
   background: var(--glass-soft);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border); border-radius: 12px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
   padding: 12px 16px;
-  font-size: 11px; color: var(--t2);
+  font-size: 11px;
+  color: var(--t2);
   box-shadow: var(--shadow);
-  display: flex; flex-direction: column; gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   min-width: 140px;
   cursor: default;
 }
 .tl-panel-title {
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.8px; color: var(--t3);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--t3);
 }
-.tl-leg-section { display: flex; flex-direction: column; gap: 5px; }
+.tl-leg-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
 .tl-leg-label {
-  font-size: 9px; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.6px; color: var(--t3); opacity: 0.7;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--t3);
+  opacity: 0.7;
 }
-.tl-leg-row { display: flex; align-items: center; gap: 8px; font-weight: 500; }
-.tl-leg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.tl-leg-line { width: 22px; height: 2px; flex-shrink: 0; border-radius: 1px; }
-.tl-leg-dashed { height: 0; border-top: 2px dashed; background: none !important; }
+.tl-leg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.tl-leg-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.tl-leg-line {
+  width: 22px;
+  height: 2px;
+  flex-shrink: 0;
+  border-radius: 1px;
+}
+.tl-leg-dashed {
+  height: 0;
+  border-top: 2px dashed;
+  background: none !important;
+}
 
 /* ── Marriage edit popup ─────────────────────────────────── */
 .tl-medit {
-  position: absolute; z-index: 6; width: 220px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; padding: 12px;
+  position: absolute;
+  z-index: 6;
+  width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
   cursor: default;
 }
 .tl-medit-title {
-  font-size: 12px; font-weight: 700; color: var(--t1);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--t1);
   margin-bottom: 9px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.tl-medit-row { display: flex; gap: 6px; margin-bottom: 10px; }
+.tl-medit-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
 .tl-medit-input {
-  flex: 1; min-width: 0;
-  padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px;
-  background: var(--elevated); color: var(--t1);
-  font-family: var(--font); font-size: 12px; font-weight: 600; outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--elevated);
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
-.tl-medit-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108, 142, 245, 0.15); }
+.tl-medit-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(108, 142, 245, 0.15);
+}
 .tl-medit-select {
-  flex: 1; min-width: 0;
-  padding: 6px 6px; border: 1px solid var(--border); border-radius: 8px;
-  background: var(--elevated); color: var(--t1);
-  font-family: var(--font); font-size: 12px; font-weight: 600; outline: none;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--elevated);
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
   cursor: pointer;
 }
-.tl-medit-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.tl-medit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
 .tl-medit-btn {
-  border: 1px solid var(--border); background: transparent; color: var(--t2);
-  font-family: var(--font); font-size: 11.5px; font-weight: 600;
-  padding: 5px 12px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 8px;
+  cursor: pointer;
   transition: all 0.13s;
 }
-.tl-medit-btn:hover { background: var(--hover); color: var(--t1); }
-.tl-medit-btn.primary {
-  background: var(--accent); border-color: var(--accent); color: #fff;
+.tl-medit-btn:hover {
+  background: var(--hover);
+  color: var(--t1);
 }
-.tl-medit-btn.primary:hover { filter: brightness(1.1); }
+.tl-medit-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.tl-medit-btn.primary:hover {
+  filter: brightness(1.1);
+}
 
-.medit-enter-active { transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.34, 1.4, 0.5, 1); }
-.medit-leave-active { transition: opacity 0.12s ease, transform 0.12s ease; }
-.medit-enter-from, .medit-leave-to { opacity: 0; transform: translateY(6px) scale(0.96); }
+.medit-enter-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+.medit-leave-active {
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+}
+.medit-enter-from,
+.medit-leave-to {
+  opacity: 0;
+  transform: translateY(6px) scale(0.96);
+}
 
 /* ── Empty state ─────────────────────────────────────────── */
 .tl-empty {
-  position: absolute; inset: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  text-align: center; gap: 8px; color: var(--t2); pointer-events: none;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  color: var(--t2);
+  pointer-events: none;
 }
-.tl-empty-icon { font-size: 44px; opacity: 0.6; }
-.tl-empty-title { font-size: 16px; font-weight: 700; color: var(--t1); }
-.tl-empty-text { font-size: 13px; max-width: 300px; }
+.tl-empty-icon {
+  font-size: 44px;
+  opacity: 0.6;
+}
+.tl-empty-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--t1);
+}
+.tl-empty-text {
+  font-size: 13px;
+  max-width: 300px;
+}
 </style>

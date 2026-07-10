@@ -10,7 +10,7 @@ export function computeGenLayout(nodesData, relationships, width, height) {
   const childToParents = {}
   const spouseOf = {}
 
-  relationships.forEach(r => {
+  relationships.forEach((r) => {
     if (r.type === 'parent_child' || r.type === 'adopted') {
       if (!parentToChildren[r.person_a_id]) parentToChildren[r.person_a_id] = new Set()
       parentToChildren[r.person_a_id].add(r.person_b_id)
@@ -30,16 +30,21 @@ export function computeGenLayout(nodesData, relationships, width, height) {
     if (visited.has(id)) return 0
     visited.add(id)
     const parents = childToParents[id]
-    if (!parents || parents.size === 0) { genMap[id] = 0; return 0 }
+    if (!parents || parents.size === 0) {
+      genMap[id] = 0
+      return 0
+    }
     let maxP = 0
-    parents.forEach(pid => { maxP = Math.max(maxP, getGen(pid, visited)) })
+    parents.forEach((pid) => {
+      maxP = Math.max(maxP, getGen(pid, visited))
+    })
     genMap[id] = maxP + 1
     return genMap[id]
   }
-  nodesData.forEach(n => getGen(n.id, new Set()))
+  nodesData.forEach((n) => getGen(n.id, new Set()))
 
   // Align spouses to same generation
-  relationships.forEach(r => {
+  relationships.forEach((r) => {
     if (r.type !== 'spouse') return
     const ga = genMap[r.person_a_id]
     const gb = genMap[r.person_b_id]
@@ -51,11 +56,13 @@ export function computeGenLayout(nodesData, relationships, width, height) {
 
   // Top-down: ensure child = max(parent gens) + 1
   const sortedByGen = [...nodesData].sort((a, b) => (genMap[a.id] || 0) - (genMap[b.id] || 0))
-  sortedByGen.forEach(n => {
+  sortedByGen.forEach((n) => {
     const parents = childToParents[n.id]
     if (!parents || parents.size === 0) return
     let maxP = 0
-    parents.forEach(pid => { maxP = Math.max(maxP, genMap[pid] || 0) })
+    parents.forEach((pid) => {
+      maxP = Math.max(maxP, genMap[pid] || 0)
+    })
     genMap[n.id] = maxP + 1
   })
 
@@ -66,7 +73,7 @@ export function computeGenLayout(nodesData, relationships, width, height) {
   const personToFamily = {}
   const processedPairs = new Set()
 
-  nodesData.forEach(n => {
+  nodesData.forEach((n) => {
     const pid = n.id
     if (!parentToChildren[pid]) return
     const spouse = spouseOf[pid]
@@ -84,14 +91,16 @@ export function computeGenLayout(nodesData, relationships, width, height) {
     }
 
     children.sort((a, b) => {
-      const na = nodesData.find(x => x.id === a)
-      const nb = nodesData.find(x => x.id === b)
+      const na = nodesData.find((x) => x.id === a)
+      const nb = nodesData.find((x) => x.id === b)
       return (na?.birth_year || 9999) - (nb?.birth_year || 9999)
     })
 
     const idx = familyUnits.length
     familyUnits.push({ parents, children })
-    parents.forEach(p => { personToFamily[p] = idx })
+    parents.forEach((p) => {
+      personToFamily[p] = idx
+    })
   })
 
   // Compute subtree widths
@@ -102,7 +111,10 @@ export function computeGenLayout(nodesData, relationships, width, height) {
     if (famIdx !== undefined) {
       const fam = familyUnits[famIdx]
       const spouse = spouseOf[id]
-      if (spouse && fam.parents[0] !== id) { slotWidth[id] = 0; return 0 }
+      if (spouse && fam.parents[0] !== id) {
+        slotWidth[id] = 0
+        return 0
+      }
       let childrenWidth = 0
       fam.children.forEach((cid, i) => {
         childrenWidth += Math.max(1, getSlotWidth(cid))
@@ -115,7 +127,7 @@ export function computeGenLayout(nodesData, relationships, width, height) {
     slotWidth[id] = 1
     return 1
   }
-  nodesData.forEach(n => getSlotWidth(n.id))
+  nodesData.forEach((n) => getSlotWidth(n.id))
 
   // Assign X positions top-down
   const xPos = {}
@@ -135,7 +147,7 @@ export function computeGenLayout(nodesData, relationships, width, height) {
 
     if (fam.children.length === 0) return
 
-    const childWidths = fam.children.map(cid => Math.max(1, slotWidth[cid]) * NODE_GAP)
+    const childWidths = fam.children.map((cid) => Math.max(1, slotWidth[cid]) * NODE_GAP)
     const totalChildWidth = childWidths.reduce((a, b) => a + b, 0)
     let cx = centerX - totalChildWidth / 2
 
@@ -162,7 +174,7 @@ export function computeGenLayout(nodesData, relationships, width, height) {
   })
 
   let cursor = 0
-  rootFamilies.forEach(famIdx => {
+  rootFamilies.forEach((famIdx) => {
     const fam = familyUnits[famIdx]
     const primaryWidth = Math.max(1, slotWidth[fam.parents[0]]) * NODE_GAP
     placeFamily(famIdx, cursor + primaryWidth / 2)
@@ -175,11 +187,13 @@ export function computeGenLayout(nodesData, relationships, width, height) {
     const minX = Math.min(...allX)
     const maxX = Math.max(...allX)
     const offsetX = (width - (maxX - minX)) / 2 - minX
-    Object.keys(xPos).forEach(id => { xPos[id] += offsetX })
+    Object.keys(xPos).forEach((id) => {
+      xPos[id] += offsetX
+    })
   }
 
   // Place unplaced nodes
-  const unplacedNodes = nodesData.filter(n => !placed.has(n.id))
+  const unplacedNodes = nodesData.filter((n) => !placed.has(n.id))
   if (unplacedNodes.length) {
     const maxPlacedX = allX.length ? Math.max(...allX) + FAMILY_GAP : width / 2
     unplacedNodes.forEach((n, i) => {
@@ -201,7 +215,7 @@ export function computeGenLayout(nodesData, relationships, width, height) {
     genLabels.push({ label: `Gen ${g + 1}`, y: startY + ri * rowHeight })
   })
 
-  nodesData.forEach(n => {
+  nodesData.forEach((n) => {
     const g = genMap[n.id] || 0
     const ri = genKeys.indexOf(g)
     const y = startY + ri * rowHeight

@@ -93,7 +93,19 @@
       "Bash(node __perf.mjs)",
       "Bash(node __diag.mjs)",
       "Bash(rm -f __perf.mjs __diag.mjs)",
-      "Bash(xargs wc -l)"
+      "Bash(xargs wc -l)",
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "PowerShell(npm run lint 2>$null)",
+      "PowerShell(npm run lint:fix 2>$null)",
+      "PowerShell(npm run lint 2>$null; \"LINT EXIT: $LASTEXITCODE\"; npm run format:check 2>$null | Select-Object -Last 15)",
+      "PowerShell(npx prettier --list-different . 2>$null)",
+      "PowerShell(npm run format 2>$null | Select-Object -Last 3; \"FORMAT EXIT: $LASTEXITCODE\"; npm run lint 2>$null | Select-Object -Last 10; \"LINT EXIT: $LASTEXITCODE\")",
+      "PowerShell(npm test 2>$null | Select-Object -Last 12; \"TEST EXIT: $LASTEXITCODE\")",
+      "PowerShell(npm run lint 2>$null | Out-Null; \"LINT: $LASTEXITCODE\"; npm run format:check 2>$null | Select-Object -Last 2; \"FORMAT: $LASTEXITCODE\"; npm test 2>$null | Select-Object -Last 4; \"TEST: $LASTEXITCODE\"; npm run build 2>$null | Select-Object -Last 6; \"BUILD: $LASTEXITCODE\")",
+      "PowerShell(npm run lint 2>$null | Out-Null; \"LINT: $LASTEXITCODE\"; npm run format:check 2>$null | Select-Object -Last 1; \"FORMAT: $LASTEXITCODE\"; npm run build 2>$null | Select-Object -Last 4; \"BUILD: $LASTEXITCODE\")",
+      "PowerShell(npm install --no-save playwright-core 2>$null)",
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\f7904ca8-2bdc-4846-9d0d-f5db004f0b3e\\\\scratchpad\\\\verify-app.mjs\"; \"SCRIPT EXIT: $LASTEXITCODE\")"
     ]
   }
 }

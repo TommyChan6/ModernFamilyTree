@@ -50,9 +50,9 @@ function createWindow() {
   mainWindow.on('close', async (e) => {
     if (forceClose) return
     e.preventDefault()
-    const dirty = await mainWindow.webContents.executeJavaScript(
-      'window.__isGraphDirty ? window.__isGraphDirty() : false'
-    ).catch(() => false)
+    const dirty = await mainWindow.webContents
+      .executeJavaScript('window.__isGraphDirty ? window.__isGraphDirty() : false')
+      .catch(() => false)
 
     if (dirty) {
       const { response } = await dialog.showMessageBox(mainWindow, {
@@ -66,9 +66,11 @@ function createWindow() {
       })
       if (response === 0) {
         // Save then close
-        await mainWindow.webContents.executeJavaScript(
-          'window.__saveGraphLayout ? window.__saveGraphLayout() : Promise.resolve()'
-        ).catch(() => {})
+        await mainWindow.webContents
+          .executeJavaScript(
+            'window.__saveGraphLayout ? window.__saveGraphLayout() : Promise.resolve()'
+          )
+          .catch(() => {})
         forceClose = true
         mainWindow.close()
       } else if (response === 1) {

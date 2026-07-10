@@ -7,21 +7,27 @@
 export function createCssColorCache() {
   let cache = null
   return {
-    invalidate() { cache = null },
+    invalidate() {
+      cache = null
+    },
     get() {
       if (!cache) {
         const cs = getComputedStyle(document.documentElement)
         const v = (name, fallback) => (cs.getPropertyValue(name) || fallback).trim()
         cache = {
-          t1: v('--t1', '#e8eaf6'), t2: v('--t2', '#9ea3b8'), t3: v('--t3', '#4a5068'),
+          t1: v('--t1', '#e8eaf6'),
+          t2: v('--t2', '#9ea3b8'),
+          t3: v('--t3', '#4a5068'),
           border: v('--border', 'rgba(255,255,255,0.07)'),
-          surface: v('--surface', '#181c27'), elevated: v('--elevated', '#1f2437'),
-          accent: v('--accent', '#6c8ef5'), adim: v('--adim', 'rgba(108,142,245,0.14)'),
-          bg: v('--bg', '#0f1117'),
+          surface: v('--surface', '#181c27'),
+          elevated: v('--elevated', '#1f2437'),
+          accent: v('--accent', '#6c8ef5'),
+          adim: v('--adim', 'rgba(108,142,245,0.14)'),
+          bg: v('--bg', '#0f1117')
         }
       }
       return cache
-    },
+    }
   }
 }
 

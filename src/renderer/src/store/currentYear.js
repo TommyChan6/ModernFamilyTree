@@ -9,7 +9,10 @@ export function latestDataYear(persons = [], relationships = []) {
     const y = typeof v === 'number' ? v : parseInt(v, 10)
     if (Number.isFinite(y) && y > 0 && (max === null || y > max)) max = y
   }
-  for (const p of persons) { consider(p.birth_year); consider(p.death_year) }
+  for (const p of persons) {
+    consider(p.birth_year)
+    consider(p.death_year)
+  }
   for (const r of relationships) consider(r.formed_date)
   return max
 }

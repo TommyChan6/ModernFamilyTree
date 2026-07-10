@@ -62,7 +62,10 @@ export function useDragScroll(scrollEl, opts = {}) {
   }
 
   function wasDragged() {
-    if (moved) { moved = false; return true }
+    if (moved) {
+      moved = false
+      return true
+    }
     return false
   }
 
