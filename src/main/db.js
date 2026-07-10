@@ -2,28 +2,16 @@ import { app } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { randomUUID } from 'crypto'
+import { EMPTY_DB, nowStr, seedSampleData } from '../shared/dbCore'
 
-const EMPTY_DB = () => ({
-  trees: {}, // { treeId: { id, name, created_at, updated_at } }
-  activeTreeId: null,
-  persons: {}, // { personId: { ...fields, tree_id } }
-  relationships: {},
-  factions: {}, // { factionId: { id, tree_id, scenario_id, name, color, icon, description, member_ids, x, y, visible } }
-  scenarios: {}, // { scenarioId: { id, tree_id, name } } — each holds its own set of factions
-  images: {},
-  settings: {}, // { `${treeId}:key`: value } for per-tree settings, or global keys
-  globalSettings: {} // theme, etc.
-})
+// DB shape and the sample-family seed live in src/shared/dbCore.ts so the
+// browser-local backend starts from the exact same state as the desktop app.
 
 let _db = null
 let _dbPath = null
 
 function save() {
   fs.writeFileSync(_dbPath, JSON.stringify(_db, null, 2))
-}
-
-function nowStr() {
-  return new Date().toISOString().replace('T', ' ').slice(0, 19)
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────────
@@ -99,7 +87,7 @@ export function initDB() {
       }
     } else if (Object.keys(_db.persons).length === 0) {
       // Fresh install: seed sample data
-      seedSampleData(treeId)
+      seedSampleData(_db, treeId, { uuid: randomUUID, nowStr })
     }
 
     // Migrate old flat settings to prefixed per-tree settings
@@ -120,109 +108,6 @@ export function initDB() {
     _db.activeTreeId = Object.keys(_db.trees)[0]
     save()
   }
-}
-
-function seedSampleData(treeId) {
-  const now = nowStr()
-  const gp1 = randomUUID(),
-    gp2 = randomUUID()
-  const p1 = randomUUID(),
-    p2 = randomUUID()
-  const c1 = randomUUID(),
-    c2 = randomUUID()
-
-  const addP = (id, name, birth_year, gender, bio, occupation, location) => {
-    _db.persons[id] = {
-      id,
-      tree_id: treeId,
-      name,
-      birth_year,
-      death_year: null,
-      gender,
-      bio,
-      occupation,
-      location,
-      created_at: now,
-      updated_at: now
-    }
-  }
-  const addR = (a, b, type) => {
-    const id = randomUUID()
-    _db.relationships[id] = {
-      id,
-      tree_id: treeId,
-      person_a_id: a,
-      person_b_id: b,
-      type,
-      status: 'active',
-      formed_date: null,
-      created_at: now
-    }
-  }
-
-  addP(
-    gp1,
-    'Robert Anderson',
-    1948,
-    'male',
-    'Retired civil engineer who loved woodworking and jazz.',
-    'Civil Engineer',
-    'Chicago, IL'
-  )
-  addP(
-    gp2,
-    'Dorothy Anderson',
-    1950,
-    'female',
-    'Retired school teacher with a passion for gardening.',
-    'Teacher',
-    'Chicago, IL'
-  )
-  addP(
-    p1,
-    'James Anderson',
-    1975,
-    'male',
-    'Architect running his own firm in New York.',
-    'Architect',
-    'New York, NY'
-  )
-  addP(
-    p2,
-    'Sarah Anderson',
-    1977,
-    'female',
-    'Pediatrician at Brooklyn General Hospital.',
-    'Pediatrician',
-    'New York, NY'
-  )
-  addP(
-    c1,
-    'Lucas Anderson',
-    2005,
-    'male',
-    'High school student and basketball enthusiast.',
-    'Student',
-    'New York, NY'
-  )
-  addP(
-    c2,
-    'Olivia Anderson',
-    2008,
-    'female',
-    'Middle school student who loves reading and art.',
-    'Student',
-    'New York, NY'
-  )
-
-  addR(gp1, gp2, 'spouse')
-  addR(gp1, p1, 'parent_child')
-  addR(gp2, p1, 'parent_child')
-  addR(p1, p2, 'spouse')
-  addR(p1, c1, 'parent_child')
-  addR(p1, c2, 'parent_child')
-  addR(p2, c1, 'parent_child')
-  addR(p2, c2, 'parent_child')
 }
 
 export function getDB() {

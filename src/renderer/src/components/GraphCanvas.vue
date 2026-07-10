@@ -210,6 +210,7 @@
 import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import * as d3 from 'd3'
 import { useMainStore } from '../store/index.js'
+import { api } from '../api'
 import {
   nodeColor,
   getLinkStroke,
@@ -688,7 +689,7 @@ ctx.ticked = ticked
 ctx.requestRedraw = () => ctx.renderer?.requestRedraw()
 
 function getImageUrl(filePath) {
-  return window.electronAPI?.getImageUrl?.(filePath) || null
+  return api.getImageUrl(filePath)
 }
 
 // Age in years: counted to the current date (or today if none set), capped at death year.

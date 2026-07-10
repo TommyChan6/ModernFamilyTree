@@ -1,14 +1,19 @@
 # IPC API reference
 
 All communication between the renderer and main process goes through named IPC
-channels registered in [`src/main/ipc.js`](../src/main/ipc.js). The renderer calls
-them via the store, which uses the [`api`](../src/renderer/src/api.js) wrapper over
-the preload bridge.
+channels. The channel *logic* lives in the shared data core
+([`src/shared/dbCore.ts`](../src/shared/dbCore.ts) — `channelHandlers`);
+[`src/main/ipc.js`](../src/main/ipc.js) registers each one with `ipcMain` and adds the
+few platform-bound channels (file dialog, file bytes). The renderer calls them via the
+store, which uses the [`api`](../src/renderer/src/api/index.ts) seam over the preload
+bridge. (On the web build the same channels run in-page against IndexedDB via
+[`api/backends/local.ts`](../src/renderer/src/api/backends/local.ts) — same names,
+same envelopes.)
 
 ## Calling convention
 
 ```js
-import { api } from './api.js'
+import { api } from './api'
 const res = await api.invoke('persons:getAll')
 if (res.success) { /* use res.data */ }
 ```

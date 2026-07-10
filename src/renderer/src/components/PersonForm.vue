@@ -239,7 +239,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useMainStore } from '../store/index.js'
-import { api } from '../api.js'
+import { api } from '../api'
 
 const store = useMainStore()
 

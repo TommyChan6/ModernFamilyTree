@@ -1,5 +1,6 @@
 import js from '@eslint/js'
 import pluginVue from 'eslint-plugin-vue'
+import tseslint from 'typescript-eslint'
 import prettier from 'eslint-config-prettier'
 import globals from 'globals'
 
@@ -18,6 +19,8 @@ export default [
 
   js.configs.recommended,
   ...pluginVue.configs['flat/recommended'],
+  // TypeScript files (src/shared, src/renderer/src/api) get the TS parser/rules
+  ...tseslint.configs.recommended.map((cfg) => ({ ...cfg, files: ['**/*.ts'] })),
 
   // Main process, preload, config and tests run in Node
   {
@@ -38,6 +41,19 @@ export default [
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }
       ],
       'no-empty': ['error', { allowEmptyCatch: true }]
+    }
+  },
+
+  // In TS files the TS-aware unused-vars rule replaces the base one (which
+  // false-positives on parameter names in type signatures)
+  {
+    files: ['**/*.ts'],
+    rules: {
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }
+      ]
     }
   },
 

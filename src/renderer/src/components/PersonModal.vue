@@ -120,7 +120,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useMainStore } from '../store/index.js'
-import { api } from '../api.js'
+import { api } from '../api'
 
 const store = useMainStore()
 const images = ref([])

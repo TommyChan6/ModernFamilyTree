@@ -24,6 +24,10 @@ npm run dev      # launch the app with hot reload
 |---------|--------------|
 | `npm run dev` | Start the app in development with electron-vite (HMR for the renderer). |
 | `npm run build` | Build main, preload, and renderer bundles into `out/`. |
+| `npm run dev:web` | Run the app as a plain website in your browser (data in IndexedDB, no Electron). Use it to check web parity while building features. |
+| `npm run build:web` | Build the static website into `dist/` (plain Vite). |
+| `npm run preview:web` | Serve the built `dist/` locally. |
+| `npm run typecheck` | Type-check the TypeScript files (`tsc --noEmit`). CI runs this. |
 | `npm test` | Run the Vitest suite once. |
 | `npm run test:watch` | Run Vitest in watch mode. |
 
@@ -35,20 +39,28 @@ npm run dev      # launch the app with hot reload
 
 ```
 newFamilyTree/
-├── electron.vite.config.js   # build config for all 3 targets
+├── electron.vite.config.js   # build config for the 3 Electron targets
+├── vite.config.web.js        # plain-Vite config for the web build (dist/)
+├── tsconfig.json             # TypeScript (new files are TS; converts gradually)
 ├── package.json
 ├── src/
+│   ├── shared/               # platform-free TS used by main AND the web backend
+│   │   ├── dbCore.ts         # every API channel's logic + empty DB shape + seed
+│   │   └── types.ts          # entity types, result envelope, Env interface
 │   ├── main/                 # main process (Node)
 │   │   ├── index.js          # window, protocol, close confirmation
-│   │   ├── db.js             # JSON store, migrations, seed
-│   │   └── ipc.js            # IPC channel handlers
+│   │   ├── db.js             # JSON file store + migrations (logic from dbCore)
+│   │   └── ipc.js            # thin Electron shell around dbCore's handlers
 │   ├── preload/
 │   │   └── index.js          # contextBridge (electronAPI)
-│   └── renderer/             # Vue 3 SPA
+│   └── renderer/             # Vue 3 SPA (identical on desktop and web)
 │       ├── index.html
 │       └── src/
 │           ├── main.js       # Vue + Pinia bootstrap
-│           ├── api.js        # IPC wrapper
+│           ├── api/          # the data-access seam
+│           │   ├── index.ts  # picks the backend at startup
+│           │   ├── types.ts  # ApiBackend interface
+│           │   └── backends/ # ipc.ts (Electron) · local.ts (browser IndexedDB)
 │           ├── store/index.js# Pinia store `main`
 │           ├── styles/global.css
 │           └── components/

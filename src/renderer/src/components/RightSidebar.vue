@@ -68,7 +68,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useMainStore } from '../store/index.js'
-import { api } from '../api.js'
+import { api } from '../api'
 
 const store = useMainStore()
 const searchQuery = ref('')

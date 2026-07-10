@@ -7,6 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 npm run dev          # run the app with hot reload (electron-vite)
 npm run build        # bundle main, preload, renderer into out/
+npm run dev:web      # run the app as a plain website (browser, IndexedDB backend)
+npm run build:web    # static web build into dist/ (plain Vite, no Electron code)
+npm run preview:web  # serve the built dist/ locally
+npm run typecheck    # tsc --noEmit over the TS files (CI runs this)
 npm test             # run the Vitest suite once
 npm run test:watch   # Vitest watch mode
 npm run lint         # ESLint (flat config, eslint.config.js)
@@ -25,33 +29,56 @@ npx vitest run -t "migrates an old single-tree database"   # by test name
 Requires Node 18.18+. There are **no native modules** — no SQLite, no rebuild step, no
 build tools. (Ignore any older notes mentioning `better-sqlite3` / `npm run rebuild` /
 `sql.js`.) ESLint + Prettier are configured; CI (`.github/workflows/ci.yml`) gates on
-lint, format check, and the Vitest suite. New source files should be TypeScript per the
-Step 0 decision in `docs/MID_DEVELOPMENT.md`; existing JS converts opportunistically
-(`api.js` + store first, during the web-migration seam cut).
+lint, format check, typecheck, and the Vitest suite. New source files should be
+TypeScript per the Step 0 decision in `docs/MID_DEVELOPMENT.md`; `src/shared/` and the
+api module already are; existing JS converts opportunistically (store next).
+
+**Project constraints (2026-07-10):** deployment is deferred — current work is
+client-side features in the local app, but web parity is mandatory (check changes in
+`npm run dev:web` too). **Zero cost**: no paid services and nothing that asks for
+card/bank details, even free tiers. Mobile is planned web-first (responsive → PWA;
+store apps deferred). See `docs/DEPLOYMENT_PLAN.md` and `docs/MID_DEVELOPMENT.md`.
 
 ## Architecture
 
-Electron desktop app: **Vue 3 renderer** + **Node main process**, with a plain JSON
-file as the datastore. Extended docs live in [`docs/`](docs/README.md) — this is the
-condensed version.
+Electron desktop app **and** browser web app from one codebase: **Vue 3 renderer** +
+swappable data backends behind one seam. Desktop persists to a plain JSON file via the
+Node main process; the web build runs the same logic in-page against IndexedDB.
+Extended docs live in [`docs/`](docs/README.md) — this is the condensed version.
 
 **Process split:**
+- `src/shared/` — platform-free TypeScript used by BOTH the main process and the
+  browser backend. `dbCore.ts` holds every API channel's business logic
+  (`channelHandlers`, pure functions over the DB object), the empty-DB shape, the
+  first-run seed, and `WRITE_CHANNELS`; `types.ts` holds the entity types + `Env`
+  (injected platform services: uuid, clock, image-file storage). **New data
+  operations go here**, not in bespoke `ipcMain.handle`s — then they work on desktop
+  and web at once.
 - `src/main/` — Node side. `index.js` (BrowserWindow, `appimg://` protocol, unsaved-
-  changes close confirmation), `db.js` (the JSON store + migrations + seed), `ipc.js`
-  (all `ipcMain.handle` channels = the entire server API).
+  changes close confirmation), `db.js` (the JSON file store + migrations), `ipc.js`
+  (a thin Electron shell that registers every `channelHandlers` entry with `ipcMain`
+  plus the platform-bound channels `images:openDialog` / `images:bytes`).
 - `src/preload/index.js` — the only bridge across the isolation boundary. Exposes
   `window.electronAPI.invoke(channel, data)` and `getImageUrl(path)`. `contextIsolation`
   is on and `nodeIntegration` is off — the renderer has no Node access by design.
-- `src/renderer/` — Vue 3 SPA (Composition API, `<script setup>`).
+- `src/renderer/` — Vue 3 SPA (Composition API, `<script setup>`), identical on
+  desktop and web. `src/api/` is the data-access seam: `index.ts` auto-selects
+  `backends/ipc.ts` (Electron) or `backends/local.ts` (browser: shared core over
+  IndexedDB; photos as data URLs); a future HTTP/Supabase backend slots in beside
+  them (`VITE_API_BACKEND`).
 
 **The mandatory data-access chain** — never skip a layer:
 ```
-component → Pinia store action → api.invoke() → electronAPI → ipcRenderer
-          → ipcMain.handle (main) → getDB() mutate + save() → { success, data }
+component → Pinia store action → api.invoke()
+   desktop: → electronAPI → ipcRenderer → ipcMain.handle (main)
+                → channelHandlers[channel](db, data, env) + save() → { success, data }
+   web:     → backends/local.ts → same channelHandlers → IndexedDB persist
 ```
 Components must not call `api.invoke`/`window.electronAPI` directly for
 persons/relationships/trees; add a store action instead. (Image lists are the one
-pragmatic exception — some components call `images:*` directly.)
+pragmatic exception — some components call `images:*` directly.) `window.electronAPI`
+may only be referenced inside `api/backends/ipc.ts` (plus feature-detection), so the
+web build keeps working.
 
 **Persistence** (`src/main/db.js`): all data is one pretty-printed JSON file at
 `<userData>/db/familytree.json`, rewritten in full on every `save()`. Photos are
@@ -59,13 +86,16 @@ copied into `<userData>/images/<uuid>.<ext>` and served via the privileged `appi
 protocol (never `file://`). `initDB()` is idempotent and self-migrating (single-tree →
 multi-tree) and seeds a sample family on first run. Data is scoped per tree via
 `tree_id`; deletes cascade explicitly (person → its relationships + image files +
-removal from faction `member_ids`).
+removal from faction `member_ids`). On the web build the same data (including the
+same seed) lives in a single IndexedDB record instead, with photos stored inline as
+data URLs — see `src/renderer/src/api/backends/local.ts`.
 
-**IPC conventions** (`src/main/ipc.js`): channels are named `domain:action`. Every
-handler wraps its body in try/catch and returns `{ success: true, data }` or
-`{ success: false, error }` — exceptions never cross the process boundary. Callers
-check `success` before reading `data`. Write handlers call `save()` before returning.
-Writes tag new records with the active `tree_id`; reads filter by it.
+**Channel conventions** (`src/shared/dbCore.ts` + shells): channels are named
+`domain:action`. Handlers mutate the raw DB and return plain data or throw; the shell
+wraps that in `{ success: true, data }` / `{ success: false, error }` — exceptions
+never cross the seam. Callers check `success` before reading `data`. The shell
+persists after any channel in `WRITE_CHANNELS` before returning. Writes tag new
+records with the active `tree_id`; reads filter by it.
 
 **State** (`src/renderer/src/store/index.js`): a single Pinia store `main` is the
 source of truth for `persons`, `relationships`, `trees`, UI flags, and `graphSettings`.
@@ -128,7 +158,7 @@ no per-frame buffer writes — and each renderer releases its GL context on unmo
 Vitest. `tests/db.test.js` covers the data layer (mocks Electron's `app` module to
 point `userData` at a temp dir and exercises `db.js` directly: migrations, tree
 scoping, cascade deletes, graph-state persistence, field integrity) — update it when
-changing `db.js` or the data shape. `tests/graphMath.test.js` and
+changing `db.js`, `src/shared/dbCore.ts`, or the data shape. `tests/graphMath.test.js` and
 `tests/viewMath.test.js` cover the pure view math (camera transforms, link curves,
 timeline layout, faction arc spans). Rendering/interaction has no automated coverage —
 verify manually with `npm run dev` (test both themes for visual changes).

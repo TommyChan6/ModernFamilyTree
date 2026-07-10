@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { api } from '../api.js'
+import { api } from '../api'
 import { latestDataYear } from './currentYear.js'
 
 export const useMainStore = defineStore('main', () => {

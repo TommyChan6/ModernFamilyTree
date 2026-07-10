@@ -296,7 +296,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { forceSimulation, forceCollide, forceManyBody } from 'd3'
 import { useMainStore } from '../store/index.js'
-import { api } from '../api.js'
+import { api } from '../api'
 import {
   factionRadius,
   computeTargets,

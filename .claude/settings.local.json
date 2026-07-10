@@ -105,7 +105,21 @@
       "PowerShell(npm run lint 2>$null | Out-Null; \"LINT: $LASTEXITCODE\"; npm run format:check 2>$null | Select-Object -Last 2; \"FORMAT: $LASTEXITCODE\"; npm test 2>$null | Select-Object -Last 4; \"TEST: $LASTEXITCODE\"; npm run build 2>$null | Select-Object -Last 6; \"BUILD: $LASTEXITCODE\")",
       "PowerShell(npm run lint 2>$null | Out-Null; \"LINT: $LASTEXITCODE\"; npm run format:check 2>$null | Select-Object -Last 1; \"FORMAT: $LASTEXITCODE\"; npm run build 2>$null | Select-Object -Last 4; \"BUILD: $LASTEXITCODE\")",
       "PowerShell(npm install --no-save playwright-core 2>$null)",
-      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\f7904ca8-2bdc-4846-9d0d-f5db004f0b3e\\\\scratchpad\\\\verify-app.mjs\"; \"SCRIPT EXIT: $LASTEXITCODE\")"
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\f7904ca8-2bdc-4846-9d0d-f5db004f0b3e\\\\scratchpad\\\\verify-app.mjs\"; \"SCRIPT EXIT: $LASTEXITCODE\")",
+      "Bash(npm ls *)",
+      "Bash(npm i *)",
+      "Bash(sed -i \"s|from '../api.js'|from '../api'|\" src/renderer/src/store/index.js src/renderer/src/components/FactionsView.vue src/renderer/src/components/PersonForm.vue src/renderer/src/components/PersonModal.vue src/renderer/src/components/RelationshipsView.vue src/renderer/src/components/RightSidebar.vue src/renderer/src/components/TimelineView.vue)",
+      "Bash(sed -i \"s|from '../../api.js'|from '../../api'|\" src/renderer/src/components/people/useThumbnail.js)",
+      "Bash(rm src/renderer/src/api.js)",
+      "Bash(ls node_modules/playwright-core 2>/dev/null >/dev/null && echo \"playwright-core: yes\" || echo \"playwright-core: no\"; ls \"C:/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe\" 2>/dev/null && echo edge-found; git status --short | head -30)",
+      "Read(//c/Program Files \\(x86\\)/Microsoft/Edge/Application/**)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:4173/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:4173/)",
+      "Bash(node \"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/d74f430c-6b6e-41c8-b7dc-b6ea74ac2111/scratchpad/smokeWeb.mjs\")",
+      "Bash(node smoke-web.tmp.mjs)",
+      "Bash(node smoke-electron.tmp.mjs)",
+      "Bash(powershell -Command 'Get-NetTCPConnection -LocalPort 4173 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }')",
+      "Bash(grep -v 'ms$')"
     ]
   }
 }

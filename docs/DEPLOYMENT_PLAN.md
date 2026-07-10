@@ -7,6 +7,41 @@ and do the few clicks Claude can't do yourself.*
 
 ---
 
+## ⏸ Current status & ground rules (updated 2026-07-10)
+
+**Deployment is deferred for now.** The current focus is building client-side features
+in the local app. This plan stays valid — do it whenever you're ready — and the code
+has already been restructured so that starting it later is cheap:
+
+- The `api.js` seam is now a real backend-adapter module
+  (`src/renderer/src/api/` — see the note above Step 2.2). The app picks its data
+  backend automatically: Electron IPC on desktop, a browser-local IndexedDB store on
+  the web. Adding the cloud backend later is one new file, not a rewrite.
+- The business logic behind every API channel lives in one shared module
+  (`src/shared/dbCore.ts`) used by both desktop and web, so the local app and the
+  future website behave identically — that's the whole point: fewer surprises when
+  migrating.
+- The web build already exists: `npm run dev:web` runs the full app in a plain
+  browser (data saved in the browser's IndexedDB, photos included), and
+  `npm run build:web` produces the static `dist/` folder a host needs. Step 2.5 below
+  is **done**. Use `dev:web` regularly while building features to make sure the app
+  keeps working outside Electron.
+
+**💸 The zero-cost rule:** in the short term this project uses **no paid services and
+no service that asks for a credit card / bank details — not even for a "free" tier
+that wants a card on file.** Every service this plan selects (GitHub, Supabase free
+tier, Vercel Hobby) can be signed up for with just an email, no card. If any signup
+ever asks for payment details: **stop, don't enter them**, and pick an alternative or
+skip that step. Steps that inherently cost money (custom domain, mobile app store
+fees) are explicitly marked **[PAID — deferred]** and are optional extras, not
+requirements.
+
+**📱 Mobile is on the roadmap** (see the new Phase 6): web-first and responsive, then
+an installable PWA (free), and only later — if ever — native store apps (store fees
+are paid, so deferred).
+
+---
+
 ## 0. Read this first — how the plan works
 
 Right now this app is a **desktop program** (Electron). It runs on one computer, saves
@@ -15,9 +50,9 @@ is a **website** anyone can sign up for, where trees live in the cloud and can b
 
 **The good news:** almost the entire app already runs in a web browser (Electron *is* a
 browser inside). Only the bottom layer — the part that saves data — has to change. There
-is one small file, [`api.js`](../src/renderer/src/api.js), that everything funnels
-through. Swap what that file does (from "talk to the local file" to "talk to a cloud
-database") and the whole app comes along for the ride.
+is one small module, [`src/renderer/src/api/`](../src/renderer/src/api/index.ts), that
+everything funnels through. Swap what it talks to (the local file today, a cloud
+database later) and the whole app comes along for the ride.
 
 ### The two kinds of steps
 
@@ -57,14 +92,20 @@ optional if real people's data goes online.
 
 You'll create free accounts on three services. Here's what each one is, in plain terms:
 
-| Service | What it is | Why | Cost |
-|--------|-----------|-----|------|
-| **GitHub** | Stores your code online | The host reads your code from here | Free |
-| **Supabase** | The cloud "backend" — database + logins + photo storage, all in one | Replaces the local file. Its "Row Level Security" makes sharing safe with almost no code | Free tier is plenty to start |
-| **Vercel** | The web host — turns your code into a live website | Connects to GitHub and auto-deploys. Easiest for beginners | Free tier is plenty to start |
+| Service | What it is | Why | Cost | Card needed? |
+|--------|-----------|-----|------|--------------|
+| **GitHub** | Stores your code online | The host reads your code from here | Free | **No** |
+| **Supabase** | The cloud "backend" — database + logins + photo storage, all in one | Replaces the local file. Its "Row Level Security" makes sharing safe with almost no code | Free tier is plenty to start | **No** — email/GitHub signup only |
+| **Vercel** | The web host — turns your code into a live website | Connects to GitHub and auto-deploys. Easiest for beginners | Free "Hobby" tier is plenty to start | **No** — GitHub signup only |
+
+All three satisfy the zero-cost rule: sign up with email/GitHub, no payment details.
+Their free tiers don't auto-upgrade — if you ever hit a limit, things pause or slow
+down rather than charging you (there's nothing to charge). If any of them changes its
+signup to require a card, use an alternative instead.
 
 You could swap Vercel for **Netlify** or **Cloudflare Pages** — they're equivalent for
-this app. This plan uses Vercel because it's the smoothest with GitHub.
+this app and also card-free on their free tiers. This plan uses Vercel because it's
+the smoothest with GitHub.
 
 ---
 
@@ -169,8 +210,15 @@ them into Supabase's built-in SQL editor and click Run.*
 ## Phase 2 — Rewire the app to talk to the cloud (the main coding phase, ~1–2 weeks)
 
 *This is where the app stops using the local file and starts using Supabase. The trick is
-that we only change the bottom layer — [`api.js`](../src/renderer/src/api.js) — so the
-rest of the app doesn't notice.*
+that we only change the bottom layer — the backend adapters in
+[`src/renderer/src/api/`](../src/renderer/src/api/index.ts) — so the rest of the app
+doesn't notice.*
+
+> **Structure note (2026-07-10):** this seam was formalized ahead of time. The api
+> module already has two working backends — `backends/ipc.ts` (Electron desktop) and
+> `backends/local.ts` (browser IndexedDB, what `npm run dev:web` uses) — both driven
+> by the shared channel handlers in `src/shared/dbCore.ts`. The cloud migration adds a
+> third backend beside them; nothing above the seam changes.
 
 ### Step 2.1 🤖 CLAUDE — Add the Supabase library and a config file
 > **Prompt to paste to Claude:**
@@ -183,20 +231,25 @@ rest of the app doesn't notice.*
 Then: **🧑 YOU** — open the new `.env` file, paste the **Project URL** and **anon key**
 from Step 0.3.
 
-### Step 2.2 🤖 CLAUDE — Rewrite `api.js` to call the cloud instead of the desktop
-This is the heart of the migration. `api.js` today just forwards a "channel" name to the
-desktop. We make it recognize each channel and do the matching cloud operation instead.
+### Step 2.2 🤖 CLAUDE — Add a Supabase backend behind the existing seam
+This is the heart of the migration — and it's now an *add*, not a rewrite. The channel
+contract already lives in one place (`src/shared/dbCore.ts`, mirrored by
+`src/main/ipc.js`); the new backend implements the same channels against Supabase.
 
 > **Prompt to paste to Claude:**
-> "Read `src/main/ipc.js` — it lists every channel the app uses (like `persons:getAll`,
-> `persons:create`, `relationships:delete`, etc.). Rewrite `src/renderer/src/api.js` so
-> `invoke(channel, data)` routes each of those channels to the equivalent Supabase query,
-> returning the **exact same `{ success, data }` shape** the app already expects. Use the
-> Supabase client from `supabaseClient.js`. Keep every method signature identical so the
-> Pinia store and components don't change at all. For now, handle the person/relationship/
-> tree/faction/scenario/settings channels; we'll do images and auth in the next steps.
-> Where a channel used the 'active tree', read it from the store/current selection instead
-> of the server. Add short comments mapping each channel to what it now does."
+> "Read `src/shared/dbCore.ts` — its `channelHandlers` object lists every channel the
+> app uses (like `persons:getAll`, `persons:create`, `relationships:delete`) and is the
+> reference implementation of what each one does. Create
+> `src/renderer/src/api/backends/supabase.ts` implementing the `ApiBackend` interface
+> from `src/renderer/src/api/types.ts`: route each channel to the equivalent Supabase
+> query, returning the **exact same `{ success, data }` shape**. Use the Supabase client
+> from `supabaseClient.js`. Then update the backend selection in
+> `src/renderer/src/api/index.ts` to pick the Supabase backend when
+> `import.meta.env.VITE_API_BACKEND === 'supabase'`. Nothing above the seam (store,
+> components) may change. For now, handle the person/relationship/tree/faction/scenario/
+> settings channels; we'll do images and auth in the next steps. Where a channel used
+> the 'active tree', read it from the store/current selection instead of the server.
+> Add short comments mapping each channel to what it now does."
 
 > **Note for you:** this is the biggest single step. Test after it — see Step 2.6.
 
@@ -212,30 +265,24 @@ desktop. We make it recognize each channel and do the matching cloud operation i
 
 ### Step 2.4 🤖 CLAUDE — Move photos from local files to cloud storage
 On desktop, photos are copied into a folder and shown via a special `appimg://` link. On
-the web there are no local files — photos upload to Supabase Storage.
+the web there are no local files — photos upload to Supabase Storage. (The browser-local
+backend already does the `<input type="file">` half — reuse it.)
 
 > **Prompt to paste to Claude:**
-> "Replace the image handling for the web. The `images:openDialog` channel used an Electron
-> file dialog — on web, use a normal `<input type=\"file\">` instead. The `images:add`
-> channel copied a file on disk — on web, upload the chosen file to the Supabase Storage
-> `images` bucket and save its path in the `images` table. Rewrite `getImageUrl` in
-> `api.js` to return a Supabase Storage URL (signed URL for private buckets) instead of an
-> `appimg://` link. Keep our existing renderer-side webp thumbnailing via
-> `createImageBitmap` — it still works on the web (see the note in our memory about
-> nativeImage not decoding webp)."
+> "Add image handling to the Supabase backend. Reuse the `<input type=\"file\">` picker
+> from `src/renderer/src/api/backends/local.ts` for `images:openDialog`. For
+> `images:add`, upload the chosen file to the Supabase Storage `images` bucket and save
+> its path in the `images` table. Implement `getImageUrl` in the Supabase backend to
+> return a Supabase Storage URL (signed URL for private buckets). Keep our existing
+> renderer-side webp thumbnailing via `createImageBitmap` — it still works on the web
+> (see the note in our memory about nativeImage not decoding webp)."
 
-### Step 2.5 🤖 CLAUDE — Make the app buildable as a plain website
-Today the app is built with `electron-vite` (for desktop). We need a second build that
-produces a normal static website.
-
-> **Prompt to paste to Claude:**
-> "Our build uses electron-vite, which is for the desktop app. Add a way to build just the
-> Vue renderer (`src/renderer`) as a standalone static website with plain Vite. Create a
-> `vite.config.web.js` (or equivalent) whose root is the renderer, and add npm scripts
-> `dev:web` and `build:web`. The web build must NOT include any Electron or Node code. If
-> `api.js` still imports anything Electron-specific, split it so the web build only uses
-> the Supabase version. Confirm `npm run build:web` produces a `dist/` folder of static
-> files."
+### Step 2.5 ✅ DONE (2026-07-10) — Make the app buildable as a plain website
+Already in place: `vite.config.web.js` builds just the Vue renderer as a static site.
+`npm run dev:web` serves it locally (on the browser-local IndexedDB backend),
+`npm run build:web` produces the static `dist/` folder, `npm run preview:web` serves
+that build. No Electron or Node code is included — the renderer never imports Electron
+(only the preload bridge, which simply doesn't exist in a browser).
 
 ### Step 2.6 🧑 YOU — Test the whole thing locally
 1. In your terminal, run `npm run dev:web` (the script Claude just added).
@@ -329,8 +376,9 @@ free generators exist (e.g. search "privacy policy generator"), but read what th
 > "Add Sentry for error tracking (client-side) behind an env var so it's off in
 > development. Tell me what to create in the Sentry dashboard and which key to paste."
 
-Then: **🧑 YOU** — make a free **sentry.io** account, create a project, copy the key Claude
-asks for into your Vercel environment variables.
+Then: **🧑 YOU** — make a free **sentry.io** account (the free "Developer" tier needs no
+card — zero-cost rule holds), create a project, copy the key Claude asks for into your
+Vercel environment variables.
 
 > ✅ **End of Phase 4.** You can now safely invite a small group ("invite-only alpha").
 
@@ -341,33 +389,70 @@ asks for into your Vercel environment variables.
 These are not needed to be "live." They make it better. See `MID_DEVELOPMENT.md` §8 for the
 full roadmap.
 
-- **🧑 Buy a real domain** (e.g. on Namecheap or Cloudflare, ~$10/year) and connect it in
-  Vercel → Settings → Domains. Turns `familytree.vercel.app` into `yourname.com`.
+- **🧑 Buy a real domain** **[PAID — deferred]** (e.g. on Namecheap or Cloudflare,
+  ~$10/year) and connect it in Vercel → Settings → Domains. Turns
+  `familytree.vercel.app` into `yourname.com`. The free `*.vercel.app` address works
+  fine until you decide the project deserves spending money — skip under the zero-cost
+  rule.
 - **🤖 Share links & public "Explore" page** — the growth engine (doc §8 Phase B).
 - **🤖 Fork/remix public trees** — GitHub-style copying of a tree.
 - **🤖 The AI tree-builder** — "describe your family in a paragraph" → generated tree, using
-  the Claude API (doc §9). A signature feature.
+  the Claude API (doc §9). A signature feature. **[PAID — deferred]**: the Claude API is
+  pay-per-use and needs payment details, so this waits until the zero-cost rule is lifted.
 - **🤖 GEDCOM import/export** — needed to attract genealogy users.
-- **🤖 Set up automated checks (CI)** — GitHub Actions running tests on every push (doc §7).
+- ~~**🤖 Set up automated checks (CI)**~~ — already done (GitHub Actions runs lint,
+  format, typecheck, and tests on every push — free for public and private repos at
+  this scale).
+
+---
+
+## Phase 6 — Mobile app (planned, after the website is stable)
+
+The goal is a phone app without maintaining a separate codebase. Three stages, in
+order of increasing cost and effort — stop at whichever stage feels good enough:
+
+### Stage M1 🤖 CLAUDE — Make the website work well on phones (free)
+Responsive layout + touch input for the five views. This is a prerequisite for
+everything below and benefits normal browser users too. Do this as part of regular
+feature work — test with the browser's device-emulation mode (F12 → device toolbar)
+against `npm run dev:web`.
+
+### Stage M2 🤖 CLAUDE — Installable PWA (free, no store, no card)
+A Progressive Web App: a manifest + service worker on top of the existing web build.
+Users tap "Add to Home Screen" and get an icon, full-screen launch, and offline
+support (the browser-local IndexedDB backend is *already* an offline data store —
+that's most of the work done). No app store, no fees, no review process. **This is the
+zero-cost mobile app** and the recommended stopping point until the project outgrows it.
+
+### Stage M3 — Native store apps via Capacitor **[PAID — deferred]**
+Capacitor wraps the same Vue app in a real iOS/Android shell (the WebGL views run fine
+in system webviews). The wrapper is free and open source, but **publishing is not**:
+Google Play charges a **$25 one-time** fee and Apple's App Store **$99/year** — both
+need payment details, so this stage is out of scope under the zero-cost rule. Decide
+later, only if PWA installability turns out not to be enough (e.g. you want push
+notifications on iOS or store visibility).
 
 ---
 
 ## Quick reference: the whole thing in one glance
 
-| Phase | Goal | Who does most of it | Time |
-|-------|------|--------------------|------|
-| 0 | Create accounts (GitHub, Supabase, Vercel) | 🧑 You | ~1 hr |
-| 1 | Build the cloud database + security rules | 🤖 Claude writes, 🧑 you run SQL | ½ day |
-| 2 | Rewire the app to use the cloud | 🤖 Claude | 1–2 weeks |
-| 3 | Import data + deploy live | 🧑 You (clicks) + 🤖 Claude (script) | ½ day |
-| 4 | Legal, privacy, error tracking (before real users) | 🤖 + 🧑 | 2–3 days |
-| 5 | Sharing, AI features, domain, CI | 🤖 (mostly) | ongoing |
+| Phase | Goal | Who does most of it | Time | Cost |
+|-------|------|--------------------|------|------|
+| 0 | Create accounts (GitHub, Supabase, Vercel) | 🧑 You | ~1 hr | Free, no card |
+| 1 | Build the cloud database + security rules | 🤖 Claude writes, 🧑 you run SQL | ½ day | Free |
+| 2 | Rewire the app to use the cloud (seam prep ✅ done) | 🤖 Claude | ~1 week | Free |
+| 3 | Import data + deploy live | 🧑 You (clicks) + 🤖 Claude (script) | ½ day | Free |
+| 4 | Legal, privacy, error tracking (before real users) | 🤖 + 🧑 | 2–3 days | Free |
+| 5 | Sharing, GEDCOM; domain & AI marked [PAID — deferred] | 🤖 (mostly) | ongoing | Mixed |
+| 6 | Mobile: responsive → PWA (free) → stores [PAID — deferred] | 🤖 (mostly) | ongoing | Free until M3 |
 
 ### The five things only YOU can do (Claude cannot)
 1. **Create the accounts** on GitHub, Supabase, and Vercel (login, CAPTCHA, email codes).
 2. **Copy secret keys** from dashboards and paste them into `.env` / Vercel.
 3. **Click "Run" in Supabase's SQL editor** and **"Deploy" in Vercel**.
-4. **Enter any payment info** (only if you upgrade past free tiers or buy a domain).
+4. **Enter any payment info** — which, under the zero-cost rule, you simply **don't**:
+   every required step here works without a card. Paid items are marked
+   **[PAID — deferred]** and skipped.
 5. **Make the legal decisions** — what your privacy policy promises is your call.
 
 Everything else — all the actual code — you can hand to Claude, one step at a time.

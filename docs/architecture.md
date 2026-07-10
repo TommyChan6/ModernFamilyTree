@@ -47,7 +47,17 @@ filesystem, native dialogs, the app lifecycle, and custom protocols.
 |------|----------------|
 | [`index.js`](../src/main/index.js) | App entry. Creates the `BrowserWindow`, registers the `appimg://` protocol, wires the unsaved-changes close confirmation, and binds a custom `Ctrl+=` zoom accelerator. |
 | [`db.js`](../src/main/db.js) | The data store. Loads/saves `familytree.json`, runs schema migrations, and seeds sample data on first run. Exposes `initDB()` and `getDB()`. |
-| [`ipc.js`](../src/main/ipc.js) | Registers all `ipcMain.handle` channels — the complete server-side API surface. See [ipc-api.md](./ipc-api.md). |
+| [`ipc.js`](../src/main/ipc.js) | Registers all `ipcMain.handle` channels — the complete server-side API surface. A thin shell: the actual channel logic lives in the shared data core. See [ipc-api.md](./ipc-api.md). |
+
+### Shared data core (`src/shared/`)
+
+Platform-free TypeScript used on *both* sides of the boundary — and by the web build,
+which has no boundary at all:
+
+| File | Responsibility |
+|------|----------------|
+| [`dbCore.ts`](../src/shared/dbCore.ts) | Every API channel's business logic as pure functions over the DB object (`channelHandlers`), plus the empty-DB shape, the first-run seed, and `WRITE_CHANNELS` (which channels persist). The Electron main process and the browser-local backend are both thin shells around this, so desktop and web behave identically. |
+| [`types.ts`](../src/shared/types.ts) | The entity types (`Person`, `Tree`, …), the `{ success, data | error }` envelope, and the `Env` interface for the few platform services handlers need (uuid, clock, image file storage). |
 
 ### Preload bridge (`src/preload/index.js`)
 
@@ -88,6 +98,12 @@ Every IPC handler returns a uniform envelope — `{ success: true, data }` on su
 or `{ success: false, error }` on failure — so the renderer never sees a thrown
 exception cross the process boundary. See [conventions.md](./conventions.md).
 
+In the **web build** (`npm run dev:web`) the chain is identical down to
+`api.invoke`, which then routes to the browser-local backend
+([`api/backends/local.ts`](../src/renderer/src/api/backends/local.ts)) instead of the
+preload bridge: the same shared channel handlers run in-page against an IndexedDB
+store. Components and the store cannot tell the difference — that is the point.
+
 ### Reactive state
 
 [`store/index.js`](../src/renderer/src/store/index.js) is the single source of truth
@@ -117,13 +133,19 @@ The app ships as ESM; a small `strip-cjs-shim` plugin removes the CommonJS
 `createRequire` shim that electron-vite injects, which Electron 31's ESM loader
 cannot pre-parse. See [developer.md](./developer.md) for commands.
 
+A second, plain-Vite config ([`vite.config.web.js`](../vite.config.web.js)) builds the
+renderer alone as a static website: `npm run dev:web` (dev server), `npm run build:web`
+(static `dist/`), `npm run preview:web`. No Electron or Node code is included; the app
+detects the missing preload bridge and uses the browser-local backend.
+
 ## Module map
 
 | Area | Location | Notes |
 |------|----------|-------|
 | App shell | [`App.vue`](../src/renderer/src/App.vue) | Tree tabs, resizable sidebars, view routing, JSON export. |
 | Global state | [`store/index.js`](../src/renderer/src/store/index.js) | Pinia store `main`. |
-| IPC wrapper | [`api.js`](../src/renderer/src/api.js) | Thin `invoke` / `getImageUrl` façade. |
+| API seam | [`api/`](../src/renderer/src/api/index.ts) | `invoke` / `getImageUrl` façade over swappable backends: `backends/ipc.ts` (Electron) or `backends/local.ts` (browser IndexedDB, used by the web build); auto-selected at startup. Future HTTP/Supabase backend slots in here. |
+| Shared data core | [`src/shared/`](../src/shared/dbCore.ts) | Channel handlers + entity types used by the main process *and* the browser backend (see above). |
 | Views | `components/{GraphCanvas,PeopleView,RelationshipsView,TimelineView,FactionsView}.vue` | Five main workspace views. Tree/timeline/factions draw with Three.js; people/relationships virtualize their DOM lists. |
 | Panels & modals | `components/{LeftSidebar,RightSidebar,PersonModal,PersonForm,GraphSettings}.vue` | Right sidebar member list is virtualized. |
 | Graph engine | [`components/graph/`](../src/renderer/src/components/graph/) | Pure layout/style helpers + the animation composable + the tree's WebGL renderer (`graph/webgl/`). |

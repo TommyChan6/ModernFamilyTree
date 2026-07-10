@@ -26,13 +26,15 @@ component → Pinia store action → api.invoke(channel) → [ boundary ] → db
 
 Everything above the boundary is a normal Vue 3 + Three.js SPA that *already runs in a
 browser* (Electron's renderer is Chromium). Everything below it — the JSON file and the
-IPC handlers — is the only part that has to change. Your `api.js` façade is the seam.
-Swap it from "invoke IPC" to "call HTTP API," reimplement the ~30 IPC handlers as server
-endpoints over a real database, and **the entire renderer comes along for free.**
+IPC handlers — is the only part that has to change. Your api façade
+(`src/renderer/src/api/`) is the seam. Swap it from "invoke IPC" to "call HTTP API,"
+reimplement the ~30 channel handlers as server endpoints over a real database, and
+**the entire renderer comes along for free.**
 
-> **Strategic takeaway:** don't rewrite the app. Cut it at the `api.js` seam, keep the
-> top, replace the bottom. Optionally keep the Electron shell too (see §4.4) so you ship
-> *both* a web app and a desktop app from one codebase.
+> **Strategic takeaway:** don't rewrite the app. Cut it at the api seam, keep the
+> top, replace the bottom. Keep the Electron shell too (see §4.4) so you ship
+> *both* a web app and a desktop app from one codebase. **Update 2026-07-10: the seam
+> cut is done** — see §4.2 and §12 Step 0.5.
 
 ---
 
@@ -69,9 +71,10 @@ A genuinely substantial, high-quality core. This is well past prototype.
 
 **Honest gaps (all expected at this stage)**
 - No packaging/installer, no auth, no server, no sharing, no network at all.
-- No TypeScript yet (adoption decided — see Step 0). ~~No linter/formatter, no CI, no
-  error tracking~~ — ESLint + Prettier + GitHub Actions CI and Sentry/PostHog stubs added
-  2026-07-10 (Step 0).
+- ~~No TypeScript yet~~ — adoption started 2026-07-10 (`src/shared/` + the api module
+  are TS; `tsc --noEmit` in CI; rest converts gradually). ~~No linter/formatter, no CI,
+  no error tracking~~ — ESLint + Prettier + GitHub Actions CI and Sentry/PostHog stubs
+  added 2026-07-10 (Step 0).
 - JSON import is a stub; export is one-way. No GEDCOM.
 - Rendering/interaction has no automated coverage. Light mode needs polish (per draft).
 - ~~Unused `sql.js` dependency lingering in `package.json`.~~ Removed 2026-07-10.
@@ -97,6 +100,21 @@ remix**." Keep that framing — it justifies half the features below.
 ---
 
 ## 4. The desktop → web migration (the central decision)
+
+> **Status (2026-07-10): migration prepared, deployment deferred.** The near-term
+> focus is client-side features in the local app. The structural work that makes the
+> migration cheap is already done (see §4.2 and §12 Step 1.5): the seam is a real
+> backend-adapter module, the channel logic is shared between desktop and a
+> browser-local backend, and `npm run dev:web` runs the full app in a plain browser.
+> Run the web build regularly during feature work — parity between local app and
+> future website is the explicit goal, so migration day is boring.
+
+> **💸 Constraint (decided 2026-07-10): zero cost in the short term.** No paid
+> services, and no service that requires entering card/bank details — even for a free
+> tier. Everything selected below (GitHub, Supabase free tier, Vercel/Netlify/
+> Cloudflare free tiers, Sentry free tier) is signup-with-email only. Items that
+> inherently cost money (custom domain, app-store fees, the pay-per-use Claude API,
+> any tier upgrade) are marked deferred and skipped until this constraint is lifted.
 
 ### 4.1 Recommended backend: Supabase
 
@@ -130,14 +148,24 @@ declarative SQL policy instead of auth middleware sprinkled across 30 endpoints.
 
 ### 4.2 What actually changes in the code
 
-- **`api.js`** — becomes an HTTP client (Supabase JS client or `fetch`). This is the seam.
-  Keep the *exact same method signatures* the store already calls so store/components don't
-  change.
-- **`src/main/ipc.js`** — its ~30 handlers become the contract for your API. With RLS, many
+*(Updated 2026-07-10 — the first two bullets are **done**.)*
+
+- ~~**`api.js`** — becomes an HTTP client.~~ **Done, better:** `api.js` is now the
+  backend-adapter module `src/renderer/src/api/` — `index.ts` picks the backend
+  (`backends/ipc.ts` in Electron, `backends/local.ts` = IndexedDB in a plain browser),
+  all behind one `ApiBackend` interface with the *exact same* `invoke`/`getImageUrl`
+  signatures the store already calls. The cloud migration adds `backends/supabase.ts`
+  beside them; store/components don't change.
+- ~~**`src/main/ipc.js`** — its ~30 handlers become the contract for your API.~~
+  **Done:** the contract now *is* one file — `src/shared/dbCore.ts` holds every channel
+  handler as a pure function over the DB object; `ipc.js` is a thin Electron shell
+  around it and `backends/local.ts` is a thin browser shell around it. When Supabase
+  arrives, `channelHandlers` is the reference implementation to port: with RLS, many
   become thin table reads/writes; only compound operations (cascade delete, migrations)
   need server logic (Postgres functions or Edge Functions).
-- **`src/main/db.js`** — retires. Its migration logic becomes a one-time **JSON→Postgres
-  importer** (also your users' "import my desktop data" feature — do not throw it away).
+- **`src/main/db.js`** — retires at migration time. Its migration logic becomes a
+  one-time **JSON→Postgres importer** (also your users' "import my desktop data"
+  feature — do not throw it away).
 - **Images** — `appimg://` → Supabase Storage public/signed URLs. Your existing renderer-side
   webp thumbnailing (see memory: `nativeImage` can't decode webp) is *still correct* on web;
   keep decoding via `createImageBitmap` client-side or use Storage's transform params.
@@ -156,15 +184,28 @@ Practical shape: a lightweight SSR/SSG shell (Nuxt, or Vite SSR, or even prerend
 pages hitting the API) for discovery + profiles, and the heavy WebGL editor loaded
 client-only. Lazy-load Three.js so browse pages don't pay for it.
 
-### 4.4 Keep desktop *and* web from one codebase (optional but cheap)
+### 4.4 One codebase, three targets: desktop, web, **and mobile**
 
-Because the split is clean, you can retain the Electron app as an **offline-capable desktop
-client** that talks to the same API (or works offline against a local store and syncs). The
-`api.js` seam picks its implementation at build time: IPC for desktop, HTTP for web. This is
-a real differentiator for the genealogy audience, who value owning their data offline.
+Because the split is clean, one Vue renderer serves every platform; only the backend
+adapter behind `src/renderer/src/api/` differs:
 
-A local-first sync engine (e.g. an IndexedDB store that reconciles with the server) is the
-"cool but not required" version of this — file under exploratory (§9).
+- **Desktop (today):** Electron shell, IPC backend, JSON file. Stays — a real
+  differentiator for the genealogy audience, who value owning their data offline.
+- **Web (prepared):** the same renderer as a static site. Already runs via
+  `npm run dev:web` on the browser-local IndexedDB backend; gains the Supabase backend
+  at deployment time. The IndexedDB backend then remains valuable as the **offline /
+  instant-demo mode** ("try it without an account").
+- **Mobile (planned):** the web app again, in three stages —
+  1. **Responsive + touch** for the five views (free; do during normal feature work);
+  2. **Installable PWA** (free, no store account, no card): manifest + service worker
+     over the web build. Offline comes almost free — the IndexedDB backend *is* an
+     offline store. The recommended mobile target under the zero-cost constraint;
+  3. **Capacitor store apps** *(deferred — paid)*: same code in a native shell, but
+     Google Play ($25 one-time) / Apple ($99/yr) require payment details.
+
+A local-first **sync** engine (IndexedDB store reconciling with the server) is the
+"cool but not required" endgame that would unify offline desktop, offline web, and
+mobile — file under exploratory (§9).
 
 ---
 
@@ -306,8 +347,10 @@ Reconciled `designDraft.txt` × `design.md` × the north star. Roughly dependenc
 - **Real-time collaborative editing** (Supabase Realtime / Yjs CRDT).
 - **Localization / multiple languages** (draft) — the "different languages" reveal-info idea
   generalizes to full i18n. The user base is international; the author is in Norway (EU).
-- **Mobile** — web is responsive first; then **Capacitor** to wrap the same Vue app as
-  iOS/Android (draft "mobile version").
+- **Mobile** (see §4.4 for the full plan) — responsive + touch first (start during
+  regular feature work, not in this phase), then an **installable PWA** (free — the
+  zero-cost mobile app), and only later **Capacitor** store apps (deferred; store fees
+  are paid) (draft "mobile version").
 
 ---
 
@@ -320,6 +363,8 @@ Ordered roughly by "impact per unit weirdness."
   three feuding branches." For genealogists: extract a tree from a **photo of a hand-drawn
   family tree** (vision). This is a *signature* feature and directly on-goal. Use the latest
   Claude models via the Anthropic API — see the `claude-api` skill for model IDs/params.
+  *Deferred under the zero-cost constraint: the API is pay-per-use and needs payment
+  details on file.*
 - **Import from Wikidata/Wikipedia.** Type "House of Habsburg" → seed a historical tree from
   structured data, with citations. Turns the "browse famous families" dream into
   one-click reality and seeds your public gallery.
@@ -346,17 +391,24 @@ Ordered roughly by "impact per unit weirdness."
 Do these *around* the web migration, not as a separate stop-the-world project.
 
 - **Adopt TypeScript gradually.** At ~14k LOC and growing into a networked multi-user app,
-  the type safety pays for itself — especially across the new client↔server contract. Start
-  by generating types from the Postgres schema (Supabase can emit them) and typing `api.js` +
-  the store; let it spread. Vue `<script setup lang="ts">` + `vue-tsc`.
-- **ESLint + Prettier.** None today. Add before CI so the gate means something.
-- **Remove `sql.js`** — listed but unused; delete to avoid confusion.
-- **Formalize the `api.js` seam** into a repository interface with two implementations
-  (IPC / HTTP) so desktop and web coexist (§4.4).
-- **Extract shared code** into a workspace package if you split repos: the pure layout math
-  (`layoutAge`, `layoutGeneration`, `linkHelpers`, `timelineLayout`, `factionLayout`) and the
-  data types are 100% reusable client/server and desktop/web. Consider a monorepo
-  (pnpm/turborepo) with `packages/core`, `apps/web`, `apps/desktop`.
+  the type safety pays for itself — especially across the new client↔server contract.
+  ~~Start by typing `api.js` + the store~~ **Started 2026-07-10:** the api module,
+  the shared data core, and the entity/contract types (`src/shared/types.ts`) are TS;
+  `tsc --noEmit` runs in CI (`npm run typecheck`). Next: the Pinia store, then let it
+  spread (`<script setup lang="ts">` + `vue-tsc` when .vue files convert). At Supabase
+  time, generate DB types from the schema and align them with `src/shared/types.ts`.
+- ~~**ESLint + Prettier.** None today. Add before CI so the gate means something.~~ Done.
+- ~~**Remove `sql.js`** — listed but unused; delete to avoid confusion.~~ Done.
+- ~~**Formalize the `api.js` seam** into a repository interface with two implementations
+  (IPC / HTTP) so desktop and web coexist (§4.4).~~ **Done 2026-07-10:**
+  `src/renderer/src/api/` — `ApiBackend` interface, `backends/ipc.ts` +
+  `backends/local.ts`, auto-selected at startup. Third (HTTP/Supabase) slot reserved.
+- **Extract shared code** — **first slice done 2026-07-10:** `src/shared/` now holds the
+  data types and the whole channel-handler core (`dbCore.ts`), consumed by both the
+  Electron main process and the browser backend. The pure layout math
+  (`layoutAge`, `layoutGeneration`, `linkHelpers`, `timelineLayout`, `factionLayout`)
+  stays where it is for now; a monorepo split (`packages/core`, `apps/web`,
+  `apps/desktop`) only if the repos ever split.
 - **Server-side validation** — you currently trust the client (fine for single-user). On the
   web, validate every write server-side (Zod schemas shared client/server) and rely on RLS
   for authz. Never trust `tree_id`/ownership from the client.
@@ -422,14 +474,39 @@ year-long branch.
    generated from the Supabase schema. Add `vue-tsc` to CI at that point. No big-bang
    conversion of existing files.
 
-**Step 1 — Backend spike (1–2 weeks)**
+**Step 0.5 — Deployment-ready structure (days)** — ✅ **done 2026-07-10**
+Pulled forward from Steps 1–2 so the codebase is web-shaped *before* any service
+exists, while day-to-day work stays on local client features:
+- The seam is real: `src/renderer/src/api/` (`ApiBackend` interface; `backends/ipc.ts`
+  for Electron, `backends/local.ts` for the browser; auto-selected at startup).
+- One data core: every channel handler moved to `src/shared/dbCore.ts` (TypeScript,
+  pure functions over the DB object). `src/main/ipc.js` and the browser backend are
+  thin shells around it → desktop and web behave identically by construction. Also
+  fixed a latent bug where deleting the *active* tree reported a stale
+  `newActiveTreeId`.
+- Web build: `npm run dev:web` / `build:web` / `preview:web` (plain Vite, static
+  `dist/`, zero Electron code). Data persists in IndexedDB; photos as data URLs;
+  unsaved-layout warning via `beforeunload` in the browser (Electron keeps its native
+  close dialog).
+- TS adoption started (`src/shared/`, the api module, `tsconfig.json`); CI now gates
+  on `tsc --noEmit` too.
+- Verified end-to-end on both targets (headless smoke: seed renders, person creation
+  persists — to the JSON file on desktop, to IndexedDB on web).
+
+**Current phase — client-side features (ongoing).** Build features in the local app;
+keep `npm run dev:web` working as the parity check. Steps 1–3 below start whenever
+deployment is wanted — nothing blocks them, and nothing below costs money until then.
+
+**Step 1 — Backend spike (1–2 weeks)** *(deferred until deployment is wanted)*
 4. Stand up Supabase: schema (§5), RLS policies, Auth, Storage bucket.
 5. Write the **JSON→Postgres importer** from your `db.js` migration logic.
 6. Build a throwaway script that round-trips your seed data in and back out — proves the model.
 
-**Step 2 — Cut the seam (2–4 weeks)**
-7. Reimplement `api.js` against Supabase, *same signatures*. Add auth state to the store.
-8. Get the app running in a plain browser (Vite web build) end-to-end for a logged-in user:
+**Step 2 — Cut the seam (1–2 weeks — halved by Step 0.5)** *(deferred)*
+7. Add `backends/supabase.ts` implementing the `ApiBackend` interface (use
+   `src/shared/dbCore.ts` `channelHandlers` as the reference for every channel's
+   semantics). Add auth state to the store.
+8. Run the existing web build against it end-to-end for a logged-in user:
    create/edit persons + relationships, all five views, save graph state to DB.
 9. Port the Playwright harness to the web build; add E2E for the core loop. Wire preview deploys.
 
@@ -445,16 +522,29 @@ year-long branch.
 15. Time-lapse mode, relationship path finder, minimap, map view.
 
 **Step 5 — Social & scale (ongoing)**
-16. Likes/comments/follows, real-time collaboration, i18n, Capacitor mobile, monetization tiers.
+16. Likes/comments/follows, real-time collaboration, i18n, mobile per §4.4
+    (responsive → PWA → Capacitor), monetization tiers.
 
 ---
 
 ## 13. Open decisions for you
 
+- **Spending money** — **Decided (2026-07-10): zero cost for now.** No paid services, no
+  service that wants card/bank details even on a free tier. Everything in the current
+  plan fits inside genuinely card-free tiers; paid items (domain, Claude API, app-store
+  fees, tier upgrades) are marked deferred throughout. Revisit when the project has
+  users or the free tiers pinch.
+- **Deploy now or later?** — **Decided (2026-07-10): later.** Structure prepared
+  (§12 Step 0.5); work happens on local client features until deployment is wanted.
+- **Mobile app?** — **Decided (2026-07-10): yes, staged.** Responsive/touch during
+  normal feature work → installable PWA (free) → Capacitor store apps only if PWA
+  proves insufficient (store fees conflict with the zero-cost rule). See §4.4 and
+  `DEPLOYMENT_PLAN.md` Phase 6.
 - **Desktop: keep or drop?** — **Decided (2026-07-10): keep both.** Web-first, but retain
-  Electron as an offline desktop client from the same codebase via the `api.js` seam (§4.4).
-  This makes formalizing the seam into a repository interface with IPC + HTTP implementations
-  (§10) a firm requirement, not optional.
+  Electron as an offline desktop client from the same codebase via the api seam (§4.4).
+  ~~This makes formalizing the seam into a repository interface with IPC + HTTP
+  implementations (§10) a firm requirement, not optional.~~ Done — the seam now has
+  exactly that shape (IPC + browser-local, HTTP slot reserved).
 - **SPA + Supabase now, or Nuxt full-stack from the start?** SPA + Supabase ships fastest and
   reuses everything; Nuxt front-loads SSR/SEO. *Recommendation: SPA now, Nuxt for discovery
   pages in Phase B if SEO proves to be the growth lever.*

@@ -140,7 +140,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useMainStore } from '../store/index.js'
-import { api } from '../api.js'
+import { api } from '../api'
 import { computeTimelineLayout, GUTTER, Y_PAD } from './timeline/timelineLayout.js'
 import { TimelineRenderer } from './timeline/TimelineRenderer.js'
 

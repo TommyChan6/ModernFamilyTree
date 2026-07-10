@@ -93,6 +93,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useMainStore } from './store/index.js'
+import { api } from './api'
 import LeftSidebar from './components/LeftSidebar.vue'
 import GraphCanvas from './components/GraphCanvas.vue'
 import PeopleView from './components/PeopleView.vue'
@@ -231,9 +232,16 @@ function handleExport() {
   URL.revokeObjectURL(url)
 }
 
+// In the browser there is no main-process close dialog, so warn about unsaved
+// layout changes via beforeunload instead. Skipped in Electron, where the
+// main process runs its own Save/Discard/Cancel dialog on close.
+function onBeforeUnload(e) {
+  if (store.graphDirty) e.preventDefault()
+}
+
 onMounted(async () => {
   // Load global settings (theme)
-  const globalRes = await window.electronAPI.invoke('globalSettings:getAll')
+  const globalRes = await api.invoke('globalSettings:getAll')
   if (globalRes.success && globalRes.data.theme) {
     store.setTheme(globalRes.data.theme)
   }
@@ -244,11 +252,13 @@ onMounted(async () => {
 
   window.__isGraphDirty = () => store.graphDirty
   window.__saveGraphLayout = () => handleSave()
+  if (!window.electronAPI) window.addEventListener('beforeunload', onBeforeUnload)
 })
 
 onUnmounted(() => {
   window.removeEventListener('mousemove', onResizeMove)
   window.removeEventListener('mouseup', onResizeEnd)
+  window.removeEventListener('beforeunload', onBeforeUnload)
 })
 </script>
 

@@ -41,10 +41,15 @@ There is no linter or formatter config in the repo; follow the prevailing style:
 
 ## State & data access
 
-- **Components → store → api → IPC.** Views must not call `api.invoke` or
+- **Components → store → api → backend.** Views must not call `api.invoke` or
   `window.electronAPI` directly; add a store action instead. (A few components read
   images directly via `api.invoke('images:*')` for local, component-owned lists — but
   all persons/relationships/trees flow through the store.)
+- **Never touch `window.electronAPI` outside `src/renderer/src/api/backends/ipc.ts`.**
+  Everything goes through the `api` seam so the same code runs in the web build
+  (where `electronAPI` doesn't exist). New data operations = a handler in
+  `src/shared/dbCore.ts` (works on desktop *and* web at once), not a bespoke
+  `ipcMain.handle` — unless the operation is genuinely platform-bound.
 - Store actions do the IPC round-trip and **optimistically update** the reactive
   arrays only after `res.success`.
 - Keep the store the single source of truth for `persons`, `relationships`, `trees`,

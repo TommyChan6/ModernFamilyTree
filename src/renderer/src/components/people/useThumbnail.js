@@ -1,5 +1,5 @@
 import { ref, watch } from 'vue'
-import { api } from '../../api.js'
+import { api } from '../../api'
 
 // Session-wide avatar thumbnail cache shared by every card.
 //
