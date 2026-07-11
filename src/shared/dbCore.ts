@@ -15,13 +15,15 @@
 
 import type {
   DB,
+  EntityTag,
   Env,
   Faction,
   ImageRecord,
   Person,
   Project,
   Relationship,
-  Scenario
+  Scenario,
+  Tag
 } from './types'
 import { yearDate } from './calendarMath'
 
@@ -46,12 +48,23 @@ export const EMPTY_DB = (): DB => ({
   activeProjectId: null,
   persons: {},
   relationships: {},
+  tags: {},
+  entity_tags: {},
   factions: {},
   scenarios: {},
   images: {},
   settings: {},
   globalSettings: {}
 })
+
+/** Delete every entity_tags row touching the given tag or entity. */
+function cascadeEntityTags(db: DB, { tagId, entityId }: { tagId?: string; entityId?: string }) {
+  for (const [id, row] of Object.entries(db.entity_tags)) {
+    if ((tagId && row.tag_id === tagId) || (entityId && row.entity_id === entityId)) {
+      delete db.entity_tags[id]
+    }
+  }
+}
 
 export function nowStr(): string {
   return new Date().toISOString().replace('T', ' ').slice(0, 19)
@@ -278,12 +291,22 @@ export const channelHandlers: Record<string, Handler> = {
 
   'projects:delete'(db, data, env) {
     const pid = data.id
-    // Remove all persons, relationships, factions, scenarios, images for this project
+    // Remove all persons, relationships, tags (+joins), factions, scenarios,
+    // images for this project
     for (const [id, p] of Object.entries(db.persons)) {
-      if (p.project_id === pid) delete db.persons[id]
+      if (p.project_id === pid) {
+        cascadeEntityTags(db, { entityId: id })
+        delete db.persons[id]
+      }
     }
     for (const [rid, r] of Object.entries(db.relationships)) {
       if (r.project_id === pid) delete db.relationships[rid]
+    }
+    for (const [tid, t] of Object.entries(db.tags)) {
+      if (t.project_id === pid) {
+        cascadeEntityTags(db, { tagId: tid })
+        delete db.tags[tid]
+      }
     }
     for (const [fid, f] of Object.entries(db.factions)) {
       if (f.project_id === pid) delete db.factions[fid]
@@ -378,6 +401,7 @@ export const channelHandlers: Record<string, Handler> = {
         delete db.images[iid]
       }
     }
+    cascadeEntityTags(db, { entityId: data.id })
     delete db.persons[data.id]
     return { id: data.id }
   },
@@ -417,6 +441,83 @@ export const channelHandlers: Record<string, Handler> = {
   'relationships:delete'(db, data) {
     delete db.relationships[data.id]
     return { id: data.id }
+  },
+
+  // ── tags ───────────────────────────────────────────────────────────────────
+  'tags:getAll'(db) {
+    return sortByDate(forProject(db, db.tags))
+  },
+
+  'tags:create'(db, data, env) {
+    const id = env.uuid()
+    const now = env.nowStr()
+    const tag: Tag = {
+      id,
+      project_id: db.activeProjectId as string,
+      label: data?.label || 'New Tag',
+      type: data?.type || '',
+      source: data?.source === 'derived' ? 'derived' : 'manual',
+      color: data?.color || '#6c8ef5',
+      icon: data?.icon || '',
+      created_at: now,
+      updated_at: now
+    }
+    db.tags[id] = tag
+    return tag
+  },
+
+  'tags:update'(db, data, env) {
+    const existing = db.tags[data.id]
+    if (!existing) throw new Error('Tag not found')
+    if (data.label !== undefined) existing.label = data.label
+    if (data.type !== undefined) existing.type = data.type
+    if (data.color !== undefined) existing.color = data.color
+    if (data.icon !== undefined) existing.icon = data.icon
+    existing.updated_at = env.nowStr()
+    return existing
+  },
+
+  'tags:delete'(db, data) {
+    cascadeEntityTags(db, { tagId: data.id })
+    delete db.tags[data.id]
+    return { id: data.id }
+  },
+
+  // ── entity_tags (the many-to-many membership join) ─────────────────────────
+  // Rows carry no project_id; they are scoped through their tag.
+  'entity_tags:getAll'(db) {
+    return sortByDate(
+      Object.values(db.entity_tags).filter(
+        (row) => db.tags[row.tag_id]?.project_id === db.activeProjectId
+      )
+    )
+  },
+
+  // Idempotent: adding an existing (entity, tag) pair returns the existing row.
+  'entity_tags:add'(db, data, env) {
+    const { entity_id, tag_id } = data
+    if (!db.tags[tag_id]) throw new Error('Tag not found')
+    if (!db.persons[entity_id]) throw new Error('Entity not found')
+    const existing = Object.values(db.entity_tags).find(
+      (row) => row.entity_id === entity_id && row.tag_id === tag_id
+    )
+    if (existing) return existing
+    const id = env.uuid()
+    const row: EntityTag = { id, entity_id, tag_id, created_at: env.nowStr() }
+    db.entity_tags[id] = row
+    return row
+  },
+
+  'entity_tags:remove'(db, data) {
+    const { entity_id, tag_id } = data
+    const removed: string[] = []
+    for (const [id, row] of Object.entries(db.entity_tags)) {
+      if (row.entity_id === entity_id && row.tag_id === tag_id) {
+        delete db.entity_tags[id]
+        removed.push(id)
+      }
+    }
+    return { entity_id, tag_id, removed }
   },
 
   // ── factions ───────────────────────────────────────────────────────────────
@@ -610,6 +711,11 @@ export const WRITE_CHANNELS = new Set([
   'relationships:create',
   'relationships:update',
   'relationships:delete',
+  'tags:create',
+  'tags:update',
+  'tags:delete',
+  'entity_tags:add',
+  'entity_tags:remove',
   'factions:create',
   'factions:update',
   'factions:delete',

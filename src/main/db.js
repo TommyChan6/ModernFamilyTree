@@ -43,6 +43,8 @@ export function initDB() {
   _db.projects = _db.projects || {}
   _db.persons = _db.persons || {}
   _db.relationships = _db.relationships || {}
+  _db.tags = _db.tags || {}
+  _db.entity_tags = _db.entity_tags || {}
   _db.factions = _db.factions || {}
   _db.scenarios = _db.scenarios || {}
   _db.images = _db.images || {}
@@ -133,6 +135,8 @@ export function getDB() {
     activeProjectId: _db.activeProjectId,
     persons: _db.persons,
     relationships: _db.relationships,
+    tags: _db.tags,
+    entityTags: _db.entity_tags,
     factions: _db.factions,
     scenarios: _db.scenarios,
     images: _db.images,

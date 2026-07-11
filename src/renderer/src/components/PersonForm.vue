@@ -82,6 +82,12 @@
             </div>
           </div>
 
+          <!-- Tags (existing persons only — a new person has no id to join on yet) -->
+          <div v-if="store.editingPerson" class="form-section">
+            <div class="form-section-label">Tags</div>
+            <TagChipsEditor :entity-id="store.editingPerson.id" />
+          </div>
+
           <!-- Relationships -->
           <div class="form-section">
             <div class="form-section-label">Relationships</div>
@@ -241,6 +247,7 @@ import { ref, computed, watch } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { api } from '../api'
 import { yearDate } from '../../../shared/calendarMath'
+import TagChipsEditor from './TagChipsEditor.vue'
 
 const store = useMainStore()
 

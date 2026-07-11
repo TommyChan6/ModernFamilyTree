@@ -11,6 +11,8 @@ export const useMainStore = defineStore('main', () => {
   // ── State ──────────────────────────────────────────────────────────────────
   const persons = ref([])
   const relationships = ref([])
+  const tags = ref([])
+  const entityTags = ref([]) // the entity↔tag membership join rows
   const factions = ref([]) // all factions of the project, across scenarios
   const scenarios = ref([])
   const activeScenarioId = ref(null)
@@ -77,6 +79,27 @@ export const useMainStore = defineStore('main', () => {
   const activeFactions = computed(() =>
     factions.value.filter((f) => f.scenario_id === activeScenarioId.value)
   )
+  // O(1) membership lookups in both directions, rebuilt when the join changes:
+  // tagsOf.get(entityId) → Tag[]; membersOf.get(tagId) → entityId[]
+  const tagById = computed(() => new Map(tags.value.map((t) => [t.id, t])))
+  const tagsOf = computed(() => {
+    const m = new Map()
+    for (const row of entityTags.value) {
+      const tag = tagById.value.get(row.tag_id)
+      if (!tag) continue
+      if (!m.has(row.entity_id)) m.set(row.entity_id, [])
+      m.get(row.entity_id).push(tag)
+    }
+    return m
+  })
+  const membersOf = computed(() => {
+    const m = new Map()
+    for (const row of entityTags.value) {
+      if (!m.has(row.tag_id)) m.set(row.tag_id, [])
+      m.get(row.tag_id).push(row.entity_id)
+    }
+    return m
+  })
 
   // ── Project actions ───────────────────────────────────────────────────────
   async function loadProjects() {
@@ -134,15 +157,20 @@ export const useMainStore = defineStore('main', () => {
 
   // ── Data actions ──────────────────────────────────────────────────────────
   async function loadAll() {
-    const [personsRes, relsRes, factionsRes, scenariosRes, settingsRes] = await Promise.all([
-      api.invoke('persons:getAll'),
-      api.invoke('relationships:getAll'),
-      api.invoke('factions:getAll'),
-      api.invoke('scenarios:getAll'),
-      api.invoke('settings:getAll')
-    ])
+    const [personsRes, relsRes, tagsRes, entityTagsRes, factionsRes, scenariosRes, settingsRes] =
+      await Promise.all([
+        api.invoke('persons:getAll'),
+        api.invoke('relationships:getAll'),
+        api.invoke('tags:getAll'),
+        api.invoke('entity_tags:getAll'),
+        api.invoke('factions:getAll'),
+        api.invoke('scenarios:getAll'),
+        api.invoke('settings:getAll')
+      ])
     if (personsRes.success) persons.value = personsRes.data
     if (relsRes.success) relationships.value = relsRes.data
+    if (tagsRes.success) tags.value = tagsRes.data
+    if (entityTagsRes.success) entityTags.value = entityTagsRes.data
     if (factionsRes.success) factions.value = factionsRes.data
     if (scenariosRes.success) scenarios.value = scenariosRes.data
     // Restore the project's active scenario; fall back to the first one
@@ -173,6 +201,7 @@ export const useMainStore = defineStore('main', () => {
       relationships.value = relationships.value.filter(
         (r) => r.person_a_id !== id && r.person_b_id !== id
       )
+      entityTags.value = entityTags.value.filter((row) => row.entity_id !== id)
       factions.value.forEach((f) => {
         if (f.member_ids?.includes(id)) {
           f.member_ids = f.member_ids.filter((pid) => pid !== id)
@@ -204,6 +233,51 @@ export const useMainStore = defineStore('main', () => {
   async function deleteRelationship(id) {
     const res = await api.invoke('relationships:delete', { id })
     if (res.success) relationships.value = relationships.value.filter((r) => r.id !== id)
+    return res
+  }
+
+  // ── Tag actions ───────────────────────────────────────────────────────────
+  async function createTag(data) {
+    const res = await api.invoke('tags:create', data)
+    if (res.success) tags.value.push(res.data)
+    return res
+  }
+
+  async function updateTag(data) {
+    const res = await api.invoke('tags:update', data)
+    if (res.success) {
+      const idx = tags.value.findIndex((t) => t.id === data.id)
+      if (idx !== -1) tags.value[idx] = res.data
+    }
+    return res
+  }
+
+  async function deleteTag(id) {
+    const res = await api.invoke('tags:delete', { id })
+    if (res.success) {
+      tags.value = tags.value.filter((t) => t.id !== id)
+      entityTags.value = entityTags.value.filter((row) => row.tag_id !== id)
+    }
+    return res
+  }
+
+  async function addEntityTag(entityId, tagId) {
+    if (entityTags.value.some((row) => row.entity_id === entityId && row.tag_id === tagId))
+      return null
+    const res = await api.invoke('entity_tags:add', { entity_id: entityId, tag_id: tagId })
+    if (res.success && !entityTags.value.some((row) => row.id === res.data.id)) {
+      entityTags.value.push(res.data)
+    }
+    return res
+  }
+
+  async function removeEntityTag(entityId, tagId) {
+    const res = await api.invoke('entity_tags:remove', { entity_id: entityId, tag_id: tagId })
+    if (res.success) {
+      entityTags.value = entityTags.value.filter(
+        (row) => !(row.entity_id === entityId && row.tag_id === tagId)
+      )
+    }
     return res
   }
 
@@ -384,6 +458,8 @@ export const useMainStore = defineStore('main', () => {
     // state
     persons,
     relationships,
+    tags,
+    entityTags,
     factions,
     scenarios,
     activeScenarioId,
@@ -409,6 +485,8 @@ export const useMainStore = defineStore('main', () => {
     coupleCount,
     activeScenario,
     activeFactions,
+    tagsOf,
+    membersOf,
     // actions
     loadAll,
     createPerson,
@@ -417,6 +495,11 @@ export const useMainStore = defineStore('main', () => {
     createRelationship,
     updateRelationship,
     deleteRelationship,
+    createTag,
+    updateTag,
+    deleteTag,
+    addEntityTag,
+    removeEntityTag,
     createFaction,
     updateFaction,
     deleteFaction,

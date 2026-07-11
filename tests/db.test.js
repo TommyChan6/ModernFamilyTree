@@ -2,7 +2,17 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
+import { randomUUID } from 'crypto'
 import { yearDate } from '../src/shared/calendarMath'
+import { channelHandlers } from '../src/shared/dbCore'
+
+// Env for exercising the shared channel handlers directly
+const handlerEnv = {
+  uuid: () => randomUUID(),
+  nowStr: () => '2026-01-01 00:00:00',
+  storeImageFile: (p) => p,
+  removeImageFile: () => {}
+}
 
 // ── Mock Electron's `app` module before importing db.js ─────────────────────
 let tmpDir
@@ -963,6 +973,144 @@ describe('Scenarios', () => {
     expect(raw.factions.fB).toBeDefined()
     expect(raw.scenarios.sA).toBeUndefined()
     expect(raw.scenarios.sB).toBeDefined()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Tags & the entity_tags join', () => {
+  it('adds empty tags/entity_tags tables when loading an older database', () => {
+    const dbDir = path.join(tmpDir, 'db')
+    fs.mkdirSync(dbDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dbDir, 'familytree.json'),
+      JSON.stringify({
+        projects: {
+          t1: { id: 't1', name: 'T', created_at: '2024-01-01', updated_at: '2024-01-01' }
+        },
+        activeProjectId: 't1',
+        persons: {},
+        relationships: {},
+        factions: {},
+        scenarios: {},
+        images: {},
+        settings: {},
+        globalSettings: {}
+      })
+    )
+
+    initDB()
+    const { tags, entityTags } = getDB()
+    expect(tags).toEqual({})
+    expect(entityTags).toEqual({})
+  })
+
+  it('creates a tag scoped to the active project and persists it', () => {
+    initDB()
+    const { db, save, activeProjectId } = getDB()
+    const tag = channelHandlers['tags:create'](
+      db,
+      { label: 'House Anderson', color: '#f5a623', icon: '🏰', type: 'family' },
+      handlerEnv
+    )
+    save()
+
+    const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, 'db', 'familytree.json'), 'utf8'))
+    expect(raw.tags[tag.id].label).toBe('House Anderson')
+    expect(raw.tags[tag.id].project_id).toBe(activeProjectId)
+    expect(raw.tags[tag.id].source).toBe('manual')
+    expect(raw.tags[tag.id].color).toBe('#f5a623')
+  })
+
+  it('joins an entity to a tag exactly once (duplicate add returns the same row)', () => {
+    initDB()
+    const { db } = getDB()
+    const personId = Object.keys(db.persons)[0]
+    const tag = channelHandlers['tags:create'](db, { label: 'T' }, handlerEnv)
+
+    const row1 = channelHandlers['entity_tags:add'](
+      db,
+      { entity_id: personId, tag_id: tag.id },
+      handlerEnv
+    )
+    const row2 = channelHandlers['entity_tags:add'](
+      db,
+      { entity_id: personId, tag_id: tag.id },
+      handlerEnv
+    )
+    expect(row2.id).toBe(row1.id)
+    expect(Object.keys(db.entity_tags)).toHaveLength(1)
+
+    const rows = channelHandlers['entity_tags:getAll'](db)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ entity_id: personId, tag_id: tag.id })
+  })
+
+  it('entity_tags:remove deletes the pair and leaves other joins alone', () => {
+    initDB()
+    const { db } = getDB()
+    const [p1, p2] = Object.keys(db.persons)
+    const tag = channelHandlers['tags:create'](db, { label: 'T' }, handlerEnv)
+    channelHandlers['entity_tags:add'](db, { entity_id: p1, tag_id: tag.id }, handlerEnv)
+    channelHandlers['entity_tags:add'](db, { entity_id: p2, tag_id: tag.id }, handlerEnv)
+
+    channelHandlers['entity_tags:remove'](db, { entity_id: p1, tag_id: tag.id })
+    const rows = Object.values(db.entity_tags)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].entity_id).toBe(p2)
+  })
+
+  it('deleting a person cascades its join rows; the tag and other members stay', () => {
+    initDB()
+    const { db } = getDB()
+    const [p1, p2] = Object.keys(db.persons)
+    const tag = channelHandlers['tags:create'](db, { label: 'T' }, handlerEnv)
+    channelHandlers['entity_tags:add'](db, { entity_id: p1, tag_id: tag.id }, handlerEnv)
+    channelHandlers['entity_tags:add'](db, { entity_id: p2, tag_id: tag.id }, handlerEnv)
+
+    channelHandlers['persons:delete'](db, { id: p1 }, handlerEnv)
+
+    expect(db.persons[p1]).toBeUndefined()
+    expect(db.tags[tag.id]).toBeDefined()
+    const rows = Object.values(db.entity_tags)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].entity_id).toBe(p2)
+  })
+
+  it('deleting a tag cascades its join rows; people are untouched', () => {
+    initDB()
+    const { db } = getDB()
+    const personCount = Object.keys(db.persons).length
+    const [p1, p2] = Object.keys(db.persons)
+    const keep = channelHandlers['tags:create'](db, { label: 'Keep' }, handlerEnv)
+    const drop = channelHandlers['tags:create'](db, { label: 'Drop' }, handlerEnv)
+    channelHandlers['entity_tags:add'](db, { entity_id: p1, tag_id: keep.id }, handlerEnv)
+    channelHandlers['entity_tags:add'](db, { entity_id: p1, tag_id: drop.id }, handlerEnv)
+    channelHandlers['entity_tags:add'](db, { entity_id: p2, tag_id: drop.id }, handlerEnv)
+
+    channelHandlers['tags:delete'](db, { id: drop.id })
+
+    expect(db.tags[drop.id]).toBeUndefined()
+    expect(db.tags[keep.id]).toBeDefined()
+    const rows = Object.values(db.entity_tags)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].tag_id).toBe(keep.id)
+    expect(Object.keys(db.persons)).toHaveLength(personCount)
+  })
+
+  it('deleting a project removes its tags and their join rows', () => {
+    initDB()
+    const { db, activeProjectId } = getDB()
+    const personId = Object.keys(db.persons)[0]
+    const tag = channelHandlers['tags:create'](db, { label: 'T' }, handlerEnv)
+    channelHandlers['entity_tags:add'](db, { entity_id: personId, tag_id: tag.id }, handlerEnv)
+
+    // A second project must survive the delete
+    const other = channelHandlers['projects:create'](db, { name: 'Other' }, handlerEnv)
+    channelHandlers['projects:delete'](db, { id: activeProjectId }, handlerEnv)
+
+    expect(db.projects[other.id]).toBeDefined()
+    expect(Object.keys(db.tags)).toHaveLength(0)
+    expect(Object.keys(db.entity_tags)).toHaveLength(0)
   })
 })
 
