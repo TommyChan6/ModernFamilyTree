@@ -52,6 +52,7 @@ export function initDB() {
   _db.entity_tags = _db.entity_tags || {}
   _db.factions = _db.factions || {}
   _db.scenes = _db.scenes || {}
+  _db.scene_tags = _db.scene_tags || {}
   _db.images = _db.images || {}
   _db.settings = _db.settings || {}
   _db.globalSettings = _db.globalSettings || {}
@@ -150,6 +151,7 @@ export function getDB() {
     entityTags: _db.entity_tags,
     factions: _db.factions,
     scenes: _db.scenes,
+    sceneTags: _db.scene_tags,
     images: _db.images,
     settings: _db.settings,
     globalSettings: _db.globalSettings,

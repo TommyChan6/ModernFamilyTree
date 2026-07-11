@@ -1167,6 +1167,112 @@ describe('Tags & the entity_tags join', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+describe('scene_tags (tag placements)', () => {
+  it('adds a placement that round-trips to disk; duplicate add returns the same row', () => {
+    initDB()
+    const { db, save } = getDB()
+    const { scene } = channelHandlers['scenes:create'](
+      db,
+      { view: 'groups', name: 'S' },
+      handlerEnv
+    )
+    const tag = channelHandlers['tags:create'](db, { label: 'T' }, handlerEnv)
+
+    const row1 = channelHandlers['scene_tags:add'](
+      db,
+      { scene_id: scene.id, tag_id: tag.id, x: 120, y: -40, visible: true },
+      handlerEnv
+    )
+    const row2 = channelHandlers['scene_tags:add'](
+      db,
+      { scene_id: scene.id, tag_id: tag.id, x: 999, y: 999 },
+      handlerEnv
+    )
+    expect(row2.id).toBe(row1.id)
+    expect(Object.keys(db.scene_tags)).toHaveLength(1)
+    save()
+
+    const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, 'db', 'familytree.json'), 'utf8'))
+    expect(raw.scene_tags[row1.id]).toMatchObject({
+      scene_id: scene.id,
+      tag_id: tag.id,
+      x: 120,
+      y: -40,
+      visible: true
+    })
+  })
+
+  it('move / setVisible / remove update the placement', () => {
+    initDB()
+    const { db } = getDB()
+    const { scene } = channelHandlers['scenes:create'](
+      db,
+      { view: 'groups', name: 'S' },
+      handlerEnv
+    )
+    const tag = channelHandlers['tags:create'](db, { label: 'T' }, handlerEnv)
+    const row = channelHandlers['scene_tags:add'](
+      db,
+      { scene_id: scene.id, tag_id: tag.id },
+      handlerEnv
+    )
+
+    channelHandlers['scene_tags:move'](db, { id: row.id, x: 55, y: 66 }, handlerEnv)
+    expect(db.scene_tags[row.id]).toMatchObject({ x: 55, y: 66 })
+
+    channelHandlers['scene_tags:setVisible'](db, { id: row.id, visible: false }, handlerEnv)
+    expect(db.scene_tags[row.id].visible).toBe(false)
+
+    channelHandlers['scene_tags:remove'](db, { id: row.id })
+    expect(db.scene_tags[row.id]).toBeUndefined()
+  })
+
+  it('is cascade-deleted with its scene', () => {
+    initDB()
+    const { db } = getDB()
+    const a = channelHandlers['scenes:create'](db, { view: 'groups', name: 'A' }, handlerEnv)
+    const b = channelHandlers['scenes:create'](db, { view: 'groups', name: 'B' }, handlerEnv)
+    const tag = channelHandlers['tags:create'](db, { label: 'T' }, handlerEnv)
+    channelHandlers['scene_tags:add'](db, { scene_id: a.scene.id, tag_id: tag.id }, handlerEnv)
+    const keep = channelHandlers['scene_tags:add'](
+      db,
+      { scene_id: b.scene.id, tag_id: tag.id },
+      handlerEnv
+    )
+
+    channelHandlers['scenes:delete'](db, { id: a.scene.id })
+
+    expect(Object.values(db.scene_tags)).toHaveLength(1)
+    expect(db.scene_tags[keep.id]).toBeDefined()
+    expect(db.tags[tag.id]).toBeDefined() // the tag itself survives
+  })
+
+  it('is cascade-deleted with its tag', () => {
+    initDB()
+    const { db } = getDB()
+    const { scene } = channelHandlers['scenes:create'](
+      db,
+      { view: 'groups', name: 'S' },
+      handlerEnv
+    )
+    const drop = channelHandlers['tags:create'](db, { label: 'Drop' }, handlerEnv)
+    const keep = channelHandlers['tags:create'](db, { label: 'Keep' }, handlerEnv)
+    channelHandlers['scene_tags:add'](db, { scene_id: scene.id, tag_id: drop.id }, handlerEnv)
+    const kept = channelHandlers['scene_tags:add'](
+      db,
+      { scene_id: scene.id, tag_id: keep.id },
+      handlerEnv
+    )
+
+    channelHandlers['tags:delete'](db, { id: drop.id })
+
+    expect(Object.values(db.scene_tags)).toHaveLength(1)
+    expect(db.scene_tags[kept.id]).toBeDefined()
+    expect(db.scenes[scene.id]).toBeDefined() // the scene itself survives
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 describe('Data integrity', () => {
   it('person fields are all preserved through save/load cycle', () => {
     initDB()

@@ -15,6 +15,7 @@ export const useMainStore = defineStore('main', () => {
   const entityTags = ref([]) // the entity↔tag membership join rows
   const factions = ref([]) // all factions of the project, across groups scenes
   const scenes = ref([]) // every saved Scene of the project, all views
+  const sceneTags = ref([]) // tag placements ("Groups"): {id, scene_id, tag_id, x, y, visible}
   // Which scene is open — for the GROUPS view only for now (Phase 5 makes this
   // per-view when graph/timeline scenes land).
   const activeSceneId = ref(null)
@@ -158,22 +159,32 @@ export const useMainStore = defineStore('main', () => {
 
   // ── Data actions ──────────────────────────────────────────────────────────
   async function loadAll() {
-    const [personsRes, relsRes, tagsRes, entityTagsRes, factionsRes, scenesRes, settingsRes] =
-      await Promise.all([
-        api.invoke('persons:getAll'),
-        api.invoke('relationships:getAll'),
-        api.invoke('tags:getAll'),
-        api.invoke('entity_tags:getAll'),
-        api.invoke('factions:getAll'),
-        api.invoke('scenes:getAll'),
-        api.invoke('settings:getAll')
-      ])
+    const [
+      personsRes,
+      relsRes,
+      tagsRes,
+      entityTagsRes,
+      factionsRes,
+      scenesRes,
+      sceneTagsRes,
+      settingsRes
+    ] = await Promise.all([
+      api.invoke('persons:getAll'),
+      api.invoke('relationships:getAll'),
+      api.invoke('tags:getAll'),
+      api.invoke('entity_tags:getAll'),
+      api.invoke('factions:getAll'),
+      api.invoke('scenes:getAll'),
+      api.invoke('scene_tags:getAll'),
+      api.invoke('settings:getAll')
+    ])
     if (personsRes.success) persons.value = personsRes.data
     if (relsRes.success) relationships.value = relsRes.data
     if (tagsRes.success) tags.value = tagsRes.data
     if (entityTagsRes.success) entityTags.value = entityTagsRes.data
     if (factionsRes.success) factions.value = factionsRes.data
     if (scenesRes.success) scenes.value = scenesRes.data
+    if (sceneTagsRes.success) sceneTags.value = sceneTagsRes.data
     // Restore the project's active groups scene; the legacy activeScenarioId
     // setting still works because scenes kept the scenario ids. Fall back to
     // the first groups scene.
@@ -261,6 +272,7 @@ export const useMainStore = defineStore('main', () => {
     if (res.success) {
       tags.value = tags.value.filter((t) => t.id !== id)
       entityTags.value = entityTags.value.filter((row) => row.tag_id !== id)
+      sceneTags.value = sceneTags.value.filter((row) => row.tag_id !== id)
     }
     return res
   }
@@ -336,10 +348,48 @@ export const useMainStore = defineStore('main', () => {
     if (res.success) {
       scenes.value = scenes.value.filter((s) => s.id !== id)
       factions.value = factions.value.filter((f) => f.scenario_id !== id)
+      sceneTags.value = sceneTags.value.filter((row) => row.scene_id !== id)
       if (activeSceneId.value === id) {
         setActiveScene(groupsScenes.value[0]?.id ?? null)
       }
     }
+    return res
+  }
+
+  // ── Scene-tag (placement) actions ─────────────────────────────────────────
+  async function addSceneTag(sceneId, tagId, opts = {}) {
+    const res = await api.invoke('scene_tags:add', {
+      scene_id: sceneId,
+      tag_id: tagId,
+      ...opts
+    })
+    if (res.success && !sceneTags.value.some((row) => row.id === res.data.id)) {
+      sceneTags.value.push(res.data)
+    }
+    return res
+  }
+
+  async function moveSceneTag(id, x, y) {
+    const res = await api.invoke('scene_tags:move', { id, x, y })
+    if (res.success) {
+      const idx = sceneTags.value.findIndex((row) => row.id === id)
+      if (idx !== -1) sceneTags.value[idx] = res.data
+    }
+    return res
+  }
+
+  async function setSceneTagVisible(id, visible) {
+    const res = await api.invoke('scene_tags:setVisible', { id, visible })
+    if (res.success) {
+      const idx = sceneTags.value.findIndex((row) => row.id === id)
+      if (idx !== -1) sceneTags.value[idx] = res.data
+    }
+    return res
+  }
+
+  async function removeSceneTag(id) {
+    const res = await api.invoke('scene_tags:remove', { id })
+    if (res.success) sceneTags.value = sceneTags.value.filter((row) => row.id !== id)
     return res
   }
 
@@ -471,6 +521,7 @@ export const useMainStore = defineStore('main', () => {
     entityTags,
     factions,
     scenes,
+    sceneTags,
     activeSceneId,
     draggingPersonId,
     selectedPersonId,
@@ -520,6 +571,10 @@ export const useMainStore = defineStore('main', () => {
     renameScene,
     deleteScene,
     setActiveScene,
+    addSceneTag,
+    moveSceneTag,
+    setSceneTagVisible,
+    removeSceneTag,
     selectPerson,
     openForm,
     closeModal,

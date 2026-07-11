@@ -23,6 +23,7 @@ import type {
   Project,
   Relationship,
   Scene,
+  SceneTag,
   Tag
 } from './types'
 import { yearDate } from './calendarMath'
@@ -52,6 +53,7 @@ export const EMPTY_DB = (): DB => ({
   entity_tags: {},
   factions: {},
   scenes: {},
+  scene_tags: {},
   images: {},
   settings: {},
   globalSettings: {}
@@ -62,6 +64,15 @@ function cascadeEntityTags(db: DB, { tagId, entityId }: { tagId?: string; entity
   for (const [id, row] of Object.entries(db.entity_tags)) {
     if ((tagId && row.tag_id === tagId) || (entityId && row.entity_id === entityId)) {
       delete db.entity_tags[id]
+    }
+  }
+}
+
+/** Delete every scene_tags placement touching the given scene or tag. */
+function cascadeSceneTags(db: DB, { sceneId, tagId }: { sceneId?: string; tagId?: string }) {
+  for (const [id, row] of Object.entries(db.scene_tags)) {
+    if ((sceneId && row.scene_id === sceneId) || (tagId && row.tag_id === tagId)) {
+      delete db.scene_tags[id]
     }
   }
 }
@@ -352,7 +363,10 @@ export const channelHandlers: Record<string, Handler> = {
       if (f.project_id === pid) delete db.factions[fid]
     }
     for (const [sid, s] of Object.entries(db.scenes)) {
-      if (s.project_id === pid) delete db.scenes[sid]
+      if (s.project_id === pid) {
+        cascadeSceneTags(db, { sceneId: sid })
+        delete db.scenes[sid]
+      }
     }
     for (const [iid, img] of Object.entries(db.images)) {
       if (img.project_id === pid) {
@@ -519,6 +533,7 @@ export const channelHandlers: Record<string, Handler> = {
 
   'tags:delete'(db, data) {
     cascadeEntityTags(db, { tagId: data.id })
+    cascadeSceneTags(db, { tagId: data.id })
     delete db.tags[data.id]
     return { id: data.id }
   },
@@ -663,7 +678,65 @@ export const channelHandlers: Record<string, Handler> = {
     for (const [fid, f] of Object.entries(db.factions)) {
       if (f.scenario_id === data.id) delete db.factions[fid]
     }
+    cascadeSceneTags(db, { sceneId: data.id })
     delete db.scenes[data.id]
+    return { id: data.id }
+  },
+
+  // ── scene_tags (a tag placed in a scene = a "Group") ────────────────────────
+  // Rows carry no project_id; they are scoped through their scene.
+  'scene_tags:getAll'(db) {
+    return sortByDate(
+      Object.values(db.scene_tags).filter(
+        (row) => db.scenes[row.scene_id]?.project_id === db.activeProjectId
+      )
+    )
+  },
+
+  // Idempotent per (scene, tag) pair — re-adding returns the existing placement.
+  'scene_tags:add'(db, data, env) {
+    const { scene_id, tag_id } = data
+    if (!db.scenes[scene_id]) throw new Error('Scene not found')
+    if (!db.tags[tag_id]) throw new Error('Tag not found')
+    const existing = Object.values(db.scene_tags).find(
+      (row) => row.scene_id === scene_id && row.tag_id === tag_id
+    )
+    if (existing) return existing
+    const id = env.uuid()
+    const now = env.nowStr()
+    const row: SceneTag = {
+      id,
+      scene_id,
+      tag_id,
+      x: data.x ?? 0,
+      y: data.y ?? 0,
+      visible: data.visible !== false,
+      created_at: now,
+      updated_at: now
+    }
+    db.scene_tags[id] = row
+    return row
+  },
+
+  'scene_tags:move'(db, data, env) {
+    const row = db.scene_tags[data.id]
+    if (!row) throw new Error('Placement not found')
+    if (data.x !== undefined) row.x = data.x
+    if (data.y !== undefined) row.y = data.y
+    row.updated_at = env.nowStr()
+    return row
+  },
+
+  'scene_tags:setVisible'(db, data, env) {
+    const row = db.scene_tags[data.id]
+    if (!row) throw new Error('Placement not found')
+    row.visible = !!data.visible
+    row.updated_at = env.nowStr()
+    return row
+  },
+
+  'scene_tags:remove'(db, data) {
+    delete db.scene_tags[data.id]
     return { id: data.id }
   },
 
@@ -768,6 +841,10 @@ export const WRITE_CHANNELS = new Set([
   'scenes:create',
   'scenes:rename',
   'scenes:delete',
+  'scene_tags:add',
+  'scene_tags:move',
+  'scene_tags:setVisible',
+  'scene_tags:remove',
   'images:add',
   'images:setPrimary',
   'images:delete',

@@ -70,6 +70,19 @@ export interface EntityTag {
   created_at: string
 }
 
+/** A tag placed in a (groups) scene — this is what the UI calls a "Group".
+ *  Position/visibility live here; membership stays on the tag's join. */
+export interface SceneTag {
+  id: string
+  scene_id: string
+  tag_id: string
+  x: number
+  y: number
+  visible: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface Faction {
   id: string
   project_id: string
@@ -126,6 +139,7 @@ export interface DB {
   entity_tags: Record<string, EntityTag>
   factions: Record<string, Faction>
   scenes: Record<string, Scene>
+  scene_tags: Record<string, SceneTag>
   images: Record<string, ImageRecord>
   /** `${projectId}:key` → value for per-project settings */
   settings: Record<string, unknown>
