@@ -45,13 +45,14 @@ function createWindow() {
     }
   })
 
-  // Close confirmation for unsaved changes
+  // Close confirmation when the working copy differs from the saved checkpoint.
+  // Everything autosaves; Save commits a checkpoint, Discard reverts to it.
   let forceClose = false
   mainWindow.on('close', async (e) => {
     if (forceClose) return
     e.preventDefault()
     const dirty = await mainWindow.webContents
-      .executeJavaScript('window.__isGraphDirty ? window.__isGraphDirty() : false')
+      .executeJavaScript('window.__hasUnsavedChanges ? window.__hasUnsavedChanges() : false')
       .catch(() => false)
 
     if (dirty) {
@@ -61,20 +62,23 @@ function createWindow() {
         defaultId: 0,
         cancelId: 2,
         title: 'Unsaved Changes',
-        message: 'You have unsaved graph layout changes.',
-        detail: 'Would you like to save before closing?'
+        message: 'You have changes since your last saved checkpoint.',
+        detail: 'Save commits a new checkpoint; Discard reverts to the last one.'
       })
       if (response === 0) {
-        // Save then close
         await mainWindow.webContents
           .executeJavaScript(
-            'window.__saveGraphLayout ? window.__saveGraphLayout() : Promise.resolve()'
+            'window.__saveCheckpoint ? window.__saveCheckpoint() : Promise.resolve()'
           )
           .catch(() => {})
         forceClose = true
         mainWindow.close()
       } else if (response === 1) {
-        // Discard and close
+        await mainWindow.webContents
+          .executeJavaScript(
+            'window.__discardChanges ? window.__discardChanges() : Promise.resolve()'
+          )
+          .catch(() => {})
         forceClose = true
         mainWindow.close()
       }

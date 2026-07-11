@@ -103,12 +103,22 @@
       <div class="nav-section-label">Data</div>
       <button
         class="nav-item save-btn"
-        :class="{ 'save-dirty': store.graphDirty }"
+        :class="{ 'save-dirty': store.hasUnsavedChanges }"
+        title="Commit a checkpoint you can revert to (⌘S / Ctrl+S) — edits autosave regardless"
         @click="$emit('save')"
       >
         <span class="nav-icon">💾</span>
-        <span>Save Layout</span>
-        <span v-if="store.graphDirty" class="save-badge">unsaved</span>
+        <span>Save</span>
+        <span v-if="store.hasUnsavedChanges" class="save-badge">unsaved</span>
+      </button>
+      <button
+        class="nav-item"
+        :disabled="!store.hasUnsavedChanges"
+        title="Restore the arrangement saved by the last checkpoint"
+        @click="$emit('revert')"
+      >
+        <span class="nav-icon">↩</span>
+        <span>Revert to saved</span>
       </button>
       <button class="nav-item" @click="handleExport">
         <span class="nav-icon">⬆</span>
@@ -189,7 +199,7 @@
 import { computed } from 'vue'
 import { useMainStore } from '../store/index.js'
 
-defineEmits(['save'])
+defineEmits(['save', 'revert'])
 
 const store = useMainStore()
 

@@ -47,7 +47,7 @@
       </button>
     </header>
     <div class="workspace" :style="workspaceStyle">
-      <LeftSidebar :style="{ width: leftWidth + 'px' }" @save="handleSave" />
+      <LeftSidebar :style="{ width: leftWidth + 'px' }" @save="handleSave" @revert="handleRevert" />
       <div class="resize-handle resize-handle-left" @mousedown="startResizeLeft"></div>
       <div class="canvas-stack">
         <!-- Graph stays mounted (tucked away) so its layout & simulation state persist -->
@@ -111,28 +111,43 @@ const renameInputRef = ref(null)
 const renamingId = ref(null)
 const renameValue = ref('')
 
+// ── Save model: everything autosaves; Save commits a checkpoint you can
+// revert to (see docs/client-structure.md §6.2) ─────────────────────────────
 async function handleSave() {
-  if (graphRef.value?.saveGraphLayout) {
-    await graphRef.value.saveGraphLayout()
+  await graphRef.value?.flushLayout?.() // fold in any not-yet-autosaved drag
+  await store.saveCheckpoint()
+}
+
+async function handleRevert(skipConfirm = false) {
+  if (!store.hasUnsavedChanges) return
+  if (
+    !skipConfirm &&
+    !confirm('Revert to the last saved checkpoint? Changes since then will be lost.')
+  )
+    return
+  const res = await store.revertToCheckpoint()
+  if (res.success) await graphRef.value?.reloadScenes?.()
+}
+
+function onKeydown(e) {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 's') {
+    e.preventDefault()
+    handleSave()
   }
 }
 
 // ── Project tab actions ─────────────────────────────────────────────────────
 async function handleSwitchProject(id) {
   if (id === store.activeProjectId || renamingId.value) return
-  // Save current graph state before switching
-  if (store.graphDirty && graphRef.value?.saveGraphLayout) {
-    await graphRef.value.saveGraphLayout()
-  }
+  // Flush any not-yet-autosaved layout changes before switching
+  await graphRef.value?.flushLayout?.()
   await store.switchProject(id)
 }
 
 async function handleAddProject() {
   const project = await store.createProject()
   if (project) {
-    if (store.graphDirty && graphRef.value?.saveGraphLayout) {
-      await graphRef.value.saveGraphLayout()
-    }
+    await graphRef.value?.flushLayout?.()
     await store.switchProject(project.id)
   }
 }
@@ -232,11 +247,12 @@ function handleExport() {
   URL.revokeObjectURL(url)
 }
 
-// In the browser there is no main-process close dialog, so warn about unsaved
-// layout changes via beforeunload instead. Skipped in Electron, where the
-// main process runs its own Save/Discard/Cancel dialog on close.
+// In the browser there is no main-process close dialog, so prompt about a
+// working copy that differs from the checkpoint via beforeunload (the browser
+// shows its own native leave dialog). Skipped in Electron, where the main
+// process runs the Save / Discard / Cancel dialog on close.
 function onBeforeUnload(e) {
-  if (store.graphDirty) e.preventDefault()
+  if (store.hasUnsavedChanges) e.preventDefault()
 }
 
 onMounted(async () => {
@@ -250,14 +266,18 @@ onMounted(async () => {
   await store.loadProjects()
   await store.loadAll()
 
-  window.__isGraphDirty = () => store.graphDirty
-  window.__saveGraphLayout = () => handleSave()
+  // Exit-dialog hooks for the Electron main process (src/main/index.js)
+  window.__hasUnsavedChanges = () => store.hasUnsavedChanges
+  window.__saveCheckpoint = () => handleSave()
+  window.__discardChanges = () => handleRevert(true)
+  window.addEventListener('keydown', onKeydown)
   if (!window.electronAPI) window.addEventListener('beforeunload', onBeforeUnload)
 })
 
 onUnmounted(() => {
   window.removeEventListener('mousemove', onResizeMove)
   window.removeEventListener('mouseup', onResizeEnd)
+  window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('beforeunload', onBeforeUnload)
 })
 </script>

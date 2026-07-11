@@ -1401,6 +1401,77 @@ describe('scene_tags (tag placements)', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+describe('Checkpoint save / revert', () => {
+  it('revert restores the checkpointed arrangement (positions, placements, deletions)', () => {
+    initDB()
+    const { db, save } = getDB()
+    const scene = channelHandlers['scenes:create'](
+      db,
+      { view: 'graph', name: 'G', type: 'free', positions: { p1: { x: 1, y: 2 } } },
+      handlerEnv
+    )
+    const groups = channelHandlers['scenes:create'](db, { view: 'groups', name: 'S' }, handlerEnv)
+    const tag = channelHandlers['tags:create'](db, { label: 'T' }, handlerEnv)
+    const placement = channelHandlers['scene_tags:add'](
+      db,
+      { scene_id: groups.id, tag_id: tag.id, x: 10, y: 20 },
+      handlerEnv
+    )
+    channelHandlers['settings:set'](db, { key: 'userCurrentYear', value: 1990 }, handlerEnv)
+
+    channelHandlers['checkpoint:save'](db, undefined, handlerEnv)
+    save()
+
+    // Diverge from the checkpoint: move things, delete a scene, add another
+    channelHandlers['scenes:save'](
+      db,
+      { id: scene.id, positions: { p1: { x: 999, y: 999 } } },
+      handlerEnv
+    )
+    channelHandlers['scene_tags:move'](db, { id: placement.id, x: 777, y: 777 }, handlerEnv)
+    channelHandlers['scenes:delete'](db, { id: groups.id }, handlerEnv)
+    channelHandlers['scenes:create'](db, { view: 'graph', name: 'After' }, handlerEnv)
+    channelHandlers['settings:set'](db, { key: 'userCurrentYear', value: 2020 }, handlerEnv)
+
+    const cp = channelHandlers['checkpoint:revert'](db, undefined, handlerEnv)
+
+    // Positions restored, deleted scene + its placement back with original ids
+    expect(db.scenes[scene.id].positions).toEqual({ p1: { x: 1, y: 2 } })
+    expect(db.scenes[groups.id]).toBeDefined()
+    expect(db.scene_tags[placement.id]).toMatchObject({ x: 10, y: 20 })
+    // The scene created after the checkpoint is gone
+    expect(Object.values(db.scenes).filter((s) => s.name === 'After')).toHaveLength(0)
+    // The current-year override is restored
+    expect(db.settings[`${db.activeProjectId}:userCurrentYear`]).toBe(1990)
+    expect(cp.scenes[scene.id]).toBeDefined()
+  })
+
+  it('revert without a saved checkpoint throws (the shell reports failure)', () => {
+    initDB()
+    const { db } = getDB()
+    expect(() => channelHandlers['checkpoint:revert'](db, undefined, handlerEnv)).toThrow(
+      /No saved checkpoint/
+    )
+  })
+
+  it('reverting never touches people, relationships or tag membership', () => {
+    initDB()
+    const { db } = getDB()
+    const personCount = Object.keys(db.persons).length
+    const tag = channelHandlers['tags:create'](db, { label: 'T' }, handlerEnv)
+    const pid = Object.keys(db.persons)[0]
+    channelHandlers['entity_tags:add'](db, { entity_id: pid, tag_id: tag.id }, handlerEnv)
+
+    channelHandlers['checkpoint:save'](db, undefined, handlerEnv)
+    channelHandlers['checkpoint:revert'](db, undefined, handlerEnv)
+
+    expect(Object.keys(db.persons)).toHaveLength(personCount)
+    expect(db.tags[tag.id]).toBeDefined()
+    expect(Object.values(db.entity_tags)).toHaveLength(1)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 describe('Data integrity', () => {
   it('person fields are all preserved through save/load cycle', () => {
     initDB()

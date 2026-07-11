@@ -39,7 +39,10 @@ export const useMainStore = defineStore('main', () => {
     const y = userCurrentYear.value ?? autoCurrentYear.value
     return y != null ? { year: y } : null
   })
-  const graphDirty = ref(false)
+  // The saved checkpoint: the user's last explicit Save of the project's
+  // arrangement (scenes + placements + current-year override). Everything
+  // autosaves; this is what Revert goes back to. null = never saved one.
+  const checkpoint = ref(null)
   const activeView = ref('tree') // 'tree' | 'people' | 'relationships' | 'timeline' | 'factions'
 
   // Graph visual settings
@@ -102,6 +105,36 @@ export const useMainStore = defineStore('main', () => {
     }
     return m
   })
+  // Canonical, timestamp-free form of the arrangement state, for comparing the
+  // working copy against the checkpoint.
+  function arrangementFingerprint(sceneList, placements, userYear) {
+    const s = sceneList
+      .map(({ id, view, name, type, config, positions }) => ({
+        id,
+        view,
+        name,
+        type,
+        config,
+        positions
+      }))
+      .sort((a, b) => (a.id < b.id ? -1 : 1))
+    const t = placements
+      .map(({ id, scene_id, tag_id, x, y, visible }) => ({ id, scene_id, tag_id, x, y, visible }))
+      .sort((a, b) => (a.id < b.id ? -1 : 1))
+    return JSON.stringify({ s, t, y: userYear ?? null })
+  }
+
+  const hasUnsavedChanges = computed(() => {
+    if (!checkpoint.value) return false // nothing to diverge from — first Save creates it
+    const current = arrangementFingerprint(scenes.value, sceneTags.value, userCurrentYear.value)
+    const saved = arrangementFingerprint(
+      Object.values(checkpoint.value.scenes || {}),
+      Object.values(checkpoint.value.scene_tags || {}),
+      checkpoint.value.userCurrentYear
+    )
+    return current !== saved
+  })
+
   // The Groups view's display list: every tag placed in the active groups
   // scene, joined with its identity (tag) and members (entity_tags). Identity
   // is the TAG id — stable across scenes, so scene switches glide naturally.
@@ -173,7 +206,6 @@ export const useMainStore = defineStore('main', () => {
       formOpen.value = false
       editingPerson.value = null
       relPopup.value = null
-      graphDirty.value = false
       userCurrentYear.value = null // revert to auto; restored from the project's saved layout
       // Reload data for new project
       await loadAll()
@@ -215,6 +247,40 @@ export const useMainStore = defineStore('main', () => {
     // Restore the current-year override (used to live in the graphState blob)
     const savedYear = parseInt(saved.userCurrentYear)
     userCurrentYear.value = Number.isFinite(savedYear) && savedYear > 0 ? savedYear : null
+    // Restore the saved checkpoint (if the user ever saved one)
+    try {
+      checkpoint.value = saved.checkpoint ? JSON.parse(saved.checkpoint) : null
+    } catch {
+      checkpoint.value = null
+    }
+  }
+
+  // ── Save model: checkpoint + revert ────────────────────────────────────────
+  async function saveCheckpoint() {
+    const res = await api.invoke('checkpoint:save')
+    if (res.success) checkpoint.value = res.data
+    return res
+  }
+
+  async function revertToCheckpoint() {
+    const res = await api.invoke('checkpoint:revert')
+    if (res.success) {
+      const byDate = (a, b) => (a.created_at > b.created_at ? 1 : -1)
+      scenes.value = Object.values(res.data.scenes || {}).sort(byDate)
+      sceneTags.value = Object.values(res.data.scene_tags || {}).sort(byDate)
+      const y = parseInt(res.data.userCurrentYear)
+      userCurrentYear.value = Number.isFinite(y) && y > 0 ? y : null
+      // Re-validate each view's active scene (it may have been created after
+      // the checkpoint and just got reverted away)
+      const next = { ...activeSceneIds.value }
+      for (const view of ['groups', 'graph', 'timeline']) {
+        if (!scenes.value.some((s) => s.id === next[view] && s.view === view)) {
+          next[view] = scenes.value.find((s) => s.view === view)?.id ?? null
+        }
+      }
+      activeSceneIds.value = next
+    }
+    return res
   }
 
   async function createPerson(data) {
@@ -640,12 +706,8 @@ export const useMainStore = defineStore('main', () => {
     setCurrentYear,
     updateGraphSetting,
     resetGraphSettings,
-    graphDirty,
-    markGraphDirty() {
-      graphDirty.value = true
-    },
-    clearGraphDirty() {
-      graphDirty.value = false
-    }
+    hasUnsavedChanges,
+    saveCheckpoint,
+    revertToCheckpoint
   }
 })

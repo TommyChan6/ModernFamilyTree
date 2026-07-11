@@ -963,6 +963,57 @@ export const channelHandlers: Record<string, Handler> = {
     return { imageId }
   },
 
+  // ── checkpoint (manual save point over the autosaved working copy) ─────────
+  // Everything autosaves through the normal channels; the checkpoint is the
+  // user's explicit "Save": a snapshot of the project's ARRANGEMENT state
+  // (scenes + tag placements + the current-year override) they can revert to.
+  // Entity/relationship/tag data is not part of it — those edits are final.
+  'checkpoint:save'(db) {
+    const pid = db.activeProjectId as string
+    const scenes: Record<string, Scene> = {}
+    const scene_tags: Record<string, SceneTag> = {}
+    for (const s of Object.values(db.scenes)) {
+      if (s.project_id === pid) scenes[s.id] = JSON.parse(JSON.stringify(s))
+    }
+    for (const st of Object.values(db.scene_tags)) {
+      if (db.scenes[st.scene_id]?.project_id === pid) {
+        scene_tags[st.id] = JSON.parse(JSON.stringify(st))
+      }
+    }
+    const checkpoint = {
+      scenes,
+      scene_tags,
+      userCurrentYear: db.settings[`${pid}:userCurrentYear`] ?? null
+    }
+    db.settings[`${pid}:checkpoint`] = JSON.stringify(checkpoint)
+    return checkpoint
+  },
+
+  // Wholesale-restore the project's arrangement from the saved checkpoint:
+  // scenes and placements created since are dropped, deleted ones come back
+  // (with their original ids). People/relationships/tags are untouched.
+  'checkpoint:revert'(db) {
+    const pid = db.activeProjectId as string
+    const raw = db.settings[`${pid}:checkpoint`]
+    if (typeof raw !== 'string') throw new Error('No saved checkpoint')
+    const cp = JSON.parse(raw) as {
+      scenes?: Record<string, Scene>
+      scene_tags?: Record<string, SceneTag>
+      userCurrentYear?: unknown
+    }
+    for (const [id, s] of Object.entries(db.scenes)) {
+      if (s.project_id === pid) {
+        cascadeSceneTags(db, { sceneId: id })
+        delete db.scenes[id]
+      }
+    }
+    for (const s of Object.values(cp.scenes || {})) db.scenes[s.id] = s
+    for (const st of Object.values(cp.scene_tags || {})) db.scene_tags[st.id] = st
+    if (cp.userCurrentYear != null) db.settings[`${pid}:userCurrentYear`] = cp.userCurrentYear
+    else delete db.settings[`${pid}:userCurrentYear`]
+    return cp
+  },
+
   // ── settings (per-project) ─────────────────────────────────────────────────
   'settings:getAll'(db) {
     const result: Record<string, unknown> = {}
@@ -1018,6 +1069,8 @@ export const WRITE_CHANNELS = new Set([
   'scene_tags:move',
   'scene_tags:setVisible',
   'scene_tags:remove',
+  'checkpoint:save',
+  'checkpoint:revert',
   'images:add',
   'images:setPrimary',
   'images:delete',

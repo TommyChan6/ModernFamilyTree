@@ -481,11 +481,31 @@ function snapshotActiveScene() {
   }
   w.config.emphasis = activeEmphasis.value
   ctx.activeSnapshot = snap
-  store.markGraphDirty()
+  schedulePersist(activeSceneId.value)
 }
 const snapshotMode = snapshotActiveScene
 const snapshotGenMode = snapshotActiveScene
 const saveCurrentState = snapshotActiveScene
+
+// Autosave: every snapshot persists its scene through the data-access chain,
+// lightly debounced so bursts (drags, row cleanups) coalesce into one write.
+let persistTimer = null
+let pendingPersistId = null
+function schedulePersist(sceneId) {
+  if (!sceneId) return
+  if (persistTimer && pendingPersistId !== sceneId) {
+    // switching scenes mid-debounce: flush the previous scene's write now
+    clearTimeout(persistTimer)
+    persistScene(pendingPersistId)
+  }
+  pendingPersistId = sceneId
+  if (persistTimer) clearTimeout(persistTimer)
+  persistTimer = setTimeout(() => {
+    persistTimer = null
+    pendingPersistId = null
+    persistScene(sceneId)
+  }, 400)
+}
 
 function hasSnapshot() {
   return ctx.activeSnapshot && Object.keys(ctx.activeSnapshot).length > 0
@@ -558,7 +578,6 @@ async function removeScene(scene) {
   working.delete(scene.id)
   await store.deleteScene(scene.id) // re-activates the view's first scene
   if (wasActive) enterActiveScene()
-  store.markGraphDirty()
 }
 
 /** Persist one scene's working arrangement through the data-access chain. */
@@ -1368,14 +1387,19 @@ function highlightSearch() {
 
 // ── Lifecycle & watchers ────────────────────────────────────────────────────
 // ── Save / restore (scenes are the source of truth) ─────────────────────────
-// Save Layout persists every scene's working arrangement through the
-// data-access chain (Phase 5.4 replaces this button with autosave).
-async function saveGraphLayout() {
-  saveCurrentState()
+// Flush the live arrangement to disk right now (checkpoint save, project
+// switch, exit) — snapshots the current positions and writes every scene's
+// working copy without waiting for the autosave debounce.
+async function flushLayout() {
+  if (persistTimer) {
+    clearTimeout(persistTimer)
+    persistTimer = null
+    pendingPersistId = null
+  }
+  if (ctx.nodesData.length) saveCurrentState()
   for (const sceneId of working.keys()) {
     await persistScene(sceneId)
   }
-  store.clearGraphDirty()
 }
 
 // First entry after data loads: make sure the project has a graph scene, then
@@ -1390,7 +1414,15 @@ async function initScenes() {
   if (activeSceneId.value) enterActiveScene()
 }
 
-defineExpose({ saveGraphLayout })
+// After a checkpoint revert the persisted scenes ARE the truth again — drop
+// the working copies and re-enter the (re-validated) active scene.
+async function reloadScenes() {
+  cancelAnimation()
+  working.clear()
+  await initScenes()
+}
+
+defineExpose({ flushLayout, reloadScenes })
 
 let scenesInitialized = false
 
@@ -1403,6 +1435,12 @@ onUnmounted(() => {
   ctx.resizeObserver?.disconnect()
   cancelAnimation()
   if (refreshSpinTimer) clearTimeout(refreshSpinTimer)
+  if (persistTimer) {
+    // flush the pending autosave (fire-and-forget — the component is going away)
+    clearTimeout(persistTimer)
+    persistScene(pendingPersistId)
+    persistTimer = null
+  }
   cancelGuideTimers(ctx)
   removePointerHandlers()
   ctx.renderer?.dispose()
@@ -1417,7 +1455,6 @@ watch(
       scenesInitialized = true
       await nextTick()
       await initScenes()
-      store.clearGraphDirty()
     }
   },
   { deep: true }
