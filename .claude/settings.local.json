@@ -126,7 +126,22 @@
       "Bash(node -e \"console.log\\(require\\('./package.json'\\).main\\)\")",
       "Bash(node drive.mjs)",
       "Bash(taskkill //F //IM electron.exe)",
-      "Bash(node drive-web.mjs)"
+      "Bash(node drive-web.mjs)",
+      "PowerShell(Get-Process electron, family-tree -ErrorAction SilentlyContinue | Select-Object Name, Id; Test-Path \"$env:APPDATA\\\\family-tree\\\\db\\\\familytree.json\"; Get-ChildItem \"$env:APPDATA\\\\family-tree\" -ErrorAction SilentlyContinue | Select-Object Name)",
+      "PowerShell($r = Invoke-RestMethod -Uri \"https://awoiaf.westeros.org/api.php?action=query&prop=revisions&rvprop=content&rvslots=main&format=json&formatversion=2&titles=Eddard%20Stark\" -Headers @{ 'User-Agent' = 'FamilyTreeImport/1.0' }; $wikitext = $r.query.pages[0].revisions[0].slots.main.content; \\($wikitext -split \"`n\" | Select-String -Pattern 'Birth|Death' | Select-Object -First 6\\).Line)",
+      "PowerShell($r = Invoke-RestMethod -Uri \"https://gameofthrones.fandom.com/api.php?action=query&prop=pageimages&piprop=thumbnail&pithumbsize=512&format=json&formatversion=2&redirects=1&titles=Jon%20Snow%7CDaenerys%20Targaryen%7CYara%20Greyjoy\" -Headers @{ 'User-Agent' = 'FamilyTreeImport/1.0' }; $r.query.pages | ForEach-Object { \"$\\($_.title\\) -> $\\($_.thumbnail.source\\)\" })",
+      "PowerShell($r = Invoke-RestMethod -Uri \"https://iceandfire.fandom.com/api.php?action=query&prop=revisions&rvprop=content&rvslots=main&format=json&formatversion=2&redirects=1&titles=Eddard%20Stark%7CDaenerys%20Targaryen\" -Headers @{ 'User-Agent' = 'FamilyTreeImport/1.0' }; foreach \\($p in $r.query.pages\\) { \"=== $\\($p.title\\) ===\"; \\($p.revisions[0].slots.main.content -split \"`n\" | Select-String -Pattern '\\(?i\\)birth|death|born|died' | Select-Object -First 5\\).Line })",
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\5806128c-9854-4066-b6ec-d8a96df29eec\\\\scratchpad\\\\import_got.mjs\")",
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\5806128c-9854-4066-b6ec-d8a96df29eec\\\\scratchpad\\\\verify_got.mjs\")",
+      "PowerShell(taskkill /F /IM electron.exe 2>$null)",
+      "PowerShell(\"done\")",
+      "PowerShell(Copy-Item \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\5806128c-9854-4066-b6ec-d8a96df29eec\\\\scratchpad\\\\verify_got.mjs\" \".\\\\verify_got_tmp.mjs\")",
+      "PowerShell(node .\\\\verify_got_tmp.mjs)",
+      "PowerShell(npm uninstall --no-save playwright-core 2>&1)",
+      "PowerShell(Get-Process electron -ErrorAction SilentlyContinue | ForEach-Object { $_.Kill\\(\\) }; Start-Sleep -Milliseconds 300; node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\5806128c-9854-4066-b6ec-d8a96df29eec\\\\scratchpad\\\\import_dynasty.mjs\")",
+      "PowerShell(npm install --no-save playwright-core 2>&1)",
+      "PowerShell(node .\\\\verify_dynasty_tmp.mjs)",
+      "PowerShell(\"cleaned\")"
     ]
   }
 }

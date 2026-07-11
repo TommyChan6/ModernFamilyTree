@@ -3,6 +3,10 @@ possible future
 	- a feature that play the tree in a time scale, the tree evolves as time passes, people only appear when time reaches their birth, links between marriages
 	- reveal info: future feature, click a person, reveals the relationships of other people to the person, different languages
 	- mobile version
+	- three levels of complexity for the user, simple, default, advanced
+		- simple: the hide certain features to make the family tree program as easy as possible for the user to user
+		- default: the normal version, with most of the most important features, hide only the once that are extremely rarily used
+		- advanced: all features are present in this mode no matter how complex it is.
 
 must later
 	- the state of the graph is saved to database
