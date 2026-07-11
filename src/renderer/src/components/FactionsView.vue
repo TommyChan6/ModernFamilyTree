@@ -236,53 +236,25 @@
       </Transition>
     </div>
 
-    <!-- Scenario bar -->
-    <div class="fx-scenarios" @wheel.stop>
-      <span class="fx-sc-label">Scenarios</span>
-      <div class="fx-sc-chips">
-        <TransitionGroup name="scpill">
-          <button
-            v-for="s in store.groupsScenes"
-            :key="s.id"
-            class="fx-sc-chip"
-            :class="{ active: s.id === store.activeSceneId }"
-            :title="scenarioTooltip(s)"
-            @click="switchScenario(s.id)"
-            @dblclick="startRenameScenario(s)"
-          >
-            <input
-              v-if="renamingScenarioId === s.id"
-              ref="scRenameRef"
-              v-model="scRenameValue"
-              class="fx-sc-rename"
-              @keydown.enter="confirmRenameScenario"
-              @keydown.escape="renamingScenarioId = null"
-              @blur="confirmRenameScenario"
-              @click.stop
-            />
-            <span v-else class="fx-sc-name">{{ s.name }}</span>
-            <span class="fx-sc-badge">{{ peopleInScenario(s.id) }}</span>
-            <span
-              v-if="store.groupsScenes.length > 1 && renamingScenarioId !== s.id"
-              class="fx-sc-x"
-              title="Delete scenario"
-              @click.stop="handleDeleteScenario(s)"
-              >×</span
-            >
-          </button>
-        </TransitionGroup>
-        <button class="fx-sc-add" title="New empty scenario" @click="addScenario(false)">＋</button>
-        <button
-          v-if="store.activeSceneId"
-          class="fx-sc-add"
-          title="Duplicate current scenario"
-          @click="addScenario(true)"
-        >
-          ⧉
-        </button>
-      </div>
-      <span class="fx-sc-hint">Each scenario keeps its own factions — people carry over</span>
-    </div>
+    <!-- Scene tab strip (this view's scenes = the old scenario bar) -->
+    <SceneTabs
+      ref="sceneTabsRef"
+      :scenes="store.groupsScenes"
+      :active-id="store.activeSceneId"
+      label="Scenarios"
+      hint="Each scenario keeps its own factions — people carry over"
+      :tooltip="scenarioTooltip"
+      add-title="New empty scenario"
+      duplicate-title="Duplicate current scenario"
+      delete-title="Delete scenario"
+      @switch="switchScenario"
+      @create="addScenario(false)"
+      @duplicate="addScenario(true)"
+      @rename="(id, name) => store.renameScene(id, name)"
+      @remove="handleDeleteScenario"
+    >
+      <template #badge="{ scene }">{{ peopleInScenario(scene.id) }}</template>
+    </SceneTabs>
   </div>
 </template>
 
@@ -299,6 +271,7 @@ import {
   membershipArcSpans
 } from './factions/factionLayout.js'
 import { FactionsRenderer } from './factions/webgl/FactionsRenderer.js'
+import SceneTabs from './SceneTabs.vue'
 
 const store = useMainStore()
 
@@ -351,9 +324,7 @@ const dropTargetId = ref(null) // faction ring under the current drag
 const fEdit = ref(null) // faction edit popup model
 const pPop = ref(null) // person popup: { id, px, py }
 const fEditNameRef = ref(null)
-const renamingScenarioId = ref(null)
-const scRenameValue = ref('')
-const scRenameRef = ref(null)
+const sceneTabsRef = ref(null)
 
 // "Factions" here are the new Groups: tags placed in the active groups scene
 // (identity + members from the tag, position/visibility from the placement).
@@ -1239,34 +1210,18 @@ function scenarioTooltip(s) {
 }
 
 function switchScenario(id) {
-  if (renamingScenarioId.value) return
   store.setActiveScene(id)
 }
 
 async function addScenario(duplicate) {
   const name = `Scenario ${store.groupsScenes.length + 1}`
-  const res = await store.createGroupsScene(name, duplicate ? store.activeSceneId : null)
+  const res = duplicate
+    ? await store.duplicateScene(store.activeSceneId, name)
+    : await store.createScene('groups', name)
   if (res?.success) {
-    store.setActiveScene(res.data.scene.id)
-    startRenameScenario(res.data.scene)
-  }
-}
-
-function startRenameScenario(s) {
-  renamingScenarioId.value = s.id
-  scRenameValue.value = s.name
-  nextTick(() => {
-    const el = Array.isArray(scRenameRef.value) ? scRenameRef.value[0] : scRenameRef.value
-    el?.focus()
-    el?.select()
-  })
-}
-
-async function confirmRenameScenario() {
-  const id = renamingScenarioId.value
-  renamingScenarioId.value = null
-  if (id && scRenameValue.value.trim()) {
-    await store.renameScene(id, scRenameValue.value.trim())
+    const scene = duplicate ? res.data.scene : res.data
+    store.setActiveScene(scene.id)
+    sceneTabsRef.value?.startRename(scene)
   }
 }
 
@@ -1901,164 +1856,6 @@ onBeforeUnmount(() => {
 .fxpop-leave-to {
   opacity: 0;
   transform: translateY(6px) scale(0.96);
-}
-
-/* ── Scenario bar ────────────────────────────────────────── */
-.fx-scenarios {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
-  border-top: 1px solid var(--border);
-  background: var(--glass-soft);
-  backdrop-filter: blur(10px);
-  z-index: 2;
-  min-height: 46px;
-}
-.fx-sc-label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: var(--t3);
-  flex-shrink: 0;
-}
-.fx-sc-chips {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.fx-sc-chips::-webkit-scrollbar {
-  display: none;
-}
-
-.fx-sc-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 11px;
-  border-radius: 18px;
-  border: 1px solid var(--border);
-  background: var(--elevated);
-  color: var(--t2);
-  font-family: var(--font);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition:
-    background 0.15s,
-    color 0.15s,
-    border-color 0.15s,
-    transform 0.15s;
-}
-.fx-sc-chip:hover {
-  background: var(--hover);
-  color: var(--t1);
-  transform: translateY(-1px);
-}
-.fx-sc-chip.active {
-  background: var(--adim);
-  color: var(--accent);
-  border-color: rgba(108, 142, 245, 0.35);
-}
-.fx-sc-name {
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.fx-sc-badge {
-  font-size: 10px;
-  font-weight: 700;
-  background: var(--surface);
-  color: var(--t3);
-  padding: 0 6px;
-  border-radius: 9px;
-  font-variant-numeric: tabular-nums;
-}
-.fx-sc-chip.active .fx-sc-badge {
-  color: var(--accent);
-}
-.fx-sc-x {
-  display: none;
-  font-size: 13px;
-  line-height: 1;
-  color: var(--t3);
-  border-radius: 4px;
-  padding: 0 2px;
-  transition: color 0.12s;
-}
-.fx-sc-chip:hover .fx-sc-x {
-  display: inline;
-}
-.fx-sc-x:hover {
-  color: #ef5350;
-}
-.fx-sc-rename {
-  width: 110px;
-  background: transparent;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  color: var(--t1);
-  font-family: var(--font);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 1px 6px;
-  outline: none;
-  box-shadow: none;
-}
-.fx-sc-add {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1px dashed var(--border);
-  background: transparent;
-  color: var(--t3);
-  font-size: 13px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.18s ease;
-}
-.fx-sc-add:hover {
-  background: var(--hover);
-  color: var(--accent);
-  border-color: var(--accent);
-  border-style: solid;
-}
-.fx-sc-hint {
-  font-size: 10.5px;
-  color: var(--t3);
-  flex-shrink: 0;
-}
-@media (max-width: 1100px) {
-  .fx-sc-hint {
-    display: none;
-  }
-}
-
-/* Scenario chip enter/leave */
-.scpill-enter-active {
-  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.scpill-leave-active {
-  transition: all 0.18s ease;
-}
-.scpill-enter-from {
-  opacity: 0;
-  transform: translateY(6px) scale(0.9);
-}
-.scpill-leave-to {
-  opacity: 0;
-  transform: scale(0.9);
 }
 
 /* ── Empty state ─────────────────────────────────────────── */

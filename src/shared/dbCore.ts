@@ -673,9 +673,6 @@ export const channelHandlers: Record<string, Handler> = {
     return data?.view ? list.filter((s) => s.view === data.view) : list
   },
 
-  // With clone_from: duplicates that scene's tag placements into the new one,
-  // so the client gets scene + placements in a single round-trip. Membership
-  // lives on the tags and is shared — only positions/visibility are copied.
   'scenes:create'(db, data, env) {
     const id = env.uuid()
     const now = env.nowStr()
@@ -691,23 +688,54 @@ export const channelHandlers: Record<string, Handler> = {
       updated_at: now
     }
     db.scenes[id] = scene
-    const cloned: SceneTag[] = []
-    if (data?.clone_from) {
-      for (const st of Object.values(db.scene_tags)) {
-        if (st.scene_id !== data.clone_from) continue
-        const rid = env.uuid()
-        const copy: SceneTag = { ...st, id: rid, scene_id: id, created_at: now, updated_at: now }
-        db.scene_tags[rid] = copy
-        cloned.push(copy)
-      }
-    }
-    return { scene, scene_tags: cloned }
+    return scene
   },
 
   'scenes:rename'(db, data, env) {
     const scene = db.scenes[data.id]
     if (!scene) throw new Error('Scene not found')
     scene.name = data.name
+    scene.updated_at = env.nowStr()
+    return scene
+  },
+
+  // Deep-copies the scene (config/positions) plus its tag placements, so a
+  // duplicated groups scene starts as an exact visual copy. Membership lives
+  // on the tags and is shared — never duplicated.
+  'scenes:duplicate'(db, data, env) {
+    const src = db.scenes[data.id]
+    if (!src) throw new Error('Scene not found')
+    const id = env.uuid()
+    const now = env.nowStr()
+    const scene: Scene = {
+      ...src,
+      id,
+      name: data?.name || `${src.name} copy`,
+      config: JSON.parse(JSON.stringify(src.config || {})),
+      positions: JSON.parse(JSON.stringify(src.positions || {})),
+      created_at: now,
+      updated_at: now
+    }
+    db.scenes[id] = scene
+    const cloned: SceneTag[] = []
+    for (const st of Object.values(db.scene_tags)) {
+      if (st.scene_id !== src.id) continue
+      const rid = env.uuid()
+      const copy: SceneTag = { ...st, id: rid, scene_id: id, created_at: now, updated_at: now }
+      db.scene_tags[rid] = copy
+      cloned.push(copy)
+    }
+    return { scene, scene_tags: cloned }
+  },
+
+  // Persist a scene's arrangement: any of type/config/positions (and name).
+  'scenes:save'(db, data, env) {
+    const scene = db.scenes[data.id]
+    if (!scene) throw new Error('Scene not found')
+    if (data.name !== undefined) scene.name = data.name
+    if (data.type !== undefined) scene.type = data.type
+    if (data.config !== undefined) scene.config = data.config
+    if (data.positions !== undefined) scene.positions = data.positions
     scene.updated_at = env.nowStr()
     return scene
   },
@@ -872,6 +900,8 @@ export const WRITE_CHANNELS = new Set([
   'entity_tags:remove',
   'scenes:create',
   'scenes:rename',
+  'scenes:duplicate',
+  'scenes:save',
   'scenes:delete',
   'scene_tags:add',
   'scene_tags:move',

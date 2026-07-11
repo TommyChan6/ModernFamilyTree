@@ -313,8 +313,8 @@ export const useMainStore = defineStore('main', () => {
         .invoke('scenes:create', { view: 'groups', name: 'Scenario 1' })
         .then((res) => {
           if (res.success) {
-            scenes.value.push(res.data.scene)
-            activeSceneId.value = res.data.scene.id
+            scenes.value.push(res.data)
+            activeSceneId.value = res.data.id
           }
           return activeSceneId.value
         })
@@ -325,16 +325,9 @@ export const useMainStore = defineStore('main', () => {
     return ensureGroupsScenePromise
   }
 
-  async function createGroupsScene(name, cloneFromId = null) {
-    const res = await api.invoke('scenes:create', {
-      view: 'groups',
-      name,
-      clone_from: cloneFromId
-    })
-    if (res.success) {
-      scenes.value.push(res.data.scene)
-      sceneTags.value.push(...res.data.scene_tags)
-    }
+  async function createScene(view, name, extra = {}) {
+    const res = await api.invoke('scenes:create', { view, name, ...extra })
+    if (res.success) scenes.value.push(res.data)
     return res
   }
 
@@ -342,6 +335,26 @@ export const useMainStore = defineStore('main', () => {
     const res = await api.invoke('scenes:rename', { id, name })
     if (res.success) {
       const idx = scenes.value.findIndex((s) => s.id === id)
+      if (idx !== -1) scenes.value[idx] = res.data
+    }
+    return res
+  }
+
+  /** Deep-copy a scene (config/positions and its tag placements). */
+  async function duplicateScene(id, name) {
+    const res = await api.invoke('scenes:duplicate', { id, name })
+    if (res.success) {
+      scenes.value.push(res.data.scene)
+      sceneTags.value.push(...res.data.scene_tags)
+    }
+    return res
+  }
+
+  /** Persist a scene's arrangement (type/config/positions, optionally name). */
+  async function saveScene(patch) {
+    const res = await api.invoke('scenes:save', patch)
+    if (res.success) {
+      const idx = scenes.value.findIndex((s) => s.id === patch.id)
       if (idx !== -1) scenes.value[idx] = res.data
     }
     return res
@@ -588,8 +601,10 @@ export const useMainStore = defineStore('main', () => {
     addPersonToGroup,
     removePersonFromGroup,
     ensureGroupsScene,
-    createGroupsScene,
+    createScene,
     renameScene,
+    duplicateScene,
+    saveScene,
     deleteScene,
     setActiveScene,
     addSceneTag,
