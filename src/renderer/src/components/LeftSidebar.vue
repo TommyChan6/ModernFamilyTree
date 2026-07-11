@@ -44,8 +44,8 @@
       >
         <span class="nav-icon">⬡</span>
         <span>Factions</span>
-        <span v-if="store.activeFactions.length" class="badge" style="margin-left: auto">{{
-          store.activeFactions.length
+        <span v-if="store.activeGroups.length" class="badge" style="margin-left: auto">{{
+          store.activeGroups.length
         }}</span>
       </button>
     </nav>

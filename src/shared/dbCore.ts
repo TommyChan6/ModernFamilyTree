@@ -17,7 +17,6 @@ import type {
   DB,
   EntityTag,
   Env,
-  Faction,
   ImageRecord,
   Person,
   Project,
@@ -26,6 +25,21 @@ import type {
   SceneTag,
   Tag
 } from './types'
+
+/** The pre-overhaul faction shape — consumed only by migrateFactionsToTags. */
+interface LegacyFaction {
+  id: string
+  project_id: string
+  scenario_id: string | null
+  name: string
+  color?: string
+  icon?: string
+  member_ids?: string[]
+  x?: number
+  y?: number
+  visible?: boolean
+  created_at: string
+}
 import { yearDate } from './calendarMath'
 
 function sortByDate<T extends { created_at: string }>(arr: T[]): T[] {
@@ -51,7 +65,6 @@ export const EMPTY_DB = (): DB => ({
   relationships: {},
   tags: {},
   entity_tags: {},
-  factions: {},
   scenes: {},
   scene_tags: {},
   images: {},
@@ -189,16 +202,15 @@ export function migrateScenariosToScenes(db: any): boolean {
 //   - member_ids become entity_tags rows (one per distinct person↔tag pair)
 //   - each faction becomes one scene_tags placement in the groups scene
 //     migrated from its scenario (same id), copying x/y/visible
-// The old factions collection is NOT deleted here — step 4.4 removes it once
-// the Groups view reads the new model, so this step stays reversible.
-// Idempotent: reruns find the tag by label and skip existing rows.
+// The legacy factions collection is removed once converted.
+// Idempotent: reruns find the tag by label and skip existing rows; once the
+// factions key is gone the whole migration is a no-op.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function migrateFactionsToTags(db: any, env: Env): boolean {
-  let changed = false
-  const factions = (Object.values(db.factions || {}) as Faction[])
+  if (!('factions' in db)) return false
+  const factions = (Object.values(db.factions || {}) as LegacyFaction[])
     .slice()
     .sort((a, b) => (a.created_at > b.created_at ? 1 : a.created_at < b.created_at ? -1 : 0))
-  if (!factions.length) return false
 
   db.tags = db.tags || {}
   db.entity_tags = db.entity_tags || {}
@@ -242,13 +254,11 @@ export function migrateFactionsToTags(db: any, env: Env): boolean {
       }
       db.tags[tagId] = tag
       tagByName.set(key, tagId)
-      changed = true
     }
     for (const pid of f.member_ids || []) {
       if (!db.persons[pid] || hasJoin(pid, tagId)) continue
       const id = env.uuid()
       db.entity_tags[id] = { id, entity_id: pid, tag_id: tagId, created_at: env.nowStr() }
-      changed = true
     }
     if (f.scenario_id && db.scenes[f.scenario_id] && !hasPlacement(f.scenario_id, tagId)) {
       const id = env.uuid()
@@ -263,10 +273,11 @@ export function migrateFactionsToTags(db: any, env: Env): boolean {
         created_at: now,
         updated_at: now
       }
-      changed = true
     }
   }
-  return changed
+  // Everything is converted — retire the legacy collection for good
+  delete db.factions
+  return true
 }
 
 // ── Sample family seeded on first run (shared so desktop and web start identical) ──
@@ -448,9 +459,6 @@ export const channelHandlers: Record<string, Handler> = {
         delete db.tags[tid]
       }
     }
-    for (const [fid, f] of Object.entries(db.factions)) {
-      if (f.project_id === pid) delete db.factions[fid]
-    }
     for (const [sid, s] of Object.entries(db.scenes)) {
       if (s.project_id === pid) {
         cascadeSceneTags(db, { sceneId: sid })
@@ -531,11 +539,6 @@ export const channelHandlers: Record<string, Handler> = {
     for (const [rid, rel] of Object.entries(db.relationships)) {
       if (rel.person_a_id === data.id || rel.person_b_id === data.id) {
         delete db.relationships[rid]
-      }
-    }
-    for (const f of Object.values(db.factions)) {
-      if (Array.isArray(f.member_ids) && f.member_ids.includes(data.id)) {
-        f.member_ids = f.member_ids.filter((pid) => pid !== data.id)
       }
     }
     for (const [iid, img] of Object.entries(db.images)) {
@@ -664,62 +667,15 @@ export const channelHandlers: Record<string, Handler> = {
     return { entity_id, tag_id, removed }
   },
 
-  // ── factions ───────────────────────────────────────────────────────────────
-  'factions:getAll'(db) {
-    return sortByDate(forProject(db, db.factions))
-  },
-
-  'factions:create'(db, data, env) {
-    const id = env.uuid()
-    const now = env.nowStr()
-    const faction: Faction = {
-      id,
-      project_id: db.activeProjectId as string,
-      scenario_id: data?.scenario_id || null,
-      name: data?.name || 'New Faction',
-      description: data?.description || '',
-      color: data?.color || '#6c8ef5',
-      icon: data?.icon || '⚑',
-      member_ids: Array.isArray(data?.member_ids) ? data.member_ids : [],
-      x: data?.x ?? 0,
-      y: data?.y ?? 0,
-      visible: data?.visible !== false,
-      created_at: now,
-      updated_at: now
-    }
-    db.factions[id] = faction
-    return faction
-  },
-
-  'factions:update'(db, data, env) {
-    const existing = db.factions[data.id]
-    if (!existing) throw new Error('Faction not found')
-    if (data.name !== undefined) existing.name = data.name
-    if (data.description !== undefined) existing.description = data.description
-    if (data.color !== undefined) existing.color = data.color
-    if (data.icon !== undefined) existing.icon = data.icon
-    if (data.member_ids !== undefined) existing.member_ids = data.member_ids
-    if (data.x !== undefined) existing.x = data.x
-    if (data.y !== undefined) existing.y = data.y
-    if (data.visible !== undefined) existing.visible = data.visible
-    existing.updated_at = env.nowStr()
-    return existing
-  },
-
-  'factions:delete'(db, data) {
-    delete db.factions[data.id]
-    return { id: data.id }
-  },
-
   // ── scenes (per-view saved arrangements; groups scenes only for now) ───────
   'scenes:getAll'(db, data) {
     const list = sortByDate(forProject(db, db.scenes))
     return data?.view ? list.filter((s) => s.view === data.view) : list
   },
 
-  // With clone_from: duplicates that scene's factions into the new one, so
-  // the client gets scene + factions in a single round-trip. (Faction cloning
-  // goes away in step 4.4 when placements move to scene_tags.)
+  // With clone_from: duplicates that scene's tag placements into the new one,
+  // so the client gets scene + placements in a single round-trip. Membership
+  // lives on the tags and is shared — only positions/visibility are copied.
   'scenes:create'(db, data, env) {
     const id = env.uuid()
     const now = env.nowStr()
@@ -735,24 +691,17 @@ export const channelHandlers: Record<string, Handler> = {
       updated_at: now
     }
     db.scenes[id] = scene
-    const cloned: Faction[] = []
+    const cloned: SceneTag[] = []
     if (data?.clone_from) {
-      for (const f of Object.values(db.factions)) {
-        if (f.scenario_id !== data.clone_from) continue
-        const fid = env.uuid()
-        const copy: Faction = {
-          ...f,
-          id: fid,
-          scenario_id: id,
-          member_ids: [...(f.member_ids || [])],
-          created_at: now,
-          updated_at: now
-        }
-        db.factions[fid] = copy
+      for (const st of Object.values(db.scene_tags)) {
+        if (st.scene_id !== data.clone_from) continue
+        const rid = env.uuid()
+        const copy: SceneTag = { ...st, id: rid, scene_id: id, created_at: now, updated_at: now }
+        db.scene_tags[rid] = copy
         cloned.push(copy)
       }
     }
-    return { scene, factions: cloned }
+    return { scene, scene_tags: cloned }
   },
 
   'scenes:rename'(db, data, env) {
@@ -764,9 +713,6 @@ export const channelHandlers: Record<string, Handler> = {
   },
 
   'scenes:delete'(db, data) {
-    for (const [fid, f] of Object.entries(db.factions)) {
-      if (f.scenario_id === data.id) delete db.factions[fid]
-    }
     cascadeSceneTags(db, { sceneId: data.id })
     delete db.scenes[data.id]
     return { id: data.id }
@@ -924,9 +870,6 @@ export const WRITE_CHANNELS = new Set([
   'tags:delete',
   'entity_tags:add',
   'entity_tags:remove',
-  'factions:create',
-  'factions:update',
-  'factions:delete',
   'scenes:create',
   'scenes:rename',
   'scenes:delete',

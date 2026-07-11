@@ -51,17 +51,17 @@ export function initDB() {
   _db.relationships = _db.relationships || {}
   _db.tags = _db.tags || {}
   _db.entity_tags = _db.entity_tags || {}
-  _db.factions = _db.factions || {}
   _db.scenes = _db.scenes || {}
   _db.scene_tags = _db.scene_tags || {}
   _db.images = _db.images || {}
   _db.settings = _db.settings || {}
   _db.globalSettings = _db.globalSettings || {}
 
-  // Migration: adopt factions created before scenarios/scenes existed into a
-  // default groups scene per project (idempotent — only touches factions with
-  // no scenario_id)
-  const orphanFactions = Object.values(_db.factions).filter((f) => !f.scenario_id)
+  // Migration: adopt legacy factions created before scenarios/scenes existed
+  // into a default groups scene per project, so the faction→tag dissolution
+  // below has a scene to place them in (only touches factions missing a
+  // scenario_id; the factions collection itself is removed right after)
+  const orphanFactions = Object.values(_db.factions || {}).filter((f) => !f.scenario_id)
   if (orphanFactions.length > 0) {
     const now = nowStr()
     const defaultSceneByProject = {}
@@ -90,8 +90,8 @@ export function initDB() {
     save()
   }
 
-  // Migration: dissolve factions into tags + entity_tags + scene_tags (the
-  // old factions collection stays until step 4.4 removes it)
+  // Migration: dissolve legacy factions into tags + entity_tags + scene_tags
+  // and retire the factions collection
   if (migrateFactionsToTags(_db, { uuid: randomUUID, nowStr })) save()
 
   // Migration: convert an old single-container DB (no projects at all) to the
@@ -154,7 +154,6 @@ export function getDB() {
     relationships: _db.relationships,
     tags: _db.tags,
     entityTags: _db.entity_tags,
-    factions: _db.factions,
     scenes: _db.scenes,
     sceneTags: _db.scene_tags,
     images: _db.images,

@@ -89,7 +89,7 @@
           @mouseleave="hoverFactionId = null"
         >
           <span class="fx-mdot" :style="{ background: f.color }"></span>
-          <span class="fx-mname" :title="f.description || f.name">{{ f.name }}</span>
+          <span class="fx-mname" :title="f.name">{{ f.name }}</span>
           <span class="fx-mcount">{{ (f.member_ids || []).length }}</span>
           <button
             class="fx-mbtn"
@@ -158,12 +158,6 @@
             @keydown.enter="saveFactionEdit"
             @keydown.escape="fEdit = null"
           />
-          <textarea
-            v-model="fEdit.description"
-            class="fx-textarea"
-            rows="2"
-            placeholder="Description (optional)"
-          ></textarea>
           <div class="fx-swatch-row">
             <button
               v-for="c in PRESET_COLORS"
@@ -220,7 +214,7 @@
               <button
                 class="fx-fchip-x"
                 title="Remove from faction"
-                @click="store.removePersonFromFaction(pPop.id, f.id)"
+                @click="store.removePersonFromGroup(pPop.id, f.id)"
               >
                 ✕
               </button>
@@ -302,8 +296,7 @@ import {
   computeTargets,
   nextFactionPosition,
   arrangeInRing,
-  membershipArcSpans,
-  matchFactionsByName
+  membershipArcSpans
 } from './factions/factionLayout.js'
 import { FactionsRenderer } from './factions/webgl/FactionsRenderer.js'
 
@@ -362,7 +355,9 @@ const renamingScenarioId = ref(null)
 const scRenameValue = ref('')
 const scRenameRef = ref(null)
 
-const activeFactions = computed(() => store.activeFactions)
+// "Factions" here are the new Groups: tags placed in the active groups scene
+// (identity + members from the tag, position/visibility from the placement).
+const activeFactions = computed(() => store.activeGroups)
 const visibleFactions = computed(() => activeFactions.value.filter((f) => f.visible !== false))
 
 // ── Zone display positions (outside Vue reactivity; the renderer reads them) ─
@@ -485,26 +480,29 @@ const membershipKey = computed(
 )
 watch(membershipKey, rebuildNodes)
 
-// ── Scenario switching: same-name zones glide, everyone else pops ──────────
+// ── Scenario switching: zones of the SAME tag glide, everyone else pops ─────
+// Group identity is the tag id, shared across scenes, so matching placements
+// directly replaces the old fuzzy match-by-name.
 watch(
   () => store.activeSceneId,
   (newId, oldId) => {
     fEdit.value = null
     pPop.value = null
     dropTargetId.value = null
-    const oldFactions = store.factions.filter((f) => f.scenario_id === oldId)
-    const newFactions = store.factions.filter((f) => f.scenario_id === newId)
-    const matches = matchFactionsByName(oldFactions, newFactions)
+    const oldByTag = new Map(
+      store.sceneTags.filter((st) => st.scene_id === oldId).map((st) => [st.tag_id, st])
+    )
+    const newPlacements = store.sceneTags.filter((st) => st.scene_id === newId)
     const tweens = []
-    for (const f of newFactions) {
-      const old = matches.get(f.id)
+    for (const st of newPlacements) {
+      const old = oldByTag.get(st.tag_id)
       if (!old) continue
-      const from = zonePos.get(old.id) ? { ...zonePos.get(old.id) } : { x: old.x, y: old.y }
-      zonePos.set(f.id, { ...from })
-      tweens.push({ id: f.id, from, to: { x: f.x, y: f.y } })
+      const from = zonePos.get(st.tag_id) ? { ...zonePos.get(st.tag_id) } : { x: old.x, y: old.y }
+      zonePos.set(st.tag_id, { ...from })
+      tweens.push({ id: st.tag_id, from, to: { x: st.x, y: st.y } })
     }
     startZoneTweens(tweens)
-    if (newFactions.some((f) => f.visible !== false)) fitAll(true)
+    if (newPlacements.some((st) => st.visible !== false)) fitAll(true)
   }
 )
 
@@ -945,7 +943,7 @@ function onZoneUp(e) {
   suppressClick = true
   if (moved) {
     const p = zonePos.get(f.id)
-    if (p) store.updateFaction({ id: f.id, x: Math.round(p.x), y: Math.round(p.y) })
+    if (p) store.moveGroup(f.id, Math.round(p.x), Math.round(p.y))
   } else {
     openFactionEdit(f.id, e)
   }
@@ -996,10 +994,10 @@ function onNodeUp(e) {
   if (z && !memberships.includes(z.id)) {
     // Dropped into a new camp — join it (existing memberships are kept;
     // remove via the person popup)
-    store.addPersonToFaction(n.id, z.id)
+    store.addPersonToGroup(n.id, z.id)
   } else if (!z && memberships.length === 1) {
     // Deliberately pulled out of their only faction — back to the tray
-    store.removePersonFromFaction(n.id, memberships[0])
+    store.removePersonFromGroup(n.id, memberships[0])
   }
   // Multi-faction people dropped in open space just spring back — no
   // accidental data loss from a sloppy drag.
@@ -1052,7 +1050,7 @@ function onTrayUp(e) {
   if (target) {
     const w = toWorld(e)
     pendingSpawn = { id: p.id, x: w.x, y: w.y }
-    store.addPersonToFaction(p.id, target)
+    store.addPersonToGroup(p.id, target)
   }
 }
 
@@ -1097,7 +1095,7 @@ function onSidebarDrop(e) {
   if (!f || (f.member_ids || []).includes(pid)) return
   const w = toWorld(e)
   if (!nodeById.has(pid)) pendingSpawn = { id: pid, x: w.x, y: w.y }
-  store.addPersonToFaction(pid, target)
+  store.addPersonToGroup(pid, target)
 }
 
 // Ghost/highlight must not outlive an aborted sidebar drag (Esc, drop outside)
@@ -1116,7 +1114,7 @@ async function handleCreateFaction() {
   const cx = (stageW.value / 2 - tx.value) / k.value
   const cy = (stageH.value / 2 - ty.value) / k.value
   const pos = nextFactionPosition(activeFactions.value, cx, cy)
-  const res = await store.createFaction({
+  const res = await store.createGroup({
     name: `Faction ${activeFactions.value.length + 1}`,
     color: PRESET_COLORS[activeFactions.value.length % PRESET_COLORS.length],
     icon: ICON_PRESETS[activeFactions.value.length % ICON_PRESETS.length],
@@ -1137,7 +1135,6 @@ function openFactionEdit(fid, e) {
   fEdit.value = {
     id: f.id,
     name: f.name,
-    description: f.description || '',
     color: f.color,
     icon: f.icon,
     px,
@@ -1148,12 +1145,11 @@ function openFactionEdit(fid, e) {
 
 async function saveFactionEdit() {
   if (!fEdit.value) return
-  const { id, name, description, color, icon } = fEdit.value
+  const { id, name, color, icon } = fEdit.value
   fEdit.value = null
-  await store.updateFaction({
+  await store.updateGroup({
     id,
     name: name.trim() || 'Unnamed Faction',
-    description,
     color,
     icon
   })
@@ -1169,12 +1165,12 @@ async function handleDeleteFaction() {
   if (!ok) return
   const id = fEdit.value.id
   fEdit.value = null
-  await store.deleteFaction(id)
+  await store.deleteGroup(id)
 }
 
 function toggleVisible(f) {
   hoverFactionId.value = null
-  store.updateFaction({ id: f.id, visible: f.visible === false })
+  store.setGroupVisible(f.id, f.visible === false)
 }
 
 async function autoArrange() {
@@ -1187,9 +1183,7 @@ async function autoArrange() {
       return { id: p.id, from: cur, to: { x: p.x, y: p.y } }
     })
   )
-  await Promise.all(
-    placed.map((p) => store.updateFaction({ id: p.id, x: Math.round(p.x), y: Math.round(p.y) }))
-  )
+  await Promise.all(placed.map((p) => store.moveGroup(p.id, Math.round(p.x), Math.round(p.y))))
   fitAll(true)
 }
 
@@ -1214,7 +1208,7 @@ const pPopAddable = computed(() =>
 function onAddToFaction(e) {
   const fid = e.target.value
   e.target.value = ''
-  if (fid && pPop.value) store.addPersonToFaction(pPop.value.id, fid)
+  if (fid && pPop.value) store.addPersonToGroup(pPop.value.id, fid)
 }
 
 function openPersonProfile() {
@@ -1226,11 +1220,11 @@ function openPersonProfile() {
 // ── Scenario bar ────────────────────────────────────────────────────────────
 const peopleByScenario = computed(() => {
   const m = new Map()
-  for (const f of store.factions) {
-    if (f.visible === false) continue
-    let set = m.get(f.scenario_id)
-    if (!set) m.set(f.scenario_id, (set = new Set()))
-    for (const pid of f.member_ids || []) set.add(pid)
+  for (const st of store.sceneTags) {
+    if (st.visible === false) continue
+    let set = m.get(st.scene_id)
+    if (!set) m.set(st.scene_id, (set = new Set()))
+    for (const pid of store.membersOf.get(st.tag_id) || []) set.add(pid)
   }
   return m
 })
@@ -1240,7 +1234,7 @@ function peopleInScenario(sid) {
 }
 
 function scenarioTooltip(s) {
-  const fCount = store.factions.filter((f) => f.scenario_id === s.id).length
+  const fCount = store.sceneTags.filter((st) => st.scene_id === s.id).length
   return `${fCount} faction${fCount === 1 ? '' : 's'} · ${peopleInScenario(s.id)} people in scene`
 }
 
@@ -1277,7 +1271,7 @@ async function confirmRenameScenario() {
 }
 
 async function handleDeleteScenario(s) {
-  const fCount = store.factions.filter((f) => f.scenario_id === s.id).length
+  const fCount = store.sceneTags.filter((st) => st.scene_id === s.id).length
   const ok = confirm(
     `Delete scenario "${s.name}"${fCount ? ` and its ${fCount} faction${fCount === 1 ? '' : 's'}` : ''}? People stay in your tree.`
   )
@@ -1759,14 +1753,9 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
 }
 .fx-input,
-.fx-textarea,
 .fx-select {
   font-size: 12px;
   padding: 7px 9px;
-}
-.fx-textarea {
-  min-height: 0;
-  resize: none;
 }
 
 .fx-swatch-row {

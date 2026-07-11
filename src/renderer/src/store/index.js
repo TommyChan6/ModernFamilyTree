@@ -13,7 +13,6 @@ export const useMainStore = defineStore('main', () => {
   const relationships = ref([])
   const tags = ref([])
   const entityTags = ref([]) // the entity↔tag membership join rows
-  const factions = ref([]) // all factions of the project, across groups scenes
   const scenes = ref([]) // every saved Scene of the project, all views
   const sceneTags = ref([]) // tag placements ("Groups"): {id, scene_id, tag_id, x, y, visible}
   // Which scene is open — for the GROUPS view only for now (Phase 5 makes this
@@ -78,9 +77,6 @@ export const useMainStore = defineStore('main', () => {
   )
   const groupsScenes = computed(() => scenes.value.filter((s) => s.view === 'groups'))
   const activeScene = computed(() => scenes.value.find((s) => s.id === activeSceneId.value) || null)
-  const activeFactions = computed(() =>
-    factions.value.filter((f) => f.scenario_id === activeSceneId.value)
-  )
   // O(1) membership lookups in both directions, rebuilt when the join changes:
   // tagsOf.get(entityId) → Tag[]; membersOf.get(tagId) → entityId[]
   const tagById = computed(() => new Map(tags.value.map((t) => [t.id, t])))
@@ -101,6 +97,29 @@ export const useMainStore = defineStore('main', () => {
       m.get(row.tag_id).push(row.entity_id)
     }
     return m
+  })
+  // The Groups view's display list: every tag placed in the active groups
+  // scene, joined with its identity (tag) and members (entity_tags). Identity
+  // is the TAG id — stable across scenes, so scene switches glide naturally.
+  const activeGroups = computed(() => {
+    const out = []
+    for (const st of sceneTags.value) {
+      if (st.scene_id !== activeSceneId.value) continue
+      const tag = tagById.value.get(st.tag_id)
+      if (!tag) continue
+      out.push({
+        id: tag.id,
+        placement_id: st.id,
+        name: tag.label,
+        color: tag.color,
+        icon: tag.icon,
+        member_ids: membersOf.value.get(tag.id) || [],
+        x: st.x,
+        y: st.y,
+        visible: st.visible !== false
+      })
+    }
+    return out
   })
 
   // ── Project actions ───────────────────────────────────────────────────────
@@ -159,30 +178,20 @@ export const useMainStore = defineStore('main', () => {
 
   // ── Data actions ──────────────────────────────────────────────────────────
   async function loadAll() {
-    const [
-      personsRes,
-      relsRes,
-      tagsRes,
-      entityTagsRes,
-      factionsRes,
-      scenesRes,
-      sceneTagsRes,
-      settingsRes
-    ] = await Promise.all([
-      api.invoke('persons:getAll'),
-      api.invoke('relationships:getAll'),
-      api.invoke('tags:getAll'),
-      api.invoke('entity_tags:getAll'),
-      api.invoke('factions:getAll'),
-      api.invoke('scenes:getAll'),
-      api.invoke('scene_tags:getAll'),
-      api.invoke('settings:getAll')
-    ])
+    const [personsRes, relsRes, tagsRes, entityTagsRes, scenesRes, sceneTagsRes, settingsRes] =
+      await Promise.all([
+        api.invoke('persons:getAll'),
+        api.invoke('relationships:getAll'),
+        api.invoke('tags:getAll'),
+        api.invoke('entity_tags:getAll'),
+        api.invoke('scenes:getAll'),
+        api.invoke('scene_tags:getAll'),
+        api.invoke('settings:getAll')
+      ])
     if (personsRes.success) persons.value = personsRes.data
     if (relsRes.success) relationships.value = relsRes.data
     if (tagsRes.success) tags.value = tagsRes.data
     if (entityTagsRes.success) entityTags.value = entityTagsRes.data
-    if (factionsRes.success) factions.value = factionsRes.data
     if (scenesRes.success) scenes.value = scenesRes.data
     if (sceneTagsRes.success) sceneTags.value = sceneTagsRes.data
     // Restore the project's active groups scene; the legacy activeScenarioId
@@ -217,11 +226,6 @@ export const useMainStore = defineStore('main', () => {
         (r) => r.person_a_id !== id && r.person_b_id !== id
       )
       entityTags.value = entityTags.value.filter((row) => row.entity_id !== id)
-      factions.value.forEach((f) => {
-        if (f.member_ids?.includes(id)) {
-          f.member_ids = f.member_ids.filter((pid) => pid !== id)
-        }
-      })
       if (selectedPersonId.value === id) {
         selectedPersonId.value = null
         modalOpen.value = false
@@ -329,7 +333,7 @@ export const useMainStore = defineStore('main', () => {
     })
     if (res.success) {
       scenes.value.push(res.data.scene)
-      factions.value.push(...res.data.factions)
+      sceneTags.value.push(...res.data.scene_tags)
     }
     return res
   }
@@ -347,7 +351,6 @@ export const useMainStore = defineStore('main', () => {
     const res = await api.invoke('scenes:delete', { id })
     if (res.success) {
       scenes.value = scenes.value.filter((s) => s.id !== id)
-      factions.value = factions.value.filter((f) => f.scenario_id !== id)
       sceneTags.value = sceneTags.value.filter((row) => row.scene_id !== id)
       if (activeSceneId.value === id) {
         setActiveScene(groupsScenes.value[0]?.id ?? null)
@@ -400,42 +403,59 @@ export const useMainStore = defineStore('main', () => {
     if (id) api.invoke('settings:set', { key: 'activeSceneId:groups', value: id })
   }
 
-  // ── Faction actions ───────────────────────────────────────────────────────
-  async function createFaction(data) {
+  // ── Group actions (the Groups view's verbs over tags + placements) ─────────
+  /** Find the active scene's placement of a tag. */
+  function placementOf(tagId) {
+    return (
+      sceneTags.value.find((row) => row.scene_id === activeSceneId.value && row.tag_id === tagId) ||
+      null
+    )
+  }
+
+  /** Create a tag and place it in the active groups scene. Returns the tag. */
+  async function createGroup({ name, color, icon, x = 0, y = 0 } = {}) {
     const sceneId = await ensureGroupsScene()
-    const res = await api.invoke('factions:create', { ...data, scenario_id: sceneId })
-    if (res.success) factions.value.push(res.data)
-    return res
+    const tagRes = await createTag({ label: name, color, icon })
+    if (!tagRes.success) return tagRes
+    const placeRes = await addSceneTag(sceneId, tagRes.data.id, { x, y })
+    return placeRes.success ? tagRes : placeRes
   }
 
-  async function updateFaction(data) {
-    const res = await api.invoke('factions:update', data)
-    if (res.success) {
-      const idx = factions.value.findIndex((f) => f.id === data.id)
-      if (idx !== -1) factions.value[idx] = res.data
+  /** Rename / recolor / re-icon a group — edits the shared tag identity. */
+  function updateGroup({ id, name, color, icon }) {
+    return updateTag({ id, label: name, color, icon })
+  }
+
+  /** Remove a group from the active scene. If the tag isn't placed in any
+   *  other scene, delete the tag too (membership included) — matching the old
+   *  "delete faction" outcome; people are never deleted. */
+  async function deleteGroup(tagId) {
+    const placement = placementOf(tagId)
+    if (placement) {
+      const res = await removeSceneTag(placement.id)
+      if (!res.success) return res
     }
-    return res
+    const placedElsewhere = sceneTags.value.some((row) => row.tag_id === tagId)
+    if (!placedElsewhere) return deleteTag(tagId)
+    return { success: true }
   }
 
-  async function deleteFaction(id) {
-    const res = await api.invoke('factions:delete', { id })
-    if (res.success) factions.value = factions.value.filter((f) => f.id !== id)
-    return res
+  function moveGroup(tagId, x, y) {
+    const placement = placementOf(tagId)
+    return placement ? moveSceneTag(placement.id, x, y) : null
   }
 
-  async function addPersonToFaction(personId, factionId) {
-    const f = factions.value.find((x) => x.id === factionId)
-    if (!f || f.member_ids?.includes(personId)) return null
-    return updateFaction({ id: factionId, member_ids: [...(f.member_ids || []), personId] })
+  function setGroupVisible(tagId, visible) {
+    const placement = placementOf(tagId)
+    return placement ? setSceneTagVisible(placement.id, visible) : null
   }
 
-  async function removePersonFromFaction(personId, factionId) {
-    const f = factions.value.find((x) => x.id === factionId)
-    if (!f || !f.member_ids?.includes(personId)) return null
-    return updateFaction({
-      id: factionId,
-      member_ids: f.member_ids.filter((pid) => pid !== personId)
-    })
+  function addPersonToGroup(personId, tagId) {
+    return addEntityTag(personId, tagId)
+  }
+
+  function removePersonFromGroup(personId, tagId) {
+    return removeEntityTag(personId, tagId)
   }
 
   function selectPerson(id) {
@@ -519,7 +539,6 @@ export const useMainStore = defineStore('main', () => {
     relationships,
     tags,
     entityTags,
-    factions,
     scenes,
     sceneTags,
     activeSceneId,
@@ -545,7 +564,7 @@ export const useMainStore = defineStore('main', () => {
     coupleCount,
     groupsScenes,
     activeScene,
-    activeFactions,
+    activeGroups,
     tagsOf,
     membersOf,
     // actions
@@ -561,11 +580,13 @@ export const useMainStore = defineStore('main', () => {
     deleteTag,
     addEntityTag,
     removeEntityTag,
-    createFaction,
-    updateFaction,
-    deleteFaction,
-    addPersonToFaction,
-    removePersonFromFaction,
+    createGroup,
+    updateGroup,
+    deleteGroup,
+    moveGroup,
+    setGroupVisible,
+    addPersonToGroup,
+    removePersonFromGroup,
     ensureGroupsScene,
     createGroupsScene,
     renameScene,

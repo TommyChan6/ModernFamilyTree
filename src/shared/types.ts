@@ -83,24 +83,6 @@ export interface SceneTag {
   updated_at: string
 }
 
-export interface Faction {
-  id: string
-  project_id: string
-  /** The groups Scene this faction lives in (was the scenario id — scenes kept
-   *  the same ids in the migration). Being dissolved into tags in Phase 4. */
-  scenario_id: string | null
-  name: string
-  description: string
-  color: string
-  icon: string
-  member_ids: string[]
-  x: number
-  y: number
-  visible: boolean
-  created_at: string
-  updated_at: string
-}
-
 /** A saved arrangement of ONE view. Groups scenes replace the old
  *  "scenarios"; graph scenes replace the serialized graphState "states"
  *  (Phase 5). Directory/Relationships have no positions → no scenes. */
@@ -137,7 +119,6 @@ export interface DB {
   relationships: Record<string, Relationship>
   tags: Record<string, Tag>
   entity_tags: Record<string, EntityTag>
-  factions: Record<string, Faction>
   scenes: Record<string, Scene>
   scene_tags: Record<string, SceneTag>
   images: Record<string, ImageRecord>

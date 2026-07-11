@@ -34,29 +34,6 @@ export function computeTargets(factions, getPos = (f) => f) {
 }
 
 /**
- * Match factions across two scenarios by (case-insensitive) name — "the same
- * faction is present" continuity when switching scenarios. Duplicate names
- * match first-come-first-served. Returns Map<newFactionId, oldFaction>.
- */
-export function matchFactionsByName(oldFactions, newFactions) {
-  const byName = new Map()
-  for (const f of oldFactions) {
-    const key = (f.name || '').trim().toLowerCase()
-    if (key && !byName.has(key)) byName.set(key, f)
-  }
-  const matches = new Map()
-  for (const f of newFactions) {
-    const key = (f.name || '').trim().toLowerCase()
-    const old = key ? byName.get(key) : null
-    if (old) {
-      matches.set(f.id, old)
-      byName.delete(key)
-    }
-  }
-  return matches
-}
-
-/**
  * Where to place a newly created faction: the view centre if it is free,
  * otherwise the first spot on an outward spiral that keeps clear of every
  * existing zone.
