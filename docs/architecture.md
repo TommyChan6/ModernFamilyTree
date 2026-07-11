@@ -94,6 +94,42 @@ Component  →  Pinia store action  →  api.invoke(channel, data)
            ←  store updates reactive refs  ←
 ```
 
+The same round-trip as a sequence, showing where the desktop and web builds diverge
+(everything above `api.invoke` is identical):
+
+```mermaid
+sequenceDiagram
+    participant C as Component
+    participant S as Pinia store
+    participant A as api.invoke
+    box Desktop only
+    participant P as preload + ipcRenderer
+    participant M as main (ipc.js)
+    end
+    box Web only
+    participant L as local backend
+    end
+    participant H as channelHandlers<br/>(shared dbCore)
+    participant D as Disk / IndexedDB
+
+    C->>S: createPerson(data)
+    S->>A: invoke('persons:create', data)
+    alt Desktop
+        A->>P: electronAPI.invoke
+        P->>M: ipcRenderer.invoke
+        M->>H: channelHandlers[ch](db, data, env)
+    else Web
+        A->>L: local.invoke
+        L->>H: channelHandlers[ch](db, data, env)
+    end
+    H->>D: mutate + save()
+    D-->>H: ok
+    H-->>A: { success, data }
+    A-->>S: { success, data }
+    S->>S: optimistic update of reactive arrays
+    S-->>C: reactive re-render
+```
+
 Every IPC handler returns a uniform envelope — `{ success: true, data }` on success
 or `{ success: false, error }` on failure — so the renderer never sees a thrown
 exception cross the process boundary. See [conventions.md](./conventions.md).
@@ -103,6 +139,23 @@ In the **web build** (`npm run dev:web`) the chain is identical down to
 ([`api/backends/local.ts`](../src/renderer/src/api/backends/local.ts)) instead of the
 preload bridge: the same shared channel handlers run in-page against an IndexedDB
 store. Components and the store cannot tell the difference — that is the point.
+
+```mermaid
+flowchart TD
+    seam["🔌 api/index.ts<br/>picks a backend at startup"]
+    seam -->|electronAPI present| ipc["backends/ipc.ts<br/>→ IPC → main → JSON file"]
+    seam -->|browser| local["backends/local.ts<br/>→ IndexedDB (photos as data URLs)"]
+    seam -.->|VITE_API_BACKEND<br/>future| http["backends/http.ts<br/>→ HTTP / Supabase"]
+    ipc --> core["shared/dbCore.ts channelHandlers"]
+    local --> core
+
+    style seam fill:#6c8ef5,color:#fff
+    style core fill:#8b6cc5,color:#fff
+    style http stroke-dasharray: 5 5
+```
+
+Both real backends funnel into the **same** `channelHandlers` in `dbCore.ts`, so the
+business logic is written once. A future HTTP/Supabase backend slots in beside them.
 
 ### Reactive state
 

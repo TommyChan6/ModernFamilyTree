@@ -25,6 +25,63 @@ Every collection is keyed by ID (an object map, not an array). All IDs are v4 UU
 generated with Node's `crypto.randomUUID()`. Timestamps are stored as
 `"YYYY-MM-DD HH:MM:SS"` strings (`nowStr()`), in local time.
 
+## Entity relationships at a glance
+
+```mermaid
+erDiagram
+    TREE ||--o{ PERSON : "scopes"
+    TREE ||--o{ RELATIONSHIP : "scopes"
+    TREE ||--o{ SCENARIO : "scopes"
+    TREE ||--o{ IMAGE : "scopes"
+    TREE ||--o{ SETTING : "scopes"
+    PERSON ||--o{ IMAGE : "has photos"
+    PERSON ||--o{ RELATIONSHIP : "person_a / person_b"
+    SCENARIO ||--o{ FACTION : "owns"
+    FACTION }o--o{ PERSON : "member_ids (many-to-many)"
+
+    TREE {
+        string id PK
+        string name
+    }
+    PERSON {
+        string id PK
+        string tree_id FK
+        string name
+        number birth_year
+        number death_year
+        string gender
+    }
+    RELATIONSHIP {
+        string id PK
+        string tree_id FK
+        string person_a_id FK
+        string person_b_id FK
+        string type
+        string status
+    }
+    SCENARIO {
+        string id PK
+        string tree_id FK
+        string name
+    }
+    FACTION {
+        string id PK
+        string tree_id FK
+        string scenario_id FK
+        string_array member_ids
+    }
+    IMAGE {
+        string id PK
+        string person_id FK
+        string file_path
+        boolean is_primary
+    }
+```
+
+Everything hangs off **Tree** — it's the scoping root. A `FACTION` is the only
+many-to-many join (a person can be in many factions; a faction holds many people), and
+it's stored as a plain `member_ids` array rather than a join table.
+
 ## Entities
 
 ### Tree
@@ -77,6 +134,25 @@ An undirected-ish edge between two persons. Direction matters for `parent_child`
 Deleting a person cascades: all relationships referencing it and all its images
 (files included) are removed, and the person is dropped from every faction's
 `member_ids`.
+
+**Cascade map** — what each delete takes down with it:
+
+```mermaid
+flowchart LR
+    delTree["🗑️ delete TREE"] --> persons & rels & scenarios2["scenarios"] & images2["images (+files)"] & settings2["settings"]
+    delPerson["🗑️ delete PERSON"] --> pRels["its relationships"] & pImgs["its images (+files)"] & pMem["removed from all member_ids"]
+    delScenario["🗑️ delete SCENARIO"] --> sFactions["its factions"]
+    delScenario -. "people untouched" .-> nothing1["∅"]
+    delFaction["🗑️ delete FACTION"] -. "people untouched" .-> nothing2["∅"]
+
+    style delTree fill:#c0392b,color:#fff
+    style delPerson fill:#c0392b,color:#fff
+    style delScenario fill:#e67e22,color:#fff
+    style delFaction fill:#e67e22,color:#fff
+```
+
+Deleting a **faction** or a **scenario** never deletes people — it only removes the
+grouping. Deleting a **person** or a **tree** is the destructive direction.
 
 ### Faction
 
@@ -141,7 +217,24 @@ Two distinct scopes:
 
 ## Migrations
 
-`initDB()` is idempotent and self-migrating. On load it:
+`initDB()` runs on every load and brings any older file up to the current shape:
+
+```mermaid
+flowchart TD
+    load(["load familytree.json"]) --> ensure["1 · backfill any missing<br/>top-level collections"]
+    ensure --> q1{"activeTreeId<br/>or trees exist?"}
+    q1 -->|no| mig["2 · single-tree → multi-tree:<br/>create default tree, tag old<br/>persons/rels/images, move theme<br/>to globalSettings, re-scope settings"]
+    q1 -->|yes| q2
+    mig --> q2{"factions without<br/>scenario_id?"}
+    q2 -->|yes| adopt["3 · adopt them into a<br/>default “Scenario 1” per tree"]
+    q2 -->|no| q3
+    adopt --> q3{"any data at all?"}
+    q3 -->|no| seed["4 · seed sample Anderson family<br/>(6 persons, 8 relationships)"]
+    q3 -->|yes| done
+    seed --> done(["5 · ensure activeTreeId is valid"])
+```
+
+In prose, `initDB()` is idempotent and self-migrating. On load it:
 
 1. Ensures every top-level collection exists (backfills empty objects).
 2. **Single-tree → multi-tree migration:** if there is no `activeTreeId` and no

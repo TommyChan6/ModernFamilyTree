@@ -1,9 +1,16 @@
 # The graph engine
 
-The interactive family tree is the heart of the app. It is rendered with
-[D3](https://d3js.org) (SVG + force simulation), driven from
+The interactive family tree is the heart of the app. The **layout** is driven by a
+[d3-force](https://d3js.org) simulation from
 [`GraphCanvas.vue`](../src/renderer/src/components/GraphCanvas.vue) with pure helper
-modules in [`components/graph/`](../src/renderer/src/components/graph/).
+modules in [`components/graph/`](../src/renderer/src/components/graph/); the **drawing**
+is done by a Three.js/WebGL renderer under
+[`components/graph/webgl/`](../src/renderer/src/components/graph/webgl/).
+
+> **Rendering note.** Earlier versions drew the graph as SVG. It now draws every node
+> and link with instanced WebGL for scale, while d3-force still owns the simulation. The
+> Vue ↔ simulation boundary below is unchanged; wherever this doc says "SVG"/"repaints
+> paths", read it as the WebGL renderer being poked to redraw.
 
 ## Vue ↔ D3 boundary
 
@@ -54,6 +61,33 @@ versions of the same tree per mode.
 Switching modes or states snapshots the current positions first, then animates into
 the target snapshot (recomputing a fresh layout if none exists yet).
 
+The shape of it — 4 modes, each holding its own list of position snapshots:
+
+```mermaid
+flowchart TD
+    G["graphState (per tree)"]
+    G --> custom["✋ custom"] & auto["⚡ auto"] & age["📅 age"] & gen["🏛 generation"]
+    custom --> cs["states[]: “Default”, “Reunion”, …"]
+    auto --> as["states[]"]
+    age --> ags["states[]"]
+    gen --> gs["states[] (+ _genRowYValues, _genRowSpacing)"]
+    cs --> snap["each state = { personId → {x, y} }"]
+
+    style G fill:#8b6cc5,color:#fff
+```
+
+Switching mode/state is always the same guarded transition:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Live
+    Live --> Snapshotting: user picks mode/state
+    Snapshotting --> Resolving: save current x/y into the outgoing state
+    Resolving --> Animating: look up target snapshot (compute fresh if empty)
+    Animating --> Live: tween ~350–500ms, then settle
+```
+
 ## Guides & generation rows
 
 [`guideLines.js`](../src/renderer/src/components/graph/guideLines.js) draws the
@@ -99,6 +133,23 @@ date (or today) and capped at the death year.
 ## Persistence {#persistence}
 
 The full graph arrangement is serialized per tree and restored on load.
+
+```mermaid
+flowchart LR
+    subgraph save["💾 Save (on demand)"]
+        collect["collectGraphState()<br/>snapshot mode + all states"] --> set["store.saveGraphState<br/>→ settings:set 'graphState'"]
+        set --> clear["graphDirty = false"]
+    end
+    subgraph loadflow["📂 Load (first data load)"]
+        get["settings:getAll → graphState"] --> restore["restoreGraphState()"] --> reenter["re-enter saved mode"]
+    end
+    edit["✋ user moves nodes /<br/>switches mode/state"] --> dirty["graphDirty = true<br/>(Save Layout pulses)"]
+    dirty -.->|user clicks Save| save
+
+    style dirty fill:#f5a623,color:#000
+```
+
+
 
 - `collectGraphState()` snapshots the current mode, emphasis, and **all** modes'
   state names, active indices, and position snapshots into one object.
