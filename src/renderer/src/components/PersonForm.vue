@@ -332,47 +332,62 @@ async function updateExistingRelDate(relId, val) {
   if (rel) rel.formedDate = formedDate
 }
 
-// Populate form when editing
+// (Re)fill the form from the person being edited, or blank it for Add.
+async function populate(person) {
+  if (person) {
+    const parts = person.name.trim().split(/\s+/)
+    form.value = {
+      firstName: parts.slice(0, -1).join(' ') || parts[0] || '',
+      lastName: parts.length > 1 ? parts[parts.length - 1] : '',
+      gender: person.gender || 'unknown',
+      birthYear: person.birth?.year || null,
+      deathYear: person.death?.year || null,
+      occupation: person.occupation || '',
+      location: person.location || '',
+      bio: person.bio || ''
+    }
+    errors.value.firstName = ''
+    existingRels.value = buildExistingRels(person.id)
+    pendingLinks.value = []
+    // Load photos
+    const res = await api.invoke('images:getByPerson', { personId: person.id })
+    if (res.success) photos.value = res.data
+    else photos.value = []
+  } else {
+    form.value = {
+      firstName: '',
+      lastName: '',
+      gender: 'unknown',
+      birthYear: null,
+      deathYear: null,
+      occupation: '',
+      location: '',
+      bio: ''
+    }
+    errors.value.firstName = ''
+    pendingLinks.value = []
+    existingRels.value = []
+    photos.value = []
+  }
+}
+
+// Reset the form every time it OPENS (not only when the edited person
+// changes) — otherwise the always-mounted form keeps stale text from a prior
+// open when you click Add again (editingPerson null → null is not a change).
+// editingPerson is set before formOpen in the store's openForm/selectPerson,
+// so it's current here.
+watch(
+  () => store.formOpen,
+  (open) => {
+    if (open) populate(store.editingPerson)
+  }
+)
+// Also re-fill if the edited person switches while the form is already open.
 watch(
   () => store.editingPerson,
-  async (person) => {
-    if (person) {
-      const parts = person.name.trim().split(/\s+/)
-      form.value = {
-        firstName: parts.slice(0, -1).join(' ') || parts[0] || '',
-        lastName: parts.length > 1 ? parts[parts.length - 1] : '',
-        gender: person.gender || 'unknown',
-        birthYear: person.birth?.year || null,
-        deathYear: person.death?.year || null,
-        occupation: person.occupation || '',
-        location: person.location || '',
-        bio: person.bio || ''
-      }
-      errors.value.firstName = ''
-      existingRels.value = buildExistingRels(person.id)
-      pendingLinks.value = []
-      // Load photos
-      const res = await api.invoke('images:getByPerson', { personId: person.id })
-      if (res.success) photos.value = res.data
-      else photos.value = []
-    } else {
-      form.value = {
-        firstName: '',
-        lastName: '',
-        gender: 'unknown',
-        birthYear: null,
-        deathYear: null,
-        occupation: '',
-        location: '',
-        bio: ''
-      }
-      errors.value.firstName = ''
-      pendingLinks.value = []
-      existingRels.value = []
-      photos.value = []
-    }
-  },
-  { immediate: true }
+  (person) => {
+    if (store.formOpen) populate(person)
+  }
 )
 
 function fullName() {
