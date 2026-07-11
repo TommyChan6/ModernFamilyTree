@@ -49,7 +49,7 @@ describe('Database initialization', () => {
     expect(data).toHaveProperty('persons')
     expect(data).toHaveProperty('relationships')
     expect(data).toHaveProperty('factions')
-    expect(data).toHaveProperty('scenarios')
+    expect(data).toHaveProperty('scenes')
     expect(data).toHaveProperty('settings')
     expect(data).toHaveProperty('globalSettings')
   })
@@ -320,7 +320,11 @@ describe('Migration from tree vocabulary to project vocabulary', () => {
     expect(db.persons.p1.tree_id).toBeUndefined()
     expect(db.relationships.r1.project_id).toBe('t1')
     expect(db.factions.f1.project_id).toBe('t1')
-    expect(db.scenarios.s1.project_id).toBe('t1')
+
+    // The old scenario became a groups scene with the same id
+    expect(db.scenes.s1.project_id).toBe('t1')
+    expect(db.scenes.s1.view).toBe('groups')
+    expect(db.db.scenarios).toBeUndefined()
 
     // Year numbers wrapped as DateValues
     expect(db.persons.p1.birth).toEqual(yearDate(1980))
@@ -805,9 +809,80 @@ describe('Factions', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe('Scenarios', () => {
-  it('adopts pre-scenario factions into a default scenario per project', () => {
-    // Database written before scenarios existed: factions with no scenario_id
+describe('Scenes (groups)', () => {
+  it('migrates scenarios into groups scenes with the same ids', () => {
+    const dbDir = path.join(tmpDir, 'db')
+    fs.mkdirSync(dbDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dbDir, 'familytree.json'),
+      JSON.stringify({
+        projects: {
+          t1: { id: 't1', name: 'T', created_at: '2024-01-01', updated_at: '2024-01-01' }
+        },
+        activeProjectId: 't1',
+        persons: {},
+        relationships: {},
+        images: {},
+        settings: { 't1:activeScenarioId': 's2' },
+        globalSettings: {},
+        scenarios: {
+          s1: {
+            id: 's1',
+            project_id: 't1',
+            name: 'By family',
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01'
+          },
+          s2: {
+            id: 's2',
+            project_id: 't1',
+            name: 'Allegiance',
+            created_at: '2024-01-02',
+            updated_at: '2024-01-02'
+          }
+        },
+        factions: {
+          f1: {
+            id: 'f1',
+            project_id: 't1',
+            scenario_id: 's1',
+            name: 'F',
+            description: '',
+            color: '#6c8ef5',
+            icon: '⚑',
+            member_ids: [],
+            x: 5,
+            y: 6,
+            visible: true,
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01'
+          }
+        }
+      })
+    )
+
+    initDB()
+    const { db, scenes, factions } = getDB()
+
+    expect(db.scenarios).toBeUndefined()
+    expect(Object.keys(scenes).sort()).toEqual(['s1', 's2'])
+    expect(scenes.s1).toMatchObject({ view: 'groups', name: 'By family', project_id: 't1' })
+    expect(scenes.s2.name).toBe('Allegiance')
+    // Factions still resolve — the scene kept the scenario's id
+    expect(factions.f1.scenario_id).toBe('s1')
+
+    // Idempotent: a second init changes nothing on disk
+    const first = JSON.parse(fs.readFileSync(path.join(dbDir, 'familytree.json'), 'utf8'))
+    vi.resetModules()
+    return import('../src/main/db.js').then((mod2) => {
+      mod2.initDB()
+      const second = JSON.parse(fs.readFileSync(path.join(dbDir, 'familytree.json'), 'utf8'))
+      expect(second).toEqual(first)
+    })
+  })
+
+  it('adopts pre-scenario factions into a default groups scene per project', () => {
+    // Database written before scenarios/scenes existed: factions with no scenario_id
     const dbDir = path.join(tmpDir, 'db')
     fs.mkdirSync(dbDir, { recursive: true })
     fs.writeFileSync(
@@ -862,35 +937,30 @@ describe('Scenarios', () => {
     )
 
     initDB()
-    const { factions, scenarios } = getDB()
+    const { factions, scenes } = getDB()
 
-    // One default scenario per project that had factions
-    const t1Scenarios = Object.values(scenarios).filter((s) => s.project_id === 't1')
-    const t2Scenarios = Object.values(scenarios).filter((s) => s.project_id === 't2')
-    expect(t1Scenarios).toHaveLength(1)
-    expect(t2Scenarios).toHaveLength(1)
-    expect(t1Scenarios[0].name).toBe('Scenario 1')
+    // One default groups scene per project that had factions
+    const t1Scenes = Object.values(scenes).filter((s) => s.project_id === 't1')
+    const t2Scenes = Object.values(scenes).filter((s) => s.project_id === 't2')
+    expect(t1Scenes).toHaveLength(1)
+    expect(t2Scenes).toHaveLength(1)
+    expect(t1Scenes[0].name).toBe('Scenario 1')
+    expect(t1Scenes[0].view).toBe('groups')
 
-    // Factions adopted into their project's scenario
-    expect(factions.f1.scenario_id).toBe(t1Scenarios[0].id)
-    expect(factions.f2.scenario_id).toBe(t1Scenarios[0].id)
-    expect(factions.f3.scenario_id).toBe(t2Scenarios[0].id)
+    // Factions adopted into their project's scene
+    expect(factions.f1.scenario_id).toBe(t1Scenes[0].id)
+    expect(factions.f2.scenario_id).toBe(t1Scenes[0].id)
+    expect(factions.f3.scenario_id).toBe(t2Scenes[0].id)
   })
 
-  it('migration is idempotent — a second init creates no extra scenarios', () => {
+  it('adoption is idempotent — a second init creates no extra scenes', () => {
     initDB()
-    const { factions, scenarios, activeProjectId, save, nowStr } = getDB()
-    scenarios['s1'] = {
-      id: 's1',
-      project_id: activeProjectId,
-      name: 'S',
-      created_at: nowStr(),
-      updated_at: nowStr()
-    }
+    const { db, factions, save } = getDB()
+    const scene = channelHandlers['scenes:create'](db, { view: 'groups', name: 'S' }, handlerEnv)
     factions['f1'] = {
       id: 'f1',
-      project_id: activeProjectId,
-      scenario_id: 's1',
+      project_id: db.activeProjectId,
+      scenario_id: scene.scene.id,
       name: 'F',
       description: '',
       color: '#6c8ef5',
@@ -899,8 +969,8 @@ describe('Scenarios', () => {
       x: 0,
       y: 0,
       visible: true,
-      created_at: nowStr(),
-      updated_at: nowStr()
+      created_at: '2026-01-01 00:00:00',
+      updated_at: '2026-01-01 00:00:00'
     }
     save()
 
@@ -908,71 +978,53 @@ describe('Scenarios', () => {
     return import('../src/main/db.js').then((mod2) => {
       mod2.initDB()
       const db2 = mod2.getDB()
-      expect(Object.keys(db2.scenarios)).toHaveLength(1)
-      expect(db2.factions.f1.scenario_id).toBe('s1')
+      expect(Object.keys(db2.scenes)).toHaveLength(1)
+      expect(db2.factions.f1.scenario_id).toBe(scene.scene.id)
     })
   })
 
-  it('deleting a scenario cascades its factions but not other scenarios’ factions', () => {
+  it('cloning a scene duplicates only that scene’s factions', () => {
     initDB()
-    const { factions, scenarios, activeProjectId, save, nowStr } = getDB()
-    scenarios['sA'] = {
-      id: 'sA',
-      project_id: activeProjectId,
-      name: 'A',
-      created_at: nowStr(),
-      updated_at: nowStr()
-    }
-    scenarios['sB'] = {
-      id: 'sB',
-      project_id: activeProjectId,
-      name: 'B',
-      created_at: nowStr(),
-      updated_at: nowStr()
-    }
-    factions['fA'] = {
-      id: 'fA',
-      project_id: activeProjectId,
-      scenario_id: 'sA',
-      name: 'FA',
-      description: '',
-      color: '#6c8ef5',
-      icon: '⚑',
-      member_ids: [],
-      x: 0,
-      y: 0,
-      visible: true,
-      created_at: nowStr(),
-      updated_at: nowStr()
-    }
-    factions['fB'] = {
-      id: 'fB',
-      project_id: activeProjectId,
-      scenario_id: 'sB',
-      name: 'FB',
-      description: '',
-      color: '#f06292',
-      icon: '⚑',
-      member_ids: [],
-      x: 0,
-      y: 0,
-      visible: true,
-      created_at: nowStr(),
-      updated_at: nowStr()
-    }
+    const { db } = getDB()
+    const a = channelHandlers['scenes:create'](db, { view: 'groups', name: 'A' }, handlerEnv)
+    channelHandlers['factions:create'](
+      db,
+      { scenario_id: a.scene.id, name: 'FA', member_ids: ['p1'] },
+      handlerEnv
+    )
+    const b = channelHandlers['scenes:create'](
+      db,
+      { view: 'groups', name: 'B', clone_from: a.scene.id },
+      handlerEnv
+    )
+    expect(b.factions).toHaveLength(1)
+    expect(b.factions[0].scenario_id).toBe(b.scene.id)
+    expect(b.factions[0].member_ids).toEqual(['p1'])
+    expect(Object.keys(db.factions)).toHaveLength(2)
+  })
 
-    // Mirror the scenarios:delete cascade
-    for (const [fid, f] of Object.entries(factions)) {
-      if (f.scenario_id === 'sA') delete factions[fid]
-    }
-    delete scenarios['sA']
-    save()
+  it('deleting a scene cascades its factions but not other scenes’ factions', () => {
+    initDB()
+    const { db } = getDB()
+    const a = channelHandlers['scenes:create'](db, { view: 'groups', name: 'A' }, handlerEnv)
+    const b = channelHandlers['scenes:create'](db, { view: 'groups', name: 'B' }, handlerEnv)
+    const fA = channelHandlers['factions:create'](
+      db,
+      { scenario_id: a.scene.id, name: 'FA' },
+      handlerEnv
+    )
+    const fB = channelHandlers['factions:create'](
+      db,
+      { scenario_id: b.scene.id, name: 'FB' },
+      handlerEnv
+    )
 
-    const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, 'db', 'familytree.json'), 'utf8'))
-    expect(raw.factions.fA).toBeUndefined()
-    expect(raw.factions.fB).toBeDefined()
-    expect(raw.scenarios.sA).toBeUndefined()
-    expect(raw.scenarios.sB).toBeDefined()
+    channelHandlers['scenes:delete'](db, { id: a.scene.id })
+
+    expect(db.scenes[a.scene.id]).toBeUndefined()
+    expect(db.scenes[b.scene.id]).toBeDefined()
+    expect(db.factions[fA.id]).toBeUndefined()
+    expect(db.factions[fB.id]).toBeDefined()
   })
 })
 

@@ -7,7 +7,8 @@ import {
   nowStr,
   seedSampleData,
   migrateTreesToProjects,
-  migrateYearsToDateValues
+  migrateYearsToDateValues,
+  migrateScenariosToScenes
 } from '../shared/dbCore'
 
 // DB shape and the sample-family seed live in src/shared/dbCore.ts so the
@@ -39,6 +40,10 @@ export function initDB() {
   // structured DateValues (birth/death/formed)
   if (migrateYearsToDateValues(_db)) save()
 
+  // Migration: convert the Factions view's "scenarios" into view:'groups'
+  // scenes (same ids, so factions' scenario_id keeps resolving)
+  if (migrateScenariosToScenes(_db)) save()
+
   // Migration: ensure all tables exist
   _db.projects = _db.projects || {}
   _db.persons = _db.persons || {}
@@ -46,33 +51,39 @@ export function initDB() {
   _db.tags = _db.tags || {}
   _db.entity_tags = _db.entity_tags || {}
   _db.factions = _db.factions || {}
-  _db.scenarios = _db.scenarios || {}
+  _db.scenes = _db.scenes || {}
   _db.images = _db.images || {}
   _db.settings = _db.settings || {}
   _db.globalSettings = _db.globalSettings || {}
 
-  // Migration: adopt factions created before scenarios existed into a default
-  // scenario per project (idempotent — only touches factions with no scenario_id)
+  // Migration: adopt factions created before scenarios/scenes existed into a
+  // default groups scene per project (idempotent — only touches factions with
+  // no scenario_id)
   const orphanFactions = Object.values(_db.factions).filter((f) => !f.scenario_id)
   if (orphanFactions.length > 0) {
     const now = nowStr()
-    const defaultScenarioByProject = {}
-    for (const s of Object.values(_db.scenarios)) {
-      defaultScenarioByProject[s.project_id] = defaultScenarioByProject[s.project_id] || s.id
+    const defaultSceneByProject = {}
+    for (const s of Object.values(_db.scenes)) {
+      if (s.view !== 'groups') continue
+      defaultSceneByProject[s.project_id] = defaultSceneByProject[s.project_id] || s.id
     }
     for (const f of orphanFactions) {
-      if (!defaultScenarioByProject[f.project_id]) {
+      if (!defaultSceneByProject[f.project_id]) {
         const sid = randomUUID()
-        _db.scenarios[sid] = {
+        _db.scenes[sid] = {
           id: sid,
           project_id: f.project_id,
+          view: 'groups',
           name: 'Scenario 1',
+          type: null,
+          config: {},
+          positions: {},
           created_at: now,
           updated_at: now
         }
-        defaultScenarioByProject[f.project_id] = sid
+        defaultSceneByProject[f.project_id] = sid
       }
-      f.scenario_id = defaultScenarioByProject[f.project_id]
+      f.scenario_id = defaultSceneByProject[f.project_id]
     }
     save()
   }
@@ -138,7 +149,7 @@ export function getDB() {
     tags: _db.tags,
     entityTags: _db.entity_tags,
     factions: _db.factions,
-    scenarios: _db.scenarios,
+    scenes: _db.scenes,
     images: _db.images,
     settings: _db.settings,
     globalSettings: _db.globalSettings,

@@ -73,6 +73,8 @@ export interface EntityTag {
 export interface Faction {
   id: string
   project_id: string
+  /** The groups Scene this faction lives in (was the scenario id — scenes kept
+   *  the same ids in the migration). Being dissolved into tags in Phase 4. */
   scenario_id: string | null
   name: string
   description: string
@@ -86,10 +88,21 @@ export interface Faction {
   updated_at: string
 }
 
-export interface Scenario {
+/** A saved arrangement of ONE view. Groups scenes replace the old
+ *  "scenarios"; graph scenes replace the serialized graphState "states"
+ *  (Phase 5). Directory/Relationships have no positions → no scenes. */
+export interface Scene {
   id: string
   project_id: string
+  /** Which view owns this scene: 'groups' | 'graph' | 'timeline'. */
+  view: string
   name: string
+  /** Graph layout type (free/organic/birth/generations); null elsewhere. */
+  type: string | null
+  /** View-specific settings (e.g. generation-row config). */
+  config: Record<string, unknown>
+  /** Per-entity position snapshots (graph/timeline scenes). */
+  positions: Record<string, unknown>
   created_at: string
   updated_at: string
 }
@@ -112,7 +125,7 @@ export interface DB {
   tags: Record<string, Tag>
   entity_tags: Record<string, EntityTag>
   factions: Record<string, Faction>
-  scenarios: Record<string, Scenario>
+  scenes: Record<string, Scene>
   images: Record<string, ImageRecord>
   /** `${projectId}:key` → value for per-project settings */
   settings: Record<string, unknown>

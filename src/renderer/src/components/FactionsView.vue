@@ -50,14 +50,14 @@
       <div v-if="!activeFactions.length" class="fx-empty">
         <div class="fx-empty-icon">⬡</div>
         <div class="fx-empty-title">
-          {{ store.scenarios.length > 1 ? 'No factions in this scenario' : 'No factions yet' }}
+          {{ store.groupsScenes.length > 1 ? 'No factions in this scenario' : 'No factions yet' }}
         </div>
         <div class="fx-empty-text">
           Group your people into families, companies, schools, guilds — any camps you like. People
           in several factions settle in the middle ground between them.
         </div>
         <button class="btn btn-primary" @click="handleCreateFaction">
-          ＋ Create {{ store.scenarios.length > 1 ? 'a' : 'your first' }} faction
+          ＋ Create {{ store.groupsScenes.length > 1 ? 'a' : 'your first' }} faction
         </button>
       </div>
 
@@ -248,10 +248,10 @@
       <div class="fx-sc-chips">
         <TransitionGroup name="scpill">
           <button
-            v-for="s in store.scenarios"
+            v-for="s in store.groupsScenes"
             :key="s.id"
             class="fx-sc-chip"
-            :class="{ active: s.id === store.activeScenarioId }"
+            :class="{ active: s.id === store.activeSceneId }"
             :title="scenarioTooltip(s)"
             @click="switchScenario(s.id)"
             @dblclick="startRenameScenario(s)"
@@ -269,7 +269,7 @@
             <span v-else class="fx-sc-name">{{ s.name }}</span>
             <span class="fx-sc-badge">{{ peopleInScenario(s.id) }}</span>
             <span
-              v-if="store.scenarios.length > 1 && renamingScenarioId !== s.id"
+              v-if="store.groupsScenes.length > 1 && renamingScenarioId !== s.id"
               class="fx-sc-x"
               title="Delete scenario"
               @click.stop="handleDeleteScenario(s)"
@@ -279,7 +279,7 @@
         </TransitionGroup>
         <button class="fx-sc-add" title="New empty scenario" @click="addScenario(false)">＋</button>
         <button
-          v-if="store.activeScenarioId"
+          v-if="store.activeSceneId"
           class="fx-sc-add"
           title="Duplicate current scenario"
           @click="addScenario(true)"
@@ -487,7 +487,7 @@ watch(membershipKey, rebuildNodes)
 
 // ── Scenario switching: same-name zones glide, everyone else pops ──────────
 watch(
-  () => store.activeScenarioId,
+  () => store.activeSceneId,
   (newId, oldId) => {
     fEdit.value = null
     pPop.value = null
@@ -1246,15 +1246,15 @@ function scenarioTooltip(s) {
 
 function switchScenario(id) {
   if (renamingScenarioId.value) return
-  store.setActiveScenario(id)
+  store.setActiveScene(id)
 }
 
 async function addScenario(duplicate) {
-  const name = `Scenario ${store.scenarios.length + 1}`
-  const res = await store.createScenario(name, duplicate ? store.activeScenarioId : null)
+  const name = `Scenario ${store.groupsScenes.length + 1}`
+  const res = await store.createGroupsScene(name, duplicate ? store.activeSceneId : null)
   if (res?.success) {
-    store.setActiveScenario(res.data.scenario.id)
-    startRenameScenario(res.data.scenario)
+    store.setActiveScene(res.data.scene.id)
+    startRenameScenario(res.data.scene)
   }
 }
 
@@ -1272,7 +1272,7 @@ async function confirmRenameScenario() {
   const id = renamingScenarioId.value
   renamingScenarioId.value = null
   if (id && scRenameValue.value.trim()) {
-    await store.renameScenario(id, scRenameValue.value.trim())
+    await store.renameScene(id, scRenameValue.value.trim())
   }
 }
 
@@ -1281,7 +1281,7 @@ async function handleDeleteScenario(s) {
   const ok = confirm(
     `Delete scenario "${s.name}"${fCount ? ` and its ${fCount} faction${fCount === 1 ? '' : 's'}` : ''}? People stay in your tree.`
   )
-  if (ok) await store.deleteScenario(s.id)
+  if (ok) await store.deleteScene(s.id)
 }
 
 // ── Lifecycle ───────────────────────────────────────────────────────────────

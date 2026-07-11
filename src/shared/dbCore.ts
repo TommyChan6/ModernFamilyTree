@@ -22,7 +22,7 @@ import type {
   Person,
   Project,
   Relationship,
-  Scenario,
+  Scene,
   Tag
 } from './types'
 import { yearDate } from './calendarMath'
@@ -51,7 +51,7 @@ export const EMPTY_DB = (): DB => ({
   tags: {},
   entity_tags: {},
   factions: {},
-  scenarios: {},
+  scenes: {},
   images: {},
   settings: {},
   globalSettings: {}
@@ -125,6 +125,46 @@ export function migrateYearsToDateValues(db: any): boolean {
   }
   for (const r of Object.values(db.relationships || {})) {
     move(r as Record<string, unknown>, 'formed_date', 'formed')
+  }
+  return changed
+}
+
+// ── Migration: scenarios → groups scenes ─────────────────────────────────────
+// The Factions view's "scenarios" became per-view Scenes. Convert each
+// scenario 1:1 into a `view:'groups'` scene KEEPING ITS ID, so factions'
+// `scenario_id` (and the saved activeScenarioId setting) still resolve without
+// rewriting them. Idempotent; returns true when anything changed.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function migrateScenariosToScenes(db: any): boolean {
+  let changed = false
+  db.scenes = db.scenes || {}
+  for (const row of Object.values(db.scenarios || {})) {
+    const s = row as {
+      id: string
+      project_id: string
+      created_at: string
+      updated_at: string
+      name?: string
+    }
+    if (!db.scenes[s.id]) {
+      const scene: Scene = {
+        id: s.id,
+        project_id: s.project_id,
+        view: 'groups',
+        name: s.name || 'Scenario',
+        type: null,
+        config: {},
+        positions: {},
+        created_at: s.created_at,
+        updated_at: s.updated_at
+      }
+      db.scenes[s.id] = scene
+    }
+    changed = true
+  }
+  if ('scenarios' in db) {
+    delete db.scenarios
+    changed = true
   }
   return changed
 }
@@ -311,8 +351,8 @@ export const channelHandlers: Record<string, Handler> = {
     for (const [fid, f] of Object.entries(db.factions)) {
       if (f.project_id === pid) delete db.factions[fid]
     }
-    for (const [sid, s] of Object.entries(db.scenarios)) {
-      if (s.project_id === pid) delete db.scenarios[sid]
+    for (const [sid, s] of Object.entries(db.scenes)) {
+      if (s.project_id === pid) delete db.scenes[sid]
     }
     for (const [iid, img] of Object.entries(db.images)) {
       if (img.project_id === pid) {
@@ -567,24 +607,30 @@ export const channelHandlers: Record<string, Handler> = {
     return { id: data.id }
   },
 
-  // ── scenarios ──────────────────────────────────────────────────────────────
-  'scenarios:getAll'(db) {
-    return sortByDate(forProject(db, db.scenarios))
+  // ── scenes (per-view saved arrangements; groups scenes only for now) ───────
+  'scenes:getAll'(db, data) {
+    const list = sortByDate(forProject(db, db.scenes))
+    return data?.view ? list.filter((s) => s.view === data.view) : list
   },
 
-  // With clone_from: duplicates that scenario's factions into the new one, so
-  // the client gets scenario + factions in a single round-trip.
-  'scenarios:create'(db, data, env) {
+  // With clone_from: duplicates that scene's factions into the new one, so
+  // the client gets scene + factions in a single round-trip. (Faction cloning
+  // goes away in step 4.4 when placements move to scene_tags.)
+  'scenes:create'(db, data, env) {
     const id = env.uuid()
     const now = env.nowStr()
-    const scenario: Scenario = {
+    const scene: Scene = {
       id,
       project_id: db.activeProjectId as string,
-      name: data?.name || 'New Scenario',
+      view: data?.view || 'groups',
+      name: data?.name || 'New Scene',
+      type: data?.type ?? null,
+      config: data?.config || {},
+      positions: data?.positions || {},
       created_at: now,
       updated_at: now
     }
-    db.scenarios[id] = scenario
+    db.scenes[id] = scene
     const cloned: Faction[] = []
     if (data?.clone_from) {
       for (const f of Object.values(db.factions)) {
@@ -602,22 +648,22 @@ export const channelHandlers: Record<string, Handler> = {
         cloned.push(copy)
       }
     }
-    return { scenario, factions: cloned }
+    return { scene, factions: cloned }
   },
 
-  'scenarios:rename'(db, data, env) {
-    const scenario = db.scenarios[data.id]
-    if (!scenario) throw new Error('Scenario not found')
-    scenario.name = data.name
-    scenario.updated_at = env.nowStr()
-    return scenario
+  'scenes:rename'(db, data, env) {
+    const scene = db.scenes[data.id]
+    if (!scene) throw new Error('Scene not found')
+    scene.name = data.name
+    scene.updated_at = env.nowStr()
+    return scene
   },
 
-  'scenarios:delete'(db, data) {
+  'scenes:delete'(db, data) {
     for (const [fid, f] of Object.entries(db.factions)) {
       if (f.scenario_id === data.id) delete db.factions[fid]
     }
-    delete db.scenarios[data.id]
+    delete db.scenes[data.id]
     return { id: data.id }
   },
 
@@ -719,9 +765,9 @@ export const WRITE_CHANNELS = new Set([
   'factions:create',
   'factions:update',
   'factions:delete',
-  'scenarios:create',
-  'scenarios:rename',
-  'scenarios:delete',
+  'scenes:create',
+  'scenes:rename',
+  'scenes:delete',
   'images:add',
   'images:setPrimary',
   'images:delete',
