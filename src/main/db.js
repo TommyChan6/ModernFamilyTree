@@ -9,7 +9,8 @@ import {
   migrateTreesToProjects,
   migrateYearsToDateValues,
   migrateScenariosToScenes,
-  migrateFactionsToTags
+  migrateFactionsToTags,
+  migrateGraphStateToScenes
 } from '../shared/dbCore'
 
 // DB shape and the sample-family seed live in src/shared/dbCore.ts so the
@@ -93,6 +94,10 @@ export function initDB() {
   // Migration: dissolve legacy factions into tags + entity_tags + scene_tags
   // and retire the factions collection
   if (migrateFactionsToTags(_db, { uuid: randomUUID, nowStr })) save()
+
+  // Migration: unpack the serialized graphState setting into graph scenes
+  // (each per-mode "state" becomes a scene whose type is its former mode)
+  if (migrateGraphStateToScenes(_db, { uuid: randomUUID, nowStr })) save()
 
   // Migration: convert an old single-container DB (no projects at all) to the
   // multi-project shape

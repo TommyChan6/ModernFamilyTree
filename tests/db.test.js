@@ -1201,6 +1201,111 @@ describe('Migration: factions → tags + entity_tags + scene_tags', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+describe('Migration: graphState setting → graph scenes', () => {
+  const graphState = {
+    currentMode: 'generation',
+    activeEmphasis: 'paternal',
+    userCurrentYear: 1999,
+    modeEmphasis: { custom: 'neutral', auto: 'neutral', age: 'neutral', generation: 'paternal' },
+    modeStateNames: {
+      custom: ['Reunion'],
+      auto: ['State 1'],
+      age: ['State 1'],
+      generation: ['State 1', 'Pedigree']
+    },
+    modeActiveStateIdx: { custom: 0, auto: 0, age: 0, generation: 1 },
+    modeStateSnapshots: {
+      custom: [{ p1: { x: 100, y: 200 }, p2: { x: 150, y: 200 } }],
+      auto: [null],
+      age: [{ p1: { x: 120, y: 100 }, p2: { x: 180, y: 400 } }],
+      generation: [
+        { p1: { x: 1, y: 2 }, _genRowYValues: [100, 250], _genRowSpacing: 150 },
+        {
+          p1: { x: 100, y: 100 },
+          p2: { x: 170, y: 250 },
+          _genRowYValues: [100, 250, 400],
+          _genRowSpacing: 150
+        }
+      ]
+    },
+    genRowSpacing: 150
+  }
+
+  const writeDbWithGraphState = () => {
+    const dbDir = path.join(tmpDir, 'db')
+    fs.mkdirSync(dbDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dbDir, 'familytree.json'),
+      JSON.stringify({
+        projects: {
+          t1: { id: 't1', name: 'T', created_at: '2024-01-01', updated_at: '2024-01-01' }
+        },
+        activeProjectId: 't1',
+        persons: {},
+        relationships: {},
+        tags: {},
+        entity_tags: {},
+        scenes: {},
+        scene_tags: {},
+        images: {},
+        settings: { 't1:graphState': JSON.stringify(graphState) },
+        globalSettings: {}
+      })
+    )
+  }
+
+  it('expands every per-mode state into a typed graph scene', () => {
+    writeDbWithGraphState()
+    initDB()
+    const { scenes, settings } = getDB()
+
+    const graphScenes = Object.values(scenes).filter((s) => s.view === 'graph')
+    // 1 custom + 1 auto + 1 age + 2 generation = 5
+    expect(graphScenes).toHaveLength(5)
+
+    const byName = (name, type) => graphScenes.find((s) => s.name === name && s.type === type)
+    const reunion = byName('Reunion', 'free')
+    expect(reunion.positions).toEqual({ p1: { x: 100, y: 200 }, p2: { x: 150, y: 200 } })
+    expect(reunion.config).toEqual({})
+
+    const organic = graphScenes.find((s) => s.type === 'organic')
+    expect(organic.name).toBe('State 1')
+    expect(organic.positions).toEqual({}) // null snapshot → no positions yet
+
+    const birth = graphScenes.find((s) => s.type === 'birth')
+    expect(birth.positions.p2).toEqual({ x: 180, y: 400 })
+
+    const pedigree = byName('Pedigree', 'generations')
+    expect(pedigree.positions).toEqual({ p1: { x: 100, y: 100 }, p2: { x: 170, y: 250 } })
+    expect(pedigree.config).toEqual({
+      genRowYValues: [100, 250, 400],
+      genRowSpacing: 150,
+      emphasis: 'paternal'
+    })
+
+    // The previously-active mode+state (generation, idx 1) is the active scene
+    expect(settings['t1:activeSceneId:graph']).toBe(pedigree.id)
+    // The current-year override moved to its own setting
+    expect(settings['t1:userCurrentYear']).toBe(1999)
+    // The old blob is kept until step 5.3 is verified
+    expect(settings['t1:graphState']).toBeDefined()
+  })
+
+  it('re-running the migration is a no-op', () => {
+    writeDbWithGraphState()
+    initDB()
+    const first = JSON.parse(fs.readFileSync(path.join(tmpDir, 'db', 'familytree.json'), 'utf8'))
+
+    vi.resetModules()
+    return import('../src/main/db.js').then((mod2) => {
+      mod2.initDB()
+      const second = JSON.parse(fs.readFileSync(path.join(tmpDir, 'db', 'familytree.json'), 'utf8'))
+      expect(second).toEqual(first)
+    })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 describe('scene_tags (tag placements)', () => {
   it('adds a placement that round-trips to disk; duplicate add returns the same row', () => {
     initDB()

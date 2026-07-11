@@ -9,6 +9,7 @@ import {
   migrateYearsToDateValues,
   migrateScenariosToScenes,
   migrateFactionsToTags,
+  migrateGraphStateToScenes,
   nowStr
 } from '../../../../shared/dbCore'
 
@@ -88,7 +89,10 @@ function getLocalDB(): Promise<DB> {
         const datesWrapped = migrateYearsToDateValues(merged)
         const scenesMade = migrateScenariosToScenes(merged)
         const factionsDissolved = migrateFactionsToTags(merged, env)
-        if (renamed || datesWrapped || scenesMade || factionsDissolved) void persist(merged)
+        const graphScenesMade = migrateGraphStateToScenes(merged, env)
+        if (renamed || datesWrapped || scenesMade || factionsDissolved || graphScenesMade) {
+          void persist(merged)
+        }
         return merged
       }
       const db = createInitialDB(env)

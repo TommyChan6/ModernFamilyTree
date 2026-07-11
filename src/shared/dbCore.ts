@@ -280,6 +280,101 @@ export function migrateFactionsToTags(db: any, env: Env): boolean {
   return true
 }
 
+// ── Migration: the serialized graphState setting → graph scenes ──────────────
+// The Tree view used to keep its whole arrangement in one per-project setting:
+// four mode buckets (custom/auto/age/generation), each holding named "states"
+// with position snapshots. Flatten it: every saved state becomes ONE
+// view:'graph' scene whose `type` is its former mode, carrying that state's
+// node positions and any generation-row config in scene.config. The
+// previously-active mode+state becomes the active graph scene (saved under the
+// activeSceneId:graph setting) and the current-year override moves to its own
+// userCurrentYear setting. Idempotent: a project that already has graph scenes
+// is skipped. The old graphState value is kept until step 5.3 is verified.
+const MODE_TO_TYPE: Record<string, string> = {
+  custom: 'free',
+  auto: 'organic',
+  age: 'birth',
+  generation: 'generations'
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function migrateGraphStateToScenes(db: any, env: Env): boolean {
+  let changed = false
+  db.scenes = db.scenes || {}
+  db.settings = db.settings || {}
+  for (const pid of Object.keys(db.projects || {})) {
+    const hasGraphScenes = (Object.values(db.scenes) as Scene[]).some(
+      (s) => s.project_id === pid && s.view === 'graph'
+    )
+    if (hasGraphScenes) continue
+    const raw = db.settings[`${pid}:graphState`]
+    if (typeof raw !== 'string') continue
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let state: any
+    try {
+      state = JSON.parse(raw)
+    } catch {
+      continue
+    }
+    if (!state || typeof state !== 'object') continue
+
+    let activeSceneId: string | null = null
+    for (const mode of ['custom', 'auto', 'age', 'generation']) {
+      const names: string[] = state.modeStateNames?.[mode] || []
+      const snaps: unknown[] = state.modeStateSnapshots?.[mode] || []
+      const count = Math.max(names.length, snaps.length)
+      for (let i = 0; i < count; i++) {
+        const snap = (snaps[i] || {}) as Record<string, { x?: number; y?: number } | unknown>
+        const positions: Record<string, { x: number; y: number }> = {}
+        for (const [key, v] of Object.entries(snap)) {
+          if (key.startsWith('_')) continue
+          const p = v as { x?: number; y?: number }
+          if (p && typeof p.x === 'number' && typeof p.y === 'number') {
+            positions[key] = { x: p.x, y: p.y }
+          }
+        }
+        const config: Record<string, unknown> = {}
+        const rows = (snap as { _genRowYValues?: number[] })._genRowYValues
+        const spacing = (snap as { _genRowSpacing?: number })._genRowSpacing
+        if (rows) config.genRowYValues = rows
+        if (spacing) config.genRowSpacing = spacing
+        else if (mode === 'generation' && state.genRowSpacing) {
+          config.genRowSpacing = state.genRowSpacing
+        }
+        const emphasis = state.modeEmphasis?.[mode]
+        if (emphasis && emphasis !== 'neutral') config.emphasis = emphasis
+
+        const id = env.uuid()
+        const now = env.nowStr()
+        const scene: Scene = {
+          id,
+          project_id: pid,
+          view: 'graph',
+          name: names[i] || `State ${i + 1}`,
+          type: MODE_TO_TYPE[mode],
+          config,
+          positions,
+          created_at: now,
+          updated_at: now
+        }
+        db.scenes[id] = scene
+        const activeIdx = state.modeActiveStateIdx?.[mode] ?? 0
+        if (mode === (state.currentMode || 'auto') && i === activeIdx) activeSceneId = id
+        changed = true
+      }
+    }
+    if (activeSceneId) {
+      db.settings[`${pid}:activeSceneId:graph`] = activeSceneId
+      changed = true
+    }
+    if (state.userCurrentYear != null && db.settings[`${pid}:userCurrentYear`] === undefined) {
+      db.settings[`${pid}:userCurrentYear`] = state.userCurrentYear
+      changed = true
+    }
+  }
+  return changed
+}
+
 // ── Sample family seeded on first run (shared so desktop and web start identical) ──
 export function seedSampleData(db: DB, projectId: string, env: Env): void {
   const now = env.nowStr()
