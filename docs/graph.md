@@ -1,5 +1,13 @@
 # The graph engine
 
+> 📐 **Naming in transition.** This doc uses today's names; the overhaul renames them (see
+> [`client-structure.md`](./client-structure.md) + [`OVERHAUL_GUIDE.md`](./OVERHAUL_GUIDE.md)):
+> **Tree view → Graph** · **mode → type** (Custom→**Free**, Auto→**Organic**, Age→**Birth**,
+> Generation→**Generations**) · **state → Scene** (the layout **type** becomes a property of
+> the scene — flattened, no separate mode buckets) · **Factions → Groups** · **Current Date →
+> Present** · **Save Layout / `graphDirty` → autosave + manual Save/Revert checkpoint**. The
+> engine's mechanics below are unchanged by the rename.
+
 The interactive family tree is the heart of the app. The **layout** is driven by a
 [d3-force](https://d3js.org) simulation from
 [`GraphCanvas.vue`](../src/renderer/src/components/GraphCanvas.vue) with pure helper

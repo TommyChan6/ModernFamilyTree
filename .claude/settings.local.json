@@ -141,7 +141,9 @@
       "PowerShell(Get-Process electron -ErrorAction SilentlyContinue | ForEach-Object { $_.Kill\\(\\) }; Start-Sleep -Milliseconds 300; node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\5806128c-9854-4066-b6ec-d8a96df29eec\\\\scratchpad\\\\import_dynasty.mjs\")",
       "PowerShell(npm install --no-save playwright-core 2>&1)",
       "PowerShell(node .\\\\verify_dynasty_tmp.mjs)",
-      "PowerShell(\"cleaned\")"
+      "PowerShell(\"cleaned\")",
+      "Bash(git rm *)",
+      "Bash(rm -f docs/temp-client-structure.md)"
     ]
   }
 }

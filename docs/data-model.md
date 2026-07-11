@@ -5,6 +5,115 @@ Electron's `userData` directory. The main process reads it once at startup into 
 in-memory object and rewrites the whole file on every mutation. See
 [`db.js`](../src/main/db.js).
 
+> 📐 **Two models in this doc.** The [**Target model**](#target-model-in-progress) is what the
+> overhaul is moving to (see [`client-structure.md`](./client-structure.md) and
+> [`OVERHAUL_GUIDE.md`](./OVERHAUL_GUIDE.md)). The [**Current model**](#current-model) below it
+> is still accurate to today's code until those steps land.
+
+---
+
+## Target model (in progress)
+
+The renamed, generalized shape. Everything is still keyed by UUID in object maps; the changes
+are **new names**, a **tags join**, **scenes** (unifying states + scenarios), and **structured
+dates**.
+
+```jsonc
+{
+  "projects":        { "<id>": { /* Project: name, entity_noun, mode, calendar */ } },
+  "activeProjectId": "<id> | null",
+  "persons":         { "<id>": { /* Entity: name, gender, birth, death, … */ } },
+  "relationships":   { "<id>": { /* + formed: DateValue */ } },
+  "tags":            { "<id>": { /* label, type, source, color, icon */ } },
+  "entity_tags":     { "<id>": { "entity_id": "…", "tag_id": "…" } },   // many-to-many JOIN
+  "scenes":          { "<id>": { /* project_id, view, name, type?, config, positions */ } },
+  "scene_tags":      { "<id>": { /* scene_id, tag_id, x, y, visible */ } }, // groups scenes
+  "images":          { "<id>": { /* … */ } },
+  "settings":        { "<projectId>:<key>": "<value>" },
+  "globalSettings":  { "theme": "dark", "programMode": "standard" }
+}
+```
+
+### Target ER diagram
+
+```mermaid
+erDiagram
+    PROJECT ||--o{ ENTITY : scopes
+    PROJECT ||--o{ RELATIONSHIP : scopes
+    PROJECT ||--o{ TAG : scopes
+    PROJECT ||--o{ SCENE : scopes
+    PROJECT ||--|| CALENDAR : has
+    ENTITY ||--o{ ENTITY_TAG : ""
+    TAG    ||--o{ ENTITY_TAG : ""
+    SCENE  ||--o{ SCENE_TAG : "(groups scenes)"
+    TAG    ||--o{ SCENE_TAG : ""
+    ENTITY ||--o{ RELATIONSHIP : "a / b"
+    ENTITY ||--o{ IMAGE : has
+
+    PROJECT { string id PK  string name  string entity_noun  string mode }
+    ENTITY { string id PK  string project_id FK  string name  json birth  json death  string gender }
+    TAG { string id PK  string project_id FK  string label  string type  string source  string color }
+    ENTITY_TAG { string entity_id FK  string tag_id FK }
+    SCENE { string id PK  string project_id FK  string view  string name  string type  json config  json positions }
+    SCENE_TAG { string scene_id FK  string tag_id FK  number x  number y  boolean visible }
+```
+
+### Key entity changes
+
+| Now | Target | Change |
+|-----|--------|--------|
+| `trees` | `projects` | rename; `tree_id` → `project_id` everywhere; add `entity_noun` (default `"Person"`), `mode`, `calendar` |
+| `persons.birth_year` / `death_year` (number) | `persons.birth` / `death` (**DateValue**) | structured & mutable so custom calendars slot in later (below) |
+| `relationships.formed_date` (number) | `relationships.formed` (**DateValue**) | same |
+| `factions{ member_ids, scenario_id, x, y, visible }` | `tags` + `entity_tags` + `scene_tags` | membership becomes a **join** on the tag (global); placement moves to the scene |
+| `scenarios` | `scenes` where `view='groups'` | unify with graph states |
+| `graphState` setting (modes → states → snapshots) | `scenes` where `view='graph'` | each scene carries its layout **type** (flattened — no separate mode buckets) |
+| *(new)* | `scenes` where `view='timeline'` | manual timeline positions, when they ship |
+
+### DateValue — mutable structured dates
+
+Even though only **Gregorian** is used for now (usually just a year), dates are stored as a
+**structured, mutable object** rather than a bare number, so custom calendars (a future feature
+— see [design.md](./design.md)) are a data-compatible change, not a migration:
+
+```jsonc
+"birth": {
+  "year": 1950,
+  "month": null,        // null = unknown / not entered
+  "day":   null,
+  "precision": "year",  // "year" | "month" | "day"
+  "calendar": "gregorian"
+}
+```
+
+- Partial precision is first-class (a birth year alone is `precision:"year"`).
+- Sorting/spacing (Birth layout, Timeline) go through a pure `calendarMath.toOrdinal(date, cal)`
+  so the layout code never special-cases a calendar.
+- `null` (unknown date) stays valid everywhere.
+
+### Groups, tags & scenes
+
+- A **Group** is a `scene_tag` row — a tag placed at `(x,y)`/`visible` inside a Groups scene.
+  Membership is **not** stored on the group; it lives on the tag via `entity_tags`, so a tag can
+  appear in any number of scenes and "moving a faction between scenarios" is trivial.
+- Build two in-memory index Maps at load (`tagsOf[entityId]`, `membersOf[tagId]`) so both
+  directions are O(1). Derived (smart) tags are computed from an entity field and never stored.
+
+### Target migration (implemented by the guide)
+
+`initDB()` gains steps that run once on an old file: rename `trees`→`projects` (+`project_id`);
+wrap `birth_year`/`death_year`/`formed_date` numbers as `DateValue`; convert each faction into a
+tag (dedupe by name) + `entity_tags` rows + one `scene_tag` per scenario placement; turn
+`scenarios` into `view='groups'` scenes and the `graphState` blob into `view='graph'` scenes
+(mode → `scene.type`); default `programMode='standard'`, `entity_noun='Person'`,
+`calendar='gregorian'`. All covered by [`tests/db.test.js`](../tests/db.test.js).
+
+---
+
+## Current model
+
+*Accurate to today's code, until the overhaul steps land.*
+
 ## Top-level shape
 
 ```jsonc

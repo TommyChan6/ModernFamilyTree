@@ -1,13 +1,18 @@
 # Client-side structure — a visual guide
 
+> 📐 **This describes the _target_ design.** The overhaul is being implemented in slices via
+> [`OVERHAUL_GUIDE.md`](./OVERHAUL_GUIDE.md). Until those steps land, the running code still
+> uses the **legacy names** — each section notes them, and the [glossary](#10-glossary) maps
+> old → new. Legend: **new name** *(was: old name)*.
+
 A map of what the app *is* from the inside: the containers your data lives in
-(**trees**), the five **views** that draw it, the graph **modes** and their saved
-**states**, the **scenarios** that reshape the Factions view, and the single **store**
-that ties it all together.
+(**projects**), the five **views** that draw it, the layout **types** and saved **scenes**,
+the **tags** and **groups** that cluster people, the app-wide **modes**, and the single
+**store** that ties it all together.
 
 This is the "what are all these words?" doc. For process/architecture see
-[architecture.md](./architecture.md); for the exact data shapes see
-[data-model.md](./data-model.md); for the deep graph internals see [graph.md](./graph.md).
+[architecture.md](./architecture.md); for exact data shapes see
+[data-model.md](./data-model.md); for the graph internals see [graph.md](./graph.md).
 
 ---
 
@@ -15,343 +20,356 @@ This is the "what are all these words?" doc. For process/architecture see
 
 ```mermaid
 flowchart TD
-    App["🖥️  App shell<br/>(one window)"]
-    App --> Trees["🌳 Trees<br/><i>your top-level projects</i>"]
+    App["🖥️ App shell (one window)"]
+    App --> Mode["🎚️ Program Mode<br/>Simple · Standard · Advanced<br/><i>gates which features appear</i>"]
+    App --> Proj["🗂️ Projects <i>(was: trees)</i>"]
 
-    Trees --> T1["Tree: “Anderson Family”"]
-    Trees --> T2["Tree: “Targaryens”"]
-    Trees -.-> Tn["…more tabs"]
+    Proj --> P1["Project: “Anderson Family”"]
+    Proj -.-> Pn["…more tabs"]
 
-    T1 --> Data["Everything below is scoped to ONE tree"]
-
-    Data --> People["👤 Persons"]
+    P1 --> Data["Everything below is scoped to ONE project"]
+    Data --> Ent["◈ Entities <i>(persons)</i>"]
     Data --> Rels["🔗 Relationships"]
-    Data --> Imgs["🖼️ Images"]
-    Data --> Scen["🎬 Scenarios"]
+    Data --> Tags["🏷️ Tags <i>(identity + members)</i>"]
+    Data --> Cal["📅 Calendar <i>(dates; Gregorian for now)</i>"]
+    Data --> Views["🖼️ Views → each owns its Scenes"]
 
-    Scen --> S1["Scenario: “By family”"]
-    Scen --> S2["Scenario: “By company”"]
-    S1 --> F1["🏳️ Factions<br/>(groups)"]
-    S2 --> F2["🏳️ Factions<br/>(groups)"]
+    Views --> Scenes["🎬 Scenes <i>(saved arrangements — was: states / scenarios)</i>"]
+    Tags -. "placed & shown in a Groups scene = a Group" .-> Scenes
 
     style App fill:#6c8ef5,color:#fff
-    style Trees fill:#8b6cc5,color:#fff
-    style Scen fill:#f5a623,color:#000
+    style Mode fill:#c95fa0,color:#fff
+    style Proj fill:#8b6cc5,color:#fff
+    style Tags fill:#f5a623,color:#000
+    style Cal fill:#4db6ac,color:#000
 ```
 
-**Read it top-down:** one window opens one **tree** at a time (tabs switch between
-them). A tree owns all its people, relationships, and photos. **Scenarios** and
-**factions** are an extra grouping layer used only by the Factions view.
+**Read it top-down:** the whole app runs at one of three **Program Modes** (feature tiers).
+One window opens one **project** at a time (tabs switch between them). A project owns its
+entities, relationships, tags, calendar, and — per view — its scenes.
 
-> **"Project" = "Tree".** There's no separate "project" concept in the code — a *tree*
-> is the top-level workspace/project. Each one is a tab across the top bar.
+> **Project = the old "tree".** The container is now a *Project*; the node-link picture is the
+> *Graph* view. The word "tree" retires from the UI (a family graph with remarriage/adoption
+> isn't a tree anyway).
 
 ---
 
 ## 2. Containment: what belongs to what
 
-Every arrow means "owns / cascades to". Delete a container and everything below it goes
-with it.
+Solid arrow = "owns / cascades to". Dashed = "references" (following it backwards deletes
+nothing).
 
 ```mermaid
 flowchart LR
-    Tree -->|has many| Person
-    Tree -->|has many| Relationship
-    Tree -->|has many| Scenario
-    Person -->|has many| Image
-    Scenario -->|has many| Faction
-    Faction -.->|references<br/>(member_ids)| Person
-    Relationship -.->|connects two| Person
+    Project -->|has many| Entity
+    Project -->|has many| Relationship
+    Project -->|has many| Tag
+    Project -->|has many| Scene
+    Project -->|has one| Calendar
+    Entity -->|has many| Image
+    Entity -.->|membership via join| Tag
+    Relationship -.->|connects two| Entity
+    Scene -.->|places / shows| Tag
 
-    style Tree fill:#8b6cc5,color:#fff
-    style Scenario fill:#f5a623,color:#000
-    style Faction fill:#f5a623,color:#000
+    style Project fill:#8b6cc5,color:#fff
+    style Tag fill:#f5a623,color:#000
+    style Scene fill:#6c8ef5,color:#fff
 ```
 
 | Container | Owns | On delete, also removes |
 |-----------|------|-------------------------|
-| **Tree** | persons, relationships, scenarios, images, settings | *everything* scoped to it |
-| **Person** | its images (files on disk too) | its relationships + its membership in every faction |
-| **Scenario** | its factions | its factions (people are **untouched**) |
-| **Faction** | nothing (just a membership list) | just itself (people untouched) |
+| **Project** | entities, relationships, tags, scenes, images, calendar, settings | *everything* scoped to it |
+| **Entity** *(person)* | its images (files too) | its relationships + its rows in the tag join + its placements in scenes |
+| **Tag** | nothing (identity only) | its join rows + its placements in scenes (entities untouched) |
+| **Scene** | its tag placements / positions | just itself (entities & tags untouched) |
 
-Solid arrows = ownership. Dashed arrows = *reference* (a faction points at people by ID;
-a relationship points at two people) — following a dashed arrow backwards never deletes
-anything.
+Membership is a **many-to-many join** (`entity_tags`), so neither entities nor tags "own" the
+other — see [§5](#5-tags-groups--scenes) and [data-model.md](./data-model.md).
 
 ---
 
 ## 3. The five views
 
-All five views read the **same** people + relationships of the active tree — they're
-different lenses, not different data. You switch with the left-sidebar nav; the store
-remembers your choice in `activeView`.
+All views read the **same** entities + relationships of the active project — different lenses,
+not different data. You switch from the left **icon rail**; the store remembers your choice in
+`activeView`.
 
 ```mermaid
 flowchart TD
-    Store[("🗄️ Pinia store<br/>persons · relationships · factions")]
-    Store --> Tree["🌳 Tree"]
+    Store[("🗄️ Pinia store<br/>entities · relationships · tags · scenes")]
+    Store --> Graph["🕸️ Graph"]
     Store --> Timeline["📅 Timeline"]
-    Store --> Factions["🏳️ Factions"]
-    Store --> People["👥 People"]
+    Store --> Groups["◈ Groups"]
+    Store --> Directory["👥 Directory"]
     Store --> Rels["🔗 Relationships"]
-
     style Store fill:#6c8ef5,color:#fff
 ```
 
-| View | `activeView` | What it shows | How it draws | Interaction |
-|------|--------------|---------------|--------------|-------------|
-| 🌳 **Tree** | `tree` | The family graph — nodes + links | **WebGL** (Three.js) | Drag nodes, 4 layout **modes** (§4) |
-| 📅 **Timeline** | `timeline` | Vertical lifelines on a year axis | **WebGL** | Zoom time & width; birth/marriage ribbons |
-| 🏳️ **Factions** | `factions` | People clustered into groups | **WebGL** | Drag-to-group; switch **scenarios** (§5) |
-| 👥 **People** | `people` | Searchable card grid | **DOM** (virtualized) | Search, sort, click a card |
-| 🔗 **Relationships** | `relationships` | Editable table + issue detection | **DOM** (virtualized) | Edit rows, spot bad data |
+| View *(was)* | `activeView` | Shows | Draws | Interaction |
+|--------------|--------------|-------|-------|-------------|
+| 🕸️ **Graph** *(Tree)* | `graph` | node-link graph | **WebGL** | drag nodes; layout **types** (§4); drag entities in from the Directory tab |
+| 📅 **Timeline** | `timeline` | lifelines on a date axis | **WebGL** | zoom time & width; will gain manual positions + scenes |
+| ◈ **Groups** *(Factions)* | `groups` | entities clustered by tag | **WebGL** | drag to group; switch **scenes** (§5) |
+| 👥 **Directory** *(All People)* | `directory` | searchable card grid | **DOM** (virtualized) | search, sort, click a card |
+| 🔗 **Relationships** | `relationships` | editable table + issue detection | **DOM** (virtualized) | edit rows, spot bad data |
 
-**Two rendering families:**
-
-```
-   WebGL views (thousands of nodes, 60fps)      DOM views (virtualized lists)
-   ┌───────────────────────────────┐            ┌──────────────────────────┐
-   │  Tree · Timeline · Factions    │            │  People · Relationships   │
-   │  pure layout math  →  renderer │            │  only visible rows exist  │
-   │  steps OUTSIDE Vue reactivity  │            │  in the DOM (windowing)   │
-   └───────────────────────────────┘            └──────────────────────────┘
-```
-
-> The **Tree** view stays mounted (just hidden) when you switch away, so its simulation
-> and layout survive — coming back is instant.
+> Spatial views (Graph/Timeline/Groups) draw only **placed** entities — you add entities to a
+> scene by dragging them from the **Directory tab** of the right dock (§7). WebGL views stay
+> mounted (hidden) when inactive so their GL context & layout survive view switches.
 
 ---
 
-## 4. Graph modes & states (Tree view only)
+## 4. Graph layout **types** & **scenes**
 
-The Tree view has **4 layout modes**. Think of a mode as *"how nodes are arranged"*, and
-a **state** as *"a saved snapshot of positions within that mode"*. Every mode can hold
-several named states.
+A **type** *(was: mode)* is *how nodes are arranged*. A **scene** *(was: state)* is a *named,
+saved arrangement*. **The type is a property of the scene** — each scene picks one:
 
 ```
-  MODE  (arrangement strategy)
-   └── STATE 1  { personId → {x, y} }   ← a saved position snapshot
-   └── STATE 2  { personId → {x, y} }
-   └── STATE 3  …
-
-  4 modes × N states each  →  serialized into the tree's `graphState` setting
+  SCENE  "Reunion"     → type Free       → { entityId → {x,y} } + style overrides
+  SCENE  "Big picture" → type Organic
+  SCENE  "Pedigree"    → type Generations
 ```
 
 ```mermaid
 flowchart LR
-    subgraph Modes
-        C["✋ Custom<br/>free drag, pinned"]
-        A["⚡ Auto<br/>force-directed"]
-        Ag["📅 Age<br/>Y = birth year"]
-        G["🏛 Generation<br/>hierarchical rows"]
+    subgraph Types["Layout TYPES (was: modes)"]
+        C["✋ Free <i>(Custom)</i><br/>drag, pinned"]
+        A["⚡ Organic <i>(Auto)</i><br/>force-directed"]
+        Ag["📅 Birth <i>(Age)</i><br/>Y = birth date"]
+        G["🏛 Generations <i>(Gen)</i><br/>hierarchy"]
     end
-    C <--> A <--> Ag <--> G
-    G -->|each mode keeps| States["📸 named states<br/>(position snapshots)"]
+    Types --> Scene["🎬 a Graph SCENE picks one type<br/>+ stores node positions"]
+    style Scene fill:#6c8ef5,color:#fff
 ```
 
-| Mode | Icon | Arrangement rule | Drag behavior |
-|------|------|------------------|---------------|
-| **Custom** | ✋ | Nodes stay exactly where you put them (pinned) | Free — positions persist |
-| **Auto** | ⚡ | D3 force simulation finds a layout | Perturbs the physics |
-| **Age** | 📅 | Vertical position locked to **birth year** (older = higher) | X free, Y locked; shows year + "Now" lines |
-| **Generation** | 🏛 | Top-down hierarchy from parent/child + spouse links | Drag between rows to re-generation |
+| Type *(was)* | Icon | Arrangement rule | Drag behavior |
+|--------------|------|------------------|---------------|
+| **Free** *(Custom)* | ✋ | nodes stay where you put them | free — positions persist |
+| **Organic** *(Auto)* | ⚡ | d3-force finds a layout | perturbs the physics |
+| **Birth** *(Age)* | 📅 | vertical position = **birth date** (older higher) | X free, Y locked; shows date + **Present** line |
+| **Generations** *(Gen)* | 🏛 | top-down hierarchy from parent/child + spouse | drag between rows to re-generation |
 
-**Switching is always snapshot-then-animate:**
+Switching type/scene is always **snapshot-then-animate**:
 
 ```mermaid
 sequenceDiagram
     participant U as You
     participant G as GraphCanvas
-    U->>G: click a different mode / state
-    G->>G: snapshot current node positions
-    G->>G: look up (or compute) target snapshot
+    U->>G: pick a different scene (or change its type)
+    G->>G: snapshot current node positions into the outgoing scene
+    G->>G: look up / compute the target arrangement
     G-->>U: animate nodes into place (~350–500ms)
 ```
 
-Changing positions marks the layout **dirty** (`graphDirty`) → the **Save Layout** button
-pulses. Nothing auto-saves; closing with unsaved changes prompts *Save / Discard / Cancel*.
+Layout math stays in **pure functions** (`layoutAge`/`familyTreeLayout`) — no store or WebGL
+dependency — so it's easy to test. See [graph.md](./graph.md).
 
 ---
 
-## 5. Scenarios & factions (Factions view only)
+## 5. Tags, Groups & Scenes
 
-A **faction** is any group you invent — a family, a company, a house, an elemental
-affinity. A **scenario** is a *whole set of factions* over the same people. The Factions
-view shows **one scenario at a time**; a bottom bar switches between them.
+### 5.1 Tags — a many-to-many join
+
+A **tag** is a labelled set of entities (a family, a house, a team, "Villains", "Engineers").
+Membership is a **join** (`entity_tags`), not an array owned by either side, so both lookups are
+O(1) via in-memory index Maps:
+
+```mermaid
+erDiagram
+    ENTITY ||--o{ ENTITY_TAG : ""
+    TAG    ||--o{ ENTITY_TAG : ""
+    ENTITY_TAG { string entity_id FK  string tag_id FK }
+```
+
+- **Manual tags** — user assigns members (stored in the join).
+- **Derived (smart) tags** — computed from an existing field (occupation / location / birth
+  decade); **not stored**, self-updating. *(Planned; see [design.md](./design.md).)*
+
+### 5.2 A **Group** is a tag placed in a scene
+
+The old "faction" mashed two jobs together. We split them:
+
+| Job | Was (Faction) | Now |
+|-----|---------------|-----|
+| *who belongs* | `member_ids`, **copied per scenario** | **Tag** (one member set, shared everywhere) |
+| *where it sits / is shown* | `x`,`y`,`visible`,`scenario_id` on the faction | **scene placement** (`scene_tags`) |
+
+So membership is global; a **Groups scene** just references some tags and positions them. A
+**Group** = "a tag shown in a Groups scene."
 
 ```mermaid
 flowchart TD
-    People["👤 The tree's people<br/>(shared by every scenario)"]
-
-    subgraph SA["🎬 Scenario: “By family”"]
-        FA1["🏳️ Starks"]
-        FA2["🏳️ Lannisters"]
-    end
-    subgraph SB["🎬 Scenario: “By allegiance”"]
-        FB1["🏳️ Team Fire"]
-        FB2["🏳️ Team Ice"]
-    end
-
-    People --> FA1 & FA2 & FB1 & FB2
-
-    style People fill:#6c8ef5,color:#fff
-    style SA fill:#2a2a3a,color:#fff
-    style SB fill:#2a2a3a,color:#fff
+    Tag["🏷️ Tag 'Starks' — ONE member set"]
+    S1["🎬 Scene: By family"] -->|places at x,y| Tag
+    S2["🎬 Scene: Allegiance"] -->|places same tag| Tag
+    style Tag fill:#f5a623,color:#000
 ```
 
-Same people, two totally different groupings. Membership is just an ID list on each
-faction, so **one person can belong to many factions** (they settle *between* their
-groups on screen, with tether threads + a count badge).
+This is why *"factions move between scenarios"* is now trivial — membership never moves.
 
-| Concept | Analogy | Key facts |
-|---------|---------|-----------|
-| **Scenario** | A "save slot" for a grouping idea | Owns its factions; switching is instant; the active one is remembered per tree (`activeScenarioId`) |
-| **Faction** | A labeled bubble on the stage | Has color, icon, position, visibility, and a `member_ids` list |
-| **Membership** | Tags, not folders | A person can be in 0, 1, or many factions; edited by drag-and-drop |
+### 5.3 Scenes are per-view (this replaces both "states" and "scenarios")
 
-> Same-named factions in different scenarios are treated as "the same group" so they
-> glide smoothly when you switch scenarios.
-
----
-
-## 6. State — the single Pinia store
-
-One store (`main`) is the source of truth for the whole renderer. Everything the UI
-shows comes from here. Grouped by purpose:
+A **scene** is a saved state of **one** view. Each spatial view keeps its own set:
 
 ```mermaid
 flowchart TB
-    subgraph Store["🗄️ Pinia store 'main'"]
-        direction LR
-        subgraph Data["📦 Data (from disk)"]
-            d1[persons]
-            d2[relationships]
-            d3[factions]
-            d4[scenarios]
-            d5[trees]
-        end
-        subgraph Active["🎯 Active selection"]
-            a1[activeTreeId]
-            a2[activeScenarioId]
-            a3[activeView]
-            a4[selectedPersonId]
-        end
-        subgraph UI["🎛️ UI flags"]
-            u1[modalOpen]
-            u2[formOpen]
-            u3[settingsOpen]
-            u4[cleanTree]
-            u5[theme]
-        end
-        subgraph Graph["🎨 Graph tuning"]
-            g1[graphSettings]
-            g2[graphDirty]
-            g3[currentDate]
-        end
-    end
+    P["🗂️ Project"] --> G["🕸️ Graph"] --> g1["Scene: Reunion (Free)"] & g2["Scene: Pedigree (Generations)"]
+    P --> TL["📅 Timeline"] --> t1["Scene: Full history"]
+    P --> GR["◈ Groups"] --> r1["Scene: By family"] & r2["Scene: Allegiance"]
 ```
 
-| Group | Fields | What they're for |
-|-------|--------|------------------|
-| **Data** | `persons`, `relationships`, `factions`, `scenarios`, `trees` | The loaded records for the active tree (reactive arrays) |
-| **Active selection** | `activeTreeId`, `activeScenarioId`, `activeView`, `selectedPersonId` | What's currently open / focused |
-| **UI flags** | `modalOpen`, `formOpen`, `settingsOpen`, `cleanTree`, `theme`, `lockNodes`, `lockLines` | Toggle panels, modals, theme |
-| **Graph tuning** | `graphSettings`, `graphDirty`, `currentDate` (`userCurrentYear` / `autoCurrentYear`) | Node/link appearance, unsaved-layout flag, the "now" year |
-| **Computed** | `activeTree`, `activeScenario`, `activeFactions`, `selectedPerson`, `personCount`, `coupleCount` | Derived, never stored |
+| View | Was called | Now |
+|------|-----------|-----|
+| Graph | "state" | **Scene** (carries a layout type) |
+| Timeline | *(none yet)* | **Scene** (lane order + manual positions + zoom) |
+| Groups | "scenario" | **Scene** (which tags shown + their placements) |
 
-**Golden rule — the data-access chain.** Components never talk to disk directly. They
-call a **store action**, which calls the **api seam**, which reaches the backend:
+The **Scene tab strip** at the bottom of the canvas shows only the *current* view's scenes and
+swaps as you switch views. Directory & Relationships have no positions → no scenes.
+
+---
+
+## 6. Program Modes & the Save model
+
+### 6.1 Program Modes (app-wide feature tiers) — *not* the graph layout types
 
 ```mermaid
 flowchart LR
-    Comp["🧩 Component"] --> Action["🗄️ store action<br/>createPerson()"]
+    S["🟢 Simple<br/>bare minimum to build &<br/>view a good-looking graph"] --> D["🔵 Standard<br/>most features, all the<br/>central ones"] --> A["🟣 Advanced<br/>everything: rare, gimmick,<br/>experimental (custom calendars…)"]
+    style S fill:#4db6ac,color:#000
+    style D fill:#6c8ef5,color:#fff
+    style A fill:#8b6cc5,color:#fff
+```
+
+Higher modes reveal more of the UI (rail items, pill tools, popovers) — pure **progressive
+disclosure**, no separate screens. Stored per project (or globally) as `mode`.
+
+### 6.2 Save model — autosave **and** a manual checkpoint
+
+```mermaid
+flowchart TB
+    edit["✏️ every edit"] -->|debounced| draft["💾 working copy (autosaved)<br/>survives crashes"]
+    draft -->|manual Save ⌘S| ckpt["📌 saved checkpoint"]
+    ckpt -->|Revert to saved| draft
+    exit{"exit & working ≠ checkpoint?"} -->|yes| ask["ask: Save / Discard / Cancel"]
+    style draft fill:#f5a623,color:#000
+    style ckpt fill:#4db6ac,color:#000
+```
+
+Everything **autosaves** (nothing lost to a crash); a manual **Save** commits a checkpoint;
+**Revert to saved** discards everything since. On exit, if the working copy differs from the
+checkpoint you're asked *Save / Discard / Cancel*. The old on-canvas **Save Layout** button and
+`graphDirty` pulse are replaced by this; **Save** / **Revert** live in the **Project ▾** menu.
+
+---
+
+## 7. The shell (screen layout)
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ ≡ Project ▾   Scene: Reunion ▾    🔍 ⌘K    Mode: Standard ▾    ◐   ⚙  │ top bar
+├───┬─────────────────────────────────────────────┬────────────────────┤
+│🕸 │                                             │  RIGHT DOCK        │
+│👥 │                                             │ ┌────────┬────────┐ │
+│🔗 │            ACTIVE VIEW (canvas)             │ │Inspector│Directory│ │ tabs
+│📅 │                                             │ ├────────┴────────┤ │
+│◈  │      ╭──── bottom tool pill ────╮            │ │ Inspector: the  │ │
+│   │      │ Type▾ ⊕−⊡ Focus▾ Legend  │           │ │  clicked entity │ │
+│＋ │      ╰───────────────────────────╯           │ │ Directory: full │ │
+│⚙  │                                             │ │  list, drag →   │ │
+│   ├─────────────────────────────────────────────┤ │  canvas         │ │
+│   │ Scene tabs (this view): ▸Reunion ▸Big pic + │ └─────────────────┘ │
+└───┴─────────────────────────────────────────────┴────────────────────┘
+  icon rail: 🕸Graph 👥Directory 🔗Relationships 📅Timeline ◈Groups · ＋ · ⚙
+```
+
+| Zone | Holds *(was)* |
+|------|---------------|
+| **Icon rail** (left) | the 5 views + add + settings *(was: left sidebar nav list)* |
+| **Top bar** | Project menu (Export/Import/**Save**/**Revert**/stats), Scene switcher, ⌘K search, **Mode** picker, theme, ⚙ |
+| **Canvas** | active view + one **bottom tool pill** (Type + zoom + **Focus** *(was Highlights)* + Legend) + **Scene tab strip** |
+| **Right dock** | **Inspector** tab (selected entity) + **Directory** tab (draggable roster) *(replaces the always-on people list)* |
+
+**Clean View** *(was Clean Tree)* hides the canvas overlays for an unobstructed look.
+**Style** *(was Graph Settings)* holds node/link appearance. **Present** *(was Current Date)*
+sets the reference "now" date for age / living-vs-deceased.
+
+---
+
+## 8. State — the single Pinia store
+
+One store (`main`) is the source of truth for the renderer, grouped by purpose:
+
+| Group | Fields *(target)* | Purpose |
+|-------|-------------------|---------|
+| **Data** | `entities`(persons), `relationships`, `tags`, `entityTags`, `scenes`, `projects` | loaded records for the active project |
+| **Active selection** | `activeProjectId`, `activeView`, `activeSceneId` (per view), `selectedEntityId` | what's open / focused |
+| **UI flags** | `inspectorTab`, `formOpen`, `settingsOpen`, `cleanView`, `theme`, `programMode` | panels, modals, theme, feature tier |
+| **View tuning** | `graphStyle`, `present` (date), save-checkpoint state | appearance + the "now" marker |
+| **Computed** | `activeProject`, `activeScene`, `tagsOf`/`membersOf` indexes, `selectedEntity`, counts | derived, never stored |
+
+**Golden rule — the data-access chain.** Components never touch disk; they call a store action
+→ the api seam → the backend:
+
+```mermaid
+flowchart LR
+    Comp["🧩 Component"] --> Action["🗄️ store action"]
     Action --> Api["🔌 api.invoke()"]
     Api --> D["🖥️ Desktop: IPC → main → JSON file"]
     Api --> W["🌐 Web: shared core → IndexedDB"]
     D --> Ok["{ success, data }"]
     W --> Ok
-    Ok --> Action
-    Action --> React["update reactive arrays<br/>(optimistic)"]
-    React --> Comp
-
+    Ok --> Action --> React["update reactive state (optimistic)"] --> Comp
     style Action fill:#8b6cc5,color:#fff
     style Api fill:#6c8ef5,color:#fff
 ```
 
-The same store, api, and components run on **desktop and web** — only the bottom layer
-(JSON file vs. IndexedDB) differs. See [architecture.md](./architecture.md).
+Same store/api/components run on **desktop and web** — only the bottom layer (JSON file vs.
+IndexedDB) differs. See [architecture.md](./architecture.md).
 
 ---
 
-## 7. What "active" means — one thing at a time
-
-The app is always in exactly one of each of these. Switching any of them re-scopes what
-you see below it.
+## 9. What "active" means — one thing at a time
 
 ```
-  ┌─ activeTreeId ─────────────────────────────────────────────┐
-  │   which tree/project is open   (top-bar tabs)               │
-  │                                                             │
-  │   ┌─ activeView ──────────────────────────────────────┐    │
-  │   │   which of the 5 views is showing (left nav)        │    │
-  │   │                                                     │    │
-  │   │   Tree view →   graph MODE + active STATE           │    │
-  │   │   Factions →    activeScenarioId                    │    │
-  │   │                                                     │    │
-  │   │   ┌─ selectedPersonId ──────────────────────────┐  │    │
-  │   │   │  which person's modal/sidebar is focused      │  │    │
-  │   │   └───────────────────────────────────────────────┘  │    │
-  │   └─────────────────────────────────────────────────────┘    │
-  └─────────────────────────────────────────────────────────────┘
+  ┌─ programMode ── Simple / Standard / Advanced (app-wide) ─────────┐
+  │ ┌─ activeProjectId ── which project/tab is open ───────────────┐ │
+  │ │ ┌─ activeView ── which of the 5 views ───────────────────┐   │ │
+  │ │ │   Graph/Timeline/Groups → activeSceneId (this view)     │   │ │
+  │ │ │   Graph scene → its layout TYPE                         │   │ │
+  │ │ │   ┌─ selectedEntityId ── shown in the Inspector ─────┐  │   │ │
+  │ │ │   └───────────────────────────────────────────────────┘  │   │ │
+  │ │ └────────────────────────────────────────────────────────┘   │ │
+  │ └──────────────────────────────────────────────────────────────┘ │
+  └────────────────────────────────────────────────────────────────────┘
 ```
 
-Switching **tree** resets selection, modals, and the dirty flag, then reloads all data.
-Switching **view** keeps the data; it just changes the lens (and the Tree view stays
-alive in the background).
+Switching **project** resets selection/modals and reloads data. Switching **view** keeps the
+data and swaps the lens (spatial views stay alive in the background).
 
 ---
 
-## 8. Screen layout (the shell)
+## 10. Glossary
 
-```
-┌───────────────────────────────────────────────────────────────────────┐
-│  ▸ Anderson Family   ▸ Targaryens   [ + ]           ← tree tabs (top)   │
-├──────────┬──────────────────────────────────────────────┬─────────────┤
-│          │                                              │             │
-│  LEFT    │                                              │   RIGHT     │
-│ sidebar  │            CENTRAL WORKSPACE                 │  sidebar    │
-│          │       (one of the 5 views at a time)         │             │
-│ • nav    │                                              │ • member    │
-│ • stats  │     🌳 / 📅 / 🏳️ / 👥 / 🔗                    │   list      │
-│ • data   │                                              │   (virtual- │
-│ • theme  │                                              │    ized)    │
-│ • year   │                                              │             │
-│          │                                              │             │
-└──────────┴──────────────────────────────────────────────┴─────────────┘
-     ↑ resizable                                        resizable ↑
-```
-
-Both sidebars are resizable. **Clean Tree** mode (`cleanTree`) slides the graph's overlay
-panels away for an unobstructed view.
+| New term | In the code *(target)* | Was | Plain meaning |
+|----------|------------------------|-----|---------------|
+| **Project** | `Project`, `activeProjectId` | Tree | top-level workspace (a tab) |
+| **Graph** view | `activeView='graph'` | Tree view | the node-link visualization |
+| **Directory** view | `activeView='directory'` | All People | searchable grid of all entities |
+| **Groups** view | `activeView='groups'` | Factions | tag-clustering view |
+| **Entity** | `Person` record | Person | a node (person / creature / object…) |
+| **Tag** | `Tag` + `entity_tags` join | Faction membership | a labelled set of entities |
+| **Group** | a `scene_tag` placement | Faction | a tag placed in a Groups scene |
+| **Scene** | `Scene` (has `view`) | state **and** scenario | a saved arrangement of one view |
+| **Type** | `scene.type` | mode | layout algorithm of a Graph scene |
+| **Program Mode** | `programMode` | *(none)* | Simple/Standard/Advanced feature tier |
+| **Focus** | Focus panel | Highlights | non-destructive emphasis |
+| **Style** | Style panel | Graph Settings | node/link appearance |
+| **Clean View** | `cleanView` | Clean Tree | hide canvas overlays |
+| **Present** | `present` | Current Date / "as-of year" | reference "now" date |
+| **Inspector** / **Directory tab** | right dock tabs | always-on member list | selection details / drag roster |
 
 ---
 
-## 9. Glossary
-
-| Term | In the code | Plain meaning |
-|------|-------------|---------------|
-| **Tree / Project** | `Tree`, `activeTreeId` | A whole family tree — the top-level workspace (a tab) |
-| **View** | `activeView` | One of the 5 ways to look at the tree's data |
-| **Mode** | `enter*Mode`, `graphState.mode` | A layout strategy for the **Tree** view (Custom/Auto/Age/Generation) |
-| **State** | `modeStateSnapshots` | A saved snapshot of node positions within a mode |
-| **Scenario** | `Scenario`, `activeScenarioId` | A saved set of factions over the same people (Factions view) |
-| **Faction** | `Faction`, `member_ids` | A user-defined group of people |
-| **Store** | Pinia `main` | The single in-memory source of truth for the UI |
-| **Backend / seam** | `api/backends/*` | The swappable layer that persists data (file vs. IndexedDB) |
-| **Dirty** | `graphDirty` | The tree layout has unsaved position changes |
-
----
-
-See also: [architecture.md](./architecture.md) · [data-model.md](./data-model.md) ·
-[graph.md](./graph.md) · [design.md](./design.md)
+See also: [OVERHAUL_GUIDE.md](./OVERHAUL_GUIDE.md) · [architecture.md](./architecture.md) ·
+[data-model.md](./data-model.md) · [graph.md](./graph.md) · [design.md](./design.md)

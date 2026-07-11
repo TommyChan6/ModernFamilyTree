@@ -90,6 +90,19 @@ below; many "visuals" items (maternal/paternal emphasis, married-couple and divo
 highlighting, deceased highlighting, tree naming, multiple trees) are **already
 shipped**.
 
+**Client overhaul (planned — see [`client-structure.md`](./client-structure.md) &
+[`OVERHAUL_GUIDE.md`](./OVERHAUL_GUIDE.md)):** rename tree→**Project**, faction→**Tag/Group**,
+state+scenario→**Scene**; a **tags** system (manual now, derived/smart tags later); **Program
+Modes** (Simple / Standard / Advanced feature tiers via progressive disclosure); a contextual
+**Inspector** + draggable **Directory** dock; autosave + manual **Save/Revert** checkpoint.
+
+**Custom calendars (future — Advanced mode):** let a project define its own date system —
+Gregorian by default, but a fantasy project could use *year ▸ 20 gex ▸ 100 days* or add extra
+cycles. The foundation is already reserved: dates are stored as a **structured, mutable
+`DateValue`** (year/month/day + precision + calendar), and layout math sorts via a pure
+`calendarMath.toOrdinal`, so adding calendars is a data-compatible change rather than a
+migration. See [data-model.md](./data-model.md#datevalue--mutable-structured-dates).
+
 **Likely next:**
 
 - More graph styling options and auto-mode physics sliders (with inline explainers).
