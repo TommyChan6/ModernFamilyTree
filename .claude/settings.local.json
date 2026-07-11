@@ -143,7 +143,25 @@
       "PowerShell(node .\\\\verify_dynasty_tmp.mjs)",
       "PowerShell(\"cleaned\")",
       "Bash(git rm *)",
-      "Bash(rm -f docs/temp-client-structure.md)"
+      "Bash(rm -f docs/temp-client-structure.md)",
+      "PowerShell(npm run typecheck)",
+      "PowerShell(npx prettier --write src/shared/dbCore.ts tests/db.test.js)",
+      "PowerShell(npm run format:check)",
+      "PowerShell(npm run lint)",
+      "PowerShell(npm run preview:web)",
+      "PowerShell($edge = @\\(\"${env:ProgramFiles\\(x86\\)}\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\", \"$env:ProgramFiles\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\"\\) | Where-Object { Test-Path $_ } | Select-Object -First 1; $tmp = \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\8a519e37-7b10-4b75-b0e1-e305a2a5935b\\\\scratchpad\\\\edge-profile\"; & $edge --headless=new --disable-gpu --no-first-run --user-data-dir=\"$tmp\" --virtual-time-budget=8000 --dump-dom http://localhost:4174/ > \"$tmp\\\\dom.html\" 2>$null; \\(Get-Item \"$tmp\\\\dom.html\"\\).Length)",
+      "PowerShell($tmp = \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\8a519e37-7b10-4b75-b0e1-e305a2a5935b\\\\scratchpad\\\\edge-profile\"; New-Item -ItemType Directory -Force $tmp | Out-Null; $edge = @\\(\"${env:ProgramFiles\\(x86\\)}\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\", \"$env:ProgramFiles\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\"\\) | Where-Object { Test-Path $_ } | Select-Object -First 1; & $edge --headless=new --disable-gpu --no-first-run --user-data-dir=\"$tmp\\\\profile\" --virtual-time-budget=8000 --dump-dom http://localhost:4174/ > \"$tmp\\\\dom.html\" 2>$null; \\(Get-Item \"$tmp\\\\dom.html\"\\).Length)",
+      "PowerShell($tmp = \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\8a519e37-7b10-4b75-b0e1-e305a2a5935b\\\\scratchpad\\\\edge-profile\"; $edge = @\\(\"${env:ProgramFiles\\(x86\\)}\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\", \"$env:ProgramFiles\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\"\\) | Where-Object { Test-Path $_ } | Select-Object -First 1; cmd /c \"`\"$edge`\" --headless=new --disable-gpu --no-first-run --user-data-dir=`\"$tmp\\\\profile2`\" --virtual-time-budget=8000 --dump-dom http://localhost:4174/ > `\"$tmp\\\\dom.html`\" 2>nul\"; \\(Get-Item \"$tmp\\\\dom.html\"\\).Length)",
+      "PowerShell($tmp = \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\8a519e37-7b10-4b75-b0e1-e305a2a5935b\\\\scratchpad\\\\edge-profile\"; $html = Get-Content \"$tmp\\\\dom3.html\" -Raw; $i = $html.IndexOf\\('project-tabs-area'\\); $html.Substring\\($i, 400\\))",
+      "PowerShell(Set-Location \"$env:TEMP\\\\ft-baseline\"; npm run build:web)",
+      "PowerShell(Set-Location \"$env:TEMP\\\\ft-baseline\"; $env:PATH = \"C:\\\\Users\\\\tommy\\\\OneDrive\\\\Desktop\\\\newFamilyTree\\\\node_modules\\\\.bin;$env:PATH\"; npx --prefix C:\\\\Users\\\\tommy\\\\OneDrive\\\\Desktop\\\\newFamilyTree vite build --config vite.config.web.js)",
+      "PowerShell(New-Item -ItemType Junction -Path \"$env:TEMP\\\\ft-baseline\\\\node_modules\" -Target \"C:\\\\Users\\\\tommy\\\\OneDrive\\\\Desktop\\\\newFamilyTree\\\\node_modules\" | Out-Null; Set-Location \"$env:TEMP\\\\ft-baseline\"; npm run build:web)",
+      "PowerShell(Set-Location \"$env:TEMP\\\\ft-baseline\"; npx vite preview --config vite.config.web.js --port 4199)",
+      "PowerShell($tmp = \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\8a519e37-7b10-4b75-b0e1-e305a2a5935b\\\\scratchpad\\\\edge-profile\"; $edge = @\\(\"${env:ProgramFiles\\(x86\\)}\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\", \"$env:ProgramFiles\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\"\\) | Where-Object { Test-Path $_ } | Select-Object -First 1; cmd /c \"`\"$edge`\" --headless=new --disable-gpu --no-first-run --user-data-dir=`\"$tmp\\\\profile-baseline`\" --timeout=10000 --dump-dom http://localhost:4199/ > `\"$tmp\\\\dom-baseline.html`\" 2>nul\"; $html = Get-Content \"$tmp\\\\dom-baseline.html\" -Raw; $i = $html.IndexOf\\('tree-tabs-area'\\); if \\($i -ge 0\\) { $html.Substring\\($i, 300\\) } else { 'tree-tabs-area not found; length=' + $html.Length })",
+      "PowerShell(Remove-Item -Force \"$env:TEMP\\\\ft-baseline\\\\node_modules\"; Set-Location C:\\\\Users\\\\tommy\\\\OneDrive\\\\Desktop\\\\newFamilyTree; git worktree remove --force \"$env:TEMP\\\\ft-baseline\"; git worktree list; git log --oneline -4; git status --short | Select-Object -First 15)",
+      "PowerShell(cmd /c \"rmdir `\"$env:TEMP\\\\ft-baseline\\\\node_modules`\"\"; cmd /c \"rmdir /s /q `\"$env:TEMP\\\\ft-baseline`\"\"; git worktree prune; git worktree list; git status --short)",
+      "PowerShell(Test-Path node_modules/.bin/electron-vite.cmd; Test-Path node_modules/electron-vite; Test-Path node_modules/.bin/vite.cmd; \\(Get-ChildItem node_modules -Directory | Measure-Object\\).Count)",
+      "PowerShell(npm install)"
     ]
   }
 }
