@@ -1,10 +1,5 @@
 # Client-side structure — a visual guide
 
-> 📐 **This describes the _target_ design.** The overhaul is being implemented in slices via
-> [`OVERHAUL_GUIDE.md`](./OVERHAUL_GUIDE.md). Until those steps land, the running code still
-> uses the **legacy names** — each section notes them, and the [glossary](#10-glossary) maps
-> old → new. Legend: **new name** *(was: old name)*.
-
 A map of what the app *is* from the inside: the containers your data lives in
 (**projects**), the five **views** that draw it, the layout **types** and saved **scenes**,
 the **tags** and **groups** that cluster people, the app-wide **modes**, and the single
@@ -300,7 +295,7 @@ sets the reference "now" date for age / living-vs-deceased.
 
 One store (`main`) is the source of truth for the renderer, grouped by purpose:
 
-| Group | Fields *(target)* | Purpose |
+| Group | Fields | Purpose |
 |-------|-------------------|---------|
 | **Data** | `entities`(persons), `relationships`, `tags`, `entityTags`, `scenes`, `projects` | loaded records for the active project |
 | **Active selection** | `activeProjectId`, `activeView`, `activeSceneId` (per view), `selectedEntityId` | what's open / focused |
@@ -351,7 +346,7 @@ data and swaps the lens (spatial views stay alive in the background).
 
 ## 10. Glossary
 
-| New term | In the code *(target)* | Was | Plain meaning |
+| Term | In the code | Was | Plain meaning |
 |----------|------------------------|-----|---------------|
 | **Project** | `Project`, `activeProjectId` | Tree | top-level workspace (a tab) |
 | **Graph** view | `activeView='graph'` | Tree view | the node-link visualization |

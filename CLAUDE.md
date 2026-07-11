@@ -83,10 +83,11 @@ web build keeps working.
 **Persistence** (`src/main/db.js`): all data is one pretty-printed JSON file at
 `<userData>/db/familytree.json`, rewritten in full on every `save()`. Photos are
 copied into `<userData>/images/<uuid>.<ext>` and served via the privileged `appimg://`
-protocol (never `file://`). `initDB()` is idempotent and self-migrating (single-tree →
-multi-tree) and seeds a sample family on first run. Data is scoped per tree via
-`tree_id`; deletes cascade explicitly (person → its relationships + image files +
-removal from faction `member_ids`). On the web build the same data (including the
+protocol (never `file://`). `initDB()` is idempotent and self-migrating (tree→project rename,
+years→DateValues, scenarios→scenes, factions→tags, graphState→graph scenes) and
+seeds a sample family on first run. Data is scoped per project via `project_id`;
+deletes cascade explicitly (person → its relationships + image files +
+`entity_tags` rows; tag/scene → their join/placement rows). On the web build the same data (including the
 same seed) lives in a single IndexedDB record instead, with photos stored inline as
 data URLs — see `src/renderer/src/api/backends/local.ts`.
 
@@ -95,10 +96,13 @@ data URLs — see `src/renderer/src/api/backends/local.ts`.
 wraps that in `{ success: true, data }` / `{ success: false, error }` — exceptions
 never cross the seam. Callers check `success` before reading `data`. The shell
 persists after any channel in `WRITE_CHANNELS` before returning. Writes tag new
-records with the active `tree_id`; reads filter by it.
+records with the active `project_id`; reads filter by it.
 
 **State** (`src/renderer/src/store/index.js`): a single Pinia store `main` is the
-source of truth for `persons`, `relationships`, `trees`, UI flags, and `graphSettings`.
+source of truth for `persons`, `relationships`, `tags`/`entityTags` (+ the
+`tagsOf`/`membersOf` index Maps), `scenes`/`sceneTags` (+ per-view
+`activeSceneIds`), `projects`, the `programMode` capability flags (`caps`), UI
+flags, and `graphSettings`.
 Actions do the IPC round-trip and optimistically update reactive arrays only after
 `res.success`.
 
@@ -111,14 +115,16 @@ node and link in a handful of instanced draw calls, with an on-demand frame loop
 nodes are mutated in place (`n.x/y/fx/fy`); `ticked()` just pokes the renderer.
 Layout math is kept in **pure functions** under `components/graph/` (`layoutAge.js`,
 `familyTreeLayout.ts`, `linkHelpers.js`) with no D3/Three or store dependency. Four
-layout modes (custom/auto/age/generation), each with multiple saved "states"
-(position snapshots). The full arrangement serializes to the per-tree `graphState`
-setting; a `graphDirty` flag drives the Save Layout button and the close-confirmation
-prompt (wired from main via `window.__isGraphDirty` / `window.__saveGraphLayout`).
+layout types (free/organic/birth/generations); the type is a property of the active
+graph **Scene**, and each scene stores its own positions/config. Arrangements
+autosave through `scenes:save`; a manual checkpoint (`checkpoint:save`/`revert`,
+Ctrl+S / Project ▾ menu) plus `hasUnsavedChanges` drive the close-confirmation
+prompt (wired from main via `window.__hasUnsavedChanges` / `window.__saveCheckpoint`
+/ `window.__discardChanges`).
 
 **Views:** the workspace shows one of five views (`store.activeView`), all built to
 stay smooth with thousands of people:
-- tree (`GraphCanvas`) — WebGL, see above; stays mounted (hidden) when another view
+- graph (`GraphCanvas`) — WebGL, see above; stays mounted (hidden) when another view
   is active so its simulation/layout survive view switches.
 - timeline (`TimelineView`) — WebGL. Pure layout in
   `components/timeline/timelineLayout.js` (world units, recomputed on data changes
@@ -126,14 +132,16 @@ stay smooth with thousands of people:
   pulsing dots, marriage/birth ribbons and avatar pins, with a bg canvas for the year
   grid and an fg canvas for viewport-culled labels/badges/gutter. Hit tests are
   analytic; style changes tween.
-- factions (`FactionsView`) — WebGL. Drag-and-drop clustering into switchable
-  per-tree "scenarios"; pure math in `components/factions/factionLayout.js`, drawing
+- groups (`FactionsView`) — WebGL. Drag-and-drop clustering of people by their
+  tags (a Group = a tag placed in a groups scene via `scene_tags`; membership is
+  the shared `entity_tags` join), with switchable per-view scenes; pure math in
+  `components/factions/factionLayout.js`, drawing
   in `components/factions/webgl/FactionsRenderer.js` (zone discs, dash-flow tethers,
   membership arcs, person nodes; overlay canvas for header pills/labels/ghost). The
   d3-force simulation stays in the view and pokes the renderer per tick.
-- people (`PeopleView`) and relationships (`RelationshipsView`) — DOM, but
+- directory (`PeopleView`) and relationships (`RelationshipsView`) — DOM, but
   **virtualized**: only cards/rows near the viewport exist in the DOM. The right
-  sidebar member list is virtualized the same way.
+  dock's Directory roster is virtualized the same way.
 
 Generic instanced draw layers shared by the WebGL views (capsules, dots, ribbons,
 arcs) and the overlay-canvas helpers live in `components/webgl/`. Ambient animations
@@ -156,9 +164,11 @@ no per-frame buffer writes — and each renderer releases its GL context on unmo
 ## Testing
 
 Vitest. `tests/db.test.js` covers the data layer (mocks Electron's `app` module to
-point `userData` at a temp dir and exercises `db.js` directly: migrations, tree
-scoping, cascade deletes, graph-state persistence, field integrity) — update it when
-changing `db.js`, `src/shared/dbCore.ts`, or the data shape. `tests/graphMath.test.js` and
-`tests/viewMath.test.js` cover the pure view math (camera transforms, link curves,
-timeline layout, faction arc spans). Rendering/interaction has no automated coverage —
+point `userData` at a temp dir and exercises `db.js` + the shared channel handlers:
+migrations, project scoping, cascade deletes, scene/checkpoint persistence, field
+integrity) — update it when
+changing `db.js`, `src/shared/dbCore.ts`, or the data shape. `tests/graphMath.test.js`,
+`tests/viewMath.test.js` and `tests/calendarMath.test.js` cover the pure view/date
+math (camera transforms, link curves, timeline layout, membership arc spans,
+DateValue ordinals). Rendering/interaction has no automated coverage —
 verify manually with `npm run dev` (test both themes for visual changes).

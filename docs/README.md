@@ -5,12 +5,12 @@ here, read them roughly in this order:
 
 | Doc | What it covers |
 |-----|----------------|
-| [client-structure.md](./client-structure.md) | **Visual guide** to projects, views, layout types, scenes, tags/groups & state (the target design). Read this first for the mental model. |
-| [OVERHAUL_GUIDE.md](./OVERHAUL_GUIDE.md) | Step-by-step build plan for the client overhaul — hand each step to Claude. |
+| [client-structure.md](./client-structure.md) | **Visual guide** to projects, views, layout types, scenes, tags/groups & state. Read this first for the mental model. |
+| [OVERHAUL_GUIDE.md](./OVERHAUL_GUIDE.md) | The (completed) step-by-step build plan the client overhaul followed — kept as a record. |
 | [architecture.md](./architecture.md) | Process model, layers, data flow, module map. |
 | [data-model.md](./data-model.md) | The JSON store shape, entities, IDs, migrations. |
 | [ipc-api.md](./ipc-api.md) | Every IPC channel, the request/response envelope, and the preload bridge. |
-| [graph.md](./graph.md) | The graph engine — layout modes, saved states, guides, highlights, persistence. |
+| [graph.md](./graph.md) | The graph engine — layout types, scenes, guides, Focus filters, persistence. |
 | [conventions.md](./conventions.md) | Coding conventions and the patterns to follow. |
 | [developer.md](./developer.md) | Setup, scripts, project layout, testing, build internals. |
 | [contributing.md](./contributing.md) | Branch/PR workflow and the definition of done. |

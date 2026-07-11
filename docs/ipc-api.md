@@ -40,54 +40,81 @@ Exposed on `window.electronAPI` by [`src/preload/index.js`](../src/preload/index
 
 ## Channels
 
-Most write channels operate on the **active tree** implicitly — new records are
-tagged with the current `activeTreeId`, and `getAll` handlers filter by it.
+Most write channels operate on the **active project** implicitly — new records are
+tagged with the current `activeProjectId`, and `getAll` handlers filter by it.
 
-### Trees
+### Projects
 
 | Channel | Payload | Returns |
 |---------|---------|---------|
-| `trees:getAll` | — | `{ trees: Tree[], activeTreeId }` |
-| `trees:create` | `{ name? }` | the new `Tree` |
-| `trees:rename` | `{ id, name }` | the updated `Tree` |
-| `trees:delete` | `{ id }` | `{ id, newActiveTreeId }` — cascades persons, relationships, factions, scenarios, images (files unlinked) and tree-scoped settings; switches active tree if needed |
-| `trees:setActive` | `{ id }` | `{ activeTreeId }` |
+| `projects:getAll` | — | `{ projects: Project[], activeProjectId }` |
+| `projects:create` | `{ name? }` | the new `Project` |
+| `projects:rename` | `{ id, name }` | the updated `Project` |
+| `projects:delete` | `{ id }` | `{ id, newActiveProjectId }` — cascades persons, relationships, tags (+joins +placements), scenes (+placements), images (files unlinked) and project-scoped settings; switches active project if needed |
+| `projects:setActive` | `{ id }` | `{ activeProjectId }` |
 
 ### Persons
 
 | Channel | Payload | Returns |
 |---------|---------|---------|
 | `persons:getAll` | — | `Person[]`, each enriched with `primary_image` |
-| `persons:create` | person fields | the new `Person` (`primary_image: null`) |
+| `persons:create` | person fields (`birth`/`death` are DateValues) | the new `Person` (`primary_image: null`) |
 | `persons:update` | `{ id, ...fields }` | the updated `Person` |
-| `persons:delete` | `{ id }` | `{ id }` — cascades the person's relationships and images, and removes them from all faction member lists |
+| `persons:delete` | `{ id }` | `{ id }` — cascades the person's relationships, images and `entity_tags` rows |
 
 ### Relationships
 
 | Channel | Payload | Returns |
 |---------|---------|---------|
-| `relationships:getAll` | — | `Relationship[]` (active tree) |
-| `relationships:create` | `{ person_a_id, person_b_id, type, status?, formed_date? }` | the new `Relationship` |
+| `relationships:getAll` | — | `Relationship[]` (active project) |
+| `relationships:create` | `{ person_a_id, person_b_id, type, status?, formed? }` | the new `Relationship` |
 | `relationships:update` | `{ id, ...partial }` | the updated `Relationship` (only provided fields change) |
 | `relationships:delete` | `{ id }` | `{ id }` |
 
-### Factions
+### Tags
 
 | Channel | Payload | Returns |
 |---------|---------|---------|
-| `factions:getAll` | — | `Faction[]` (active tree, all scenarios — the renderer filters by active scenario) |
-| `factions:create` | `{ scenario_id, name?, description?, color?, icon?, member_ids?, x?, y?, visible? }` | the new `Faction` (defaults filled in) |
-| `factions:update` | `{ id, ...partial }` | the updated `Faction` (only provided fields change) |
-| `factions:delete` | `{ id }` | `{ id }` — members are untouched |
+| `tags:getAll` | — | `Tag[]` (active project) |
+| `tags:create` | `{ label?, type?, source?, color?, icon? }` | the new `Tag` (defaults filled in) |
+| `tags:update` | `{ id, ...partial }` | the updated `Tag` |
+| `tags:delete` | `{ id }` | `{ id }` — cascades the tag's `entity_tags` and `scene_tags` rows; people are untouched |
 
-### Scenarios
+### Entity tags (membership join)
 
 | Channel | Payload | Returns |
 |---------|---------|---------|
-| `scenarios:getAll` | — | `Scenario[]` (active tree) |
-| `scenarios:create` | `{ name?, clone_from? }` | `{ scenario, factions }` — with `clone_from`, the source scenario's factions are duplicated into the new one and returned |
-| `scenarios:rename` | `{ id, name }` | the updated `Scenario` |
-| `scenarios:delete` | `{ id }` | `{ id }` — cascades the scenario's factions; people are untouched |
+| `entity_tags:getAll` | — | `EntityTag[]` (rows whose tag belongs to the active project) |
+| `entity_tags:add` | `{ entity_id, tag_id }` | the join row — idempotent: re-adding an existing pair returns the existing row |
+| `entity_tags:remove` | `{ entity_id, tag_id }` | `{ entity_id, tag_id, removed }` |
+
+### Scenes
+
+| Channel | Payload | Returns |
+|---------|---------|---------|
+| `scenes:getAll` | `{ view? }` | `Scene[]` (active project, optionally one view's) |
+| `scenes:create` | `{ view?, name?, type?, config?, positions? }` | the new `Scene` |
+| `scenes:rename` | `{ id, name }` | the updated `Scene` |
+| `scenes:duplicate` | `{ id, name? }` | `{ scene, scene_tags }` — deep-copies config/positions and the scene's tag placements (membership is shared, never copied) |
+| `scenes:save` | `{ id, type?, name?, config?, positions? }` | the updated `Scene` — how layout autosave persists arrangements |
+| `scenes:delete` | `{ id }` | `{ id }` — cascades the scene's `scene_tags` rows |
+
+### Scene tags (Groups placements)
+
+| Channel | Payload | Returns |
+|---------|---------|---------|
+| `scene_tags:getAll` | — | `SceneTag[]` (rows whose scene belongs to the active project) |
+| `scene_tags:add` | `{ scene_id, tag_id, x?, y?, visible? }` | the placement — idempotent per `(scene, tag)` pair |
+| `scene_tags:move` | `{ id, x, y }` | the updated placement |
+| `scene_tags:setVisible` | `{ id, visible }` | the updated placement |
+| `scene_tags:remove` | `{ id }` | `{ id }` |
+
+### Checkpoint (save model)
+
+| Channel | Payload | Returns |
+|---------|---------|---------|
+| `checkpoint:save` | — | the checkpoint — snapshots the project's arrangement state (scenes + placements + Present override) into the `checkpoint` setting |
+| `checkpoint:revert` | — | the restored checkpoint — wholesale-replaces the project's scenes and placements with it (original ids); throws if none was ever saved |
 
 ### Images
 
@@ -99,18 +126,18 @@ tagged with the current `activeTreeId`, and `getAll` handlers filter by it.
 | `images:setPrimary` | `{ imageId, personId }` | `{ imageId }` |
 | `images:delete` | `{ imageId }` | `{ imageId }` — unlinks the file |
 
-### Settings (per-tree)
+### Settings (per-project)
 
 | Channel | Payload | Returns |
 |---------|---------|---------|
-| `settings:getAll` | — | flat map of the active tree's settings (prefix stripped) |
-| `settings:set` | `{ key, value }` | `{ key, value }` — stored under `"<activeTreeId>:<key>"` |
+| `settings:getAll` | — | flat map of the active project's settings (prefix stripped) |
+| `settings:set` | `{ key, value }` | `{ key, value }` — stored under `"<activeProjectId>:<key>"` |
 
 ### Global settings
 
 | Channel | Payload | Returns |
 |---------|---------|---------|
-| `globalSettings:getAll` | — | the global settings map (e.g. `{ theme }`) |
+| `globalSettings:getAll` | — | the global settings map (e.g. `{ theme, programMode }`) |
 | `globalSettings:set` | `{ key, value }` | `{ key, value }` |
 
 ## The `appimg://` protocol
@@ -123,9 +150,10 @@ these URLs with `electronAPI.getImageUrl(path)` — never hand-construct them.
 
 ## Adding a new channel
 
-1. Add an `ipcMain.handle('domain:action', …)` in [`ipc.js`](../src/main/ipc.js),
-   wrapped in `try/catch`, returning the `{ success, data }` envelope and calling
-   `save()` after any mutation.
+1. Add a handler to `channelHandlers` in
+   [`src/shared/dbCore.ts`](../src/shared/dbCore.ts) (and the channel to
+   `WRITE_CHANNELS` if it mutates) — both shells register it automatically and
+   persist after writes.
 2. Add a store action in [`store/index.js`](../src/renderer/src/store/index.js) that
    calls `api.invoke(...)` and updates reactive state on success.
 3. Call the store action from components — never `api.invoke` directly from a view.

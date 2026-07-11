@@ -41,18 +41,23 @@ npm run test:watch # watch mode
 
 ## Features
 
-- Interactive family tree graph with physics-based animation (D3 force simulation)
-- Four layout modes — **Custom** (free drag), **Auto** (force-directed), **Age** (by
-  birth year), and **Generation** (hierarchical) — each with multiple saved arrangements
+- Interactive family graph with physics-based animation (D3 force simulation)
+- Four layout types — **Free** (drag anywhere), **Organic** (force-directed),
+  **Birth** (by birth date), and **Generations** (hierarchical) — with multiple
+  saved **scenes** per view
 - Add / edit / delete family members with photos, bio, occupation, and location
 - Relationships: parent/child, spouse (with divorce), and adopted
-- Non-destructive highlights: lineage (paternal/maternal), gender, marriage, deceased
-- Multiple family trees, switchable via tabs
-- Alternate views: **People** cards, **Relationships** table (with issue detection),
-  and a **Timeline**
+- **Tags & Groups**: label people once, cluster them per scene in the Groups view
+- Non-destructive Focus filters: lineage (paternal/maternal), gender, marriage, deceased
+- Multiple **projects**, switchable via tabs; everything autosaves, with a manual
+  Save/Revert checkpoint
+- Alternate views: **Directory** cards, **Relationships** table (with issue
+  detection), and a **Timeline**
+- **Program Modes** (Simple / Standard / Advanced) tune how much of the app is shown
 - Photo uploads stored locally in your user-data folder
-- Dark and light themes; search, zoom, pan, and fit-all
+- Dark and light themes; search (Ctrl+K), zoom, pan, and fit-all
 - JSON export
+- Runs as an Electron desktop app **or** a plain website (`npm run dev:web`)
 
 ## Troubleshooting
 

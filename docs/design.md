@@ -65,8 +65,9 @@ Two themes, switched via the `data-theme` attribute on `<html>` and persisted in
 Color carries meaning consistently across the graph, cards, chips, and legend:
 
 - **Gender** — male blue, female pink/magenta, unknown indigo.
-- **Relationships** — parent/child violet (solid line), spouse pink (dashed),
-  adopted amber (dotted). Divorced spouses render faded and finely dashed.
+- **Relationships** — parent/child violet (solid line), spouse gold (dashed),
+  adopted teal (dotted) — a hue set that never collides with the gender colors
+  (female stays magenta). Divorced spouses render faded and finely dashed.
 - **Lineage emphasis** — paternal shifts toward blue, maternal toward pink.
 
 ### Motion
@@ -90,18 +91,18 @@ below; many "visuals" items (maternal/paternal emphasis, married-couple and divo
 highlighting, deceased highlighting, tree naming, multiple trees) are **already
 shipped**.
 
-**Client overhaul (planned — see [`client-structure.md`](./client-structure.md) &
-[`OVERHAUL_GUIDE.md`](./OVERHAUL_GUIDE.md)):** rename tree→**Project**, faction→**Tag/Group**,
-state+scenario→**Scene**; a **tags** system (manual now, derived/smart tags later); **Program
-Modes** (Simple / Standard / Advanced feature tiers via progressive disclosure); a contextual
-**Inspector** + draggable **Directory** dock; autosave + manual **Save/Revert** checkpoint.
+**Client overhaul (shipped — see [`client-structure.md`](./client-structure.md)):**
+Projects, **Tags/Groups** over a membership join, per-view **Scenes** with layout
+types, **Program Modes** (Simple / Standard / Advanced feature tiers via progressive
+disclosure), the contextual **Inspector** + draggable **Directory** dock, and
+autosave + a manual **Save/Revert** checkpoint. Derived/smart tags are still ahead.
 
 **Custom calendars (future — Advanced mode):** let a project define its own date system —
 Gregorian by default, but a fantasy project could use *year ▸ 20 gex ▸ 100 days* or add extra
 cycles. The foundation is already reserved: dates are stored as a **structured, mutable
 `DateValue`** (year/month/day + precision + calendar), and layout math sorts via a pure
 `calendarMath.toOrdinal`, so adding calendars is a data-compatible change rather than a
-migration. See [data-model.md](./data-model.md#datevalue--mutable-structured-dates).
+migration. See [data-model.md](./data-model.md#datevalue--structured-dates).
 
 **Likely next:**
 

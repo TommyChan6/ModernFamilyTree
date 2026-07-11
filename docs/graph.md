@@ -1,14 +1,6 @@
 # The graph engine
 
-> 📐 **Naming in transition.** This doc uses today's names; the overhaul renames them (see
-> [`client-structure.md`](./client-structure.md) + [`OVERHAUL_GUIDE.md`](./OVERHAUL_GUIDE.md)):
-> **Tree view → Graph** · **mode → type** (Custom→**Free**, Auto→**Organic**, Age→**Birth**,
-> Generation→**Generations**) · **state → Scene** (the layout **type** becomes a property of
-> the scene — flattened, no separate mode buckets) · **Factions → Groups** · **Current Date →
-> Present** · **Save Layout / `graphDirty` → autosave + manual Save/Revert checkpoint**. The
-> engine's mechanics below are unchanged by the rename.
-
-The interactive family tree is the heart of the app. The **layout** is driven by a
+The interactive family graph is the heart of the app. The **layout** is driven by a
 [d3-force](https://d3js.org) simulation from
 [`GraphCanvas.vue`](../src/renderer/src/components/GraphCanvas.vue) with pure helper
 modules in [`components/graph/`](../src/renderer/src/components/graph/); the **drawing**
@@ -37,63 +29,46 @@ the hot path:
 `ticked()` is the single render function: it repaints link paths and applies
 `transform: translate(x,y)` to each node group on every simulation/animation frame.
 
-## Layout modes
+## Layout types
 
-Four modes, switched from the bottom control bar. Each is entered by an `enter*Mode`
-function and can animate node positions via the
+Four layout **types**, picked from the bottom tool pill. The type is a property of
+the active **scene** — picking a different type retypes the scene and re-runs that
+type's layout math (the internal entry functions still use legacy ids, mapped from
+the scene type). Position changes animate via the
 [`useGraphAnimation`](../src/renderer/src/components/graph/useGraphAnimation.js)
 composable.
 
-| Mode | ID | Behavior |
-|------|-----|----------|
-| ✋ Custom | `custom` | Nodes are pinned (`fx`/`fy`); the user drags them freely and positions persist. |
-| ⚡ Auto | `auto` | D3 force-directed layout (`forceLink`, `forceManyBody`, `forceCenter`, `forceCollide`). Dragging perturbs the simulation. |
-| 📅 Age | `age` | Y position is fixed by birth year (older = higher); X is free to drag. Draws year guide lines and a "Now" line. See [`layoutAge.js`](../src/renderer/src/components/graph/layoutAge.js). |
-| 🏛 Generation | `generation` | Hierarchical top-down layout computed from parent/child + spouse relationships. Nodes snap to generation rows; dragging between rows previews and creates new rows. See [`familyTreeLayout.ts`](../src/renderer/src/components/graph/familyTreeLayout.ts). |
+| Type | Scene `type` | Behavior |
+|------|--------------|----------|
+| ✋ Free | `free` | Nodes are pinned (`fx`/`fy`); the user drags them freely and positions persist. |
+| ⚡ Organic | `organic` | D3 force-directed layout (`forceLink`, `forceManyBody`, `forceCenter`, `forceCollide`). Dragging perturbs the simulation. |
+| 📅 Birth | `birth` | Y position is fixed by birth date (older = higher); X is free to drag. Draws year guide lines and a "Present" line. See [`layoutAge.js`](../src/renderer/src/components/graph/layoutAge.js). |
+| 🏛 Generations | `generations` | Hierarchical top-down layout computed from parent/child + spouse relationships. Nodes snap to generation rows; dragging between rows previews and creates new rows. See [`familyTreeLayout.ts`](../src/renderer/src/components/graph/familyTreeLayout.ts). |
 
 Layout math lives in **pure functions** (`computeAgeYPositions`, `computeGenLayout`)
 that take data and dimensions and return target positions — no D3, no store, so they
 are easy to reason about and test.
 
-## Per-mode multi-state
+## Scenes
 
-Each mode holds an array of named **states** (layout snapshots) the user can create,
-rename, duplicate, and delete from the states bar. This lets you keep several arranged
-versions of the same tree per mode.
+The graph runs off `view:'graph'` **Scenes** — named, saved arrangements the user
+creates, renames, duplicates and deletes from the shared Scene tab strip
+([`SceneTabs.vue`](../src/renderer/src/components/SceneTabs.vue)). Each scene
+carries its layout `type`, a `positions` map (`{ [personId]: {x, y} }`) and a
+`config` (generation rows `genRowYValues`/`genRowSpacing`, Focus `emphasis`).
+`GraphCanvas` keeps a live **working copy** per scene and points the shared `ctx`
+at the active one.
 
-- `modeStateNames[mode]` — display names.
-- `modeActiveStateIdx[mode]` — which state is live.
-- `modeStateSnapshots[mode][idx]` — `{ [personId]: {x, y} }` (generation snapshots
-  also carry `_genRowYValues` and `_genRowSpacing`).
-
-Switching modes or states snapshots the current positions first, then animates into
-the target snapshot (recomputing a fresh layout if none exists yet).
-
-The shape of it — 4 modes, each holding its own list of position snapshots:
-
-```mermaid
-flowchart TD
-    G["graphState (per tree)"]
-    G --> custom["✋ custom"] & auto["⚡ auto"] & age["📅 age"] & gen["🏛 generation"]
-    custom --> cs["states[]: “Default”, “Reunion”, …"]
-    auto --> as["states[]"]
-    age --> ags["states[]"]
-    gen --> gs["states[] (+ _genRowYValues, _genRowSpacing)"]
-    cs --> snap["each state = { personId → {x, y} }"]
-
-    style G fill:#8b6cc5,color:#fff
-```
-
-Switching mode/state is always the same guarded transition:
+Switching scene (or retyping the active one) is always the same guarded transition:
 
 ```mermaid
 stateDiagram-v2
     direction LR
     [*] --> Live
-    Live --> Snapshotting: user picks mode/state
-    Snapshotting --> Resolving: save current x/y into the outgoing state
-    Resolving --> Animating: look up target snapshot (compute fresh if empty)
-    Animating --> Live: tween ~350–500ms, then settle
+    Live --> Snapshotting: user picks a scene / type
+    Snapshotting --> Resolving: save current x/y into the outgoing working copy
+    Resolving --> Animating: look up target positions (compute fresh if empty)
+    Animating --> Live: tween ~350-500ms, then settle
 ```
 
 ## Guides & generation rows
@@ -101,10 +76,10 @@ stateDiagram-v2
 [`guideLines.js`](../src/renderer/src/components/graph/guideLines.js) draws the
 non-node overlays in the `guides-layer`:
 
-- **Age mode:** dashed horizontal year lines at a sensible interval, plus a
+- **Birth type:** dashed horizontal year lines at a sensible interval, plus a
   highlighted **"Now · <year>"** line driven by `store.currentDate` that slides when
   the year changes.
-- **Generation mode:** dashed generation-row lines. Dragging a node shows a live
+- **Generations type:** dashed generation-row lines. Dragging a node shows a live
   "New Gen" preview; dropping resolves the target row (`resolveGenTarget`), and empty
   rows are pruned and redistributed with an animated reflow
   (`cleanupEmptyGenRows` / `redistributeGenRows`).
@@ -118,18 +93,18 @@ emphasis-aware `getLinkStroke` / `getLinkWidth` / `getLinkMarker` / `getDashArra
 Line style encodes type: solid = parent/child, dashed = spouse, dotted-ish = adopted;
 divorced spouses are faded and finely dashed.
 
-## Highlights
+## Focus
 
-The Highlights panel (top-right) layers non-destructive emphasis over any mode by
-adjusting node/link opacity, size, and color. These are visual filters only — they
-never mutate data.
+The Focus popover (toggled from the tool pill) layers non-destructive emphasis over
+any layout by adjusting node/link opacity, size, and color. These are visual filters
+only — they never mutate data.
 
-| Highlight | Options |
+| Focus filter | Options |
 |-----------|---------|
 | Lineage | Default / Paternal / Maternal (traces father's vs mother's edges) |
 | Gender | Default / Male / Female |
 | Marriage | Default / Married / Divorced / Single |
-| Deceased | Default / Deceased / Living — **requires** a current date set in the left sidebar |
+| Deceased | Default / Deceased / Living — **requires** a Present date (Project ▾ menu) |
 
 ## Nodes
 
@@ -140,43 +115,26 @@ date (or today) and capped at the death year.
 
 ## Persistence {#persistence}
 
-The full graph arrangement is serialized per tree and restored on load.
+Arrangements **autosave**: every position snapshot (drag end, retype, scene
+operation) writes the active scene through `scenes:save`, lightly debounced and
+flushed on scene/project switches and exit. On load, `GraphCanvas` enters the
+project's saved active graph scene (the `activeSceneId:graph` setting), creating a
+default `organic` scene for a brand-new project.
 
-```mermaid
-flowchart LR
-    subgraph save["💾 Save (on demand)"]
-        collect["collectGraphState()<br/>snapshot mode + all states"] --> set["store.saveGraphState<br/>→ settings:set 'graphState'"]
-        set --> clear["graphDirty = false"]
-    end
-    subgraph loadflow["📂 Load (first data load)"]
-        get["settings:getAll → graphState"] --> restore["restoreGraphState()"] --> reenter["re-enter saved mode"]
-    end
-    edit["✋ user moves nodes /<br/>switches mode/state"] --> dirty["graphDirty = true<br/>(Save Layout pulses)"]
-    dirty -.->|user clicks Save| save
-
-    style dirty fill:#f5a623,color:#000
-```
-
-
-
-- `collectGraphState()` snapshots the current mode, emphasis, and **all** modes'
-  state names, active indices, and position snapshots into one object.
-- `saveGraphState` (store) writes it via `settings:set` under the `graphState` key,
-  scoped to the active tree.
-- On first data load, `GraphCanvas` restores the saved state
-  (`restoreGraphState`) and re-enters the saved mode.
-
-Because layout changes aren't auto-saved, the app tracks a `graphDirty` flag. The
-**Save Layout** button pulses when there are unsaved changes, and closing the window
-with unsaved layout changes prompts *Save & Close / Discard & Close / Cancel* — wired
-from the main process via `window.__isGraphDirty` / `window.__saveGraphLayout`
-(see [`index.js`](../src/main/index.js) and [`App.vue`](../src/renderer/src/App.vue)).
+On top of autosave sits the manual **checkpoint**: **Save** (Ctrl/Cmd+S or the
+Project ▾ menu) snapshots the project's arrangement state (scenes + Groups
+placements + the Present override) via `checkpoint:save`, and **Revert to saved**
+restores it wholesale via `checkpoint:revert`. Closing with changes since the last
+checkpoint prompts *Save & Close / Discard & Close / Cancel* — wired from the main
+process via `window.__hasUnsavedChanges` / `window.__saveCheckpoint` /
+`window.__discardChanges` (see [`index.js`](../src/main/index.js) and
+[`App.vue`](../src/renderer/src/App.vue)); the web build uses `beforeunload`.
 
 ## Other views on the same data
 
 The graph is one of five views; the others also read the store's persons/relationships:
 
-- **People** ([`PeopleView.vue`](../src/renderer/src/components/PeopleView.vue)) —
+- **Directory** ([`PeopleView.vue`](../src/renderer/src/components/PeopleView.vue)) —
   searchable, sortable card grid. A native-scroll, responsive CSS grid that windows
   to the visible rows (pure math in [`people/peopleLayout.js`](../src/renderer/src/components/people/peopleLayout.js),
   scroll/resize glue in [`people/useVirtualGrid.js`](../src/renderer/src/components/people/useVirtualGrid.js),
@@ -200,15 +158,16 @@ The graph is one of five views; the others also read the store's persons/relatio
   lifelines on a year axis, ordered into lanes by the family-tree layout algorithm
   (`computeTreeOrder`), with birth and
   marriage connectors and independent time/width zoom.
-- **Factions**
+- **Groups**
   ([`FactionsView.vue`](../src/renderer/src/components/FactionsView.vue)) — people
-  clustered into user-defined groups (families, companies, houses, …) by a small
-  d3-force simulation; members of several factions settle between them (tether
-  threads, orbiting ring segments, and a count badge mark them). Membership is
-  edited by drag-and-drop (from the stage, the unassigned tray, or the member
-  list). A bottom bar switches between **scenarios** — alternative faction
-  configurations over the same people; same-name factions glide between
-  scenarios while people shift with the simulation. Pure layout math lives in
+  clustered by their **tags** (a Group = a tag placed in a groups scene via
+  `scene_tags`) with a small d3-force simulation; members of several groups settle
+  between them (tether threads, orbiting ring segments, and a count badge mark
+  them). Membership edits the `entity_tags` join by drag-and-drop (from the stage,
+  the unassigned tray, or the Directory tab). The Scene tab strip switches between
+  **scenes** — alternative placements of the same shared tags; placements of the
+  same tag glide between scenes while people shift with the simulation. Pure
+  layout math lives in
   [`components/factions/factionLayout.js`](../src/renderer/src/components/factions/factionLayout.js).
 
 The graph stays mounted (hidden) when another view is active, so its simulation and

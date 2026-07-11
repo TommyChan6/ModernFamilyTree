@@ -63,7 +63,7 @@ There is no linter or formatter config in the repo; follow the prevailing style:
   `{ success: true, data }` or `{ success: false, error: err.message }`. Never let an
   exception cross the process boundary.
 - Call `save()` after any mutation, before returning success.
-- Tag new records with the active tree's `tree_id`; filter reads by active tree.
+- Tag new records with the active project's `project_id`; filter reads by active project.
 
 ## IDs, dates, cascades
 
