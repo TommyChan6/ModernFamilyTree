@@ -23,6 +23,7 @@ import type {
   Relationship,
   Scenario
 } from './types'
+import { yearDate } from './calendarMath'
 
 function sortByDate<T extends { created_at: string }>(arr: T[]): T[] {
   return arr.slice().sort((a, b) => (a.created_at > b.created_at ? 1 : -1))
@@ -87,6 +88,34 @@ export function migrateTreesToProjects(db: any): boolean {
   return changed
 }
 
+// ── Migration: bare year numbers → DateValue ─────────────────────────────────
+// Dates used to be stored as plain year numbers (`birth_year`, `death_year`,
+// `formed_date`). Wrap them as year-precision Gregorian DateValues in place
+// (null stays null). Idempotent — already-migrated rows pass through untouched.
+// Returns true when anything changed. Both shells run this on load.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function migrateYearsToDateValues(db: any): boolean {
+  let changed = false
+  const move = (row: Record<string, unknown>, oldKey: string, newKey: string): void => {
+    if (!(newKey in row)) {
+      row[newKey] = yearDate(row[oldKey] as number | string | null)
+      changed = true
+    }
+    if (oldKey in row) {
+      delete row[oldKey]
+      changed = true
+    }
+  }
+  for (const p of Object.values(db.persons || {})) {
+    move(p as Record<string, unknown>, 'birth_year', 'birth')
+    move(p as Record<string, unknown>, 'death_year', 'death')
+  }
+  for (const r of Object.values(db.relationships || {})) {
+    move(r as Record<string, unknown>, 'formed_date', 'formed')
+  }
+  return changed
+}
+
 // ── Sample family seeded on first run (shared so desktop and web start identical) ──
 export function seedSampleData(db: DB, projectId: string, env: Env): void {
   const now = env.nowStr()
@@ -100,7 +129,7 @@ export function seedSampleData(db: DB, projectId: string, env: Env): void {
   const addP = (
     id: string,
     name: string,
-    birth_year: number,
+    birthYear: number,
     gender: string,
     bio: string,
     occupation: string,
@@ -110,8 +139,8 @@ export function seedSampleData(db: DB, projectId: string, env: Env): void {
       id,
       project_id: projectId,
       name,
-      birth_year,
-      death_year: null,
+      birth: yearDate(birthYear),
+      death: null,
       gender,
       bio,
       occupation,
@@ -129,7 +158,7 @@ export function seedSampleData(db: DB, projectId: string, env: Env): void {
       person_b_id: b,
       type,
       status: 'active',
-      formed_date: null,
+      formed: null,
       created_at: now
     }
   }
@@ -301,8 +330,8 @@ export const channelHandlers: Record<string, Handler> = {
       id,
       project_id: db.activeProjectId as string,
       name: data.name || '',
-      birth_year: data.birth_year || null,
-      death_year: data.death_year || null,
+      birth: data.birth ?? null,
+      death: data.death ?? null,
       gender: data.gender || 'unknown',
       bio: data.bio || '',
       occupation: data.occupation || '',
@@ -320,8 +349,8 @@ export const channelHandlers: Record<string, Handler> = {
     const updated: Person = {
       ...existing,
       name: data.name || '',
-      birth_year: data.birth_year || null,
-      death_year: data.death_year || null,
+      birth: data.birth ?? null,
+      death: data.death ?? null,
       gender: data.gender || 'unknown',
       bio: data.bio || '',
       occupation: data.occupation || '',
@@ -367,7 +396,7 @@ export const channelHandlers: Record<string, Handler> = {
       person_b_id: data.person_b_id,
       type: data.type,
       status: data.status || 'active',
-      formed_date: data.formed_date || null,
+      formed: data.formed ?? null,
       created_at: env.nowStr()
     }
     db.relationships[id] = rel
@@ -378,7 +407,7 @@ export const channelHandlers: Record<string, Handler> = {
     const existing = db.relationships[data.id]
     if (!existing) throw new Error('Relationship not found')
     if (data.status !== undefined) existing.status = data.status
-    if (data.formed_date !== undefined) existing.formed_date = data.formed_date
+    if (data.formed !== undefined) existing.formed = data.formed
     if (data.type !== undefined) existing.type = data.type
     if (data.person_a_id !== undefined) existing.person_a_id = data.person_a_id
     if (data.person_b_id !== undefined) existing.person_b_id = data.person_b_id

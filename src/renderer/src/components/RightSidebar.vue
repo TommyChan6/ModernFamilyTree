@@ -40,8 +40,8 @@
           <div class="person-info">
             <div class="person-name">{{ row.p.name }}</div>
             <div class="person-meta">
-              <span v-if="row.p.birth_year">b. {{ row.p.birth_year }}</span>
-              <span v-if="row.p.birth_year && row.p.occupation"> · </span>
+              <span v-if="row.p.birth?.year">b. {{ row.p.birth.year }}</span>
+              <span v-if="row.p.birth?.year && row.p.occupation"> · </span>
               <span v-if="row.p.occupation" class="person-occ">{{ row.p.occupation }}</span>
             </div>
             <div v-if="row.p.location" class="person-location">📍 {{ row.p.location }}</div>

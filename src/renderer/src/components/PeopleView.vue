@@ -144,7 +144,7 @@ const displayed = computed(() => {
   } else if (sortBy.value === 'birth') {
     arr.sort(
       (a, b) =>
-        (a.birth_year || Infinity) - (b.birth_year || Infinity) ||
+        (a.birth?.year || Infinity) - (b.birth?.year || Infinity) ||
         (a.name || '').localeCompare(b.name || '')
     )
   } else if (sortBy.value === 'age') {

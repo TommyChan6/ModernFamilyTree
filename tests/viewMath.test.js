@@ -18,17 +18,19 @@ import {
   ROW_H
 } from '../src/renderer/src/components/people/peopleLayout.js'
 import { latestDataYear } from '../src/renderer/src/store/currentYear.js'
+import { yearDate } from '../src/shared/calendarMath'
 
 const REF = 2026
+const yd = yearDate
 
 function person(id, name, birth, extra = {}) {
-  return { id, name, birth_year: birth, ...extra }
+  return { id, name, birth: yd(birth), ...extra }
 }
 
 describe('computeTimelineLayout', () => {
   const persons = [
     person('a', 'Alice', 1950),
-    person('b', 'Bob', 1948, { death_year: 2000 }),
+    person('b', 'Bob', 1948, { death: yd(2000) }),
     person('c', 'Carol', 1975),
     person('u', 'Undated', null)
   ]
@@ -38,7 +40,7 @@ describe('computeTimelineLayout', () => {
       type: 'spouse',
       person_a_id: 'a',
       person_b_id: 'b',
-      formed_date: '1970',
+      formed: yd(1970),
       status: 'active'
     },
     { id: 'p1', type: 'parent_child', person_a_id: 'a', person_b_id: 'c' }
@@ -118,9 +120,9 @@ describe('computeTimelineLayout', () => {
 })
 
 describe('lifeEnd', () => {
-  it('uses the death year when it is in the past, else the reference year', () => {
-    expect(lifeEnd({ death_year: 1990 }, REF)).toBe(1990)
-    expect(lifeEnd({ death_year: 2100 }, REF)).toBe(REF)
+  it('uses the death date when it is in the past, else the reference year', () => {
+    expect(lifeEnd({ death: yd(1990) }, REF)).toBe(1990)
+    expect(lifeEnd({ death: yd(2100) }, REF)).toBe(REF)
     expect(lifeEnd({}, REF)).toBe(REF)
   })
 })
@@ -208,16 +210,16 @@ describe('People view — rowWindow', () => {
 
 describe('People view — person display helpers', () => {
   const REF = 2026
-  it('ageOf caps at the death year and rejects the undated/nonsensical', () => {
-    expect(ageOf({ birth_year: 2000 }, REF)).toBe(26)
-    expect(ageOf({ birth_year: 2000, death_year: 2020 }, REF)).toBe(20)
-    expect(ageOf({ birth_year: 2100, death_year: 2200 }, REF)).toBe(null) // born in the future
+  it('ageOf caps at the death date and rejects the undated/nonsensical', () => {
+    expect(ageOf({ birth: yd(2000) }, REF)).toBe(26)
+    expect(ageOf({ birth: yd(2000), death: yd(2020) }, REF)).toBe(20)
+    expect(ageOf({ birth: yd(2100), death: yd(2200) }, REF)).toBe(null) // born in the future
     expect(ageOf({}, REF)).toBe(null)
   })
 
-  it('isDeceased only counts a death year at or before the reference year', () => {
-    expect(isDeceased({ death_year: 2020 }, REF)).toBe(true)
-    expect(isDeceased({ death_year: 2100 }, REF)).toBe(false)
+  it('isDeceased only counts a death date at or before the reference year', () => {
+    expect(isDeceased({ death: yd(2020) }, REF)).toBe(true)
+    expect(isDeceased({ death: yd(2100) }, REF)).toBe(false)
     expect(isDeceased({}, REF)).toBe(false)
   })
 })
@@ -230,36 +232,40 @@ describe('latestDataYear (temporary current year)', () => {
 
   it('uses the latest birth or death year across people', () => {
     const persons = [
-      { id: 'a', birth_year: 1950, death_year: 2001 },
-      { id: 'b', birth_year: 1975 },
-      { id: 'c', birth_year: 1948, death_year: 1990 }
+      { id: 'a', birth: yd(1950), death: yd(2001) },
+      { id: 'b', birth: yd(1975) },
+      { id: 'c', birth: yd(1948), death: yd(1990) }
     ]
     expect(latestDataYear(persons, [])).toBe(2001)
   })
 
   it('picks a later birth year over an earlier death year', () => {
     const persons = [
-      { id: 'a', birth_year: 1950, death_year: 1990 },
-      { id: 'b', birth_year: 1995 }
+      { id: 'a', birth: yd(1950), death: yd(1990) },
+      { id: 'b', birth: yd(1995) }
     ]
     expect(latestDataYear(persons, [])).toBe(1995)
   })
 
-  it('considers relationship formed dates (numeric or string)', () => {
-    const persons = [{ id: 'a', birth_year: 1950 }]
-    const rels = [{ id: 'm', formed_date: '1999' }]
+  it('considers relationship formed dates', () => {
+    const persons = [{ id: 'a', birth: yd(1950) }]
+    const rels = [{ id: 'm', formed: yd('1999') }]
     expect(latestDataYear(persons, rels)).toBe(1999)
   })
 
-  it('ignores missing, zero and non-numeric years', () => {
+  it('ignores missing and unusable dates', () => {
     const persons = [
-      { id: 'a', birth_year: null, death_year: undefined },
-      { id: 'b', birth_year: 0 },
-      { id: 'c', birth_year: 1960 }
+      { id: 'a', birth: null, death: undefined },
+      { id: 'b', birth: yd(0) }, // yearDate(0) → null
+      { id: 'c', birth: yd(1960) }
     ]
     const rels = [
-      { id: 'm', formed_date: '' },
-      { id: 'n', formed_date: 'unknown' }
+      { id: 'm', formed: yd('') },
+      { id: 'n', formed: yd('unknown') },
+      {
+        id: 'o',
+        formed: { year: null, month: null, day: null, precision: 'year', calendar: 'gregorian' }
+      }
     ]
     expect(latestDataYear(persons, rels)).toBe(1960)
   })

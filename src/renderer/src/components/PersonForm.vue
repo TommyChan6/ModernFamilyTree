@@ -240,6 +240,7 @@
 import { ref, computed, watch } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { api } from '../api'
+import { yearDate } from '../../../shared/calendarMath'
 
 const store = useMainStore()
 
@@ -300,7 +301,7 @@ function buildExistingRels(personId) {
       roleLabel,
       relType: r.type,
       status: r.status || 'active',
-      formedDate: r.formed_date || null
+      formedDate: r.formed?.year || null
     })
   })
   return rels
@@ -319,7 +320,7 @@ async function updateExistingRelStatus(relId, status) {
 
 async function updateExistingRelDate(relId, val) {
   const formedDate = val ? +val : null
-  await store.updateRelationship({ id: relId, formed_date: formedDate })
+  await store.updateRelationship({ id: relId, formed: yearDate(formedDate) })
   const rel = existingRels.value.find((r) => r.id === relId)
   if (rel) rel.formedDate = formedDate
 }
@@ -334,8 +335,8 @@ watch(
         firstName: parts.slice(0, -1).join(' ') || parts[0] || '',
         lastName: parts.length > 1 ? parts[parts.length - 1] : '',
         gender: person.gender || 'unknown',
-        birthYear: person.birth_year || null,
-        deathYear: person.death_year || null,
+        birthYear: person.birth?.year || null,
+        deathYear: person.death?.year || null,
         occupation: person.occupation || '',
         location: person.location || '',
         bio: person.bio || ''
@@ -464,8 +465,9 @@ async function handleSubmit() {
   try {
     const personData = {
       name: fullName(),
-      birth_year: form.value.birthYear || null,
-      death_year: form.value.deathYear || null,
+      // The form edits just a year for now; store it as a year-precision DateValue
+      birth: yearDate(form.value.birthYear),
+      death: yearDate(form.value.deathYear),
       gender: form.value.gender,
       bio: form.value.bio,
       occupation: form.value.occupation,
@@ -501,7 +503,7 @@ async function handleSubmit() {
           person_b_id,
           type,
           status: link.divorced ? 'divorced' : 'active',
-          formed_date: link.formedDate || null
+          formed: yearDate(link.formedDate)
         })
       }
     } else {
@@ -536,7 +538,7 @@ async function handleSubmit() {
             person_b_id,
             type,
             status: link.divorced ? 'divorced' : 'active',
-            formed_date: link.formedDate || null
+            formed: yearDate(link.formedDate)
           })
         }
       }

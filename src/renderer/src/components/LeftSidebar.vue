@@ -199,7 +199,7 @@ function setCurrentDate(val) {
 
 const generationCount = computed(() => {
   // Simple heuristic: number of distinct birth decade groups
-  const years = store.persons.filter((p) => p.birth_year).map((p) => Math.floor(p.birth_year / 20))
+  const years = store.persons.filter((p) => p.birth?.year).map((p) => Math.floor(p.birth.year / 20))
   return new Set(years).size || 0
 })
 

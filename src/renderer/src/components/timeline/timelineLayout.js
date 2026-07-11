@@ -6,6 +6,7 @@
 // so the layout only recomputes when the data changes.
 
 import { computeTreeOrder } from '../graph/familyTreeLayout'
+import { toOrdinal } from '../../../../shared/calendarMath'
 
 export const GUTTER = 64 // fixed year-axis gutter width (screen px)
 export const LANE_W = 150 // horizontal distance between lifelines (unscaled px)
@@ -13,7 +14,8 @@ export const X0 = 110 // x of the first lane (unscaled px)
 export const Y_PAD = 40 // screen-space padding above the first year
 
 export function lifeEnd(p, refYear) {
-  return p.death_year && p.death_year <= refYear ? p.death_year : refYear
+  const death = toOrdinal(p.death)
+  return death != null && death <= refYear ? death : refYear
 }
 
 // Lane order comes from the same family-tree layout algorithm the Tree View
@@ -24,48 +26,51 @@ export function computeLaneOrder(persons, relationships) {
 }
 
 export function computeTimelineLayout(persons, relationships, refYear, laneOrder = null) {
-  const dated = persons.filter((p) => p.birth_year)
+  const birthOf = (p) => toOrdinal(p.birth)
+  const dated = persons.filter((p) => birthOf(p) != null)
 
   // Use the caller's (frozen) lane order when given; people missing from it —
   // e.g. added since the last "refresh layout" — append on the right in a
-  // stable birth-year order.
+  // stable birth-date order.
   const order = laneOrder || computeLaneOrder(persons, relationships)
   const orderIdx = new Map(order.map((id, i) => [id, i]))
   dated.sort((a, b) => {
     const ia = orderIdx.has(a.id) ? orderIdx.get(a.id) : Infinity
     const ib = orderIdx.has(b.id) ? orderIdx.get(b.id) : Infinity
     if (ia !== ib) return ia - ib
-    return a.birth_year - b.birth_year || (a.name || '').localeCompare(b.name || '')
+    return birthOf(a) - birthOf(b) || (a.name || '').localeCompare(b.name || '')
   })
 
-  const minYear = dated.length ? Math.min(...dated.map((p) => p.birth_year)) : refYear - 50
+  const minYear = dated.length ? Math.min(...dated.map(birthOf)) : refYear - 50
   let maxYear = minYear + 10
   dated.forEach((p) => {
     maxYear = Math.max(maxYear, lifeEnd(p, refYear))
   })
   relationships.forEach((r) => {
-    const y = parseInt(r.formed_date)
+    const y = toOrdinal(r.formed)
     if (y) maxYear = Math.max(maxYear, y)
   })
   const yearSpan = Math.max(10, maxYear - minYear)
 
   const people = dated.map((p, i) => {
-    const dead = !!p.death_year && p.death_year <= refYear
+    const birth = birthOf(p)
+    const death = toOrdinal(p.death)
+    const dead = death != null && death <= refYear
     const end = lifeEnd(p, refYear)
-    const age = Math.max(0, end - p.birth_year)
+    const age = Math.max(0, Math.floor(end - birth))
     return {
       id: p.id,
       i,
       laneX: X0 + i * LANE_W,
-      birthYear: p.birth_year,
+      birthYear: birth,
       endYear: end,
       dead,
       gender: p.gender,
       name: p.name || 'Unnamed',
       image: p.primary_image || null,
       yearsLabel: dead
-        ? `${p.birth_year}–${p.death_year} · ${age} yr`
-        : `b. ${p.birth_year} · ${age} yr`
+        ? `${p.birth.year}–${p.death.year} · ${age} yr`
+        : `b. ${p.birth.year} · ${age} yr`
     }
   })
   const laneById = new Map(people.map((p) => [p.id, p]))
@@ -81,11 +86,11 @@ export function computeTimelineLayout(persons, relationships, refYear, laneOrder
       const pa = personById.get(r.person_a_id)
       const pb = personById.get(r.person_b_id)
 
-      let year = parseInt(r.formed_date) || null
+      let year = toOrdinal(r.formed) || null
       let estimated = false
       if (!year) {
         // No recorded date — sketch a plausible spot inside the shared lifespan
-        const lo = Math.max(pa.birth_year, pb.birth_year)
+        const lo = Math.max(toOrdinal(pa.birth), toOrdinal(pb.birth))
         const hi = Math.min(lifeEnd(pa, refYear), lifeEnd(pb, refYear))
         year = hi > lo ? Math.min(lo + 25, hi) : lo
         estimated = true

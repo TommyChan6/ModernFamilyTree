@@ -8,12 +8,24 @@ export interface Project {
   updated_at: string
 }
 
+/** A structured, mutable date. Only the Gregorian calendar (usually just a
+ *  year) is used for now, but the shape lets custom calendars slot in later as
+ *  a data-compatible change. `null` parts mean "unknown / not entered"; the
+ *  precision says how much of the date is meaningful. */
+export interface DateValue {
+  year: number | null
+  month: number | null
+  day: number | null
+  precision: 'year' | 'month' | 'day'
+  calendar: 'gregorian'
+}
+
 export interface Person {
   id: string
   project_id: string
   name: string
-  birth_year: number | null
-  death_year: number | null
+  birth: DateValue | null
+  death: DateValue | null
   gender: string
   bio: string
   occupation: string
@@ -29,7 +41,7 @@ export interface Relationship {
   person_b_id: string
   type: string
   status: string
-  formed_date: string | null
+  formed: DateValue | null
   created_at: string
 }
 

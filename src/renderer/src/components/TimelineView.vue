@@ -149,6 +149,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { api } from '../api'
+import { yearDate } from '../../../shared/calendarMath'
 import {
   computeTimelineLayout,
   computeLaneOrder,
@@ -569,7 +570,7 @@ async function saveMarriageEdit() {
   const year = mEdit.value.year
   await store.updateRelationship({
     id: mEdit.value.relId,
-    formed_date: year && year > 0 ? year : null,
+    formed: year && year > 0 ? yearDate(year) : null,
     status: mEdit.value.status
   })
   mEdit.value = null

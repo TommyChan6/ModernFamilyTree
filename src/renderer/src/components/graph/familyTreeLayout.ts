@@ -16,6 +16,9 @@
 // Everything is deterministic (stable sorts, id tie-breaks) and O(sweeps · (N + E)
 // + N log N per row sort), so a few thousand people stay well under a frame.
 
+import type { DateValue } from '../../../../shared/types'
+import { toOrdinal } from '../../../../shared/calendarMath'
+
 export const NODE_GAP = 90 // min horizontal gap between neighbouring blocks
 export const SPOUSE_GAP = 56 // gap between partners inside a couple block
 export const COMPONENT_GAP = 170 // gap between disconnected family components
@@ -27,7 +30,7 @@ const LAYER_RELAX_PASSES = 20 // cap for the spouse/child row relaxation
 export interface LayoutPerson {
   id: string
   gender?: string | null
-  birth_year?: number | null
+  birth?: DateValue | null
 }
 
 export interface LayoutRelationship {
@@ -52,8 +55,7 @@ interface Block {
 }
 
 const isMale = (p: LayoutPerson | undefined): boolean => p?.gender === 'male'
-const birthOf = (p: LayoutPerson | undefined): number =>
-  typeof p?.birth_year === 'number' && p.birth_year ? p.birth_year : Infinity
+const birthOf = (p: LayoutPerson | undefined): number => toOrdinal(p?.birth) ?? Infinity
 
 function pushUnique(map: Map<string, string[]>, key: string, value: string): void {
   const arr = map.get(key)

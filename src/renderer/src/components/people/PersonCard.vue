@@ -36,9 +36,9 @@
     <div class="pcard-body">
       <div class="pcard-name" :title="person.name">{{ person.name }}</div>
       <div class="pcard-life">
-        <template v-if="person.birth_year || person.death_year">
-          {{ person.birth_year || '?'
-          }}<span v-if="person.death_year"> – {{ person.death_year }}</span>
+        <template v-if="person.birth?.year || person.death?.year">
+          {{ person.birth?.year || '?'
+          }}<span v-if="person.death?.year"> – {{ person.death.year }}</span>
         </template>
         <span v-else class="pcard-dim">Dates unknown</span>
       </div>

@@ -61,7 +61,7 @@
             <select v-model="editing.person_a_id" @keydown.enter="saveEdit">
               <option value="" disabled>Select person…</option>
               <option v-for="p in personOptions" :key="p.id" :value="p.id">
-                {{ p.name }}{{ p.birth_year ? ` (b. ${p.birth_year})` : '' }}
+                {{ p.name }}{{ p.birth?.year ? ` (b. ${p.birth.year})` : '' }}
               </option>
             </select>
           </div>
@@ -79,14 +79,14 @@
             <select v-model="editing.person_b_id" @keydown.enter="saveEdit">
               <option value="" disabled>Select person…</option>
               <option v-for="p in personOptions" :key="p.id" :value="p.id">
-                {{ p.name }}{{ p.birth_year ? ` (b. ${p.birth_year})` : '' }}
+                {{ p.name }}{{ p.birth?.year ? ` (b. ${p.birth.year})` : '' }}
               </option>
             </select>
           </div>
           <div class="rv-field rv-field-sm">
             <label>{{ editing.type === 'spouse' ? 'Married (year)' : 'Since (year)' }}</label>
             <input
-              v-model="editing.formed_date"
+              v-model="editing.formed_year"
               type="number"
               placeholder="Year"
               min="1"
@@ -184,7 +184,7 @@
                   </div>
                   <div class="rv-psub">
                     {{ roleLabel(row.rel.type, 'a')
-                    }}<template v-if="row.a?.birth_year"> · b. {{ row.a.birth_year }}</template>
+                    }}<template v-if="row.a?.birth?.year"> · b. {{ row.a.birth.year }}</template>
                   </div>
                 </div>
               </button>
@@ -250,7 +250,7 @@
                   </div>
                   <div class="rv-psub">
                     {{ roleLabel(row.rel.type, 'b')
-                    }}<template v-if="row.b?.birth_year"> · b. {{ row.b.birth_year }}</template>
+                    }}<template v-if="row.b?.birth?.year"> · b. {{ row.b.birth.year }}</template>
                   </div>
                 </div>
               </button>
@@ -260,7 +260,7 @@
                 <input
                   type="number"
                   class="rv-since-input"
-                  :value="row.rel.formed_date || ''"
+                  :value="row.rel.formed?.year || ''"
                   placeholder="—"
                   min="1"
                   max="2200"
@@ -298,7 +298,7 @@
                     <select v-model="editing.person_a_id" @keydown.enter="saveEdit">
                       <option value="" disabled>Select person…</option>
                       <option v-for="p in personOptions" :key="p.id" :value="p.id">
-                        {{ p.name }}{{ p.birth_year ? ` (b. ${p.birth_year})` : '' }}
+                        {{ p.name }}{{ p.birth?.year ? ` (b. ${p.birth.year})` : '' }}
                       </option>
                     </select>
                   </div>
@@ -316,7 +316,7 @@
                     <select v-model="editing.person_b_id" @keydown.enter="saveEdit">
                       <option value="" disabled>Select person…</option>
                       <option v-for="p in personOptions" :key="p.id" :value="p.id">
-                        {{ p.name }}{{ p.birth_year ? ` (b. ${p.birth_year})` : '' }}
+                        {{ p.name }}{{ p.birth?.year ? ` (b. ${p.birth.year})` : '' }}
                       </option>
                     </select>
                   </div>
@@ -325,7 +325,7 @@
                       editing.type === 'spouse' ? 'Married (year)' : 'Since (year)'
                     }}</label>
                     <input
-                      v-model="editing.formed_date"
+                      v-model="editing.formed_year"
                       type="number"
                       placeholder="Year"
                       min="1"
@@ -396,6 +396,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { api } from '../api'
+import { yearDate } from '../../../shared/calendarMath'
 
 const store = useMainStore()
 
@@ -413,7 +414,7 @@ const query = ref('')
 const typeFilter = ref('all') // 'all' | 'parent_child' | 'spouse' | 'adopted' | 'issues'
 const sortKey = ref('type')
 const sortDir = ref(1)
-const editing = ref(null) // { id: 'new' | relId, person_a_id, person_b_id, type, formed_date, status }
+const editing = ref(null) // { id: 'new' | relId, person_a_id, person_b_id, type, formed_year, status }
 const editError = ref('')
 
 function imageUrl(filename) {
@@ -487,11 +488,11 @@ const issuesByRel = computed(() => {
     }
     if (
       (r.type === 'parent_child' || r.type === 'adopted') &&
-      a?.birth_year &&
-      b?.birth_year &&
-      a.birth_year >= b.birth_year
+      a?.birth?.year &&
+      b?.birth?.year &&
+      a.birth.year >= b.birth.year
     ) {
-      add(r.id, `Parent (b. ${a.birth_year}) born after or same year as child (b. ${b.birth_year})`)
+      add(r.id, `Parent (b. ${a.birth.year}) born after or same year as child (b. ${b.birth.year})`)
     }
     if (r.type === 'parent_child' && parentCount[r.person_b_id] > 2) {
       add(r.id, `${b?.name || 'This child'} has more than two biological parents`)
@@ -552,7 +553,7 @@ const rows = computed(() => {
   }
   const dir = sortDir.value
   const nm = (p) => (p?.name || '').toLowerCase()
-  const yr = (r) => parseInt(r.formed_date) || 9e9
+  const yr = (r) => r.formed?.year || 9e9
   list.sort((x, y) => {
     let c = 0
     if (sortKey.value === 'from') c = nm(x.a).localeCompare(nm(y.a))
@@ -662,7 +663,7 @@ function startAdd() {
     person_a_id: '',
     person_b_id: '',
     type: 'parent_child',
-    formed_date: '',
+    formed_year: '',
     status: 'active'
   }
 }
@@ -673,7 +674,7 @@ function startEdit(rel) {
     person_a_id: rel.person_a_id,
     person_b_id: rel.person_b_id,
     type: rel.type,
-    formed_date: rel.formed_date || '',
+    formed_year: rel.formed?.year || '',
     status: rel.status || 'active'
   }
 }
@@ -728,7 +729,7 @@ async function saveEdit() {
     person_a_id: e.person_a_id,
     person_b_id: e.person_b_id,
     type: e.type,
-    formed_date: e.formed_date ? String(e.formed_date) : null,
+    formed: yearDate(e.formed_year),
     status: e.type === 'spouse' ? e.status : 'active'
   }
   const res =
@@ -765,7 +766,7 @@ async function swapRel(row) {
 }
 async function setSince(row, val) {
   const y = parseInt(val)
-  await store.updateRelationship({ id: row.rel.id, formed_date: y && y > 0 ? String(y) : null })
+  await store.updateRelationship({ id: row.rel.id, formed: y && y > 0 ? yearDate(y) : null })
 }
 async function toggleStatus(row) {
   if (row.rel.type !== 'spouse') return

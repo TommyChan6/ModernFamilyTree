@@ -6,11 +6,12 @@ import {
   SPOUSE_GAP,
   COMPONENT_GAP
 } from '../src/renderer/src/components/graph/familyTreeLayout'
+import { yearDate } from '../src/shared/calendarMath'
 
 const W = 1200
 const H = 800
 
-const person = (id, gender, birth) => ({ id, gender, birth_year: birth ?? null })
+const person = (id, gender, birth) => ({ id, gender, birth: yearDate(birth) })
 const spouse = (a, b) => ({ id: `s:${a}:${b}`, type: 'spouse', person_a_id: a, person_b_id: b })
 const child = (parent, kid, type = 'parent_child') => ({
   id: `c:${parent}:${kid}`,

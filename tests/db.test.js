@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
+import { yearDate } from '../src/shared/calendarMath'
 
 // ── Mock Electron's `app` module before importing db.js ─────────────────────
 let tmpDir
@@ -120,8 +121,8 @@ describe('Multi-project support', () => {
       id: 'p-other',
       project_id: project2Id,
       name: 'Other Person',
-      birth_year: 2000,
-      death_year: null,
+      birth: yearDate(2000),
+      death: null,
       gender: 'female',
       bio: '',
       occupation: '',
@@ -183,8 +184,8 @@ describe('Multi-project support', () => {
       id: 'dp1',
       project_id: project2Id,
       name: 'Del Person',
-      birth_year: 1990,
-      death_year: null,
+      birth: yearDate(1990),
+      death: null,
       gender: 'male',
       bio: '',
       occupation: '',
@@ -199,7 +200,7 @@ describe('Multi-project support', () => {
       person_b_id: 'dp1',
       type: 'spouse',
       status: 'active',
-      formed_date: null,
+      formed: null,
       created_at: nowStr()
     }
     save()
@@ -311,6 +312,13 @@ describe('Migration from tree vocabulary to project vocabulary', () => {
     expect(db.factions.f1.project_id).toBe('t1')
     expect(db.scenarios.s1.project_id).toBe('t1')
 
+    // Year numbers wrapped as DateValues
+    expect(db.persons.p1.birth).toEqual(yearDate(1980))
+    expect(db.persons.p1.death).toBeNull()
+    expect(db.persons.p1.birth_year).toBeUndefined()
+    expect(db.relationships.r1.formed).toBeNull()
+    expect(db.relationships.r1.formed_date).toBeUndefined()
+
     // Settings keys (keyed by id, not name) survive untouched
     expect(db.settings['t1:graphState']).toBe('{"currentMode":"auto"}')
 
@@ -349,6 +357,107 @@ describe('Migration from tree vocabulary to project vocabulary', () => {
       mod2.initDB()
       const second = JSON.parse(fs.readFileSync(path.join(dbDir, 'familytree.json'), 'utf8'))
       expect(second).toEqual(first)
+    })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Migration from year numbers to DateValues', () => {
+  const writeOldDatesDb = () => {
+    const dbDir = path.join(tmpDir, 'db')
+    fs.mkdirSync(dbDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dbDir, 'familytree.json'),
+      JSON.stringify({
+        projects: {
+          t1: { id: 't1', name: 'T', created_at: '2024-01-01', updated_at: '2024-01-01' }
+        },
+        activeProjectId: 't1',
+        persons: {
+          p1: {
+            id: 'p1',
+            project_id: 't1',
+            name: 'Dated',
+            birth_year: 1950,
+            death_year: 2001,
+            gender: 'male',
+            bio: '',
+            occupation: '',
+            location: '',
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01'
+          },
+          p2: {
+            id: 'p2',
+            project_id: 't1',
+            name: 'Undated',
+            birth_year: null,
+            death_year: null,
+            gender: 'female',
+            bio: '',
+            occupation: '',
+            location: '',
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01'
+          }
+        },
+        relationships: {
+          r1: {
+            id: 'r1',
+            project_id: 't1',
+            person_a_id: 'p1',
+            person_b_id: 'p2',
+            type: 'spouse',
+            status: 'active',
+            formed_date: '1975',
+            created_at: '2024-01-01'
+          }
+        },
+        factions: {},
+        scenarios: {},
+        images: {},
+        settings: {},
+        globalSettings: {}
+      })
+    )
+  }
+
+  it('wraps bare year numbers (and numeric strings) as year-precision DateValues', () => {
+    writeOldDatesDb()
+    initDB()
+    const { persons, relationships } = getDB()
+
+    expect(persons.p1.birth).toEqual({
+      year: 1950,
+      month: null,
+      day: null,
+      precision: 'year',
+      calendar: 'gregorian'
+    })
+    expect(persons.p1.death.year).toBe(2001)
+    expect(persons.p1.birth_year).toBeUndefined()
+    expect(persons.p1.death_year).toBeUndefined()
+
+    // null stays null
+    expect(persons.p2.birth).toBeNull()
+    expect(persons.p2.death).toBeNull()
+
+    // string year on a relationship becomes a numeric DateValue year
+    expect(relationships.r1.formed.year).toBe(1975)
+    expect(relationships.r1.formed_date).toBeUndefined()
+  })
+
+  it('round-trips: migrated DateValues persist to disk and reload unchanged', () => {
+    writeOldDatesDb()
+    initDB()
+    const first = JSON.parse(fs.readFileSync(path.join(tmpDir, 'db', 'familytree.json'), 'utf8'))
+    expect(first.persons.p1.birth.year).toBe(1950)
+
+    vi.resetModules()
+    return import('../src/main/db.js').then((mod2) => {
+      mod2.initDB()
+      const second = JSON.parse(fs.readFileSync(path.join(tmpDir, 'db', 'familytree.json'), 'utf8'))
+      expect(second).toEqual(first) // second init is a no-op
     })
   })
 })
@@ -401,6 +510,10 @@ describe('Migration from single-container to multi-project', () => {
     expect(db.persons['p1'].project_id).toBe(projectList[0].id)
     expect(db.relationships['r1'].project_id).toBe(projectList[0].id)
 
+    // Year numbers wrapped as DateValues
+    expect(db.persons['p1'].birth).toEqual(yearDate(1980))
+    expect(db.persons['p1'].birth_year).toBeUndefined()
+
     // Theme should be in globalSettings
     expect(db.globalSettings.theme).toBe('dark')
 
@@ -420,8 +533,8 @@ describe('Person CRUD', () => {
       id,
       project_id: activeProjectId,
       name: 'Test Person',
-      birth_year: 1990,
-      death_year: null,
+      birth: yearDate(1990),
+      death: null,
       gender: 'male',
       bio: 'A test person',
       occupation: 'Tester',
@@ -863,8 +976,8 @@ describe('Data integrity', () => {
       id,
       project_id: activeProjectId,
       name: 'Full Field Test',
-      birth_year: 1985,
-      death_year: 2050,
+      birth: yearDate(1985),
+      death: yearDate(2050),
       gender: 'female',
       bio: 'Bio with special chars: "quotes", <tags>, & ampersand',
       occupation: 'Engineer & Designer',
@@ -880,6 +993,15 @@ describe('Data integrity', () => {
     expect(p.name).toBe('Full Field Test')
     expect(p.bio).toBe('Bio with special chars: "quotes", <tags>, & ampersand')
     expect(p.project_id).toBe(activeProjectId)
+    // DateValues round-trip structurally intact
+    expect(p.birth).toEqual({
+      year: 1985,
+      month: null,
+      day: null,
+      precision: 'year',
+      calendar: 'gregorian'
+    })
+    expect(p.death.year).toBe(2050)
   })
 
   it('empty/null fields do not corrupt the database', () => {
@@ -889,8 +1011,8 @@ describe('Data integrity', () => {
       id: 'null-test',
       project_id: activeProjectId,
       name: '',
-      birth_year: null,
-      death_year: null,
+      birth: null,
+      death: null,
       gender: 'unknown',
       bio: '',
       occupation: '',

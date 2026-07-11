@@ -5,6 +5,8 @@
 // truth — the view feeds them to CSS via custom properties, so the JS windowing
 // math and the CSS grid can never disagree about card size or spacing.
 
+import { toOrdinal } from '../../../../shared/calendarMath'
+
 export const CARD_W = 196 // card width (px)
 export const CARD_H = 330 // card height (px)
 export const GAP = 22 // gap between cards, both axes (px)
@@ -56,18 +58,21 @@ export function rowWindow(scrollTop, viewH, count, cols, opts = {}) {
 }
 
 // ── Person display helpers ──────────────────────────────────────────────────
-// Deceased only if a death year exists and is at or before the reference year
-// (people with a future "death" year are still alive as of `refYear`).
+// Deceased only if a death date exists and is at or before the reference year
+// (people with a future "death" date are still alive as of `refYear`).
 export function isDeceased(p, refYear) {
-  return !!p.death_year && p.death_year <= refYear
+  const death = toOrdinal(p.death)
+  return death != null && death <= refYear
 }
 
-// Age at the reference year, capped at the death year; null when unknown or
+// Age at the reference year, capped at the death date; null when unknown or
 // nonsensical (birth after the reference year).
 export function ageOf(p, refYear) {
-  if (!p.birth_year) return null
-  const endYear = p.death_year ? Math.min(p.death_year, refYear) : refYear
-  const age = endYear - p.birth_year
+  const birth = toOrdinal(p.birth)
+  if (birth == null) return null
+  const death = toOrdinal(p.death)
+  const end = death != null ? Math.min(death, refYear) : refYear
+  const age = Math.floor(end - birth)
   return age >= 0 ? age : null
 }
 

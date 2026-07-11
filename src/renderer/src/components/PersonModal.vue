@@ -12,17 +12,17 @@
           <div class="hero-avatar">{{ initials(store.selectedPerson.name) }}</div>
           <div class="hero-name">{{ store.selectedPerson.name }}</div>
           <div class="hero-dates">
-            <span v-if="store.selectedPerson.birth_year"
-              >b. {{ store.selectedPerson.birth_year }}</span
+            <span v-if="store.selectedPerson.birth?.year"
+              >b. {{ store.selectedPerson.birth.year }}</span
             >
-            <span v-if="store.selectedPerson.birth_year && store.selectedPerson.death_year">
+            <span v-if="store.selectedPerson.birth?.year && store.selectedPerson.death?.year">
               –
             </span>
-            <span v-if="store.selectedPerson.death_year"
-              >d. {{ store.selectedPerson.death_year }}</span
+            <span v-if="store.selectedPerson.death?.year"
+              >d. {{ store.selectedPerson.death.year }}</span
             >
             <span
-              v-if="!store.selectedPerson.birth_year && !store.selectedPerson.death_year"
+              v-if="!store.selectedPerson.birth?.year && !store.selectedPerson.death?.year"
               class="text-muted"
               >No dates recorded</span
             >
@@ -43,9 +43,9 @@
             <div class="field-item">
               <div class="field-label">Born – Died</div>
               <div class="field-value">
-                {{ store.selectedPerson.birth_year || '—' }}
-                <span v-if="store.selectedPerson.death_year">
-                  – {{ store.selectedPerson.death_year }}</span
+                {{ store.selectedPerson.birth?.year || '—' }}
+                <span v-if="store.selectedPerson.death?.year">
+                  – {{ store.selectedPerson.death.year }}</span
                 >
               </div>
             </div>

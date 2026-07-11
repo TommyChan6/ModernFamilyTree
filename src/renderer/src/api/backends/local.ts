@@ -6,6 +6,7 @@ import {
   createInitialDB,
   EMPTY_DB,
   migrateTreesToProjects,
+  migrateYearsToDateValues,
   nowStr
 } from '../../../../shared/dbCore'
 
@@ -78,8 +79,11 @@ function getLocalDB(): Promise<DB> {
       // Merge over the empty shape so tables added later always exist
       if (stored) {
         const merged = { ...EMPTY_DB(), ...stored }
-        // One-time rename migration (tree → project) for pre-rename stores
-        if (migrateTreesToProjects(merged)) void persist(merged)
+        // One-time migrations for stores written before the overhaul:
+        // tree → project rename, then bare years → DateValues
+        const renamed = migrateTreesToProjects(merged)
+        const datesWrapped = migrateYearsToDateValues(merged)
+        if (renamed || datesWrapped) void persist(merged)
         return merged
       }
       const db = createInitialDB(env)

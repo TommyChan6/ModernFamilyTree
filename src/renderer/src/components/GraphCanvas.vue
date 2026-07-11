@@ -431,12 +431,12 @@ const deceasedIndex = computed(() => {
 
 function isDeceased(person) {
   if (!store.currentDate) return false
-  return person.death_year && person.death_year <= store.currentDate.year
+  return person.death?.year && person.death.year <= store.currentDate.year
 }
 
 function isLiving(person) {
   if (!store.currentDate) return true
-  return !person.death_year || person.death_year > store.currentDate.year
+  return !person.death?.year || person.death.year > store.currentDate.year
 }
 
 function setDeceasedHighlight(which) {
@@ -474,11 +474,11 @@ const relPopupPersonB = computed(() => {
 const relPopupFormedLabel = computed(() => {
   if (!store.relPopup) return ''
   const r = store.relPopup.rel
-  if (r.formed_date)
-    return r.type === 'spouse' ? `Married: ${r.formed_date}` : `Since: ${r.formed_date}`
+  if (r.formed?.year)
+    return r.type === 'spouse' ? `Married: ${r.formed.year}` : `Since: ${r.formed.year}`
   if (r.type === 'parent_child') {
     const child = store.persons.find((x) => x.id === r.person_b_id)
-    if (child?.birth_year) return `Born: ${child.birth_year}`
+    if (child?.birth?.year) return `Born: ${child.birth.year}`
   }
   return ''
 })
@@ -703,10 +703,10 @@ function getImageUrl(filePath) {
 
 // Age in years: counted to the current date (or today if none set), capped at death year.
 function ageOf(d) {
-  if (!d.birth_year) return null
+  if (!d.birth?.year) return null
   const refYear = store.currentDate?.year ?? new Date().getFullYear()
-  const endYear = d.death_year ? Math.min(d.death_year, refYear) : refYear
-  const age = endYear - d.birth_year
+  const endYear = d.death?.year ? Math.min(d.death.year, refYear) : refYear
+  const age = endYear - d.birth.year
   return age >= 0 ? age : null
 }
 
@@ -1220,7 +1220,7 @@ function enterAgeMode() {
     byYear = {},
     targets = {}
   ctx.nodesData.forEach((n) => {
-    const y = n.birth_year || ageInfo.maxYear
+    const y = n.birth?.year || ageInfo.maxYear
     if (!byYear[y]) byYear[y] = []
     byYear[y].push(n)
   })
@@ -1240,7 +1240,7 @@ function enterAgeMode() {
   )
 
   ctx.nodesData.forEach((n) => {
-    const yr = n.birth_year || ageInfo.maxYear,
+    const yr = n.birth?.year || ageInfo.maxYear,
       ty = ageInfo.yMap[n.id]
     const band = bands.find((b) => yr >= b.minYear && yr <= b.maxYear),
       row = band ? band.nodes : [n]

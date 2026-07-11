@@ -2,7 +2,13 @@ import { app } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { randomUUID } from 'crypto'
-import { EMPTY_DB, nowStr, seedSampleData, migrateTreesToProjects } from '../shared/dbCore'
+import {
+  EMPTY_DB,
+  nowStr,
+  seedSampleData,
+  migrateTreesToProjects,
+  migrateYearsToDateValues
+} from '../shared/dbCore'
 
 // DB shape and the sample-family seed live in src/shared/dbCore.ts so the
 // browser-local backend starts from the exact same state as the desktop app.
@@ -28,6 +34,10 @@ export function initDB() {
   // Migration: rename the old "tree" container vocabulary to "project"
   // (trees → projects, activeTreeId → activeProjectId, tree_id → project_id)
   if (migrateTreesToProjects(_db)) save()
+
+  // Migration: wrap bare year numbers (birth_year/death_year/formed_date) as
+  // structured DateValues (birth/death/formed)
+  if (migrateYearsToDateValues(_db)) save()
 
   // Migration: ensure all tables exist
   _db.projects = _db.projects || {}
