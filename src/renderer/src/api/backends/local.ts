@@ -5,6 +5,7 @@ import {
   WRITE_CHANNELS,
   createInitialDB,
   EMPTY_DB,
+  migrateTreesToProjects,
   nowStr
 } from '../../../../shared/dbCore'
 
@@ -75,7 +76,12 @@ function getLocalDB(): Promise<DB> {
     dbPromise = (async () => {
       const stored = (await idbGet(IDB_KEY).catch(() => null)) as DB | null
       // Merge over the empty shape so tables added later always exist
-      if (stored) return { ...EMPTY_DB(), ...stored }
+      if (stored) {
+        const merged = { ...EMPTY_DB(), ...stored }
+        // One-time rename migration (tree → project) for pre-rename stores
+        if (migrateTreesToProjects(merged)) void persist(merged)
+        return merged
+      }
       const db = createInitialDB(env)
       void persist(db)
       return db

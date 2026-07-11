@@ -1,17 +1,17 @@
 <template>
   <div class="app-shell">
     <header class="topbar">
-      <div class="tree-tabs-area">
-        <TransitionGroup name="tab" tag="div" class="tree-tabs">
+      <div class="project-tabs-area">
+        <TransitionGroup name="tab" tag="div" class="project-tabs">
           <div
-            v-for="tree in store.trees"
-            :key="tree.id"
-            class="tree-tab"
-            :class="{ active: tree.id === store.activeTreeId }"
-            @click="handleSwitchTree(tree.id)"
-            @dblclick="startRenaming(tree)"
+            v-for="project in store.projects"
+            :key="project.id"
+            class="project-tab"
+            :class="{ active: project.id === store.activeProjectId }"
+            @click="handleSwitchProject(project.id)"
+            @dblclick="startRenaming(project)"
           >
-            <span v-if="renamingId !== tree.id" class="tab-name">{{ tree.name }}</span>
+            <span v-if="renamingId !== project.id" class="tab-name">{{ project.name }}</span>
             <input
               v-else
               ref="renameInputRef"
@@ -23,16 +23,16 @@
               @click.stop
             />
             <button
-              v-if="store.trees.length > 1 && renamingId !== tree.id"
+              v-if="store.projects.length > 1 && renamingId !== project.id"
               class="tab-close"
-              title="Close tree"
-              @click.stop="handleDeleteTree(tree.id)"
+              title="Close project"
+              @click.stop="handleDeleteProject(project.id)"
             >
               ×
             </button>
           </div>
         </TransitionGroup>
-        <button class="tab-add" title="New family tree" @click="handleAddTree">
+        <button class="tab-add" title="New project" @click="handleAddProject">
           <span class="tab-add-icon">+</span>
         </button>
       </div>
@@ -52,15 +52,15 @@
       <div class="canvas-stack">
         <!-- Graph stays mounted (tucked away) so its layout & simulation state persist -->
         <div v-show="store.activeView === 'tree'" class="canvas-layer">
-          <GraphCanvas ref="graphRef" :key="store.activeTreeId" />
+          <GraphCanvas ref="graphRef" :key="store.activeProjectId" />
         </div>
         <Transition name="people-view">
-          <PeopleView v-if="store.activeView === 'people'" :key="store.activeTreeId" />
+          <PeopleView v-if="store.activeView === 'people'" :key="store.activeProjectId" />
         </Transition>
         <Transition name="people-view">
           <RelationshipsView
             v-if="store.activeView === 'relationships'"
-            :key="store.activeTreeId"
+            :key="store.activeProjectId"
           />
         </Transition>
         <!-- WebGL views stay mounted (toggled with v-show) so their GL context is
@@ -69,14 +69,14 @@
         <Transition name="people-view">
           <TimelineView
             v-show="store.activeView === 'timeline'"
-            :key="store.activeTreeId"
+            :key="store.activeProjectId"
             :active="store.activeView === 'timeline'"
           />
         </Transition>
         <Transition name="people-view">
           <FactionsView
             v-show="store.activeView === 'factions'"
-            :key="store.activeTreeId"
+            :key="store.activeProjectId"
             :active="store.activeView === 'factions'"
           />
         </Transition>
@@ -117,40 +117,40 @@ async function handleSave() {
   }
 }
 
-// ── Tree tab actions ────────────────────────────────────────────────────────
-async function handleSwitchTree(id) {
-  if (id === store.activeTreeId || renamingId.value) return
+// ── Project tab actions ─────────────────────────────────────────────────────
+async function handleSwitchProject(id) {
+  if (id === store.activeProjectId || renamingId.value) return
   // Save current graph state before switching
   if (store.graphDirty && graphRef.value?.saveGraphLayout) {
     await graphRef.value.saveGraphLayout()
   }
-  await store.switchTree(id)
+  await store.switchProject(id)
 }
 
-async function handleAddTree() {
-  const tree = await store.createTree()
-  if (tree) {
+async function handleAddProject() {
+  const project = await store.createProject()
+  if (project) {
     if (store.graphDirty && graphRef.value?.saveGraphLayout) {
       await graphRef.value.saveGraphLayout()
     }
-    await store.switchTree(tree.id)
+    await store.switchProject(project.id)
   }
 }
 
-async function handleDeleteTree(id) {
-  const tree = store.trees.find((t) => t.id === id)
-  if (!tree) return
+async function handleDeleteProject(id) {
+  const project = store.projects.find((p) => p.id === id)
+  if (!project) return
   const confirmed = confirm(
-    `Delete "${tree.name}"? All persons, relationships, and images in this tree will be permanently deleted.`
+    `Delete "${project.name}"? All persons, relationships, and images in this project will be permanently deleted.`
   )
   if (confirmed) {
-    await store.deleteTree(id)
+    await store.deleteProject(id)
   }
 }
 
-function startRenaming(tree) {
-  renamingId.value = tree.id
-  renameValue.value = tree.name
+function startRenaming(project) {
+  renamingId.value = project.id
+  renameValue.value = project.name
   nextTick(() => {
     const inputs = document.querySelectorAll('.tab-rename-input')
     if (inputs.length) inputs[inputs.length - 1].focus()
@@ -159,7 +159,7 @@ function startRenaming(tree) {
 
 async function confirmRename() {
   if (renamingId.value && renameValue.value.trim()) {
-    await store.renameTree(renamingId.value, renameValue.value.trim())
+    await store.renameProject(renamingId.value, renameValue.value.trim())
   }
   renamingId.value = null
 }
@@ -227,7 +227,7 @@ function handleExport() {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${store.activeTree?.name || 'family-tree'}-export.json`
+  a.download = `${store.activeProject?.name || 'project'}-export.json`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -246,8 +246,8 @@ onMounted(async () => {
     store.setTheme(globalRes.data.theme)
   }
 
-  // Load trees first, then data
-  await store.loadTrees()
+  // Load projects first, then data
+  await store.loadProjects()
   await store.loadAll()
 
   window.__isGraphDirty = () => store.graphDirty
@@ -286,7 +286,7 @@ onUnmounted(() => {
   -webkit-app-region: no-drag;
 }
 
-.tree-tabs-area {
+.project-tabs-area {
   display: flex;
   align-items: center;
   min-width: 0;
@@ -298,18 +298,18 @@ onUnmounted(() => {
   padding: 0 4px;
 }
 
-.tree-tabs-area::-webkit-scrollbar {
+.project-tabs-area::-webkit-scrollbar {
   display: none;
 }
 
-.tree-tabs {
+.project-tabs {
   display: flex;
   align-items: center;
   gap: 2px;
   min-width: 0;
 }
 
-.tree-tab {
+.project-tab {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -331,19 +331,19 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.tree-tab:hover {
+.project-tab:hover {
   background: var(--hover);
   color: var(--t2);
 }
 
-.tree-tab.active {
+.project-tab.active {
   background: var(--bg);
   color: var(--t1);
   font-weight: 600;
   border-color: var(--border);
 }
 
-.tree-tab.active::after {
+.project-tab.active::after {
   content: '';
   position: absolute;
   bottom: -1px;
@@ -390,7 +390,7 @@ onUnmounted(() => {
   padding: 0;
 }
 
-.tree-tab:hover .tab-close {
+.project-tab:hover .tab-close {
   display: flex;
 }
 

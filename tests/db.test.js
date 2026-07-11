@@ -34,7 +34,7 @@ describe('Database initialization', () => {
     const dbPath = path.join(tmpDir, 'db', 'familytree.json')
     expect(fs.existsSync(dbPath)).toBe(true)
     const data = JSON.parse(fs.readFileSync(dbPath, 'utf8'))
-    expect(data).toHaveProperty('trees')
+    expect(data).toHaveProperty('projects')
     expect(data).toHaveProperty('persons')
     expect(data).toHaveProperty('relationships')
     expect(data).toHaveProperty('factions')
@@ -43,34 +43,34 @@ describe('Database initialization', () => {
     expect(data).toHaveProperty('globalSettings')
   })
 
-  it('creates a default tree on first run', () => {
+  it('creates a default project on first run', () => {
     initDB()
-    const { trees, activeTreeId } = getDB()
-    const treeList = Object.values(trees)
-    expect(treeList).toHaveLength(1)
-    expect(treeList[0].name).toBe('Unnamed Family Tree')
-    expect(activeTreeId).toBe(treeList[0].id)
+    const { projects, activeProjectId } = getDB()
+    const projectList = Object.values(projects)
+    expect(projectList).toHaveLength(1)
+    expect(projectList[0].name).toBe('Unnamed Project')
+    expect(activeProjectId).toBe(projectList[0].id)
   })
 
-  it('seeds 6 sample persons tagged with the default tree', () => {
+  it('seeds 6 sample persons tagged with the default project', () => {
     initDB()
-    const { persons, activeTreeId } = getDB()
-    const treePersons = Object.values(persons).filter((p) => p.tree_id === activeTreeId)
-    expect(treePersons).toHaveLength(6)
+    const { persons, activeProjectId } = getDB()
+    const projectPersons = Object.values(persons).filter((p) => p.project_id === activeProjectId)
+    expect(projectPersons).toHaveLength(6)
   })
 
-  it('seeds 8 relationships tagged with the default tree', () => {
+  it('seeds 8 relationships tagged with the default project', () => {
     initDB()
-    const { relationships, activeTreeId } = getDB()
-    const treeRels = Object.values(relationships).filter((r) => r.tree_id === activeTreeId)
-    expect(treeRels).toHaveLength(8)
+    const { relationships, activeProjectId } = getDB()
+    const projectRels = Object.values(relationships).filter((r) => r.project_id === activeProjectId)
+    expect(projectRels).toHaveLength(8)
   })
 
   it('does not re-seed when database already exists', () => {
     initDB()
-    const { persons, activeTreeId } = getDB()
+    const { persons, activeProjectId } = getDB()
     const ids = Object.values(persons)
-      .filter((p) => p.tree_id === activeTreeId)
+      .filter((p) => p.project_id === activeProjectId)
       .map((p) => p.id)
     expect(ids).toHaveLength(6)
 
@@ -79,7 +79,7 @@ describe('Database initialization', () => {
       mod2.initDB()
       const db2 = mod2.getDB()
       const ids2 = Object.values(db2.persons)
-        .filter((p) => p.tree_id === db2.activeTreeId)
+        .filter((p) => p.project_id === db2.activeProjectId)
         .map((p) => p.id)
       expect(ids2).toHaveLength(6)
       expect(ids2.sort()).toEqual(ids.sort())
@@ -88,37 +88,37 @@ describe('Database initialization', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe('Multi-tree support', () => {
-  it('can create a second tree', () => {
+describe('Multi-project support', () => {
+  it('can create a second project', () => {
     initDB()
-    const { trees, save, nowStr } = getDB()
-    const id = 'tree-2'
-    trees[id] = { id, name: 'Second Tree', created_at: nowStr(), updated_at: nowStr() }
+    const { projects, save, nowStr } = getDB()
+    const id = 'project-2'
+    projects[id] = { id, name: 'Second Project', created_at: nowStr(), updated_at: nowStr() }
     save()
 
     const dbPath = path.join(tmpDir, 'db', 'familytree.json')
     const raw = JSON.parse(fs.readFileSync(dbPath, 'utf8'))
-    expect(Object.keys(raw.trees)).toHaveLength(2)
-    expect(raw.trees[id].name).toBe('Second Tree')
+    expect(Object.keys(raw.projects)).toHaveLength(2)
+    expect(raw.projects[id].name).toBe('Second Project')
   })
 
-  it('persons are scoped to their tree via tree_id', () => {
+  it('persons are scoped to their project via project_id', () => {
     initDB()
-    const { persons, trees, save, nowStr, activeTreeId } = getDB()
+    const { persons, projects, save, nowStr, activeProjectId } = getDB()
 
-    // Create second tree
-    const tree2Id = 'tree-second'
-    trees[tree2Id] = {
-      id: tree2Id,
+    // Create second project
+    const project2Id = 'project-second'
+    projects[project2Id] = {
+      id: project2Id,
       name: 'Other Family',
       created_at: nowStr(),
       updated_at: nowStr()
     }
 
-    // Add person to second tree
+    // Add person to second project
     persons['p-other'] = {
       id: 'p-other',
-      tree_id: tree2Id,
+      project_id: project2Id,
       name: 'Other Person',
       birth_year: 2000,
       death_year: null,
@@ -131,32 +131,32 @@ describe('Multi-tree support', () => {
     }
     save()
 
-    // Filter by tree
-    const tree1Persons = Object.values(persons).filter((p) => p.tree_id === activeTreeId)
-    const tree2Persons = Object.values(persons).filter((p) => p.tree_id === tree2Id)
-    expect(tree1Persons).toHaveLength(6) // seed data
-    expect(tree2Persons).toHaveLength(1)
-    expect(tree2Persons[0].name).toBe('Other Person')
+    // Filter by project
+    const p1Persons = Object.values(persons).filter((p) => p.project_id === activeProjectId)
+    const p2Persons = Object.values(persons).filter((p) => p.project_id === project2Id)
+    expect(p1Persons).toHaveLength(6) // seed data
+    expect(p2Persons).toHaveLength(1)
+    expect(p2Persons[0].name).toBe('Other Person')
   })
 
-  it('settings are scoped per tree', () => {
+  it('settings are scoped per project', () => {
     initDB()
-    const { settings, activeTreeId, save } = getDB()
+    const { settings, activeProjectId, save } = getDB()
 
-    const tree2Id = 'tree-2'
-    settings[`${activeTreeId}:graphState`] = '{"mode":"auto"}'
-    settings[`${tree2Id}:graphState`] = '{"mode":"generation"}'
+    const project2Id = 'project-2'
+    settings[`${activeProjectId}:graphState`] = '{"mode":"auto"}'
+    settings[`${project2Id}:graphState`] = '{"mode":"generation"}'
     save()
 
     const dbPath = path.join(tmpDir, 'db', 'familytree.json')
     const raw = JSON.parse(fs.readFileSync(dbPath, 'utf8'))
 
-    // Each tree has separate settings
-    expect(raw.settings[`${activeTreeId}:graphState`]).toBe('{"mode":"auto"}')
-    expect(raw.settings[`${tree2Id}:graphState`]).toBe('{"mode":"generation"}')
+    // Each project has separate settings
+    expect(raw.settings[`${activeProjectId}:graphState`]).toBe('{"mode":"auto"}')
+    expect(raw.settings[`${project2Id}:graphState`]).toBe('{"mode":"generation"}')
   })
 
-  it('global settings are separate from tree settings', () => {
+  it('global settings are separate from project settings', () => {
     initDB()
     const { globalSettings, save } = getDB()
     globalSettings.theme = 'light'
@@ -167,16 +167,21 @@ describe('Multi-tree support', () => {
     expect(raw.globalSettings.theme).toBe('light')
   })
 
-  it('deleting a tree removes its persons and relationships', () => {
+  it('deleting a project removes its persons and relationships', () => {
     initDB()
-    const { trees, persons, relationships, activeTreeId, save, nowStr } = getDB()
+    const { projects, persons, relationships, activeProjectId, save, nowStr } = getDB()
 
-    // Create second tree with data
-    const tree2Id = 'tree-del'
-    trees[tree2Id] = { id: tree2Id, name: 'Delete Me', created_at: nowStr(), updated_at: nowStr() }
+    // Create second project with data
+    const project2Id = 'project-del'
+    projects[project2Id] = {
+      id: project2Id,
+      name: 'Delete Me',
+      created_at: nowStr(),
+      updated_at: nowStr()
+    }
     persons['dp1'] = {
       id: 'dp1',
-      tree_id: tree2Id,
+      project_id: project2Id,
       name: 'Del Person',
       birth_year: 1990,
       death_year: null,
@@ -189,7 +194,7 @@ describe('Multi-tree support', () => {
     }
     relationships['dr1'] = {
       id: 'dr1',
-      tree_id: tree2Id,
+      project_id: project2Id,
       person_a_id: 'dp1',
       person_b_id: 'dp1',
       type: 'spouse',
@@ -199,30 +204,159 @@ describe('Multi-tree support', () => {
     }
     save()
 
-    expect(Object.values(persons).filter((p) => p.tree_id === tree2Id)).toHaveLength(1)
+    expect(Object.values(persons).filter((p) => p.project_id === project2Id)).toHaveLength(1)
 
-    // Delete tree
+    // Delete project
     for (const [pid, p] of Object.entries(persons)) {
-      if (p.tree_id === tree2Id) delete persons[pid]
+      if (p.project_id === project2Id) delete persons[pid]
     }
     for (const [rid, r] of Object.entries(relationships)) {
-      if (r.tree_id === tree2Id) delete relationships[rid]
+      if (r.project_id === project2Id) delete relationships[rid]
     }
-    delete trees[tree2Id]
+    delete projects[project2Id]
     save()
 
-    expect(Object.values(persons).filter((p) => p.tree_id === tree2Id)).toHaveLength(0)
-    expect(Object.values(relationships).filter((r) => r.tree_id === tree2Id)).toHaveLength(0)
-    expect(trees[tree2Id]).toBeUndefined()
-    // Original tree untouched
-    expect(Object.values(persons).filter((p) => p.tree_id === activeTreeId)).toHaveLength(6)
+    expect(Object.values(persons).filter((p) => p.project_id === project2Id)).toHaveLength(0)
+    expect(Object.values(relationships).filter((r) => r.project_id === project2Id)).toHaveLength(0)
+    expect(projects[project2Id]).toBeUndefined()
+    // Original project untouched
+    expect(Object.values(persons).filter((p) => p.project_id === activeProjectId)).toHaveLength(6)
   })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe('Migration from single-tree to multi-tree', () => {
+describe('Migration from tree vocabulary to project vocabulary', () => {
+  it('migrates an old multi-tree database (trees/tree_id/activeTreeId) in place', () => {
+    const dbDir = path.join(tmpDir, 'db')
+    fs.mkdirSync(dbDir, { recursive: true })
+    const oldDb = {
+      trees: {
+        t1: { id: 't1', name: 'Old Tree', created_at: '2024-01-01', updated_at: '2024-01-01' },
+        t2: { id: 't2', name: 'Other Tree', created_at: '2024-01-02', updated_at: '2024-01-02' }
+      },
+      activeTreeId: 't2',
+      persons: {
+        p1: {
+          id: 'p1',
+          tree_id: 't1',
+          name: 'Old Person',
+          birth_year: 1980,
+          death_year: null,
+          gender: 'male',
+          bio: '',
+          occupation: '',
+          location: '',
+          created_at: '2024-01-01',
+          updated_at: '2024-01-01'
+        }
+      },
+      relationships: {
+        r1: {
+          id: 'r1',
+          tree_id: 't1',
+          person_a_id: 'p1',
+          person_b_id: 'p1',
+          type: 'spouse',
+          status: 'active',
+          formed_date: null,
+          created_at: '2024-01-01'
+        }
+      },
+      factions: {
+        f1: {
+          id: 'f1',
+          tree_id: 't1',
+          scenario_id: 's1',
+          name: 'F',
+          description: '',
+          color: '#6c8ef5',
+          icon: '⚑',
+          member_ids: ['p1'],
+          x: 0,
+          y: 0,
+          visible: true,
+          created_at: '2024-01-01',
+          updated_at: '2024-01-01'
+        }
+      },
+      scenarios: {
+        s1: {
+          id: 's1',
+          tree_id: 't1',
+          name: 'S',
+          created_at: '2024-01-01',
+          updated_at: '2024-01-01'
+        }
+      },
+      images: {},
+      settings: { 't1:graphState': '{"currentMode":"auto"}' },
+      globalSettings: { theme: 'dark' }
+    }
+    fs.writeFileSync(path.join(dbDir, 'familytree.json'), JSON.stringify(oldDb))
+
+    initDB()
+    const db = getDB()
+
+    // Renamed collections and pointer
+    expect(db.db.trees).toBeUndefined()
+    expect(db.db.activeTreeId).toBeUndefined()
+    expect(Object.keys(db.projects).sort()).toEqual(['t1', 't2'])
+    expect(db.projects.t1.name).toBe('Old Tree')
+    expect(db.activeProjectId).toBe('t2')
+
+    // Rows renamed tree_id → project_id
+    expect(db.persons.p1.project_id).toBe('t1')
+    expect(db.persons.p1.tree_id).toBeUndefined()
+    expect(db.relationships.r1.project_id).toBe('t1')
+    expect(db.factions.f1.project_id).toBe('t1')
+    expect(db.scenarios.s1.project_id).toBe('t1')
+
+    // Settings keys (keyed by id, not name) survive untouched
+    expect(db.settings['t1:graphState']).toBe('{"currentMode":"auto"}')
+
+    // Persisted to disk in the new format
+    const raw = JSON.parse(fs.readFileSync(path.join(dbDir, 'familytree.json'), 'utf8'))
+    expect(raw.trees).toBeUndefined()
+    expect(raw.projects.t1.name).toBe('Old Tree')
+    expect(raw.activeProjectId).toBe('t2')
+  })
+
+  it('is idempotent — a second init changes nothing', () => {
+    const dbDir = path.join(tmpDir, 'db')
+    fs.mkdirSync(dbDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dbDir, 'familytree.json'),
+      JSON.stringify({
+        trees: {
+          t1: { id: 't1', name: 'T', created_at: '2024-01-01', updated_at: '2024-01-01' }
+        },
+        activeTreeId: 't1',
+        persons: {},
+        relationships: {},
+        factions: {},
+        scenarios: {},
+        images: {},
+        settings: {},
+        globalSettings: {}
+      })
+    )
+
+    initDB()
+    const first = JSON.parse(fs.readFileSync(path.join(dbDir, 'familytree.json'), 'utf8'))
+
+    vi.resetModules()
+    return import('../src/main/db.js').then((mod2) => {
+      mod2.initDB()
+      const second = JSON.parse(fs.readFileSync(path.join(dbDir, 'familytree.json'), 'utf8'))
+      expect(second).toEqual(first)
+    })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Migration from single-container to multi-project', () => {
   it('migrates an old single-tree database on init', () => {
-    // Create an old-format database (no trees, no tree_id on persons)
+    // Create an old-format database (no container at all, no tree_id on persons)
     const dbDir = path.join(tmpDir, 'db')
     fs.mkdirSync(dbDir, { recursive: true })
     const oldDb = {
@@ -257,34 +391,34 @@ describe('Migration from single-tree to multi-tree', () => {
     initDB()
     const db = getDB()
 
-    // Should have created a tree
-    const treeList = Object.values(db.trees)
-    expect(treeList).toHaveLength(1)
-    expect(treeList[0].name).toBe('Unnamed Family Tree')
-    expect(db.activeTreeId).toBe(treeList[0].id)
+    // Should have created a project
+    const projectList = Object.values(db.projects)
+    expect(projectList).toHaveLength(1)
+    expect(projectList[0].name).toBe('Unnamed Project')
+    expect(db.activeProjectId).toBe(projectList[0].id)
 
-    // Person should have tree_id
-    expect(db.persons['p1'].tree_id).toBe(treeList[0].id)
-    expect(db.relationships['r1'].tree_id).toBe(treeList[0].id)
+    // Person should have project_id
+    expect(db.persons['p1'].project_id).toBe(projectList[0].id)
+    expect(db.relationships['r1'].project_id).toBe(projectList[0].id)
 
     // Theme should be in globalSettings
     expect(db.globalSettings.theme).toBe('dark')
 
-    // Tree-scoped settings should be prefixed
-    const treeId = treeList[0].id
-    expect(db.settings[`${treeId}:graphState`]).toBe('{"mode":"auto"}')
+    // Project-scoped settings should be prefixed
+    const projectId = projectList[0].id
+    expect(db.settings[`${projectId}:graphState`]).toBe('{"mode":"auto"}')
   })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe('Person CRUD', () => {
-  it('creates a person with tree_id and persists to disk', () => {
+  it('creates a person with project_id and persists to disk', () => {
     initDB()
-    const { persons, activeTreeId, save, nowStr } = getDB()
+    const { persons, activeProjectId, save, nowStr } = getDB()
     const id = 'test-person-1'
     persons[id] = {
       id,
-      tree_id: activeTreeId,
+      project_id: activeProjectId,
       name: 'Test Person',
       birth_year: 1990,
       death_year: null,
@@ -301,14 +435,14 @@ describe('Person CRUD', () => {
     const raw = JSON.parse(fs.readFileSync(dbPath, 'utf8'))
     expect(raw.persons[id]).toBeDefined()
     expect(raw.persons[id].name).toBe('Test Person')
-    expect(raw.persons[id].tree_id).toBe(activeTreeId)
+    expect(raw.persons[id].project_id).toBe(activeProjectId)
   })
 
   it('deletes a person and cascades relationships', () => {
     initDB()
-    const { persons, relationships, activeTreeId, save } = getDB()
+    const { persons, relationships, activeProjectId, save } = getDB()
     const personIds = Object.values(persons)
-      .filter((p) => p.tree_id === activeTreeId)
+      .filter((p) => p.project_id === activeProjectId)
       .map((p) => p.id)
     const targetId = personIds[2]
 
@@ -334,12 +468,12 @@ describe('Person CRUD', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe('Graph state persistence (per-tree)', () => {
-  it('saves and restores graph state scoped to tree', () => {
+describe('Graph state persistence (per-project)', () => {
+  it('saves and restores graph state scoped to project', () => {
     initDB()
-    const { persons, settings, activeTreeId, save } = getDB()
+    const { persons, settings, activeProjectId, save } = getDB()
     const personIds = Object.values(persons)
-      .filter((p) => p.tree_id === activeTreeId)
+      .filter((p) => p.project_id === activeProjectId)
       .map((p) => p.id)
 
     const graphState = {
@@ -375,36 +509,41 @@ describe('Graph state persistence (per-tree)', () => {
       genRowSpacing: 150
     }
 
-    // Save scoped to tree
-    settings[`${activeTreeId}:graphState`] = JSON.stringify(graphState)
+    // Save scoped to project
+    settings[`${activeProjectId}:graphState`] = JSON.stringify(graphState)
     save()
 
     // Read back
     const dbPath = path.join(tmpDir, 'db', 'familytree.json')
     const raw = JSON.parse(fs.readFileSync(dbPath, 'utf8'))
-    const restored = JSON.parse(raw.settings[`${activeTreeId}:graphState`])
+    const restored = JSON.parse(raw.settings[`${activeProjectId}:graphState`])
 
     expect(restored.currentMode).toBe('generation')
     expect(restored.modeStateSnapshots.generation[0]._genRowYValues).toEqual([100, 250, 400])
     expect(restored.modeStateSnapshots.generation[0][personIds[0]]).toEqual({ x: 100, y: 100 })
   })
 
-  it('different trees have independent graph states', () => {
+  it('different projects have independent graph states', () => {
     initDB()
-    const { trees, settings, activeTreeId, save, nowStr } = getDB()
+    const { projects, settings, activeProjectId, save, nowStr } = getDB()
 
-    const tree2Id = 'tree-2-gs'
-    trees[tree2Id] = { id: tree2Id, name: 'Tree 2', created_at: nowStr(), updated_at: nowStr() }
+    const project2Id = 'project-2-gs'
+    projects[project2Id] = {
+      id: project2Id,
+      name: 'Project 2',
+      created_at: nowStr(),
+      updated_at: nowStr()
+    }
 
-    settings[`${activeTreeId}:graphState`] = JSON.stringify({ currentMode: 'auto' })
-    settings[`${tree2Id}:graphState`] = JSON.stringify({ currentMode: 'generation' })
+    settings[`${activeProjectId}:graphState`] = JSON.stringify({ currentMode: 'auto' })
+    settings[`${project2Id}:graphState`] = JSON.stringify({ currentMode: 'generation' })
     save()
 
     const dbPath = path.join(tmpDir, 'db', 'familytree.json')
     const raw = JSON.parse(fs.readFileSync(dbPath, 'utf8'))
 
-    expect(JSON.parse(raw.settings[`${activeTreeId}:graphState`]).currentMode).toBe('auto')
-    expect(JSON.parse(raw.settings[`${tree2Id}:graphState`]).currentMode).toBe('generation')
+    expect(JSON.parse(raw.settings[`${activeProjectId}:graphState`]).currentMode).toBe('auto')
+    expect(JSON.parse(raw.settings[`${project2Id}:graphState`]).currentMode).toBe('generation')
   })
 })
 
@@ -417,8 +556,10 @@ describe('Factions', () => {
     fs.writeFileSync(
       path.join(dbDir, 'familytree.json'),
       JSON.stringify({
-        trees: { t1: { id: 't1', name: 'T', created_at: '2024-01-01', updated_at: '2024-01-01' } },
-        activeTreeId: 't1',
+        projects: {
+          t1: { id: 't1', name: 'T', created_at: '2024-01-01', updated_at: '2024-01-01' }
+        },
+        activeProjectId: 't1',
         persons: {},
         relationships: {},
         images: {},
@@ -434,14 +575,14 @@ describe('Factions', () => {
 
   it('faction fields survive a save/load cycle', () => {
     initDB()
-    const { factions, persons, activeTreeId, save, nowStr } = getDB()
+    const { factions, persons, activeProjectId, save, nowStr } = getDB()
     const memberIds = Object.values(persons)
-      .filter((p) => p.tree_id === activeTreeId)
+      .filter((p) => p.project_id === activeProjectId)
       .slice(0, 2)
       .map((p) => p.id)
     factions['f1'] = {
       id: 'f1',
-      tree_id: activeTreeId,
+      project_id: activeProjectId,
       name: 'House Anderson',
       description: 'The founding family',
       color: '#f5a623',
@@ -460,17 +601,22 @@ describe('Factions', () => {
     expect(raw.factions['f1'].name).toBe('House Anderson')
     expect(raw.factions['f1'].member_ids).toEqual(memberIds)
     expect(raw.factions['f1'].x).toBe(120)
-    expect(raw.factions['f1'].tree_id).toBe(activeTreeId)
+    expect(raw.factions['f1'].project_id).toBe(activeProjectId)
   })
 
-  it('factions are scoped to their tree via tree_id', () => {
+  it('factions are scoped to their project via project_id', () => {
     initDB()
-    const { factions, trees, activeTreeId, save, nowStr } = getDB()
-    const tree2Id = 'tree-fx'
-    trees[tree2Id] = { id: tree2Id, name: 'Other', created_at: nowStr(), updated_at: nowStr() }
+    const { factions, projects, activeProjectId, save, nowStr } = getDB()
+    const project2Id = 'project-fx'
+    projects[project2Id] = {
+      id: project2Id,
+      name: 'Other',
+      created_at: nowStr(),
+      updated_at: nowStr()
+    }
     factions['fa'] = {
       id: 'fa',
-      tree_id: activeTreeId,
+      project_id: activeProjectId,
       name: 'A',
       description: '',
       color: '#6c8ef5',
@@ -484,7 +630,7 @@ describe('Factions', () => {
     }
     factions['fb'] = {
       id: 'fb',
-      tree_id: tree2Id,
+      project_id: project2Id,
       name: 'B',
       description: '',
       color: '#f06292',
@@ -498,19 +644,19 @@ describe('Factions', () => {
     }
     save()
 
-    expect(Object.values(factions).filter((f) => f.tree_id === activeTreeId)).toHaveLength(1)
-    expect(Object.values(factions).filter((f) => f.tree_id === tree2Id)).toHaveLength(1)
+    expect(Object.values(factions).filter((f) => f.project_id === activeProjectId)).toHaveLength(1)
+    expect(Object.values(factions).filter((f) => f.project_id === project2Id)).toHaveLength(1)
   })
 
   it('removing a deleted person from member lists keeps other members intact', () => {
     initDB()
-    const { factions, persons, activeTreeId, save, nowStr } = getDB()
+    const { factions, persons, activeProjectId, save, nowStr } = getDB()
     const ids = Object.values(persons)
-      .filter((p) => p.tree_id === activeTreeId)
+      .filter((p) => p.project_id === activeProjectId)
       .map((p) => p.id)
     factions['f1'] = {
       id: 'f1',
-      tree_id: activeTreeId,
+      project_id: activeProjectId,
       name: 'F',
       description: '',
       color: '#6c8ef5',
@@ -537,18 +683,18 @@ describe('Factions', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe('Scenarios', () => {
-  it('adopts pre-scenario factions into a default scenario per tree', () => {
+  it('adopts pre-scenario factions into a default scenario per project', () => {
     // Database written before scenarios existed: factions with no scenario_id
     const dbDir = path.join(tmpDir, 'db')
     fs.mkdirSync(dbDir, { recursive: true })
     fs.writeFileSync(
       path.join(dbDir, 'familytree.json'),
       JSON.stringify({
-        trees: {
+        projects: {
           t1: { id: 't1', name: 'A', created_at: '2024-01-01', updated_at: '2024-01-01' },
           t2: { id: 't2', name: 'B', created_at: '2024-01-01', updated_at: '2024-01-01' }
         },
-        activeTreeId: 't1',
+        activeProjectId: 't1',
         persons: {},
         relationships: {},
         images: {},
@@ -557,7 +703,7 @@ describe('Scenarios', () => {
         factions: {
           f1: {
             id: 'f1',
-            tree_id: 't1',
+            project_id: 't1',
             name: 'F1',
             member_ids: [],
             x: 0,
@@ -568,7 +714,7 @@ describe('Scenarios', () => {
           },
           f2: {
             id: 'f2',
-            tree_id: 't1',
+            project_id: 't1',
             name: 'F2',
             member_ids: [],
             x: 0,
@@ -579,7 +725,7 @@ describe('Scenarios', () => {
           },
           f3: {
             id: 'f3',
-            tree_id: 't2',
+            project_id: 't2',
             name: 'F3',
             member_ids: [],
             x: 0,
@@ -595,14 +741,14 @@ describe('Scenarios', () => {
     initDB()
     const { factions, scenarios } = getDB()
 
-    // One default scenario per tree that had factions
-    const t1Scenarios = Object.values(scenarios).filter((s) => s.tree_id === 't1')
-    const t2Scenarios = Object.values(scenarios).filter((s) => s.tree_id === 't2')
+    // One default scenario per project that had factions
+    const t1Scenarios = Object.values(scenarios).filter((s) => s.project_id === 't1')
+    const t2Scenarios = Object.values(scenarios).filter((s) => s.project_id === 't2')
     expect(t1Scenarios).toHaveLength(1)
     expect(t2Scenarios).toHaveLength(1)
     expect(t1Scenarios[0].name).toBe('Scenario 1')
 
-    // Factions adopted into their tree's scenario
+    // Factions adopted into their project's scenario
     expect(factions.f1.scenario_id).toBe(t1Scenarios[0].id)
     expect(factions.f2.scenario_id).toBe(t1Scenarios[0].id)
     expect(factions.f3.scenario_id).toBe(t2Scenarios[0].id)
@@ -610,17 +756,17 @@ describe('Scenarios', () => {
 
   it('migration is idempotent — a second init creates no extra scenarios', () => {
     initDB()
-    const { factions, scenarios, activeTreeId, save, nowStr } = getDB()
+    const { factions, scenarios, activeProjectId, save, nowStr } = getDB()
     scenarios['s1'] = {
       id: 's1',
-      tree_id: activeTreeId,
+      project_id: activeProjectId,
       name: 'S',
       created_at: nowStr(),
       updated_at: nowStr()
     }
     factions['f1'] = {
       id: 'f1',
-      tree_id: activeTreeId,
+      project_id: activeProjectId,
       scenario_id: 's1',
       name: 'F',
       description: '',
@@ -646,24 +792,24 @@ describe('Scenarios', () => {
 
   it('deleting a scenario cascades its factions but not other scenarios’ factions', () => {
     initDB()
-    const { factions, scenarios, activeTreeId, save, nowStr } = getDB()
+    const { factions, scenarios, activeProjectId, save, nowStr } = getDB()
     scenarios['sA'] = {
       id: 'sA',
-      tree_id: activeTreeId,
+      project_id: activeProjectId,
       name: 'A',
       created_at: nowStr(),
       updated_at: nowStr()
     }
     scenarios['sB'] = {
       id: 'sB',
-      tree_id: activeTreeId,
+      project_id: activeProjectId,
       name: 'B',
       created_at: nowStr(),
       updated_at: nowStr()
     }
     factions['fA'] = {
       id: 'fA',
-      tree_id: activeTreeId,
+      project_id: activeProjectId,
       scenario_id: 'sA',
       name: 'FA',
       description: '',
@@ -678,7 +824,7 @@ describe('Scenarios', () => {
     }
     factions['fB'] = {
       id: 'fB',
-      tree_id: activeTreeId,
+      project_id: activeProjectId,
       scenario_id: 'sB',
       name: 'FB',
       description: '',
@@ -711,11 +857,11 @@ describe('Scenarios', () => {
 describe('Data integrity', () => {
   it('person fields are all preserved through save/load cycle', () => {
     initDB()
-    const { persons, activeTreeId, save } = getDB()
+    const { persons, activeProjectId, save } = getDB()
     const id = 'integrity-test'
     persons[id] = {
       id,
-      tree_id: activeTreeId,
+      project_id: activeProjectId,
       name: 'Full Field Test',
       birth_year: 1985,
       death_year: 2050,
@@ -733,15 +879,15 @@ describe('Data integrity', () => {
     const p = raw.persons[id]
     expect(p.name).toBe('Full Field Test')
     expect(p.bio).toBe('Bio with special chars: "quotes", <tags>, & ampersand')
-    expect(p.tree_id).toBe(activeTreeId)
+    expect(p.project_id).toBe(activeProjectId)
   })
 
   it('empty/null fields do not corrupt the database', () => {
     initDB()
-    const { persons, activeTreeId, save, nowStr } = getDB()
+    const { persons, activeProjectId, save, nowStr } = getDB()
     persons['null-test'] = {
       id: 'null-test',
-      tree_id: activeTreeId,
+      project_id: activeProjectId,
       name: '',
       birth_year: null,
       death_year: null,

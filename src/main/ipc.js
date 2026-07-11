@@ -33,7 +33,7 @@ const env = {
 }
 
 export function registerHandlers(ipcMain, _app, dialog) {
-  // ── All shared channels (trees/persons/relationships/factions/scenarios/
+  // ── All shared channels (projects/persons/relationships/factions/scenarios/
   //    images metadata/settings/globalSettings) ───────────────────────────────
   for (const [channel, handler] of Object.entries(channelHandlers)) {
     ipcMain.handle(channel, async (_event, data) => {

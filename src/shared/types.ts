@@ -1,7 +1,7 @@
 // Data shapes shared by every backend (Electron main, browser-local, and the
 // future HTTP/Supabase implementation). These are the client↔server contract.
 
-export interface Tree {
+export interface Project {
   id: string
   name: string
   created_at: string
@@ -10,7 +10,7 @@ export interface Tree {
 
 export interface Person {
   id: string
-  tree_id: string
+  project_id: string
   name: string
   birth_year: number | null
   death_year: number | null
@@ -24,7 +24,7 @@ export interface Person {
 
 export interface Relationship {
   id: string
-  tree_id: string
+  project_id: string
   person_a_id: string
   person_b_id: string
   type: string
@@ -35,7 +35,7 @@ export interface Relationship {
 
 export interface Faction {
   id: string
-  tree_id: string
+  project_id: string
   scenario_id: string | null
   name: string
   description: string
@@ -51,7 +51,7 @@ export interface Faction {
 
 export interface Scenario {
   id: string
-  tree_id: string
+  project_id: string
   name: string
   created_at: string
   updated_at: string
@@ -59,7 +59,7 @@ export interface Scenario {
 
 export interface ImageRecord {
   id: string
-  tree_id: string
+  project_id: string
   person_id: string
   /** Desktop: absolute path under userData/images. Web: a data: URL. */
   file_path: string
@@ -68,14 +68,14 @@ export interface ImageRecord {
 }
 
 export interface DB {
-  trees: Record<string, Tree>
-  activeTreeId: string | null
+  projects: Record<string, Project>
+  activeProjectId: string | null
   persons: Record<string, Person>
   relationships: Record<string, Relationship>
   factions: Record<string, Faction>
   scenarios: Record<string, Scenario>
   images: Record<string, ImageRecord>
-  /** `${treeId}:key` → value for per-tree settings */
+  /** `${projectId}:key` → value for per-project settings */
   settings: Record<string, unknown>
   /** theme, etc. */
   globalSettings: Record<string, unknown>

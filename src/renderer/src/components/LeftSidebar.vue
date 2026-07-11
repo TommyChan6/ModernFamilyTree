@@ -213,13 +213,13 @@ function handleExport() {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = 'family-tree-export.json'
+  a.download = 'project-export.json'
   a.click()
   URL.revokeObjectURL(url)
 }
 
 function handleImport() {
-  alert('Import feature: drop a JSON file exported from this app to restore your family tree data.')
+  alert('Import feature: drop a JSON file exported from this app to restore your project data.')
 }
 </script>
 

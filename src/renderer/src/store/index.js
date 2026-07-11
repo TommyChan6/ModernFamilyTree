@@ -4,14 +4,14 @@ import { api } from '../api'
 import { latestDataYear } from './currentYear.js'
 
 export const useMainStore = defineStore('main', () => {
-  // ── Tree management ───────────────────────────────────────────────────────
-  const trees = ref([])
-  const activeTreeId = ref(null)
+  // ── Project management ────────────────────────────────────────────────────
+  const projects = ref([])
+  const activeProjectId = ref(null)
 
   // ── State ──────────────────────────────────────────────────────────────────
   const persons = ref([])
   const relationships = ref([])
-  const factions = ref([]) // all factions of the tree, across scenarios
+  const factions = ref([]) // all factions of the project, across scenarios
   const scenarios = ref([])
   const activeScenarioId = ref(null)
   const draggingPersonId = ref(null) // person being dragged from the member list
@@ -68,7 +68,9 @@ export const useMainStore = defineStore('main', () => {
   )
   const personCount = computed(() => persons.value.length)
   const coupleCount = computed(() => relationships.value.filter((r) => r.type === 'spouse').length)
-  const activeTree = computed(() => trees.value.find((t) => t.id === activeTreeId.value) || null)
+  const activeProject = computed(
+    () => projects.value.find((p) => p.id === activeProjectId.value) || null
+  )
   const activeScenario = computed(
     () => scenarios.value.find((s) => s.id === activeScenarioId.value) || null
   )
@@ -76,47 +78,47 @@ export const useMainStore = defineStore('main', () => {
     factions.value.filter((f) => f.scenario_id === activeScenarioId.value)
   )
 
-  // ── Tree actions ──────────────────────────────────────────────────────────
-  async function loadTrees() {
-    const res = await api.invoke('trees:getAll')
+  // ── Project actions ───────────────────────────────────────────────────────
+  async function loadProjects() {
+    const res = await api.invoke('projects:getAll')
     if (res.success) {
-      trees.value = res.data.trees
-      activeTreeId.value = res.data.activeTreeId
+      projects.value = res.data.projects
+      activeProjectId.value = res.data.activeProjectId
     }
   }
 
-  async function createTree(name) {
-    const res = await api.invoke('trees:create', { name: name || 'Unnamed Family Tree' })
+  async function createProject(name) {
+    const res = await api.invoke('projects:create', { name: name || 'Unnamed Project' })
     if (res.success) {
-      trees.value.push(res.data)
+      projects.value.push(res.data)
       return res.data
     }
     return null
   }
 
-  async function renameTree(id, name) {
-    const res = await api.invoke('trees:rename', { id, name })
+  async function renameProject(id, name) {
+    const res = await api.invoke('projects:rename', { id, name })
     if (res.success) {
-      const idx = trees.value.findIndex((t) => t.id === id)
-      if (idx !== -1) trees.value[idx] = res.data
+      const idx = projects.value.findIndex((p) => p.id === id)
+      if (idx !== -1) projects.value[idx] = res.data
     }
   }
 
-  async function deleteTree(id) {
-    const res = await api.invoke('trees:delete', { id })
+  async function deleteProject(id) {
+    const res = await api.invoke('projects:delete', { id })
     if (res.success) {
-      trees.value = trees.value.filter((t) => t.id !== id)
-      if (res.data.newActiveTreeId) {
-        await switchTree(res.data.newActiveTreeId)
+      projects.value = projects.value.filter((p) => p.id !== id)
+      if (res.data.newActiveProjectId) {
+        await switchProject(res.data.newActiveProjectId)
       }
     }
   }
 
-  async function switchTree(id) {
-    if (id === activeTreeId.value) return
-    const res = await api.invoke('trees:setActive', { id })
+  async function switchProject(id) {
+    if (id === activeProjectId.value) return
+    const res = await api.invoke('projects:setActive', { id })
     if (res.success) {
-      activeTreeId.value = id
+      activeProjectId.value = id
       // Reset UI state
       selectedPersonId.value = null
       modalOpen.value = false
@@ -124,8 +126,8 @@ export const useMainStore = defineStore('main', () => {
       editingPerson.value = null
       relPopup.value = null
       graphDirty.value = false
-      userCurrentYear.value = null // revert to auto; restored from the tree's saved layout
-      // Reload data for new tree
+      userCurrentYear.value = null // revert to auto; restored from the project's saved layout
+      // Reload data for new project
       await loadAll()
     }
   }
@@ -143,7 +145,7 @@ export const useMainStore = defineStore('main', () => {
     if (relsRes.success) relationships.value = relsRes.data
     if (factionsRes.success) factions.value = factionsRes.data
     if (scenariosRes.success) scenarios.value = scenariosRes.data
-    // Restore the tree's active scenario; fall back to the first one
+    // Restore the project's active scenario; fall back to the first one
     const savedId = settingsRes.success ? settingsRes.data.activeScenarioId : null
     activeScenarioId.value =
       scenarios.value.find((s) => s.id === savedId)?.id ?? scenarios.value[0]?.id ?? null
@@ -206,7 +208,7 @@ export const useMainStore = defineStore('main', () => {
   }
 
   // ── Scenario actions ──────────────────────────────────────────────────────
-  /** Create the default scenario if the tree has none yet. Concurrent callers
+  /** Create the default scenario if the project has none yet. Concurrent callers
    *  share one in-flight request so only a single default is ever created. */
   let ensureScenarioPromise = null
   async function ensureScenario() {
@@ -370,15 +372,15 @@ export const useMainStore = defineStore('main', () => {
   }
 
   return {
-    // tree
-    trees,
-    activeTreeId,
-    activeTree,
-    loadTrees,
-    createTree,
-    renameTree,
-    deleteTree,
-    switchTree,
+    // project
+    projects,
+    activeProjectId,
+    activeProject,
+    loadProjects,
+    createProject,
+    renameProject,
+    deleteProject,
+    switchProject,
     // state
     persons,
     relationships,

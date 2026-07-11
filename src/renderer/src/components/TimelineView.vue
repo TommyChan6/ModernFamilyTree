@@ -247,7 +247,7 @@ function genderColor(g) {
 const refYear = computed(() => store.currentDate?.year ?? new Date().getFullYear())
 const laneOrder = ref(null)
 watch(
-  () => store.activeTreeId,
+  () => store.activeProjectId,
   () => {
     laneOrder.value = null
   }

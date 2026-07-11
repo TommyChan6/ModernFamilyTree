@@ -13,15 +13,24 @@
 //   images:openDialog — native file dialog vs <input type="file">
 //   images:bytes      — fs read vs fetch of a data: URL
 
-import type { DB, Env, Faction, ImageRecord, Person, Relationship, Scenario, Tree } from './types'
+import type {
+  DB,
+  Env,
+  Faction,
+  ImageRecord,
+  Person,
+  Project,
+  Relationship,
+  Scenario
+} from './types'
 
 function sortByDate<T extends { created_at: string }>(arr: T[]): T[] {
   return arr.slice().sort((a, b) => (a.created_at > b.created_at ? 1 : -1))
 }
 
-/** Filter a table down to rows belonging to the active tree. */
-function forTree<T extends { tree_id: string }>(db: DB, table: Record<string, T>): T[] {
-  return Object.values(table).filter((item) => item.tree_id === db.activeTreeId)
+/** Filter a table down to rows belonging to the active project. */
+function forProject<T extends { project_id: string }>(db: DB, table: Record<string, T>): T[] {
+  return Object.values(table).filter((item) => item.project_id === db.activeProjectId)
 }
 
 function primaryImageOf(db: DB, personId: string): string | null {
@@ -32,8 +41,8 @@ function primaryImageOf(db: DB, personId: string): string | null {
 }
 
 export const EMPTY_DB = (): DB => ({
-  trees: {},
-  activeTreeId: null,
+  projects: {},
+  activeProjectId: null,
   persons: {},
   relationships: {},
   factions: {},
@@ -47,8 +56,39 @@ export function nowStr(): string {
   return new Date().toISOString().replace('T', ' ').slice(0, 19)
 }
 
+// ── Migration: tree → project vocabulary ─────────────────────────────────────
+// The container used to be called a "tree" (`trees`, `activeTreeId`, `tree_id`).
+// Rename in place so old files keep loading. Idempotent — files already in the
+// new format pass through untouched. Returns true when anything changed so the
+// caller knows to persist. Both shells run this on load (db.js / local.ts).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function migrateTreesToProjects(db: any): boolean {
+  let changed = false
+  if (db.trees) {
+    db.projects = { ...db.trees, ...(db.projects || {}) }
+    delete db.trees
+    changed = true
+  }
+  if ('activeTreeId' in db) {
+    db.activeProjectId = db.activeProjectId ?? db.activeTreeId
+    delete db.activeTreeId
+    changed = true
+  }
+  for (const table of ['persons', 'relationships', 'factions', 'scenarios', 'images']) {
+    for (const row of Object.values(db[table] || {})) {
+      const r = row as { tree_id?: string; project_id?: string }
+      if ('tree_id' in r) {
+        r.project_id = r.project_id ?? r.tree_id
+        delete r.tree_id
+        changed = true
+      }
+    }
+  }
+  return changed
+}
+
 // ── Sample family seeded on first run (shared so desktop and web start identical) ──
-export function seedSampleData(db: DB, treeId: string, env: Env): void {
+export function seedSampleData(db: DB, projectId: string, env: Env): void {
   const now = env.nowStr()
   const gp1 = env.uuid(),
     gp2 = env.uuid()
@@ -68,7 +108,7 @@ export function seedSampleData(db: DB, treeId: string, env: Env): void {
   ) => {
     db.persons[id] = {
       id,
-      tree_id: treeId,
+      project_id: projectId,
       name,
       birth_year,
       death_year: null,
@@ -84,7 +124,7 @@ export function seedSampleData(db: DB, treeId: string, env: Env): void {
     const id = env.uuid()
     db.relationships[id] = {
       id,
-      tree_id: treeId,
+      project_id: projectId,
       person_a_id: a,
       person_b_id: b,
       type,
@@ -162,11 +202,16 @@ export function seedSampleData(db: DB, treeId: string, env: Env): void {
 /** Fresh, seeded database for a first run (used by the browser-local backend). */
 export function createInitialDB(env: Env): DB {
   const db = EMPTY_DB()
-  const treeId = env.uuid()
+  const projectId = env.uuid()
   const now = env.nowStr()
-  db.trees[treeId] = { id: treeId, name: 'Unnamed Family Tree', created_at: now, updated_at: now }
-  db.activeTreeId = treeId
-  seedSampleData(db, treeId, env)
+  db.projects[projectId] = {
+    id: projectId,
+    name: 'Unnamed Project',
+    created_at: now,
+    updated_at: now
+  }
+  db.activeProjectId = projectId
+  seedSampleData(db, projectId, env)
   return db
 }
 
@@ -176,76 +221,76 @@ export function createInitialDB(env: Env): DB {
 type Handler = (db: DB, data: any, env: Env) => unknown
 
 export const channelHandlers: Record<string, Handler> = {
-  // ── trees ──────────────────────────────────────────────────────────────────
-  'trees:getAll'(db) {
-    return { trees: sortByDate(Object.values(db.trees)), activeTreeId: db.activeTreeId }
+  // ── projects ───────────────────────────────────────────────────────────────
+  'projects:getAll'(db) {
+    return { projects: sortByDate(Object.values(db.projects)), activeProjectId: db.activeProjectId }
   },
 
-  'trees:create'(db, data, env) {
+  'projects:create'(db, data, env) {
     const id = env.uuid()
     const now = env.nowStr()
-    const tree: Tree = {
+    const project: Project = {
       id,
-      name: data?.name || 'Unnamed Family Tree',
+      name: data?.name || 'Unnamed Project',
       created_at: now,
       updated_at: now
     }
-    db.trees[id] = tree
-    return tree
+    db.projects[id] = project
+    return project
   },
 
-  'trees:rename'(db, data, env) {
-    const tree = db.trees[data.id]
-    if (!tree) throw new Error('Tree not found')
-    tree.name = data.name
-    tree.updated_at = env.nowStr()
-    return tree
+  'projects:rename'(db, data, env) {
+    const project = db.projects[data.id]
+    if (!project) throw new Error('Project not found')
+    project.name = data.name
+    project.updated_at = env.nowStr()
+    return project
   },
 
-  'trees:delete'(db, data, env) {
-    const tid = data.id
-    // Remove all persons, relationships, factions, scenarios, images for this tree
-    for (const [pid, p] of Object.entries(db.persons)) {
-      if (p.tree_id === tid) delete db.persons[pid]
+  'projects:delete'(db, data, env) {
+    const pid = data.id
+    // Remove all persons, relationships, factions, scenarios, images for this project
+    for (const [id, p] of Object.entries(db.persons)) {
+      if (p.project_id === pid) delete db.persons[id]
     }
     for (const [rid, r] of Object.entries(db.relationships)) {
-      if (r.tree_id === tid) delete db.relationships[rid]
+      if (r.project_id === pid) delete db.relationships[rid]
     }
     for (const [fid, f] of Object.entries(db.factions)) {
-      if (f.tree_id === tid) delete db.factions[fid]
+      if (f.project_id === pid) delete db.factions[fid]
     }
     for (const [sid, s] of Object.entries(db.scenarios)) {
-      if (s.tree_id === tid) delete db.scenarios[sid]
+      if (s.project_id === pid) delete db.scenarios[sid]
     }
     for (const [iid, img] of Object.entries(db.images)) {
-      if (img.tree_id === tid) {
+      if (img.project_id === pid) {
         env.removeImageFile(img.file_path)
         delete db.images[iid]
       }
     }
-    // Remove tree-scoped settings
+    // Remove project-scoped settings
     for (const key of Object.keys(db.settings)) {
-      if (key.startsWith(`${tid}:`)) delete db.settings[key]
+      if (key.startsWith(`${pid}:`)) delete db.settings[key]
     }
-    delete db.trees[tid]
+    delete db.projects[pid]
 
-    // Switch active to another tree if needed
-    if (db.activeTreeId === tid) {
-      const remaining = Object.keys(db.trees)
-      db.activeTreeId = remaining.length > 0 ? remaining[0] : null
+    // Switch active to another project if needed
+    if (db.activeProjectId === pid) {
+      const remaining = Object.keys(db.projects)
+      db.activeProjectId = remaining.length > 0 ? remaining[0] : null
     }
-    return { id: tid, newActiveTreeId: db.activeTreeId }
+    return { id: pid, newActiveProjectId: db.activeProjectId }
   },
 
-  'trees:setActive'(db, data) {
-    if (!db.trees[data.id]) throw new Error('Tree not found')
-    db.activeTreeId = data.id
-    return { activeTreeId: data.id }
+  'projects:setActive'(db, data) {
+    if (!db.projects[data.id]) throw new Error('Project not found')
+    db.activeProjectId = data.id
+    return { activeProjectId: data.id }
   },
 
   // ── persons ────────────────────────────────────────────────────────────────
   'persons:getAll'(db) {
-    const list = sortByDate(forTree(db, db.persons))
+    const list = sortByDate(forProject(db, db.persons))
     return list.map((p) => ({ ...p, primary_image: primaryImageOf(db, p.id) }))
   },
 
@@ -254,7 +299,7 @@ export const channelHandlers: Record<string, Handler> = {
     const now = env.nowStr()
     const person: Person = {
       id,
-      tree_id: db.activeTreeId as string,
+      project_id: db.activeProjectId as string,
       name: data.name || '',
       birth_year: data.birth_year || null,
       death_year: data.death_year || null,
@@ -310,14 +355,14 @@ export const channelHandlers: Record<string, Handler> = {
 
   // ── relationships ──────────────────────────────────────────────────────────
   'relationships:getAll'(db) {
-    return sortByDate(forTree(db, db.relationships))
+    return sortByDate(forProject(db, db.relationships))
   },
 
   'relationships:create'(db, data, env) {
     const id = env.uuid()
     const rel: Relationship = {
       id,
-      tree_id: db.activeTreeId as string,
+      project_id: db.activeProjectId as string,
       person_a_id: data.person_a_id,
       person_b_id: data.person_b_id,
       type: data.type,
@@ -347,7 +392,7 @@ export const channelHandlers: Record<string, Handler> = {
 
   // ── factions ───────────────────────────────────────────────────────────────
   'factions:getAll'(db) {
-    return sortByDate(forTree(db, db.factions))
+    return sortByDate(forProject(db, db.factions))
   },
 
   'factions:create'(db, data, env) {
@@ -355,7 +400,7 @@ export const channelHandlers: Record<string, Handler> = {
     const now = env.nowStr()
     const faction: Faction = {
       id,
-      tree_id: db.activeTreeId as string,
+      project_id: db.activeProjectId as string,
       scenario_id: data?.scenario_id || null,
       name: data?.name || 'New Faction',
       description: data?.description || '',
@@ -394,7 +439,7 @@ export const channelHandlers: Record<string, Handler> = {
 
   // ── scenarios ──────────────────────────────────────────────────────────────
   'scenarios:getAll'(db) {
-    return sortByDate(forTree(db, db.scenarios))
+    return sortByDate(forProject(db, db.scenarios))
   },
 
   // With clone_from: duplicates that scenario's factions into the new one, so
@@ -404,7 +449,7 @@ export const channelHandlers: Record<string, Handler> = {
     const now = env.nowStr()
     const scenario: Scenario = {
       id,
-      tree_id: db.activeTreeId as string,
+      project_id: db.activeProjectId as string,
       name: data?.name || 'New Scenario',
       created_at: now,
       updated_at: now
@@ -466,7 +511,7 @@ export const channelHandlers: Record<string, Handler> = {
     const id = env.uuid()
     const img: ImageRecord = {
       id,
-      tree_id: db.activeTreeId as string,
+      project_id: db.activeProjectId as string,
       person_id: personId,
       file_path: filePath,
       is_primary: !!isPrimary,
@@ -495,10 +540,10 @@ export const channelHandlers: Record<string, Handler> = {
     return { imageId }
   },
 
-  // ── settings (per-tree) ────────────────────────────────────────────────────
+  // ── settings (per-project) ─────────────────────────────────────────────────
   'settings:getAll'(db) {
     const result: Record<string, unknown> = {}
-    const prefix = `${db.activeTreeId}:`
+    const prefix = `${db.activeProjectId}:`
     for (const [key, value] of Object.entries(db.settings)) {
       if (key.startsWith(prefix)) {
         result[key.slice(prefix.length)] = value
@@ -509,7 +554,7 @@ export const channelHandlers: Record<string, Handler> = {
 
   'settings:set'(db, data) {
     const { key, value } = data
-    db.settings[`${db.activeTreeId}:${key}`] = value
+    db.settings[`${db.activeProjectId}:${key}`] = value
     return { key, value }
   },
 
@@ -526,10 +571,10 @@ export const channelHandlers: Record<string, Handler> = {
 
 /** Channels that mutate the DB — the shell persists after handling one. */
 export const WRITE_CHANNELS = new Set([
-  'trees:create',
-  'trees:rename',
-  'trees:delete',
-  'trees:setActive',
+  'projects:create',
+  'projects:rename',
+  'projects:delete',
+  'projects:setActive',
   'persons:create',
   'persons:update',
   'persons:delete',

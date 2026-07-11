@@ -2,7 +2,7 @@ import { app } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { randomUUID } from 'crypto'
-import { EMPTY_DB, nowStr, seedSampleData } from '../shared/dbCore'
+import { EMPTY_DB, nowStr, seedSampleData, migrateTreesToProjects } from '../shared/dbCore'
 
 // DB shape and the sample-family seed live in src/shared/dbCore.ts so the
 // browser-local backend starts from the exact same state as the desktop app.
@@ -25,8 +25,12 @@ export function initDB() {
   _dbPath = path.join(dbDir, 'familytree.json')
   _db = fs.existsSync(_dbPath) ? JSON.parse(fs.readFileSync(_dbPath, 'utf8')) : EMPTY_DB()
 
+  // Migration: rename the old "tree" container vocabulary to "project"
+  // (trees → projects, activeTreeId → activeProjectId, tree_id → project_id)
+  if (migrateTreesToProjects(_db)) save()
+
   // Migration: ensure all tables exist
-  _db.trees = _db.trees || {}
+  _db.projects = _db.projects || {}
   _db.persons = _db.persons || {}
   _db.relationships = _db.relationships || {}
   _db.factions = _db.factions || {}
@@ -36,76 +40,77 @@ export function initDB() {
   _db.globalSettings = _db.globalSettings || {}
 
   // Migration: adopt factions created before scenarios existed into a default
-  // scenario per tree (idempotent — only touches factions with no scenario_id)
+  // scenario per project (idempotent — only touches factions with no scenario_id)
   const orphanFactions = Object.values(_db.factions).filter((f) => !f.scenario_id)
   if (orphanFactions.length > 0) {
     const now = nowStr()
-    const defaultScenarioByTree = {}
+    const defaultScenarioByProject = {}
     for (const s of Object.values(_db.scenarios)) {
-      defaultScenarioByTree[s.tree_id] = defaultScenarioByTree[s.tree_id] || s.id
+      defaultScenarioByProject[s.project_id] = defaultScenarioByProject[s.project_id] || s.id
     }
     for (const f of orphanFactions) {
-      if (!defaultScenarioByTree[f.tree_id]) {
+      if (!defaultScenarioByProject[f.project_id]) {
         const sid = randomUUID()
         _db.scenarios[sid] = {
           id: sid,
-          tree_id: f.tree_id,
+          project_id: f.project_id,
           name: 'Scenario 1',
           created_at: now,
           updated_at: now
         }
-        defaultScenarioByTree[f.tree_id] = sid
+        defaultScenarioByProject[f.project_id] = sid
       }
-      f.scenario_id = defaultScenarioByTree[f.tree_id]
+      f.scenario_id = defaultScenarioByProject[f.project_id]
     }
     save()
   }
 
-  // Migration: convert old single-tree DB to multi-tree
-  if (!_db.activeTreeId && Object.keys(_db.trees).length === 0) {
-    const hasOldPersons = Object.values(_db.persons).some((p) => !p.tree_id)
-    const treeId = randomUUID()
+  // Migration: convert an old single-container DB (no projects at all) to the
+  // multi-project shape
+  if (!_db.activeProjectId && Object.keys(_db.projects).length === 0) {
+    const hasOldPersons = Object.values(_db.persons).some((p) => !p.project_id)
+    const projectId = randomUUID()
     const now = nowStr()
-    _db.trees[treeId] = {
-      id: treeId,
-      name: 'Unnamed Family Tree',
+    _db.projects[projectId] = {
+      id: projectId,
+      name: 'Unnamed Project',
       created_at: now,
       updated_at: now
     }
-    _db.activeTreeId = treeId
+    _db.activeProjectId = projectId
 
     if (hasOldPersons) {
-      // Tag existing persons/relationships/images with tree_id
+      // Tag existing persons/relationships/images with project_id
       for (const p of Object.values(_db.persons)) {
-        p.tree_id = p.tree_id || treeId
+        p.project_id = p.project_id || projectId
       }
       for (const r of Object.values(_db.relationships)) {
-        r.tree_id = r.tree_id || treeId
+        r.project_id = r.project_id || projectId
       }
       for (const img of Object.values(_db.images)) {
-        img.tree_id = img.tree_id || treeId
+        img.project_id = img.project_id || projectId
       }
     } else if (Object.keys(_db.persons).length === 0) {
       // Fresh install: seed sample data
-      seedSampleData(_db, treeId, { uuid: randomUUID, nowStr })
+      seedSampleData(_db, projectId, { uuid: randomUUID, nowStr })
     }
 
-    // Migrate old flat settings to prefixed per-tree settings
+    // Migrate old flat settings to prefixed per-project settings
     const oldSettings = { ..._db.settings }
     _db.settings = {}
     for (const [key, value] of Object.entries(oldSettings)) {
       if (key === 'theme') {
         _db.globalSettings.theme = value
       } else {
-        _db.settings[`${treeId}:${key}`] = value
+        _db.settings[`${projectId}:${key}`] = value
       }
     }
 
     save()
   }
 
-  if (!_db.activeTreeId) {
-    _db.activeTreeId = Object.keys(_db.trees)[0]
+  if (!_db.activeProjectId) {
+    _db.activeProjectId = Object.keys(_db.projects)[0]
     save()
   }
 }
@@ -114,8 +119,8 @@ export function getDB() {
   if (!_db) throw new Error('Database not initialised')
   return {
     db: _db,
-    trees: _db.trees,
-    activeTreeId: _db.activeTreeId,
+    projects: _db.projects,
+    activeProjectId: _db.activeProjectId,
     persons: _db.persons,
     relationships: _db.relationships,
     factions: _db.factions,
@@ -123,8 +128,8 @@ export function getDB() {
     images: _db.images,
     settings: _db.settings,
     globalSettings: _db.globalSettings,
-    setActiveTree(id) {
-      _db.activeTreeId = id
+    setActiveProject(id) {
+      _db.activeProjectId = id
     },
     save,
     nowStr
