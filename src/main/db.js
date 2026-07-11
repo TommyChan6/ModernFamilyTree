@@ -8,7 +8,8 @@ import {
   seedSampleData,
   migrateTreesToProjects,
   migrateYearsToDateValues,
-  migrateScenariosToScenes
+  migrateScenariosToScenes,
+  migrateFactionsToTags
 } from '../shared/dbCore'
 
 // DB shape and the sample-family seed live in src/shared/dbCore.ts so the
@@ -88,6 +89,10 @@ export function initDB() {
     }
     save()
   }
+
+  // Migration: dissolve factions into tags + entity_tags + scene_tags (the
+  // old factions collection stays until step 4.4 removes it)
+  if (migrateFactionsToTags(_db, { uuid: randomUUID, nowStr })) save()
 
   // Migration: convert an old single-container DB (no projects at all) to the
   // multi-project shape

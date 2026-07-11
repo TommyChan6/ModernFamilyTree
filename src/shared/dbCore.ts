@@ -180,6 +180,95 @@ export function migrateScenariosToScenes(db: any): boolean {
   return changed
 }
 
+// ── Migration: factions → tags + entity_tags + scene_tags ────────────────────
+// A faction mashed two jobs together: WHO belongs (member_ids, copied per
+// scenario) and WHERE it sits (x/y/visible per scenario). Split them:
+//   - same-named factions across scenes collapse into ONE Tag per project
+//     (name key is trimmed + case-insensitive; colour/icon come from the
+//     first occurrence, oldest first)
+//   - member_ids become entity_tags rows (one per distinct person↔tag pair)
+//   - each faction becomes one scene_tags placement in the groups scene
+//     migrated from its scenario (same id), copying x/y/visible
+// The old factions collection is NOT deleted here — step 4.4 removes it once
+// the Groups view reads the new model, so this step stays reversible.
+// Idempotent: reruns find the tag by label and skip existing rows.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function migrateFactionsToTags(db: any, env: Env): boolean {
+  let changed = false
+  const factions = (Object.values(db.factions || {}) as Faction[])
+    .slice()
+    .sort((a, b) => (a.created_at > b.created_at ? 1 : a.created_at < b.created_at ? -1 : 0))
+  if (!factions.length) return false
+
+  db.tags = db.tags || {}
+  db.entity_tags = db.entity_tags || {}
+  db.scene_tags = db.scene_tags || {}
+
+  // project id + normalized name → tag id (pre-seeded with existing tags so
+  // reruns and user-created tags dedupe against the same key space)
+  const nameKey = (projectId: string, label: string) =>
+    `${projectId}~${(label || '').trim().toLowerCase()}`
+  const tagByName = new Map<string, string>()
+  for (const t of Object.values(db.tags) as Tag[]) {
+    const key = nameKey(t.project_id, t.label)
+    if (!tagByName.has(key)) tagByName.set(key, t.id)
+  }
+
+  const hasJoin = (entityId: string, tagId: string) =>
+    (Object.values(db.entity_tags) as EntityTag[]).some(
+      (row) => row.entity_id === entityId && row.tag_id === tagId
+    )
+  const hasPlacement = (sceneId: string, tagId: string) =>
+    (Object.values(db.scene_tags) as SceneTag[]).some(
+      (row) => row.scene_id === sceneId && row.tag_id === tagId
+    )
+
+  for (const f of factions) {
+    const key = nameKey(f.project_id, f.name)
+    let tagId = tagByName.get(key)
+    if (!tagId) {
+      tagId = env.uuid()
+      const now = env.nowStr()
+      const tag: Tag = {
+        id: tagId,
+        project_id: f.project_id,
+        label: (f.name || '').trim() || 'Unnamed',
+        type: '',
+        source: 'manual',
+        color: f.color || '#6c8ef5',
+        icon: f.icon || '',
+        created_at: now,
+        updated_at: now
+      }
+      db.tags[tagId] = tag
+      tagByName.set(key, tagId)
+      changed = true
+    }
+    for (const pid of f.member_ids || []) {
+      if (!db.persons[pid] || hasJoin(pid, tagId)) continue
+      const id = env.uuid()
+      db.entity_tags[id] = { id, entity_id: pid, tag_id: tagId, created_at: env.nowStr() }
+      changed = true
+    }
+    if (f.scenario_id && db.scenes[f.scenario_id] && !hasPlacement(f.scenario_id, tagId)) {
+      const id = env.uuid()
+      const now = env.nowStr()
+      db.scene_tags[id] = {
+        id,
+        scene_id: f.scenario_id,
+        tag_id: tagId,
+        x: f.x ?? 0,
+        y: f.y ?? 0,
+        visible: f.visible !== false,
+        created_at: now,
+        updated_at: now
+      }
+      changed = true
+    }
+  }
+  return changed
+}
+
 // ── Sample family seeded on first run (shared so desktop and web start identical) ──
 export function seedSampleData(db: DB, projectId: string, env: Env): void {
   const now = env.nowStr()

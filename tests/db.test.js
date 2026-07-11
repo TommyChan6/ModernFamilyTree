@@ -1167,6 +1167,150 @@ describe('Tags & the entity_tags join', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+describe('Migration: factions → tags + entity_tags + scene_tags', () => {
+  const faction = (id, sceneId, name, members, extra = {}) => ({
+    id,
+    project_id: 't1',
+    scenario_id: sceneId,
+    name,
+    description: '',
+    color: '#f5a623',
+    icon: '🏰',
+    member_ids: members,
+    x: 10,
+    y: 20,
+    visible: true,
+    created_at: `2024-01-0${id.slice(-1)}`,
+    updated_at: '2024-01-01',
+    ...extra
+  })
+
+  const writeOldFactionsDb = () => {
+    const dbDir = path.join(tmpDir, 'db')
+    fs.mkdirSync(dbDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dbDir, 'familytree.json'),
+      JSON.stringify({
+        projects: {
+          t1: { id: 't1', name: 'T', created_at: '2024-01-01', updated_at: '2024-01-01' }
+        },
+        activeProjectId: 't1',
+        persons: {
+          p1: { id: 'p1', project_id: 't1', name: 'P1', gender: 'male', created_at: '2024-01-01' },
+          p2: {
+            id: 'p2',
+            project_id: 't1',
+            name: 'P2',
+            gender: 'female',
+            created_at: '2024-01-01'
+          }
+        },
+        relationships: {},
+        images: {},
+        settings: {},
+        globalSettings: {},
+        scenarios: {
+          s1: {
+            id: 's1',
+            project_id: 't1',
+            name: 'By family',
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01'
+          },
+          s2: {
+            id: 's2',
+            project_id: 't1',
+            name: 'Allegiance',
+            created_at: '2024-01-02',
+            updated_at: '2024-01-02'
+          }
+        },
+        factions: {
+          // "Starks" exists in BOTH scenarios with overlapping members —
+          // must collapse to ONE tag, one join row per person, two placements
+          f1: faction('f1', 's1', 'Starks', ['p1', 'p2'], { x: 100, y: 110 }),
+          f2: faction('f2', 's2', 'starks ', ['p1'], { x: 300, y: 310, visible: false }),
+          f3: faction('f3', 's2', 'Lannisters', ['p2'], { color: '#6c8ef5', icon: '🦁' })
+        }
+      })
+    )
+  }
+
+  it('collapses same-named factions to one tag; joins dedupe; placements copy x/y/visible', () => {
+    writeOldFactionsDb()
+    initDB()
+    const { db } = getDB()
+
+    // Tags: one per distinct name (2), colour/icon from the first occurrence
+    const tagList = Object.values(db.tags)
+    expect(tagList).toHaveLength(2)
+    const starks = tagList.find((t) => t.label === 'Starks')
+    const lannisters = tagList.find((t) => t.label === 'Lannisters')
+    expect(starks).toMatchObject({ color: '#f5a623', icon: '🏰', source: 'manual' })
+    expect(lannisters).toMatchObject({ color: '#6c8ef5', icon: '🦁' })
+
+    // Join rows: distinct person↔tag pairs only (p1+p2→Starks, p2→Lannisters)
+    const joins = Object.values(db.entity_tags)
+    expect(joins).toHaveLength(3)
+    const pairs = joins.map((j) => `${j.entity_id}~${db.tags[j.tag_id].label}`).sort()
+    expect(pairs).toEqual(['p1~Starks', 'p2~Lannisters', 'p2~Starks'])
+
+    // Placements: one per faction (3), carrying that faction's x/y/visible
+    const placements = Object.values(db.scene_tags)
+    expect(placements).toHaveLength(3)
+    const starksS1 = placements.find((r) => r.scene_id === 's1' && r.tag_id === starks.id)
+    const starksS2 = placements.find((r) => r.scene_id === 's2' && r.tag_id === starks.id)
+    expect(starksS1).toMatchObject({ x: 100, y: 110, visible: true })
+    expect(starksS2).toMatchObject({ x: 300, y: 310, visible: false })
+
+    // The old factions collection is still there (step 4.4 removes it)
+    expect(Object.keys(db.factions)).toHaveLength(3)
+  })
+
+  it('re-running the migration is a no-op', () => {
+    writeOldFactionsDb()
+    initDB()
+    const first = JSON.parse(fs.readFileSync(path.join(tmpDir, 'db', 'familytree.json'), 'utf8'))
+
+    vi.resetModules()
+    return import('../src/main/db.js').then((mod2) => {
+      mod2.initDB()
+      const second = JSON.parse(fs.readFileSync(path.join(tmpDir, 'db', 'familytree.json'), 'utf8'))
+      expect(second).toEqual(first)
+    })
+  })
+
+  it('skips members that no longer exist and factions whose scene is gone', () => {
+    const dbDir = path.join(tmpDir, 'db')
+    fs.mkdirSync(dbDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dbDir, 'familytree.json'),
+      JSON.stringify({
+        projects: {
+          t1: { id: 't1', name: 'T', created_at: '2024-01-01', updated_at: '2024-01-01' }
+        },
+        activeProjectId: 't1',
+        persons: {},
+        relationships: {},
+        images: {},
+        settings: {},
+        globalSettings: {},
+        scenarios: {},
+        factions: {
+          f1: faction('f1', 'missing-scene', 'Ghosts', ['gone-person'])
+        }
+      })
+    )
+
+    initDB()
+    const { db } = getDB()
+    expect(Object.values(db.tags)).toHaveLength(1) // the tag itself is still made
+    expect(Object.values(db.entity_tags)).toHaveLength(0)
+    expect(Object.values(db.scene_tags)).toHaveLength(0)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 describe('scene_tags (tag placements)', () => {
   it('adds a placement that round-trips to disk; duplicate add returns the same row', () => {
     initDB()

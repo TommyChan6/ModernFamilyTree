@@ -8,6 +8,7 @@ import {
   migrateTreesToProjects,
   migrateYearsToDateValues,
   migrateScenariosToScenes,
+  migrateFactionsToTags,
   nowStr
 } from '../../../../shared/dbCore'
 
@@ -81,11 +82,13 @@ function getLocalDB(): Promise<DB> {
       if (stored) {
         const merged = { ...EMPTY_DB(), ...stored }
         // One-time migrations for stores written before the overhaul:
-        // tree → project rename, bare years → DateValues, scenarios → scenes
+        // tree → project rename, bare years → DateValues, scenarios → scenes,
+        // factions → tags + joins + placements
         const renamed = migrateTreesToProjects(merged)
         const datesWrapped = migrateYearsToDateValues(merged)
         const scenesMade = migrateScenariosToScenes(merged)
-        if (renamed || datesWrapped || scenesMade) void persist(merged)
+        const factionsDissolved = migrateFactionsToTags(merged, env)
+        if (renamed || datesWrapped || scenesMade || factionsDissolved) void persist(merged)
         return merged
       }
       const db = createInitialDB(env)
