@@ -146,6 +146,7 @@
     <!-- Scene tab strip (a single default scene for now — manual positions
          and per-scene arrangements come later) -->
     <SceneTabs
+      v-if="store.caps.scenes"
       :scenes="store.timelineScenes"
       :active-id="store.activeSceneIds.timeline"
       label="Scenes"

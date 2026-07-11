@@ -46,6 +46,18 @@
       <button class="btn btn-ghost btn-sm" title="Jump to a person (Ctrl+K)" @click="openPalette">
         🔍 ⌘K
       </button>
+      <label class="mode-picker-wrap" title="Program mode — how much of the app is shown">
+        <span class="mode-picker-label">Mode</span>
+        <select
+          class="mode-picker"
+          :value="store.programMode"
+          @change="store.setProgramMode($event.target.value)"
+        >
+          <option value="simple">Simple</option>
+          <option value="standard">Standard</option>
+          <option value="advanced">Advanced</option>
+        </select>
+      </label>
       <button
         class="icon-btn"
         :title="store.theme === 'dark' ? 'Light mode' : 'Dark mode'"
@@ -272,10 +284,13 @@ function onBeforeUnload(e) {
 }
 
 onMounted(async () => {
-  // Load global settings (theme)
+  // Load global settings (theme, program mode)
   const globalRes = await api.invoke('globalSettings:getAll')
   if (globalRes.success && globalRes.data.theme) {
     store.setTheme(globalRes.data.theme)
+  }
+  if (globalRes.success && globalRes.data.programMode) {
+    store.setProgramMode(globalRes.data.programMode)
   }
 
   // Load projects first, then data
@@ -496,6 +511,33 @@ onUnmounted(() => {
 
 .topbar-spacer {
   flex: 0;
+}
+
+.mode-picker-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mode-picker-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--t3);
+}
+
+.mode-picker {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--elevated);
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
 }
 
 .workspace {

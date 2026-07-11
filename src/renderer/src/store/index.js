@@ -45,6 +45,8 @@ export const useMainStore = defineStore('main', () => {
   // autosaves; this is what Revert goes back to. null = never saved one.
   const checkpoint = ref(null)
   const activeView = ref('graph') // 'graph' | 'directory' | 'relationships' | 'timeline' | 'groups'
+  // App-wide feature tier (progressive disclosure): 'simple' | 'standard' | 'advanced'
+  const programMode = ref('standard')
 
   // Graph visual settings
   const graphSettings = ref({
@@ -123,6 +125,37 @@ export const useMainStore = defineStore('main', () => {
       .map(({ id, scene_id, tag_id, x, y, visible }) => ({ id, scene_id, tag_id, x, y, visible }))
       .sort((a, b) => (a.id < b.id ? -1 : 1))
     return JSON.stringify({ s, t, y: userYear ?? null })
+  }
+
+  // Capability flags derived from the program mode — components read these
+  // (never the mode itself) so features gate in exactly one place.
+  //   Simple:   Graph + Directory only, one auto scene, Organic type only,
+  //             no Focus / Style / tags
+  //   Standard: all views, scenes, Focus + basic Style, manual tags
+  //   Advanced: everything (full Style incl. physics sliders)
+  const caps = computed(() => {
+    const m = programMode.value
+    return {
+      views:
+        m === 'simple'
+          ? ['graph', 'directory']
+          : ['graph', 'directory', 'relationships', 'timeline', 'groups'],
+      scenes: m !== 'simple',
+      typePicker: m !== 'simple',
+      focus: m !== 'simple',
+      /** 'none' | 'basic' (no physics sliders) | 'full' */
+      style: m === 'simple' ? 'none' : m === 'standard' ? 'basic' : 'full',
+      tags: m !== 'simple'
+    }
+  })
+
+  function setProgramMode(mode) {
+    if (!['simple', 'standard', 'advanced'].includes(mode) || mode === programMode.value) return
+    programMode.value = mode
+    api.invoke('globalSettings:set', { key: 'programMode', value: mode })
+    // A hidden view must never stay active
+    if (!caps.value.views.includes(activeView.value)) activeView.value = 'graph'
+    if (mode === 'simple') settingsOpen.value = false
   }
 
   const hasUnsavedChanges = computed(() => {
@@ -657,6 +690,9 @@ export const useMainStore = defineStore('main', () => {
     lockLines,
     relPopup,
     activeView,
+    programMode,
+    caps,
+    setProgramMode,
     // computed
     selectedPerson,
     personCount,

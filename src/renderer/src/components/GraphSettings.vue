@@ -278,8 +278,8 @@
           </Transition>
         </div>
 
-        <!-- Physics -->
-        <div class="settings-group">
+        <!-- Physics (Advanced mode only) -->
+        <div v-if="store.caps.style === 'full'" class="settings-group">
           <button class="group-toggle" @click="toggle('physics')">
             <span class="group-icon" :class="{ rotated: expanded.physics }">›</span>
             <span>Physics / Layout</span>

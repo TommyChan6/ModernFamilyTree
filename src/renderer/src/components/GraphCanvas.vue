@@ -20,7 +20,7 @@
         <button class="ctrl-btn" title="Reset view" @click="resetZoom">⊕</button>
         <div class="ctrl-sep"></div>
         <button
-          v-for="m in modes"
+          v-for="m in visibleModes"
           :key="m.id"
           class="ctrl-btn ctrl-btn-wide"
           :class="{ 'ctrl-btn-active': currentMode === m.id }"
@@ -57,6 +57,7 @@
         </button>
         <div class="ctrl-sep"></div>
         <button
+          v-if="store.caps.focus"
           class="ctrl-btn"
           :class="{ 'ctrl-btn-active': focusOpen }"
           title="Focus"
@@ -82,6 +83,7 @@
         </button>
       </div>
       <SceneTabs
+        v-if="store.caps.scenes"
         class="graph-scene-tabs"
         :scenes="graphScenes"
         :active-id="activeSceneId"
@@ -117,7 +119,11 @@
       ✨
     </button>
     <!-- Highlights (Focus) popover, toggled from the tool pill -->
-    <div v-if="focusOpen" class="highlights-panel" :class="{ 'clean-hide-right': store.cleanView }">
+    <div
+      v-if="focusOpen && store.caps.focus"
+      class="highlights-panel"
+      :class="{ 'clean-hide-right': store.cleanView }"
+    >
       <div class="highlights-title">Focus</div>
       <div class="highlight-row">
         <div class="highlight-label">Lineage</div>
@@ -280,6 +286,11 @@ const modes = [
   { id: 'age', label: '📅 Birth', title: 'Birth — vertical position by birth date' },
   { id: 'generation', label: '🏛 Generations', title: 'Generations — top-down hierarchy' }
 ]
+
+// Program-mode gating: Simple offers the Organic type only
+const visibleModes = computed(() =>
+  store.caps.typePicker ? modes : modes.filter((m) => m.id === 'auto')
+)
 
 // ── Scenes ──────────────────────────────────────────────────────────────────
 // The graph runs off view:'graph' Scenes: each carries a layout *type*

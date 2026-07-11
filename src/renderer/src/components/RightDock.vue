@@ -60,7 +60,7 @@
           </div>
         </div>
 
-        <div class="insp-section">
+        <div v-if="store.caps.tags" class="insp-section">
           <div class="insp-label">Tags</div>
           <TagChipsEditor :entity-id="person.id" />
         </div>

@@ -83,7 +83,7 @@
           </div>
 
           <!-- Tags (existing persons only — a new person has no id to join on yet) -->
-          <div v-if="store.editingPerson" class="form-section">
+          <div v-if="store.editingPerson && store.caps.tags" class="form-section">
             <div class="form-section-label">Tags</div>
             <TagChipsEditor :entity-id="store.editingPerson.id" />
           </div>

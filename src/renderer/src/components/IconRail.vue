@@ -1,7 +1,7 @@
 <template>
   <nav class="icon-rail">
     <button
-      v-for="v in views"
+      v-for="v in visibleViews"
       :key="v.id"
       class="rail-btn"
       :class="{ active: store.activeView === v.id }"
@@ -20,6 +20,7 @@
     <div class="rail-spacer"></div>
 
     <button
+      v-if="store.caps.style !== 'none'"
       class="rail-btn"
       :class="{ active: store.settingsOpen }"
       title="Style"
@@ -31,6 +32,7 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useMainStore } from '../store/index.js'
 
 // The slim left icon rail: the five views + add + settings. Everything that
@@ -45,6 +47,8 @@ const views = [
   { id: 'timeline', icon: '📅', label: 'Timeline' },
   { id: 'groups', icon: '⬡', label: 'Groups' }
 ]
+// Program-mode gating: Simple shows Graph + Directory only
+const visibleViews = computed(() => views.filter((v) => store.caps.views.includes(v.id)))
 </script>
 
 <style scoped>
