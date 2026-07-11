@@ -28,7 +28,7 @@ export const useMainStore = defineStore('main', () => {
   const lockNodes = ref(false)
   const lockLines = ref(false)
   const relPopup = ref(null)
-  const cleanTree = ref(false)
+  const cleanView = ref(false)
   // Current year. `userCurrentYear` is the explicit user override (null = follow
   // the data). While it's null the current year tracks the latest year present
   // in the data; once the user sets a value it stays pinned there regardless of
@@ -44,16 +44,16 @@ export const useMainStore = defineStore('main', () => {
   // arrangement (scenes + placements + current-year override). Everything
   // autosaves; this is what Revert goes back to. null = never saved one.
   const checkpoint = ref(null)
-  const activeView = ref('tree') // 'tree' | 'people' | 'relationships' | 'timeline' | 'factions'
+  const activeView = ref('graph') // 'graph' | 'directory' | 'relationships' | 'timeline' | 'groups'
 
   // Graph visual settings
   const graphSettings = ref({
     nodeRadius: 22,
     parentChildColor: '#8b6cc5',
     parentChildWidth: 1.8,
-    spouseColor: '#f06292',
+    spouseColor: '#d4af37',
     spouseWidth: 2,
-    adoptedColor: '#f5a623',
+    adoptedColor: '#2bb3a3',
     adoptedWidth: 1.8,
     maleColor: '#3a7bd5',
     femaleColor: '#c95fa0',
@@ -511,7 +511,7 @@ export const useMainStore = defineStore('main', () => {
 
   /** Create a tag and place it in the active groups scene. Returns the tag. */
   async function createGroup({ name, color, icon, x = 0, y = 0 } = {}) {
-    const sceneId = await ensureScene('groups', 'Scenario 1')
+    const sceneId = await ensureScene('groups', 'Scene 1')
     const tagRes = await createTag({ label: name, color, icon })
     if (!tagRes.success) return tagRes
     const placeRes = await addSceneTag(sceneId, tagRes.data.id, { x, y })
@@ -602,9 +602,9 @@ export const useMainStore = defineStore('main', () => {
       nodeRadius: 22,
       parentChildColor: '#8b6cc5',
       parentChildWidth: 1.8,
-      spouseColor: '#f06292',
+      spouseColor: '#d4af37',
       spouseWidth: 2,
-      adoptedColor: '#f5a623',
+      adoptedColor: '#2bb3a3',
       adoptedWidth: 1.8,
       maleColor: '#3a7bd5',
       femaleColor: '#c95fa0',
@@ -650,7 +650,7 @@ export const useMainStore = defineStore('main', () => {
     settingsOpen,
     graphSettings,
     lockNodes,
-    cleanTree,
+    cleanView,
     currentDate,
     userCurrentYear,
     autoCurrentYear,

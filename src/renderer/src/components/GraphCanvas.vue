@@ -7,11 +7,11 @@
   >
     <canvas ref="glCanvasEl" class="graph-gl"></canvas>
     <canvas ref="overlayEl" class="graph-overlay"></canvas>
-    <div class="graph-search" :class="{ 'clean-hide-up': store.cleanTree }">
+    <div class="graph-search" :class="{ 'clean-hide-up': store.cleanView }">
       <span class="search-icon">🔍</span>
       <input v-model="searchQuery" placeholder="Search family members…" @input="highlightSearch" />
     </div>
-    <div class="bottom-bars" :class="{ 'clean-hide-down': store.cleanTree }">
+    <div class="bottom-bars" :class="{ 'clean-hide-down': store.cleanView }">
       <div class="graph-controls">
         <button class="ctrl-btn" title="Zoom in" @click="zoomIn">＋</button>
         <button class="ctrl-btn" title="Zoom out" @click="zoomOut">－</button>
@@ -59,7 +59,7 @@
         <button
           class="ctrl-btn"
           :class="{ 'ctrl-btn-active': focusOpen }"
-          title="Highlights"
+          title="Focus"
           @click="focusOpen = !focusOpen"
         >
           🎯
@@ -74,9 +74,9 @@
         </button>
         <button
           class="ctrl-btn"
-          :class="{ 'ctrl-btn-active': store.cleanTree }"
+          :class="{ 'ctrl-btn-active': store.cleanView }"
           title="Clean view — hide canvas overlays"
-          @click="store.cleanTree = !store.cleanTree"
+          @click="store.cleanView = !store.cleanView"
         >
           ✨
         </button>
@@ -109,16 +109,16 @@
     </Transition>
     <!-- Restore button while Clean view hides the tool pill -->
     <button
-      v-if="store.cleanTree"
+      v-if="store.cleanView"
       class="clean-restore"
       title="Exit clean view"
-      @click="store.cleanTree = false"
+      @click="store.cleanView = false"
     >
       ✨
     </button>
     <!-- Highlights (Focus) popover, toggled from the tool pill -->
-    <div v-if="focusOpen" class="highlights-panel" :class="{ 'clean-hide-right': store.cleanTree }">
-      <div class="highlights-title">Highlights</div>
+    <div v-if="focusOpen" class="highlights-panel" :class="{ 'clean-hide-right': store.cleanView }">
+      <div class="highlights-title">Focus</div>
       <div class="highlight-row">
         <div class="highlight-label">Lineage</div>
         <div class="seg-slider">
@@ -195,31 +195,37 @@
       </div>
     </div>
 
-    <div v-if="legendOpen" class="graph-legend" :class="{ 'clean-hide-right': store.cleanTree }">
+    <div v-if="legendOpen" class="graph-legend" :class="{ 'clean-hide-right': store.cleanView }">
       <div class="panel-title">Legend</div>
       <div class="leg-section">
         <div class="leg-section-label">Nodes</div>
         <div class="leg-row">
-          <div class="leg-dot" style="background: #3a7bd5"></div>
+          <div class="leg-dot" :style="{ background: store.graphSettings.maleColor }"></div>
           Male
         </div>
         <div class="leg-row">
-          <div class="leg-dot" style="background: #c95fa0"></div>
+          <div class="leg-dot" :style="{ background: store.graphSettings.femaleColor }"></div>
           Female
         </div>
       </div>
       <div class="leg-section">
         <div class="leg-section-label">Lines</div>
         <div class="leg-row">
-          <div class="leg-line" style="background: #8b6cc5"></div>
+          <div class="leg-line" :style="{ background: store.graphSettings.parentChildColor }"></div>
           Parent / Child
         </div>
         <div class="leg-row">
-          <div class="leg-line leg-dashed" style="border-color: #f06292"></div>
+          <div
+            class="leg-line leg-dashed"
+            :style="{ borderColor: store.graphSettings.spouseColor }"
+          ></div>
           Spouse
         </div>
         <div class="leg-row">
-          <div class="leg-line leg-dashed" style="border-color: #f5a623"></div>
+          <div
+            class="leg-line leg-dashed"
+            :style="{ borderColor: store.graphSettings.adoptedColor }"
+          ></div>
           Adopted
         </div>
       </div>
@@ -269,10 +275,10 @@ const focusOpen = ref(false) // Highlights popover (from the tool pill)
 const legendOpen = ref(true) // Legend panel toggle (from the tool pill)
 
 const modes = [
-  { id: 'custom', label: '✋ Custom', title: 'Freely position nodes' },
-  { id: 'auto', label: '⚡ Auto', title: 'Force-directed layout' },
-  { id: 'age', label: '📅 Age', title: 'Sort by birth year' },
-  { id: 'generation', label: '🏛 Gen', title: 'Generational layout' }
+  { id: 'custom', label: '✋ Free', title: 'Free — nodes stay where you put them' },
+  { id: 'auto', label: '⚡ Organic', title: 'Organic — force-directed layout' },
+  { id: 'age', label: '📅 Birth', title: 'Birth — vertical position by birth date' },
+  { id: 'generation', label: '🏛 Generations', title: 'Generations — top-down hierarchy' }
 ]
 
 // ── Scenes ──────────────────────────────────────────────────────────────────

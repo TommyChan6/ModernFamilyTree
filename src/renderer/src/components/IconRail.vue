@@ -22,7 +22,7 @@
     <button
       class="rail-btn"
       :class="{ active: store.settingsOpen }"
-      title="Graph settings"
+      title="Style"
       @click="store.toggleSettings()"
     >
       <span class="rail-icon">⚙</span>
@@ -39,11 +39,11 @@ import { useMainStore } from '../store/index.js'
 const store = useMainStore()
 
 const views = [
-  { id: 'tree', icon: '🕸', label: 'Tree' },
-  { id: 'people', icon: '👥', label: 'All People' },
+  { id: 'graph', icon: '🕸', label: 'Graph' },
+  { id: 'directory', icon: '👥', label: 'Directory' },
   { id: 'relationships', icon: '🔗', label: 'Relationships' },
   { id: 'timeline', icon: '📅', label: 'Timeline' },
-  { id: 'factions', icon: '⬡', label: 'Factions' }
+  { id: 'groups', icon: '⬡', label: 'Groups' }
 ]
 </script>
 

@@ -3,7 +3,7 @@
     <!-- Toolbar -->
     <div class="fx-toolbar">
       <div class="fx-heading">
-        <span class="fx-title">Factions</span>
+        <span class="fx-title">Groups</span>
         <span class="fx-count">{{ activeFactions.length }}</span>
       </div>
       <div class="fx-actions">
@@ -14,12 +14,12 @@
         <button
           v-if="visibleFactions.length > 1"
           class="btn btn-sm"
-          title="Arrange factions in a ring"
+          title="Arrange groups in a ring"
           @click="autoArrange"
         >
           ✨ Arrange
         </button>
-        <button class="btn btn-primary btn-sm" @click="handleCreateFaction">＋ New Faction</button>
+        <button class="btn btn-primary btn-sm" @click="handleCreateFaction">＋ New Group</button>
       </div>
     </div>
 
@@ -50,14 +50,14 @@
       <div v-if="!activeFactions.length" class="fx-empty">
         <div class="fx-empty-icon">⬡</div>
         <div class="fx-empty-title">
-          {{ store.groupsScenes.length > 1 ? 'No factions in this scenario' : 'No factions yet' }}
+          {{ store.groupsScenes.length > 1 ? 'No groups in this scene' : 'No groups yet' }}
         </div>
         <div class="fx-empty-text">
           Group your people into families, companies, schools, guilds — any camps you like. People
-          in several factions settle in the middle ground between them.
+          in several groups settle in the middle ground between them.
         </div>
         <button class="btn btn-primary" @click="handleCreateFaction">
-          ＋ Create {{ store.groupsScenes.length > 1 ? 'a' : 'your first' }} faction
+          ＋ Create {{ store.groupsScenes.length > 1 ? 'a' : 'your first' }} group
         </button>
       </div>
 
@@ -79,7 +79,7 @@
         @wheel.stop
         @click.stop
       >
-        <div class="fx-panel-title">Factions</div>
+        <div class="fx-panel-title">Groups</div>
         <div
           v-for="f in activeFactions"
           :key="f.id"
@@ -93,16 +93,16 @@
           <span class="fx-mcount">{{ (f.member_ids || []).length }}</span>
           <button
             class="fx-mbtn"
-            :title="f.visible === false ? 'Show faction' : 'Hide faction'"
+            :title="f.visible === false ? 'Show group' : 'Hide group'"
             @click="toggleVisible(f)"
           >
             {{ f.visible === false ? '◌' : '👁' }}
           </button>
-          <button class="fx-mbtn" title="Edit faction" @click="openFactionEdit(f.id, $event)">
+          <button class="fx-mbtn" title="Edit group" @click="openFactionEdit(f.id, $event)">
             ✎
           </button>
         </div>
-        <div v-if="sharedCount" class="fx-mfoot">{{ sharedCount }} in multiple factions</div>
+        <div v-if="sharedCount" class="fx-mfoot">{{ sharedCount }} in multiple groups</div>
       </div>
 
       <!-- Unassigned tray -->
@@ -148,13 +148,13 @@
         >
           <div class="fx-popup-title">
             <span class="fx-mdot" :style="{ background: fEdit.color }"></span>
-            Edit faction
+            Edit group
           </div>
           <input
             ref="fEditNameRef"
             v-model="fEdit.name"
             class="fx-input"
-            placeholder="Faction name"
+            placeholder="Group name"
             @keydown.enter="saveFactionEdit"
             @keydown.escape="fEdit = null"
           />
@@ -213,16 +213,16 @@
               {{ f.name }}
               <button
                 class="fx-fchip-x"
-                title="Remove from faction"
+                title="Remove from group"
                 @click="store.removePersonFromGroup(pPop.id, f.id)"
               >
                 ✕
               </button>
             </span>
-            <span v-if="!pPopMemberships.length" class="fx-nochips">No factions yet</span>
+            <span v-if="!pPopMemberships.length" class="fx-nochips">No groups yet</span>
           </div>
           <select v-if="pPopAddable.length" class="fx-select" @change="onAddToFaction($event)">
-            <option value="" disabled selected>＋ Add to faction…</option>
+            <option value="" disabled selected>＋ Add to group…</option>
             <option v-for="f in pPopAddable" :key="f.id" :value="f.id">
               {{ f.icon }} {{ f.name }}
             </option>
@@ -241,12 +241,12 @@
       ref="sceneTabsRef"
       :scenes="store.groupsScenes"
       :active-id="store.activeSceneId"
-      label="Scenarios"
-      hint="Each scenario keeps its own factions — people carry over"
+      label="Scenes"
+      hint="Each scene keeps its own group placements — membership is shared"
       :tooltip="scenarioTooltip"
-      add-title="New empty scenario"
-      duplicate-title="Duplicate current scenario"
-      delete-title="Delete scenario"
+      add-title="New empty scene"
+      duplicate-title="Duplicate current scene"
+      delete-title="Delete scene"
       @switch="switchScenario"
       @create="addScenario(false)"
       @duplicate="addScenario(true)"
@@ -1086,7 +1086,7 @@ async function handleCreateFaction() {
   const cy = (stageH.value / 2 - ty.value) / k.value
   const pos = nextFactionPosition(activeFactions.value, cx, cy)
   const res = await store.createGroup({
-    name: `Faction ${activeFactions.value.length + 1}`,
+    name: `Group ${activeFactions.value.length + 1}`,
     color: PRESET_COLORS[activeFactions.value.length % PRESET_COLORS.length],
     icon: ICON_PRESETS[activeFactions.value.length % ICON_PRESETS.length],
     x: Math.round(pos.x),
@@ -1120,7 +1120,7 @@ async function saveFactionEdit() {
   fEdit.value = null
   await store.updateGroup({
     id,
-    name: name.trim() || 'Unnamed Faction',
+    name: name.trim() || 'Unnamed Group',
     color,
     icon
   })
@@ -1131,7 +1131,7 @@ async function handleDeleteFaction() {
   const f = factionById.value.get(fEdit.value.id)
   const count = (f?.member_ids || []).length
   const ok = confirm(
-    `Delete "${f?.name}"?${count ? ` Its ${count} member${count === 1 ? '' : 's'} stay in your tree.` : ''}`
+    `Delete "${f?.name}"?${count ? ` Its ${count} member${count === 1 ? '' : 's'} stay in your project.` : ''}`
   )
   if (!ok) return
   const id = fEdit.value.id
@@ -1206,7 +1206,7 @@ function peopleInScenario(sid) {
 
 function scenarioTooltip(s) {
   const fCount = store.sceneTags.filter((st) => st.scene_id === s.id).length
-  return `${fCount} faction${fCount === 1 ? '' : 's'} · ${peopleInScenario(s.id)} people in scene`
+  return `${fCount} group${fCount === 1 ? '' : 's'} · ${peopleInScenario(s.id)} people in scene`
 }
 
 function switchScenario(id) {
@@ -1214,7 +1214,7 @@ function switchScenario(id) {
 }
 
 async function addScenario(duplicate) {
-  const name = `Scenario ${store.groupsScenes.length + 1}`
+  const name = `Scene ${store.groupsScenes.length + 1}`
   const res = duplicate
     ? await store.duplicateScene(store.activeSceneId, name)
     : await store.createScene('groups', name)
@@ -1228,7 +1228,7 @@ async function addScenario(duplicate) {
 async function handleDeleteScenario(s) {
   const fCount = store.sceneTags.filter((st) => st.scene_id === s.id).length
   const ok = confirm(
-    `Delete scenario "${s.name}"${fCount ? ` and its ${fCount} faction${fCount === 1 ? '' : 's'}` : ''}? People stay in your tree.`
+    `Delete scene "${s.name}"${fCount ? ` and its ${fCount} group placement${fCount === 1 ? '' : 's'}` : ''}? People and groups stay.`
   )
   if (ok) await store.deleteScene(s.id)
 }

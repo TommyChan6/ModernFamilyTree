@@ -38,7 +38,7 @@
 
         <!-- Present (reference "now" date) -->
         <div class="pmenu-section">
-          <div class="pmenu-label">Current Date</div>
+          <div class="pmenu-label">Present</div>
           <div class="pmenu-date-row">
             <input
               type="number"

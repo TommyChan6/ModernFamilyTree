@@ -58,11 +58,11 @@
       <IconRail />
       <div class="canvas-stack">
         <!-- Graph stays mounted (tucked away) so its layout & simulation state persist -->
-        <div v-show="store.activeView === 'tree'" class="canvas-layer">
+        <div v-show="store.activeView === 'graph'" class="canvas-layer">
           <GraphCanvas ref="graphRef" :key="store.activeProjectId" />
         </div>
         <Transition name="people-view">
-          <PeopleView v-if="store.activeView === 'people'" :key="store.activeProjectId" />
+          <PeopleView v-if="store.activeView === 'directory'" :key="store.activeProjectId" />
         </Transition>
         <Transition name="people-view">
           <RelationshipsView
@@ -82,9 +82,9 @@
         </Transition>
         <Transition name="people-view">
           <FactionsView
-            v-show="store.activeView === 'factions'"
+            v-show="store.activeView === 'groups'"
             :key="store.activeProjectId"
-            :active="store.activeView === 'factions'"
+            :active="store.activeView === 'groups'"
           />
         </Transition>
       </div>

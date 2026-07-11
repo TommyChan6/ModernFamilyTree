@@ -2,7 +2,7 @@
   <Transition name="settings">
     <div v-if="store.settingsOpen" class="settings-panel">
       <div class="settings-header">
-        <h3 class="settings-title">Graph Settings</h3>
+        <h3 class="settings-title">Style</h3>
         <button class="icon-btn" @click="store.toggleSettings()">✕</button>
       </div>
 

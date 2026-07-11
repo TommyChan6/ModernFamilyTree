@@ -2,7 +2,7 @@
   <aside class="right-sidebar">
     <!-- Header -->
     <div class="sidebar-header">
-      <h2 class="sidebar-title">Family Members</h2>
+      <h2 class="sidebar-title">Directory</h2>
       <span class="badge">{{ store.personCount }}</span>
     </div>
 

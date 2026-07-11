@@ -3,7 +3,7 @@
     <!-- Toolbar -->
     <div class="pv-toolbar">
       <div class="pv-heading">
-        <span class="pv-title">All People</span>
+        <span class="pv-title">Directory</span>
         <span class="pv-count">{{ displayed.length }}</span>
       </div>
 
@@ -54,7 +54,7 @@
           {{
             store.persons.length
               ? 'Try a different search term.'
-              : 'Add family members from the tree view to see them here.'
+              : 'Add family members from the graph view to see them here.'
           }}
         </div>
       </div>

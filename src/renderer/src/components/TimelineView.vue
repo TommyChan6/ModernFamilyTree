@@ -43,7 +43,7 @@
           {{
             store.persons.length
               ? 'Add birth years to your family members to see their lives unfold on the timeline.'
-              : 'Add family members from the tree view to see them here.'
+              : 'Add family members from the graph view to see them here.'
           }}
         </div>
       </div>
