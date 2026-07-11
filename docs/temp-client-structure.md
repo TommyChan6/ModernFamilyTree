@@ -18,9 +18,11 @@ flowchart LR
     P["🗂️ PROJECT<br/>(was 'tree')"] --> E["◈ ENTITIES<br/>people · creatures · objects…"]
     P --> R["🔗 Relationships"]
     P --> T["🏷️ Tags<br/>(identity + members)"]
-    P --> SC["🎬 Scenes<br/>(saved arrangements)"]
+    P --> V["🖼️ Views (the 5 lenses)"]
+    V --> SC["🎬 Scenes<br/>(saved arrangements — one set PER VIEW)"]
     P --> CAL["📅 Calendar<br/>(date system)"]
-    T -. "shown & placed in" .-> SC
+    T -. "shown & placed in a Groups scene" .-> SC
+    style V fill:#6c8ef5,color:#fff
     MODE["🎚️ PROGRAM MODE<br/>Simple · Default · Advanced"] -. "gates which features appear" .-> P
     style P fill:#8b6cc5,color:#fff
     style MODE fill:#c95fa0,color:#fff
@@ -32,15 +34,15 @@ flowchart LR
 | Kind | Now | 🟢 New name |
 |------|-----|-------------|
 | Container / tab | Tree | **Project** |
-| The node-link view | Tree View | **Graph** *(alt: Web / Constellation / Nexus)* |
-| The browse-grid view | All People | **People** — but the label follows a per-project **entity noun** (People / Characters / Creatures / Items) |
+| The node-link view | Tree View | **Graph** ✓ |
+| The browse-grid view | All People | **Directory** ✓ |
 | The clustering view | Factions | **Groups** ✓ |
-| Table view | Relationships | **Relationships** *(alt: Table)* |
+| Table view | Relationships | **Relationships** ✓ |
 | Timeline view | Timeline | **Timeline** ✓ |
 | A group of members | Faction | **Tag** *(shown as a **Group** bubble)* |
-| A saved arrangement | Scenario **and** State | **Scene** *(one word for both)* |
+| A saved arrangement | Scenario **and** State | **Scene** *(one word for both — see §4.0)* |
 | Graph layout algorithm | mode (Custom/Auto/Age/Gen) | **type** → **Free · Organic · Birth · Generations** |
-| App feature tier | *(none)* | **Mode** → **Simple · Default · Advanced** |
+| App feature tier | *(none)* | **Mode** → **Simple · Standard · Advanced** ✓ |
 | Emphasis panel | Highlights | **Focus** |
 | Visual styling panel | Graph Settings | **Style** |
 | Declutter toggle | Clean Tree | **Clean View** |
@@ -52,7 +54,7 @@ flowchart LR
 ```mermaid
 flowchart TB
     subgraph NEW["🆕 New concepts"]
-        M["🎚️ Program Modes<br/>Simple / Default / Advanced<br/>— feature tiers for the whole app"]
+        M["🎚️ Program Modes<br/>Simple / Standard / Advanced<br/>— feature tiers for the whole app"]
         C["📅 Custom Calendars<br/>define your own date system<br/>(20 gex/year, etc.) — Advanced only"]
         D["🗂️ People Drawer (Roster)<br/>collapsible, summonable in ANY view;<br/>drag entities onto the canvas"]
         S["💾 Autosave + Checkpoint<br/>always autosaves; manual Save + Revert;<br/>exit asks to discard unsaved changes"]
@@ -64,7 +66,7 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph one["1 · PROGRAM MODE (app-wide)"]
-        m1[Simple] ~~~ m2[Default] ~~~ m3[Advanced]
+        m1[Simple] ~~~ m2[Standard] ~~~ m3[Advanced]
     end
     subgraph two["2 · VIEW (the lens)"]
         v1[Graph] ~~~ v2[Timeline] ~~~ v3[Groups] ~~~ v4[People] ~~~ v5[Relationships]
@@ -78,7 +80,7 @@ flowchart LR
 ### What changed since the last draft (your feedback)
 - ✅ Keep a **manual Save** + **Revert** + exit prompt (not autosave-only).
 - ✅ "By Age" → **Birth**; "Present/Zen" → **Clean View**.
-- ✅ New **Program Modes** (Simple/Default/Advanced); tree "modes" → **types**.
+- ✅ New **Program Modes** (Simple/Standard/Advanced); tree "modes" → **types**.
 - ✅ "Tree" view → **Graph** (it's a graph, not a tree).
 - ✅ **Custom calendars** + rename the "now" marker to **Present**.
 - ✅ Drag-and-drop works in **every** view via a **People Drawer**; scenes draw only *placed* entities.
@@ -114,38 +116,20 @@ The fix gives each concept exactly one word (see the orthogonal diagram in the s
 ### 1.2 The Graph view (was "Tree")
 
 You're right: a family tree with remarriage, adoption, and non-family links is a **graph**,
-not a tree. 🟢 **Recommended: "Graph"** — honest, neutral, works for people/creatures/objects.
-
-🟡 **Branded alternatives** if you want something with more personality:
-
-| Name | Feel | Caution |
-|------|------|---------|
-| **Web** | approachable, "web of relations" | reads oddly next to the *web build* in dev docs (not user-facing though) |
-| **Constellation** | signature, evocative (nodes = stars) | whimsical for genealogists |
-| **Nexus** | short, "connection" | slightly sci-fi |
-| **Network / Map** | clear | "Map" clashes with the planned geographic **Map view** |
-
-❓ Pick one. I'll assume **Graph** below.
+not a tree. ✅ **Decided: "Graph"** — honest, neutral, works for people/creatures/objects.
+(The container is the *Project*; the picture is the *Graph*; the word "tree" retires from the
+UI.)
 
 ### 1.3 The browse view (was "All People")
 
-Entities aren't always people — creatures, objects, inventions (an "invention tree").
-🟢 **Recommended: a per-project *entity noun*.** One setting decides what the app calls its
-nodes, and the view label + node labels + buttons all follow it:
+✅ **Decided: "Directory"** — one neutral word that covers people, creatures, objects, or
+inventions without pretending they're all "people." It's the full-screen list; the compact
+version of the *same* list is the right-dock **Directory tab** (§6.3).
 
-```mermaid
-flowchart LR
-    N["Project setting:<br/>entity noun"] --> A["family → 'Person' → view 'People'"]
-    N --> B["novel → 'Character' → view 'Characters'"]
-    N --> C["bestiary → 'Creature' → view 'Creatures'"]
-    N --> D["tech tree → 'Invention' → view 'Inventions'"]
-    style N fill:#8b6cc5,color:#fff
-```
-
-- **Default noun = "Person" → view "People"** (so nothing feels foreign for the common case).
-- 🟡 If you'd rather not do dynamic labels yet, a static neutral name works: **"Directory"**
-  (or "Roster" / "Cast" / "Catalog").
-- Internally the data stays `persons` for now — this is a *display* noun, not a data rename.
+🟡 **Optional (Advanced) follow-on — a per-project *entity noun*.** Independent of the view
+name, an Advanced-mode setting can decide what a single node is *called* (Person / Character /
+Creature / Invention) so buttons read "Add Character" etc. Default "Person". This is a *display*
+label only — internally the data stays `persons`, not a data rename.
 
 ### 1.4 Graph layout **types** (was "modes")
 
@@ -269,6 +253,41 @@ exactly what a Groups scene is: pick tags, arrange them, save as a Scene.
 
 ## 4. One unified **Scene** + the save model
 
+### 4.0 Scene *is* State — and yes, scenes live inside each view
+
+You're not confused — I under-explained it. **"Scene" is just the new name for "State."**
+Nothing about the nesting changes: a scene belongs to **one view**, exactly like a state does
+today. Each spatial view keeps its **own independent set of scenes**:
+
+```mermaid
+flowchart TB
+    P["🗂️ Project"] --> G["🕸️ Graph view"]
+    P --> TL["📅 Timeline view"]
+    P --> GR["◈ Groups view"]
+    G --> g1["Scene: Reunion"] & g2["Scene: Pedigree"]
+    TL --> t1["Scene: Full history"] & t2["Scene: 1900s only"]
+    GR --> r1["Scene: By family"] & r2["Scene: Allegiance"]
+    style G fill:#6c8ef5,color:#fff
+    style TL fill:#6c8ef5,color:#fff
+    style GR fill:#6c8ef5,color:#fff
+```
+
+So all three of these are the *same kind of thing* — a saved state of one view — which is why
+they get one name:
+
+| View | Today's word | New word |
+|------|--------------|----------|
+| Graph | "state" | **Scene** |
+| Timeline | *(none yet)* | **Scene** |
+| Groups | "scenario" | **Scene** |
+
+The only reason a scene carries a `view` field in the data model (§7) is **storage** —
+everything is stored in one per-project collection and tagged with which view owns it. But
+*logically and in the UI it lives inside its view*: the **Scene tab strip** at the bottom of
+the canvas shows only the **current view's** scenes, and it swaps when you switch views. Switch
+to Timeline → you see Timeline's scenes; switch to Groups → you see Groups' scenes. People and
+Relationships have no positions, so they have no scenes.
+
 ### 4.1 State + Scenario + (future) timeline positions = **Scene**
 
 ```mermaid
@@ -383,7 +402,7 @@ unrelated to the graph layout "types."**
 ```mermaid
 flowchart LR
     S["🟢 Simple<br/>bare minimum to build a<br/>good-looking graph + view it"]
-    D["🔵 Default<br/>most features, all the<br/>central ones"]
+    D["🔵 Standard<br/>most features, all the<br/>central ones"]
     A["🟣 Advanced<br/>everything: rare, gimmick &<br/>experimental features"]
     S --> D --> A
     style S fill:#4db6ac,color:#000
@@ -391,7 +410,7 @@ flowchart LR
     style A fill:#8b6cc5,color:#fff
 ```
 
-| Feature | Simple | Default | Advanced |
+| Feature | Simple | Standard | Advanced |
 |---------|:---:|:---:|:---:|
 | Graph + People views | ✅ | ✅ | ✅ |
 | Timeline / Groups / Relationships | — | ✅ | ✅ |
@@ -403,33 +422,43 @@ flowchart LR
 | Custom entity noun / relationship types | — | — | ✅ |
 
 Implementation is just **progressive disclosure**: a higher mode reveals more rail items,
-pill tools, and popovers — no separate UIs. 🟡 rename *Default → Standard* if you prefer.
+pill tools, and popovers — no separate UIs.
 
 ### 6.2 Layout: icon rail + one tool pill + contextual inspector + summonable roster
 
 **Today** (cluttered): 4+ floating panels on the canvas; the right sidebar permanently holds
 the whole people list; settings live in 3 places.
 
-**Proposed:**
+**Proposed** — three fixed zones: a slim **icon rail** (left), the **canvas** (center), and a
+tabbed **right dock**. The right dock has two tabs — **Inspector** and **Directory** — so the
+draggable roster lives on the right next to the details panel (your choice):
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ ≡  Project ▾   Scene: Reunion ▾        🔍 ⌘K      Mode: Default ▾  ⚙  │ slim top
-├──┬───────────────────────────────────────────────────┬───────────────┤
-│◫ │  ‹ People Drawer (roster)  ┊                       │   INSPECTOR   │
-│🕸│  slides over the canvas     ┊                       │  ┌─────────┐  │
-│👥│  search + draggable list    ┊   ACTIVE VIEW         │  │ selected│  │
-│🔗│  (summon in ANY view)       ┊                       │  │ entity  │  │
-│📅│  ‹ collapse to a thin edge  ┊                       │  │ details │  │
-│◈ │                             ┊                       │  │ +tags   │  │
-│  │        ╭──────── bottom tool pill ─────────╮        │  │ +rels   │  │
-│＋│        │ Type▾  ⊕ − ⊡   Focus▾   Legend    │        │  └─────────┘  │
-│⚙ │        ╰──────────────────────────────────╯        │  [collapse ⟩] │
-│  ├───────────────────────────────────────────────────┴───────────────┤
-│  │  Scene tabs:  ▸Reunion  ▸Big picture  +                  (spatial)  │
-└──┴────────────────────────────────────────────────────────────────────┘
-   ↑ icon rail (~56px): views + roster toggle (◫) + add (＋) + settings (⚙)
+│ ≡  Project ▾   Scene: Reunion ▾      🔍 ⌘K     Mode: Standard ▾    ⚙  │ top bar
+├───┬─────────────────────────────────────────────┬────────────────────┤
+│🕸 │                                             │  RIGHT DOCK        │
+│👥 │                                             │ ┌────────┬────────┐ │
+│🔗 │              ACTIVE VIEW (canvas)            │ │Inspector│Directory│ │  ← tabs
+│📅 │                                             │ ├────────┴────────┤ │
+│◈  │                                             │ │ Inspector:      │ │
+│   │       ╭──── bottom tool pill ────╮           │ │  clicked entity │ │
+│＋ │       │ Type▾  ⊕ − ⊡  Focus▾  Legend │       │ │  details+tags   │ │
+│⚙  │       ╰────────────────────────────╯         │ │ Directory:      │ │
+│   │                                             │ │  full list —    │ │
+│   ├─────────────────────────────────────────────┤ │  drag → canvas  │ │
+│   │ Scene tabs (this view): ▸Reunion ▸Big pic + │ └─────────────────┘ │
+└───┴─────────────────────────────────────────────┴────────────────────┘
+  icon rail (~56px): 🕸Graph · 👥Directory · 🔗Relationships · 📅Timeline · ◈Groups · ＋add · ⚙settings
 ```
+
+Three fixed zones, nothing floating except the one bottom pill:
+
+| Zone | Holds |
+|------|-------|
+| **Icon rail** (left, ~56px) | the 5 views + ＋add + ⚙settings; always visible |
+| **Canvas** (center) | the active view + one **bottom tool pill** + the **Scene tab strip** (this view's scenes) |
+| **Right dock** (tabbed, collapsible) | **Inspector** tab (what you clicked) · **Directory** tab (the draggable roster) |
 
 | Element | From | 🟢 To |
 |---------|------|------|
@@ -444,29 +473,33 @@ the whole people list; settings live in 3 places.
 ### 6.3 The right panel + the drag-and-drop problem
 
 You want drag-and-drop of entities in **every** view (Graph, Timeline, Relationships, Groups),
-*and* you don't want every entity auto-present. So we separate two jobs:
+*and* you don't want every entity auto-present. So the right dock does **two jobs via two
+tabs** — both on the right, as you chose:
 
 ```mermaid
 flowchart TD
-    RP["Right dock = INSPECTOR (contextual, collapsible)"] --> sel{"entity selected?"}
-    sel -->|yes| det["its photo, fields, tags, relationships + quick edit"]
-    sel -->|no| coll["collapse (or a slim scene summary)"]
-    DR["Left ◫ = PEOPLE DRAWER / Roster"] --> src["searchable list of ALL entities;<br/>summonable in ANY view; DRAG onto canvas to place"]
-    src -. "same list component as the People view" .-> src
-    style DR fill:#8b6cc5,color:#fff
+    RD["RIGHT DOCK (collapsible)"] --> I["📋 Inspector tab"] & D["🗂️ Directory tab"]
+    I --> sel{"entity selected?"}
+    sel -->|yes| det["photo, fields, tags, relationships + quick edit"]
+    sel -->|no| coll["empty hint / collapse"]
+    D --> src["searchable list of ALL entities;<br/>available in EVERY view; DRAG onto the canvas to place"]
+    src -. "same list component as the full Directory view" .-> src
+    style D fill:#8b6cc5,color:#fff
+    style I fill:#4db6ac,color:#000
 ```
 
-- **Inspector** (right, contextual): tells you about what you clicked; collapses when idle —
-  it stops permanently duplicating the People view.
-- **People Drawer / Roster** (left, toggled by the ◫ rail icon): the draggable source of
-  entities, available in *every* view. Default collapsed to a thin edge; open it, drag people
-  onto the Graph/Timeline/Groups canvas (or into the Relationships table) to place/relate them.
-- It's the **same list component** as the full **People view** — one implementation, two
-  surfaces (full-screen browse vs. slim drag-source).
+- **Inspector tab** — tells you about what you clicked; stops permanently duplicating the
+  Directory view (which is why the old always-on people list goes away).
+- **Directory tab** — the draggable roster, reachable in *every* view. Drag an entity onto the
+  Graph/Timeline/Groups canvas (or into the Relationships table) to place/relate it. It auto-
+  focuses this tab when you start a drag or click empty canvas, and can switch back to Inspector
+  on selection.
+- It's the **same list component** as the full-screen **Directory view** — one implementation,
+  two surfaces (full browse vs. compact drag-source).
 
-This gives you drag-to-place everywhere, keeps the canvas maximal by default, and matches the
-"placed entities only" scene model (§4.2). It's also mobile/PWA-friendly (a drawer collapses;
-a permanent sidebar doesn't).
+This gives drag-to-place everywhere, keeps the canvas maximal (the dock collapses), and matches
+the "placed entities only" scene model (§4.2). Collapsing beats a permanent sidebar on
+mobile/PWA too.
 
 ### 6.4 Colors
 
@@ -476,7 +509,7 @@ things. Give relationships their own hue family so color never double-means:
 | Encodes | Channel | 🟢 Proposed |
 |---------|---------|-------------|
 | Gender | node fill | male indigo-blue · female magenta · unknown slate |
-| Relationship | **line style + separate hues** | parent/child solid violet · spouse **gold/teal** (not pink) · adopted dashed amber · divorced faded |
+| Relationship | **line style + separate hues** | parent/child solid violet · spouse **gold** (not pink) · adopted dashed amber · divorced faded gold |
 | Tag / Group | user-chosen per tag | unchanged |
 
 🟢 **Direction (clean / cool / modern / simplistic):** one accent (keep indigo `--accent`),
@@ -527,16 +560,21 @@ with composite PKs; `config`/`positions`/`units` stay `jsonb`. Derived tags are 
 
 ---
 
-## 8. Open decisions for you
+## 8. Decisions (locked ✅)
 
-1. **Graph view name:** Graph 🟢 / Web / Constellation / Nexus? → ____
-2. **Browse view:** dynamic entity noun 🟢 / static "Directory"? → ____
-3. **"Birth" layout type** ok, or Era / Chronology? → ____
-4. **Present** ok, or Now / Vantage? → ____
-5. **Program Modes** names: Simple / Default / Advanced — keep "Default" or use "Standard"? → ____
-6. **Relationships view:** keep name or "Table"? → ____
-7. **Spouse link color** off pink (gold/teal)? 🟢 → ____
-8. **People Drawer on the left** (near rail) 🟢 vs right (tab beside Inspector)? → ____
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | Graph view name | **Graph** |
+| 2 | Browse view name | **Directory** (per-project entity noun optional, Advanced) |
+| 3 | Age layout type name | **Birth** (revisit later) |
+| 4 | The "now" marker | **Present** |
+| 5 | Program Mode tiers | **Simple / Standard / Advanced** |
+| 6 | Relationships view name | **Relationships** (keep) |
+| 7 | Spouse link color | **Gold** (off pink) |
+| 8 | People roster placement | **Right dock**, as a tab beside Inspector |
+
+Still genuinely open (not blocking): whether to **flatten layout "type" into the Scene** (§4.1,
+recommended) vs. keep it as a grouping level; and the exact **custom-calendar editor** UX (§5).
 
 ---
 
