@@ -36,8 +36,16 @@
           <span class="tab-add-icon">+</span>
         </button>
       </div>
+      <ProjectMenu
+        @save="handleSave"
+        @revert="handleRevert"
+        @export="handleExport"
+        @import="handleImport"
+      />
       <div class="topbar-spacer"></div>
-      <button class="btn btn-ghost btn-sm" @click="handleExport">Export</button>
+      <button class="btn btn-ghost btn-sm" title="Jump to a person (Ctrl+K)" @click="openPalette">
+        🔍 ⌘K
+      </button>
       <button
         class="icon-btn"
         :title="store.theme === 'dark' ? 'Light mode' : 'Dark mode'"
@@ -47,8 +55,7 @@
       </button>
     </header>
     <div class="workspace" :style="workspaceStyle">
-      <LeftSidebar :style="{ width: leftWidth + 'px' }" @save="handleSave" @revert="handleRevert" />
-      <div class="resize-handle resize-handle-left" @mousedown="startResizeLeft"></div>
+      <IconRail />
       <div class="canvas-stack">
         <!-- Graph stays mounted (tucked away) so its layout & simulation state persist -->
         <div v-show="store.activeView === 'tree'" class="canvas-layer">
@@ -81,12 +88,21 @@
           />
         </Transition>
       </div>
-      <div class="resize-handle resize-handle-right" @mousedown="startResizeRight"></div>
-      <RightSidebar :style="{ width: rightWidth + 'px' }" />
+      <div
+        v-if="!dockCollapsed"
+        class="resize-handle resize-handle-right"
+        @mousedown="startResizeRight"
+      ></div>
+      <RightDock
+        :collapsed="dockCollapsed"
+        :style="{ width: dockCollapsed ? '28px' : rightWidth + 'px' }"
+        @toggle-collapse="dockCollapsed = !dockCollapsed"
+      />
     </div>
     <PersonModal />
     <PersonForm />
     <GraphSettings />
+    <CommandPalette ref="paletteRef" />
   </div>
 </template>
 
@@ -94,22 +110,30 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useMainStore } from './store/index.js'
 import { api } from './api'
-import LeftSidebar from './components/LeftSidebar.vue'
+import IconRail from './components/IconRail.vue'
+import ProjectMenu from './components/ProjectMenu.vue'
+import CommandPalette from './components/CommandPalette.vue'
 import GraphCanvas from './components/GraphCanvas.vue'
 import PeopleView from './components/PeopleView.vue'
 import RelationshipsView from './components/RelationshipsView.vue'
 import TimelineView from './components/TimelineView.vue'
 import FactionsView from './components/FactionsView.vue'
-import RightSidebar from './components/RightSidebar.vue'
+import RightDock from './components/RightDock.vue'
 import PersonModal from './components/PersonModal.vue'
 import PersonForm from './components/PersonForm.vue'
 import GraphSettings from './components/GraphSettings.vue'
 
 const store = useMainStore()
 const graphRef = ref(null)
+const paletteRef = ref(null)
 const renameInputRef = ref(null)
 const renamingId = ref(null)
 const renameValue = ref('')
+const dockCollapsed = ref(false)
+
+function openPalette() {
+  paletteRef.value?.show?.()
+}
 
 // ── Save model: everything autosaves; Save commits a checkpoint you can
 // revert to (see docs/client-structure.md §6.2) ─────────────────────────────
@@ -183,25 +207,14 @@ function cancelRename() {
   renamingId.value = null
 }
 
-// ── Sidebar resize ──────────────────────────────────────────────────────────
-const leftWidth = ref(240)
-const rightWidth = ref(250)
-const MIN_WIDTH = 160
+// ── Right-dock resize ───────────────────────────────────────────────────────
+const rightWidth = ref(260)
+const MIN_WIDTH = 200
 const MAX_WIDTH = 500
 
 let resizing = null
 let startX = 0
 let startW = 0
-
-function startResizeLeft(e) {
-  resizing = 'left'
-  startX = e.clientX
-  startW = leftWidth.value
-  document.body.style.cursor = 'col-resize'
-  document.body.style.userSelect = 'none'
-  window.addEventListener('mousemove', onResizeMove)
-  window.addEventListener('mouseup', onResizeEnd)
-}
 
 function startResizeRight(e) {
   resizing = 'right'
@@ -216,8 +229,7 @@ function startResizeRight(e) {
 function onResizeMove(e) {
   if (!resizing) return
   const dx = e.clientX - startX
-  if (resizing === 'left') leftWidth.value = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startW + dx))
-  else rightWidth.value = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startW - dx))
+  rightWidth.value = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startW - dx))
 }
 
 function onResizeEnd() {
@@ -229,8 +241,12 @@ function onResizeEnd() {
 }
 
 const workspaceStyle = computed(() => ({
-  gridTemplateColumns: `${leftWidth.value}px 4px 1fr 4px ${rightWidth.value}px`
+  gridTemplateColumns: dockCollapsed.value ? '56px 1fr 28px' : `56px 1fr 4px ${rightWidth.value}px`
 }))
+
+function handleImport() {
+  alert('Import feature: drop a JSON file exported from this app to restore your project data.')
+}
 
 function handleExport() {
   const data = {
@@ -485,7 +501,7 @@ onUnmounted(() => {
 .workspace {
   flex: 1 1 0;
   display: grid;
-  grid-template-columns: 240px 4px 1fr 4px 250px;
+  grid-template-columns: 56px 1fr 4px 260px;
   min-height: 0;
 }
 

@@ -185,7 +185,6 @@ function avatarGradient(gender) {
 <style scoped>
 .right-sidebar {
   background: var(--surface);
-  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   min-height: 0;

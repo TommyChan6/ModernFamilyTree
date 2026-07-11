@@ -19,6 +19,7 @@ export const useMainStore = defineStore('main', () => {
   const activeSceneIds = ref({ groups: null, graph: null, timeline: null })
   const draggingPersonId = ref(null) // person being dragged from the member list
   const selectedPersonId = ref(null)
+  const inspectorTab = ref('directory') // right dock tab: 'inspector' | 'directory'
   const modalOpen = ref(false)
   const formOpen = ref(false)
   const editingPerson = ref(null)
@@ -641,6 +642,7 @@ export const useMainStore = defineStore('main', () => {
     activeSceneIds,
     draggingPersonId,
     selectedPersonId,
+    inspectorTab,
     modalOpen,
     formOpen,
     editingPerson,

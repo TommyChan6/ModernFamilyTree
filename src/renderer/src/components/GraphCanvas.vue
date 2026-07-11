@@ -1,5 +1,10 @@
 <template>
-  <div ref="containerEl" class="graph-area">
+  <div
+    ref="containerEl"
+    class="graph-area"
+    @dragover.prevent="onDirectoryDragOver"
+    @drop.prevent="onDirectoryDrop"
+  >
     <canvas ref="glCanvasEl" class="graph-gl"></canvas>
     <canvas ref="overlayEl" class="graph-overlay"></canvas>
     <div class="graph-search" :class="{ 'clean-hide-up': store.cleanTree }">
@@ -50,6 +55,31 @@
         >
           {{ store.lockLines ? '🔒' : '🔗' }}
         </button>
+        <div class="ctrl-sep"></div>
+        <button
+          class="ctrl-btn"
+          :class="{ 'ctrl-btn-active': focusOpen }"
+          title="Highlights"
+          @click="focusOpen = !focusOpen"
+        >
+          🎯
+        </button>
+        <button
+          class="ctrl-btn"
+          :class="{ 'ctrl-btn-active': legendOpen }"
+          title="Legend"
+          @click="legendOpen = !legendOpen"
+        >
+          🗺
+        </button>
+        <button
+          class="ctrl-btn"
+          :class="{ 'ctrl-btn-active': store.cleanTree }"
+          title="Clean view — hide canvas overlays"
+          @click="store.cleanTree = !store.cleanTree"
+        >
+          ✨
+        </button>
       </div>
       <SceneTabs
         class="graph-scene-tabs"
@@ -77,8 +107,17 @@
         </div>
       </div>
     </Transition>
-    <!-- Highlights panel -->
-    <div class="highlights-panel" :class="{ 'clean-hide-right': store.cleanTree }">
+    <!-- Restore button while Clean view hides the tool pill -->
+    <button
+      v-if="store.cleanTree"
+      class="clean-restore"
+      title="Exit clean view"
+      @click="store.cleanTree = false"
+    >
+      ✨
+    </button>
+    <!-- Highlights (Focus) popover, toggled from the tool pill -->
+    <div v-if="focusOpen" class="highlights-panel" :class="{ 'clean-hide-right': store.cleanTree }">
       <div class="highlights-title">Highlights</div>
       <div class="highlight-row">
         <div class="highlight-label">Lineage</div>
@@ -156,7 +195,7 @@
       </div>
     </div>
 
-    <div class="graph-legend">
+    <div v-if="legendOpen" class="graph-legend" :class="{ 'clean-hide-right': store.cleanTree }">
       <div class="panel-title">Legend</div>
       <div class="leg-section">
         <div class="leg-section-label">Nodes</div>
@@ -226,6 +265,8 @@ const overlayEl = ref(null)
 const containerEl = ref(null)
 const searchQuery = ref('')
 const activeEmphasis = ref('neutral')
+const focusOpen = ref(false) // Highlights popover (from the tool pill)
+const legendOpen = ref(true) // Legend panel toggle (from the tool pill)
 
 const modes = [
   { id: 'custom', label: '✋ Custom', title: 'Freely position nodes' },
@@ -1000,6 +1041,38 @@ function onPointerUp(_e) {
     }
   }
   pending = null
+}
+
+// ── Drag-to-place from the Directory tab ────────────────────────────────────
+// Dropping a person from the right dock's roster moves their node to the drop
+// point and snapshots it into the active scene (which autosaves).
+function onDirectoryDragOver(e) {
+  if (store.draggingPersonId) e.dataTransfer.dropEffect = 'move'
+}
+
+function onDirectoryDrop(e) {
+  const pid = store.draggingPersonId || e.dataTransfer.getData('text/plain')
+  if (!pid) return
+  const node = ctx.nodesData.find((n) => n.id === pid)
+  if (!node) return
+  const w = clientToWorld(e.clientX, e.clientY)
+  const m = currentMode.value
+  node.x = w.x
+  node.fx = w.x
+  if (m !== 'age') node.y = w.y // Birth layout keeps Y locked to the year axis
+  if (m === 'auto') {
+    // Organic: seed the position and let the simulation settle around it
+    node.fx = null
+    node.fy = null
+    node.vx = 0
+    node.vy = 0
+    ctx.simulation.alpha(0.1).restart()
+  } else if (m !== 'age') {
+    node.fy = w.y
+  }
+  ticked()
+  ctx.renderer?.invalidatePicker()
+  saveCurrentState()
 }
 
 // Hover glow (only meaningful when not dragging).
@@ -1799,6 +1872,22 @@ watch(
 }
 
 /* Clean tree — slide panels out */
+.clean-restore {
+  position: absolute;
+  bottom: 18px;
+  right: 16px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 15px;
+  cursor: pointer;
+  z-index: 6;
+  box-shadow: var(--shadow);
+}
+
 .clean-hide-up {
   transform: translateX(-50%) translateY(calc(-100% - 30px));
   opacity: 0;
