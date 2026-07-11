@@ -346,8 +346,9 @@ describe('Migration from tree vocabulary to project vocabulary', () => {
     expect(db.relationships.r1.formed).toBeNull()
     expect(db.relationships.r1.formed_date).toBeUndefined()
 
-    // Settings keys (keyed by id, not name) survive untouched
-    expect(db.settings['t1:graphState']).toBe('{"currentMode":"auto"}')
+    // The graphState blob is converted to graph scenes and retired (this one
+    // carried no saved states, so nothing to convert)
+    expect(db.settings['t1:graphState']).toBeUndefined()
 
     // Persisted to disk in the new format
     const raw = JSON.parse(fs.readFileSync(path.join(dbDir, 'familytree.json'), 'utf8'))
@@ -1287,8 +1288,8 @@ describe('Migration: graphState setting → graph scenes', () => {
     expect(settings['t1:activeSceneId:graph']).toBe(pedigree.id)
     // The current-year override moved to its own setting
     expect(settings['t1:userCurrentYear']).toBe(1999)
-    // The old blob is kept until step 5.3 is verified
-    expect(settings['t1:graphState']).toBeDefined()
+    // Scenes are the source of truth — the old blob is retired
+    expect(settings['t1:graphState']).toBeUndefined()
   })
 
   it('re-running the migration is a no-op', () => {

@@ -289,7 +289,8 @@ export function migrateFactionsToTags(db: any, env: Env): boolean {
 // previously-active mode+state becomes the active graph scene (saved under the
 // activeSceneId:graph setting) and the current-year override moves to its own
 // userCurrentYear setting. Idempotent: a project that already has graph scenes
-// is skipped. The old graphState value is kept until step 5.3 is verified.
+// is skipped. Scenes are the source of truth now, so the old graphState value
+// is retired after conversion.
 const MODE_TO_TYPE: Record<string, string> = {
   custom: 'free',
   auto: 'organic',
@@ -303,20 +304,34 @@ export function migrateGraphStateToScenes(db: any, env: Env): boolean {
   db.scenes = db.scenes || {}
   db.settings = db.settings || {}
   for (const pid of Object.keys(db.projects || {})) {
+    const stateKey = `${pid}:graphState`
+    const retireBlob = () => {
+      if (stateKey in db.settings) {
+        delete db.settings[stateKey]
+        changed = true
+      }
+    }
     const hasGraphScenes = (Object.values(db.scenes) as Scene[]).some(
       (s) => s.project_id === pid && s.view === 'graph'
     )
-    if (hasGraphScenes) continue
-    const raw = db.settings[`${pid}:graphState`]
+    if (hasGraphScenes) {
+      retireBlob() // already migrated (or born on the new model) — drop leftovers
+      continue
+    }
+    const raw = db.settings[stateKey]
     if (typeof raw !== 'string') continue
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let state: any
     try {
       state = JSON.parse(raw)
     } catch {
+      retireBlob() // unreadable — nothing to convert
       continue
     }
-    if (!state || typeof state !== 'object') continue
+    if (!state || typeof state !== 'object') {
+      retireBlob()
+      continue
+    }
 
     let activeSceneId: string | null = null
     for (const mode of ['custom', 'auto', 'age', 'generation']) {
@@ -371,6 +386,7 @@ export function migrateGraphStateToScenes(db: any, env: Env): boolean {
       db.settings[`${pid}:userCurrentYear`] = state.userCurrentYear
       changed = true
     }
+    retireBlob()
   }
   return changed
 }

@@ -142,6 +142,22 @@
         </div>
       </Transition>
     </div>
+
+    <!-- Scene tab strip (a single default scene for now — manual positions
+         and per-scene arrangements come later) -->
+    <SceneTabs
+      :scenes="store.timelineScenes"
+      :active-id="store.activeSceneIds.timeline"
+      label="Scenes"
+      add-title="New scene"
+      duplicate-title="Duplicate current scene"
+      delete-title="Delete scene"
+      @switch="(id) => store.setActiveScene('timeline', id)"
+      @create="addTimelineScene"
+      @duplicate="duplicateTimelineScene"
+      @rename="(id, name) => store.renameScene(id, name)"
+      @remove="removeTimelineScene"
+    />
   </div>
 </template>
 
@@ -157,8 +173,37 @@ import {
   Y_PAD
 } from './timeline/timelineLayout.js'
 import { TimelineRenderer } from './timeline/TimelineRenderer.js'
+import SceneTabs from './SceneTabs.vue'
 
 const store = useMainStore()
+
+// ── Scenes (a single default scene for now; manual positions come later) ────
+async function addTimelineScene() {
+  const res = await store.createScene('timeline', `Scene ${store.timelineScenes.length + 1}`)
+  if (res?.success) store.setActiveScene('timeline', res.data.id)
+}
+
+async function duplicateTimelineScene() {
+  const id = store.activeSceneIds.timeline
+  if (!id) return
+  const res = await store.duplicateScene(id)
+  if (res?.success) store.setActiveScene('timeline', res.data.scene.id)
+}
+
+async function removeTimelineScene(scene) {
+  if (store.timelineScenes.length <= 1) return
+  if (!confirm(`Delete scene "${scene.name}"?`)) return
+  await store.deleteScene(scene.id)
+}
+
+// Make sure the project has its default timeline scene once data is in.
+watch(
+  () => store.persons.length,
+  (n) => {
+    if (n > 0 && !store.timelineScenes.length) store.ensureScene('timeline', 'Timeline')
+  },
+  { immediate: true }
+)
 
 // This view stays mounted while hidden (App keeps its GL context alive to avoid a
 // white flash on view switches); `active` tells us when it's actually on screen.

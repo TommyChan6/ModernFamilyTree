@@ -1210,7 +1210,7 @@ function scenarioTooltip(s) {
 }
 
 function switchScenario(id) {
-  store.setActiveScene(id)
+  store.setActiveScene('groups', id)
 }
 
 async function addScenario(duplicate) {
@@ -1220,7 +1220,7 @@ async function addScenario(duplicate) {
     : await store.createScene('groups', name)
   if (res?.success) {
     const scene = duplicate ? res.data.scene : res.data
-    store.setActiveScene(scene.id)
+    store.setActiveScene('groups', scene.id)
     sceneTabsRef.value?.startRename(scene)
   }
 }

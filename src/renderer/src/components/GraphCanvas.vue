@@ -51,48 +51,21 @@
           {{ store.lockLines ? '🔒' : '🔗' }}
         </button>
       </div>
-      <div class="states-bar">
-        <template v-for="(name, i) in currentModeStates" :key="i">
-          <input
-            v-if="renamingState && renamingState.idx === i && renamingState.mode === currentMode"
-            v-model="renameInput"
-            class="state-rename-input"
-            @keydown.enter="confirmRename"
-            @keydown.escape="cancelRename"
-            @blur="confirmRename"
-          />
-          <div v-else class="state-btn-wrap">
-            <button
-              class="state-btn"
-              :class="{ 'state-btn-active': currentStateIndex === i }"
-              @click="switchState(i)"
-            >
-              {{ name }}
-            </button>
-            <button class="state-menu-dot" @click.stop="openStateMenu($event, i)">⋯</button>
-          </div>
-        </template>
-        <button class="state-btn state-btn-add" title="New state" @click="addState">＋</button>
-      </div>
+      <SceneTabs
+        class="graph-scene-tabs"
+        :scenes="graphScenes"
+        :active-id="activeSceneId"
+        label="Scenes"
+        add-title="New scene"
+        duplicate-title="Duplicate current scene"
+        delete-title="Delete scene"
+        @switch="switchScene"
+        @create="addScene"
+        @duplicate="duplicateActiveScene"
+        @rename="(id, name) => store.renameScene(id, name)"
+        @remove="removeScene"
+      />
     </div>
-    <!-- State context menu -->
-    <Transition name="ctx-menu">
-      <div v-if="stateMenu" class="state-context-menu" :style="stateMenuStyle" @click.stop>
-        <button class="ctx-menu-item" @click="startRenameFromMenu">
-          <span class="ctx-menu-icon">✏</span> Rename
-        </button>
-        <button class="ctx-menu-item" @click="duplicateStateFromMenu">
-          <span class="ctx-menu-icon">⧉</span> Duplicate
-        </button>
-        <button
-          v-if="currentModeStates.length > 1"
-          class="ctx-menu-item ctx-menu-danger"
-          @click="deleteStateFromMenu"
-        >
-          <span class="ctx-menu-icon">✕</span> Delete
-        </button>
-      </div>
-    </Transition>
     <Transition name="relpop">
       <div v-if="store.relPopup" class="rel-popup" :style="relPopupStyle" @click.stop>
         <button class="rel-popup-close" @click="store.relPopup = null">✕</button>
@@ -216,7 +189,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import * as d3 from 'd3'
 import { useMainStore } from '../store/index.js'
 import { api } from '../api'
@@ -245,13 +218,13 @@ import {
 import { useGraphAnimation } from './graph/useGraphAnimation.js'
 import { WebGLGraphRenderer } from './graph/webgl/WebGLGraphRenderer.js'
 import { screenToWorld } from './graph/webgl/coords.js'
+import SceneTabs from './SceneTabs.vue'
 
 const store = useMainStore()
 const glCanvasEl = ref(null)
 const overlayEl = ref(null)
 const containerEl = ref(null)
 const searchQuery = ref('')
-const currentMode = ref('auto')
 const activeEmphasis = ref('neutral')
 
 const modes = [
@@ -260,6 +233,37 @@ const modes = [
   { id: 'age', label: '📅 Age', title: 'Sort by birth year' },
   { id: 'generation', label: '🏛 Gen', title: 'Generational layout' }
 ]
+
+// ── Scenes ──────────────────────────────────────────────────────────────────
+// The graph runs off view:'graph' Scenes: each carries a layout *type*
+// (free/organic/birth/generations) plus its node positions and config. The
+// interaction code below still thinks in the legacy internal mode ids, so map
+// scene types onto them (labels get their user-facing rename in Phase 7).
+const MODE_TO_TYPE = { custom: 'free', auto: 'organic', age: 'birth', generation: 'generations' }
+const TYPE_TO_MODE = { free: 'custom', organic: 'auto', birth: 'age', generations: 'generation' }
+
+const graphScenes = computed(() => store.graphScenes)
+const activeSceneId = computed(() => store.activeSceneIds.graph)
+const activeScene = computed(
+  () => graphScenes.value.find((s) => s.id === activeSceneId.value) || null
+)
+const currentMode = computed(() => TYPE_TO_MODE[activeScene.value?.type] || 'auto')
+
+// Live working copies of each scene's arrangement, mutated as the user drags
+// and persisted by Save Layout (Phase 5.4 turns this into autosave).
+// sceneId → { positions: {personId: {x,y}}, config: {...} }
+const working = new Map()
+function workingOf(sceneId) {
+  if (!sceneId) return null
+  if (!working.has(sceneId)) {
+    const s = store.scenes.find((sc) => sc.id === sceneId)
+    working.set(sceneId, {
+      positions: JSON.parse(JSON.stringify(s?.positions || {})),
+      config: JSON.parse(JSON.stringify(s?.config || {}))
+    })
+  }
+  return working.get(sceneId)
+}
 
 // ── Shared mutable context ──────────────────────────────────────────────────
 const ctx = {
@@ -275,7 +279,7 @@ const ctx = {
   genRowYValues: [],
   genRowSpacing: 140,
   arrowSize: 9, // animated arrowhead size for lineage emphasis
-  modeSnapshots: { custom: null, auto: null, age: null, generation: null },
+  activeSnapshot: null, // the active scene's working positions ({id:{x,y}} | null)
   containerRef: null, // set in onMounted
   ticked: null, // set below
   requestRedraw: null
@@ -283,34 +287,7 @@ const ctx = {
 let hoverId = null // node currently hovered (for glow)
 let couplesHiSet = null // ids highlighted by the Marriage filter, or null
 
-const modeEmphasis = { custom: 'neutral', auto: 'neutral', age: 'neutral', generation: 'neutral' }
-
 const { cancelAnimation, animateToPositionsWithReset } = useGraphAnimation(ctx)
-
-// ── Per-mode multi-state system ─────────────────────────────────────────────
-// Each mode has an array of states (snapshots) the user can create and switch between
-const modeStateNames = reactive({
-  custom: ['State 1'],
-  auto: ['State 1'],
-  age: ['State 1'],
-  generation: ['State 1']
-})
-const modeActiveStateIdx = reactive({
-  custom: 0,
-  auto: 0,
-  age: 0,
-  generation: 0
-})
-// Snapshots: modeStateSnapshots[mode][stateIdx] = { id: {x,y}, ... } or null
-const modeStateSnapshots = reactive({
-  custom: [null],
-  auto: [null],
-  age: [null],
-  generation: [null]
-})
-
-const currentModeStates = computed(() => modeStateNames[currentMode.value])
-const currentStateIndex = computed(() => modeActiveStateIdx[currentMode.value])
 
 // ── Emphasis ────────────────────────────────────────────────────────────────
 function emphVisual() {
@@ -487,41 +464,41 @@ const relPopupStatus = computed(() =>
 )
 
 // ── Snapshot helpers ────────────────────────────────────────────────────────
-function snapshotMode(mode) {
+// Snapshot the live node positions (and generation rows / emphasis) into the
+// active scene's working copy. All the legacy per-mode snapshot entry points
+// funnel here — a scene has exactly one arrangement.
+function snapshotActiveScene() {
+  const w = workingOf(activeSceneId.value)
+  if (!w) return
   const snap = {}
   ctx.nodesData.forEach((n) => {
     snap[n.id] = { x: n.x, y: n.y }
   })
-  const idx = modeActiveStateIdx[mode]
-  modeStateSnapshots[mode][idx] = snap
-  ctx.modeSnapshots[mode] = snap
+  w.positions = snap
+  if (currentMode.value === 'generation') {
+    w.config.genRowYValues = [...ctx.genRowYValues]
+    w.config.genRowSpacing = ctx.genRowSpacing
+  }
+  w.config.emphasis = activeEmphasis.value
+  ctx.activeSnapshot = snap
   store.markGraphDirty()
 }
-function hasSnapshot(mode) {
-  return ctx.modeSnapshots[mode] && Object.keys(ctx.modeSnapshots[mode]).length > 0
+const snapshotMode = snapshotActiveScene
+const snapshotGenMode = snapshotActiveScene
+const saveCurrentState = snapshotActiveScene
+
+function hasSnapshot() {
+  return ctx.activeSnapshot && Object.keys(ctx.activeSnapshot).length > 0
 }
 
-function saveCurrentState() {
-  const mode = currentMode.value
-  if (mode === 'generation') snapshotGenMode()
-  else snapshotMode(mode)
-}
-
-function switchState(idx) {
-  const mode = currentMode.value
-  if (idx === modeActiveStateIdx[mode]) return
-  cancelAnimation()
-
-  // Save current state
-  saveCurrentState()
-
-  // Switch to new state
-  modeActiveStateIdx[mode] = idx
-  const snap = modeStateSnapshots[mode][idx]
-  ctx.modeSnapshots[mode] = snap
-
-  // Re-enter mode to load the new state's snapshot
+// Point ctx at the active scene's working arrangement and run its layout
+// type's entry (same snapshot-then-animate transition as always).
+function enterActiveScene() {
+  const w = workingOf(activeSceneId.value)
+  ctx.activeSnapshot = w && Object.keys(w.positions).length ? w.positions : null
+  activeEmphasis.value = w?.config?.emphasis || 'neutral'
   removeGuides(ctx)
+  const mode = currentMode.value
   if (mode === 'auto') enterAutoMode()
   else if (mode === 'custom') enterCustomMode()
   else if (mode === 'age') enterAgeMode()
@@ -529,161 +506,66 @@ function switchState(idx) {
   applyEmphasis()
 }
 
-function addState() {
-  const mode = currentMode.value
+// ── Scene tab operations ────────────────────────────────────────────────────
+function switchScene(id) {
+  if (id === activeSceneId.value) return
+  cancelAnimation()
+  if (ctx.nodesData.length) saveCurrentState()
+  store.setActiveScene('graph', id)
+  enterActiveScene()
+}
 
-  // Save current state first
-  saveCurrentState()
-
-  // Create new state (copy current positions as starting point)
-  const newIdx = modeStateNames[mode].length
-  modeStateNames[mode].push(`State ${newIdx + 1}`)
+// New scene: keeps the current type and starts from the current positions
+// (the old "add state" behaviour).
+async function addScene() {
+  if (ctx.nodesData.length) saveCurrentState()
   const snap = {}
   ctx.nodesData.forEach((n) => {
     snap[n.id] = { x: n.x, y: n.y }
   })
-
-  // For generation mode, also copy row state
-  if (mode === 'generation') {
-    snap._genRowYValues = [...ctx.genRowYValues]
-    snap._genRowSpacing = ctx.genRowSpacing
+  const config = {}
+  if (currentMode.value === 'generation') {
+    config.genRowYValues = [...ctx.genRowYValues]
+    config.genRowSpacing = ctx.genRowSpacing
   }
-
-  modeStateSnapshots[mode].push(snap)
-  modeActiveStateIdx[mode] = newIdx
-  ctx.modeSnapshots[mode] = snap
-}
-
-const renamingState = ref(null) // { mode, idx }
-const renameInput = ref('')
-const stateMenu = ref(null) // { idx, x, y }
-const stateMenuStyle = computed(() => {
-  if (!stateMenu.value) return {}
-  return { left: stateMenu.value.x + 'px', top: stateMenu.value.y + 'px' }
-})
-
-let closeMenuListener = null
-
-function openStateMenu(event, idx) {
-  event.stopPropagation()
-  // Remove old listener if any
-  if (closeMenuListener) {
-    document.removeEventListener('mousedown', closeMenuListener, true)
-    closeMenuListener = null
-  }
-
-  const container = containerEl.value
-  if (!container) return
-  const rect = container.getBoundingClientRect()
-
-  // Position menu above the click point
-  stateMenu.value = {
-    idx,
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top - 120
-  }
-
-  // Close on mousedown outside the menu (delayed 2 frames to skip current event)
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      closeMenuListener = (e) => {
-        // Don't close if clicking inside the menu
-        const menuEl = document.querySelector('.state-context-menu')
-        if (menuEl && menuEl.contains(e.target)) return
-        stateMenu.value = null
-        document.removeEventListener('mousedown', closeMenuListener, true)
-        closeMenuListener = null
-      }
-      document.addEventListener('mousedown', closeMenuListener, true)
-    })
+  const res = await store.createScene('graph', `State ${graphScenes.value.length + 1}`, {
+    type: activeScene.value?.type || 'organic',
+    positions: snap,
+    config
   })
-}
-
-function closeMenu() {
-  stateMenu.value = null
-  if (closeMenuListener) {
-    document.removeEventListener('mousedown', closeMenuListener, true)
-    closeMenuListener = null
+  if (res?.success) {
+    store.setActiveScene('graph', res.data.id)
+    enterActiveScene()
   }
 }
 
-function startRenameFromMenu() {
-  const idx = stateMenu.value?.idx
-  const mode = currentMode.value
-  closeMenu()
-  if (idx === undefined) return
-  renameInput.value = modeStateNames[mode][idx]
-  renamingState.value = { mode, idx }
-  nextTick(() => {
-    const el = document.querySelector('.state-rename-input')
-    if (el) {
-      el.focus()
-      el.select()
-    }
-  })
-}
-
-function duplicateStateFromMenu() {
-  const idx = stateMenu.value?.idx
-  const mode = currentMode.value
-  closeMenu()
-  if (idx === undefined) return
+async function duplicateActiveScene() {
+  const id = activeSceneId.value
+  if (!id) return
   saveCurrentState()
-  const srcSnap = modeStateSnapshots[mode][idx]
-  const newSnap = srcSnap ? JSON.parse(JSON.stringify(srcSnap)) : null
-  const newIdx = modeStateNames[mode].length
-  modeStateNames[mode].push(modeStateNames[mode][idx] + ' copy')
-  modeStateSnapshots[mode].push(newSnap)
-  modeActiveStateIdx[mode] = newIdx
-  ctx.modeSnapshots[mode] = newSnap
+  await persistScene(id) // the copy must include unsaved working changes
+  const res = await store.duplicateScene(id)
+  if (res?.success) {
+    store.setActiveScene('graph', res.data.scene.id)
+    enterActiveScene()
+  }
 }
 
-function deleteStateFromMenu() {
-  const idx = stateMenu.value?.idx
-  closeMenu()
-  if (idx === undefined) return
-  const mode = currentMode.value
-  if (modeStateNames[mode].length <= 1) return
-
-  const wasActive = modeActiveStateIdx[mode] === idx
-
-  modeStateNames[mode].splice(idx, 1)
-  modeStateSnapshots[mode].splice(idx, 1)
-
-  // Adjust active index
-  let newActive = modeActiveStateIdx[mode]
-  if (wasActive) {
-    // Deleted the active state — switch to nearest
-    newActive = Math.min(idx, modeStateNames[mode].length - 1)
-  } else if (idx < newActive) {
-    // Deleted before the active — shift index down
-    newActive--
-  }
-  modeActiveStateIdx[mode] = newActive
-  ctx.modeSnapshots[mode] = modeStateSnapshots[mode][newActive] || null
-
-  // Reload if the active state was deleted
-  if (wasActive) {
-    removeGuides(ctx)
-    if (mode === 'auto') enterAutoMode()
-    else if (mode === 'custom') enterCustomMode()
-    else if (mode === 'age') enterAgeMode()
-    else if (mode === 'generation') enterGenerationMode()
-    applyEmphasis()
-  }
+async function removeScene(scene) {
+  if (graphScenes.value.length <= 1) return
+  if (!confirm(`Delete scene "${scene.name}"?`)) return
+  const wasActive = scene.id === activeSceneId.value
+  working.delete(scene.id)
+  await store.deleteScene(scene.id) // re-activates the view's first scene
+  if (wasActive) enterActiveScene()
   store.markGraphDirty()
 }
 
-function confirmRename() {
-  if (!renamingState.value) return
-  const { mode, idx } = renamingState.value
-  const val = renameInput.value.trim()
-  if (val) modeStateNames[mode].splice(idx, 1, val)
-  renamingState.value = null
-}
-
-function cancelRename() {
-  renamingState.value = null
+/** Persist one scene's working arrangement through the data-access chain. */
+async function persistScene(sceneId) {
+  const w = working.get(sceneId)
+  if (!w || !store.scenes.some((s) => s.id === sceneId)) return
+  await store.saveScene({ id: sceneId, positions: w.positions, config: w.config })
 }
 
 // ── Ticked ──────────────────────────────────────────────────────────────────
@@ -1118,25 +1000,27 @@ function reapplyDrag() {
   ctx.renderer?.invalidatePicker()
 }
 
-// ── Mode switching ──────────────────────────────────────────────────────────
+// ── Type switching ──────────────────────────────────────────────────────────
+// The layout type is a property of the scene: picking a different type
+// retypes the ACTIVE scene and re-runs that type's layout math over the same
+// arrangement (scene switching is what changes positions).
 function switchMode(newMode) {
   if (newMode === currentMode.value) return
+  const scene = activeScene.value
+  if (!scene) return
   cancelAnimation()
-  if (!ctx.nodesData.length) {
-    currentMode.value = newMode
-    return
-  }
-
-  const oldMode = currentMode.value
-  saveCurrentState()
+  if (ctx.nodesData.length) saveCurrentState()
   removeGuides(ctx)
-  modeEmphasis[oldMode] = activeEmphasis.value
-  currentMode.value = newMode
-  activeEmphasis.value = modeEmphasis[newMode] || 'neutral'
 
-  // Restore the new mode's active state snapshot
-  const newIdx = modeActiveStateIdx[newMode]
-  ctx.modeSnapshots[newMode] = modeStateSnapshots[newMode][newIdx] || null
+  const type = MODE_TO_TYPE[newMode]
+  scene.type = type // optimistic — currentMode flips immediately
+  store.saveScene({ id: scene.id, type })
+
+  if (!ctx.nodesData.length) return
+  ctx.activeSnapshot =
+    workingOf(scene.id) && Object.keys(workingOf(scene.id).positions).length
+      ? workingOf(scene.id).positions
+      : null
 
   if (newMode === 'auto') enterAutoMode()
   else if (newMode === 'custom') enterCustomMode()
@@ -1149,8 +1033,8 @@ function switchMode(newMode) {
 function enterAutoMode() {
   ctx.simulation.stop()
   removeCurrentYearLine(ctx)
-  if (hasSnapshot('auto')) {
-    animateToPositionsWithReset(ctx.modeSnapshots['auto'], () => {
+  if (hasSnapshot()) {
+    animateToPositionsWithReset(ctx.activeSnapshot, () => {
       ctx.nodesData.forEach((n) => {
         n.fx = null
         n.fy = null
@@ -1173,8 +1057,8 @@ function enterAutoMode() {
 function enterCustomMode() {
   ctx.simulation.stop()
   removeCurrentYearLine(ctx)
-  if (hasSnapshot('custom')) {
-    animateToPositionsWithReset(ctx.modeSnapshots['custom'], () => {
+  if (hasSnapshot()) {
+    animateToPositionsWithReset(ctx.activeSnapshot, () => {
       ctx.nodesData.forEach((n) => {
         n.fx = n.x
         n.fy = n.y
@@ -1186,7 +1070,7 @@ function enterCustomMode() {
       n.fx = n.x
       n.fy = n.y
     })
-    snapshotMode('custom')
+    snapshotMode()
     reapplyDrag()
   }
 }
@@ -1198,8 +1082,8 @@ function enterAgeMode() {
   const { width, height } = container.getBoundingClientRect()
   const ageInfo = computeAgeYPositions(ctx.nodesData, height)
 
-  if (hasSnapshot('age')) {
-    const snap = ctx.modeSnapshots['age'],
+  if (hasSnapshot()) {
+    const snap = ctx.activeSnapshot,
       targets = {}
     ctx.nodesData.forEach((n) => {
       targets[n.id] = { x: snap[n.id]?.x ?? n.x, y: ageInfo.yMap[n.id] }
@@ -1216,7 +1100,10 @@ function enterAgeMode() {
     return
   }
 
-  const customSnap = ctx.modeSnapshots['custom'],
+  // Fresh Birth layout for a scene with no positions yet: band by year and
+  // order by the nodes' current x (there is no cross-scene snapshot to seed
+  // from — a scene owns exactly one arrangement).
+  const customSnap = null,
     byYear = {},
     targets = {}
   ctx.nodesData.forEach((n) => {
@@ -1261,7 +1148,7 @@ function enterAgeMode() {
       n.fx = n.x
       n.fy = ageInfo.yMap[n.id]
     })
-    snapshotMode('age')
+    snapshotMode()
     reapplyDrag()
   })
 }
@@ -1281,11 +1168,12 @@ function enterGenerationMode() {
   if (!container) return
   const { width, height } = container.getBoundingClientRect()
 
-  if (hasSnapshot('generation')) {
+  const w = workingOf(activeSceneId.value)
+  if (hasSnapshot() && w?.config?.genRowYValues) {
     // Restore saved positions and saved row state exactly as they were
-    const snap = ctx.modeSnapshots['generation']
-    if (snap._genRowYValues) ctx.genRowYValues = [...snap._genRowYValues]
-    if (snap._genRowSpacing) ctx.genRowSpacing = snap._genRowSpacing
+    const snap = ctx.activeSnapshot
+    ctx.genRowYValues = [...w.config.genRowYValues]
+    if (w.config.genRowSpacing) ctx.genRowSpacing = w.config.genRowSpacing
 
     const targets = {}
     ctx.nodesData.forEach((n) => {
@@ -1339,20 +1227,6 @@ function enterGenerationMode() {
       reapplyDrag()
     })
   }
-}
-
-// Save generation snapshot including row state
-function snapshotGenMode() {
-  const snap = {}
-  ctx.nodesData.forEach((n) => {
-    snap[n.id] = { x: n.x, y: n.y }
-  })
-  snap._genRowYValues = [...ctx.genRowYValues]
-  snap._genRowSpacing = ctx.genRowSpacing
-  const idx = modeActiveStateIdx['generation']
-  modeStateSnapshots['generation'][idx] = snap
-  ctx.modeSnapshots['generation'] = snap
-  store.markGraphDirty()
 }
 
 // ── Refresh layout ──────────────────────────────────────────────────────────
@@ -1436,11 +1310,11 @@ function applyEmphasis() {
 }
 
 function cycleEmphasis(which) {
-  const mode = currentMode.value
   // Clicking the same state again = no-op
   if (activeEmphasis.value === which) return
   activeEmphasis.value = which
-  modeEmphasis[mode] = which
+  const w = workingOf(activeSceneId.value)
+  if (w) w.config.emphasis = which
   applyEmphasis()
 }
 
@@ -1493,73 +1367,32 @@ function highlightSearch() {
 }
 
 // ── Lifecycle & watchers ────────────────────────────────────────────────────
-// ── Save / Load graph layout ────────────────────────────────────────────────
-function collectGraphState() {
-  // Save current state before collecting
-  saveCurrentState()
-  return {
-    currentMode: currentMode.value,
-    activeEmphasis: activeEmphasis.value,
-    modeEmphasis: { ...modeEmphasis },
-    modeStateNames: JSON.parse(JSON.stringify(modeStateNames)),
-    modeActiveStateIdx: { ...modeActiveStateIdx },
-    modeStateSnapshots: JSON.parse(JSON.stringify(modeStateSnapshots)),
-    genRowSpacing: ctx.genRowSpacing,
-    userCurrentYear: store.userCurrentYear
-  }
-}
-
-function restoreGraphState(state) {
-  if (!state) return
-  // Restore the saved current-year override (undefined in older saves → auto).
-  store.userCurrentYear = state.userCurrentYear ?? null
-  // Restore mode state names and snapshots
-  for (const mode of ['custom', 'auto', 'age', 'generation']) {
-    if (state.modeStateNames?.[mode]) modeStateNames[mode] = state.modeStateNames[mode]
-    if (state.modeActiveStateIdx?.[mode] !== undefined)
-      modeActiveStateIdx[mode] = state.modeActiveStateIdx[mode]
-    if (state.modeStateSnapshots?.[mode]) modeStateSnapshots[mode] = state.modeStateSnapshots[mode]
-    if (state.modeEmphasis?.[mode]) modeEmphasis[mode] = state.modeEmphasis[mode]
-    // Restore the active snapshot for each mode
-    const idx = modeActiveStateIdx[mode]
-    ctx.modeSnapshots[mode] = modeStateSnapshots[mode]?.[idx] || null
-  }
-
-  // Restore genRowSpacing fallback; genRowYValues come from the active gen state snapshot
-  if (state.genRowSpacing) ctx.genRowSpacing = state.genRowSpacing
-
-  // Restore gen row state from the active generation snapshot
-  const genIdx = modeActiveStateIdx['generation']
-  const genSnap = modeStateSnapshots['generation']?.[genIdx]
-  if (genSnap?._genRowYValues) ctx.genRowYValues = [...genSnap._genRowYValues]
-  if (genSnap?._genRowSpacing) ctx.genRowSpacing = genSnap._genRowSpacing
-
-  if (state.activeEmphasis) activeEmphasis.value = state.activeEmphasis
-  if (state.currentMode) {
-    currentMode.value = state.currentMode
-    // Enter the saved mode
-    removeGuides(ctx)
-    if (state.currentMode === 'auto') enterAutoMode()
-    else if (state.currentMode === 'custom') enterCustomMode()
-    else if (state.currentMode === 'age') enterAgeMode()
-    else if (state.currentMode === 'generation') enterGenerationMode()
-    applyEmphasis()
-  }
-}
-
+// ── Save / restore (scenes are the source of truth) ─────────────────────────
+// Save Layout persists every scene's working arrangement through the
+// data-access chain (Phase 5.4 replaces this button with autosave).
 async function saveGraphLayout() {
-  const state = collectGraphState()
-  await store.saveGraphState(state)
+  saveCurrentState()
+  for (const sceneId of working.keys()) {
+    await persistScene(sceneId)
+  }
+  store.clearGraphDirty()
 }
 
-async function loadSavedGraphState() {
-  const state = await store.loadGraphState()
-  if (state) restoreGraphState(state)
+// First entry after data loads: make sure the project has a graph scene, then
+// enter the saved active one (restored from settings by the store).
+async function initScenes() {
+  if (!store.graphScenes.length) {
+    await store.ensureScene('graph', 'State 1', { type: 'organic' })
+  }
+  if (!activeSceneId.value || !graphScenes.value.some((s) => s.id === activeSceneId.value)) {
+    store.setActiveScene('graph', graphScenes.value[0]?.id ?? null)
+  }
+  if (activeSceneId.value) enterActiveScene()
 }
 
-defineExpose({ saveGraphLayout, collectGraphState })
+defineExpose({ saveGraphLayout })
 
-let graphStateRestored = false
+let scenesInitialized = false
 
 onMounted(() => {
   initGraph()
@@ -1579,11 +1412,11 @@ watch(
   [() => store.persons, () => store.relationships],
   async () => {
     updateGraph()
-    // Restore saved graph state once after data first loads
-    if (!graphStateRestored && store.persons.length > 0) {
-      graphStateRestored = true
+    // Enter the saved active scene once after data first loads
+    if (!scenesInitialized && store.persons.length > 0) {
+      scenesInitialized = true
       await nextTick()
-      await loadSavedGraphState()
+      await initScenes()
       store.clearGraphDirty()
     }
   },
@@ -1915,182 +1748,20 @@ watch(
   transform: translateX(-50%) translateY(-100%) scale(0.95);
 }
 
-/* Clean tree — slide panels out */
-.states-bar {
-  display: flex;
-  gap: 3px;
-  background: var(--surface);
+/* Scene tab strip inside the floating bottom bar: restyle the shared banner
+   component into the old states-bar pill */
+.graph-scene-tabs {
+  border-top: none;
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 4px;
+  background: var(--surface);
   box-shadow: var(--shadow);
-}
-
-.state-btn {
-  padding: 5px 12px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--t3);
-  font-family: var(--font);
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    background 0.15s,
-    color 0.15s;
-  white-space: nowrap;
-}
-
-.state-btn:hover {
-  background: var(--hover);
-  color: var(--t1);
-}
-
-.state-btn-active {
-  background: var(--adim);
-  color: var(--accent);
-  font-weight: 700;
-}
-
-.state-btn-add {
-  color: var(--t3);
-  font-size: 14px;
   padding: 4px 10px;
-  font-weight: 600;
+  min-height: 0;
+  backdrop-filter: none;
 }
 
-.state-btn-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.state-menu-dot {
-  position: absolute;
-  right: -2px;
-  top: -6px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: none;
-  background: var(--surface);
-  color: var(--t3);
-  font-size: 10px;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition:
-    opacity 0.15s,
-    background 0.12s,
-    color 0.12s;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-  z-index: 2;
-  line-height: 1;
-  padding: 0;
-}
-
-.state-btn-wrap:hover .state-menu-dot {
-  opacity: 1;
-}
-
-.state-menu-dot:hover {
-  background: var(--hover);
-  color: var(--t1);
-}
-
-.state-btn-add:hover {
-  color: var(--accent);
-  background: var(--adim);
-}
-
-/* State context menu */
-.state-context-menu {
-  position: absolute;
-  z-index: 100;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 4px;
-  min-width: 130px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  display: flex;
-  flex-direction: column;
-  transform-origin: top left;
-}
-
-.ctx-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
-  border: none;
-  background: transparent;
-  color: var(--t2);
-  font-family: var(--font);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  border-radius: 7px;
-  transition:
-    background 0.1s,
-    color 0.1s;
-  text-align: left;
-}
-
-.ctx-menu-item:hover {
-  background: var(--hover);
-  color: var(--t1);
-}
-
-.ctx-menu-icon {
-  font-size: 12px;
-  width: 16px;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.ctx-menu-danger:hover {
-  background: rgba(239, 83, 80, 0.12);
-  color: #ef5350;
-}
-
-.ctx-menu-enter-active {
-  transition:
-    opacity 0.15s ease,
-    transform 0.18s cubic-bezier(0.34, 1.4, 0.64, 1);
-}
-.ctx-menu-leave-active {
-  transition:
-    opacity 0.1s ease,
-    transform 0.1s ease;
-}
-.ctx-menu-enter-from {
-  opacity: 0;
-  transform: scale(0.9);
-}
-.ctx-menu-leave-to {
-  opacity: 0;
-  transform: scale(0.95);
-}
-
-.state-rename-input {
-  width: 80px;
-  padding: 4px 8px;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  background: var(--elevated);
-  color: var(--t1);
-  font-family: var(--font);
-  font-size: 11px;
-  font-weight: 600;
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(108, 142, 245, 0.2);
-}
-
+/* Clean tree — slide panels out */
 .clean-hide-up {
   transform: translateX(-50%) translateY(calc(-100% - 30px));
   opacity: 0;

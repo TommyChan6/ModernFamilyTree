@@ -15,9 +15,8 @@ export const useMainStore = defineStore('main', () => {
   const entityTags = ref([]) // the entity↔tag membership join rows
   const scenes = ref([]) // every saved Scene of the project, all views
   const sceneTags = ref([]) // tag placements ("Groups"): {id, scene_id, tag_id, x, y, visible}
-  // Which scene is open — for the GROUPS view only for now (Phase 5 makes this
-  // per-view when graph/timeline scenes land).
-  const activeSceneId = ref(null)
+  // Which scene is open, per spatial view ('groups' | 'graph' | 'timeline').
+  const activeSceneIds = ref({ groups: null, graph: null, timeline: null })
   const draggingPersonId = ref(null) // person being dragged from the member list
   const selectedPersonId = ref(null)
   const modalOpen = ref(false)
@@ -76,6 +75,11 @@ export const useMainStore = defineStore('main', () => {
     () => projects.value.find((p) => p.id === activeProjectId.value) || null
   )
   const groupsScenes = computed(() => scenes.value.filter((s) => s.view === 'groups'))
+  const graphScenes = computed(() => scenes.value.filter((s) => s.view === 'graph'))
+  const timelineScenes = computed(() => scenes.value.filter((s) => s.view === 'timeline'))
+  /** The Groups view's active scene id (kept as an alias — that view predates
+   *  the per-view map). */
+  const activeSceneId = computed(() => activeSceneIds.value.groups)
   const activeScene = computed(() => scenes.value.find((s) => s.id === activeSceneId.value) || null)
   // O(1) membership lookups in both directions, rebuilt when the join changes:
   // tagsOf.get(entityId) → Tag[]; membersOf.get(tagId) → entityId[]
@@ -104,7 +108,7 @@ export const useMainStore = defineStore('main', () => {
   const activeGroups = computed(() => {
     const out = []
     for (const st of sceneTags.value) {
-      if (st.scene_id !== activeSceneId.value) continue
+      if (st.scene_id !== activeSceneIds.value.groups) continue
       const tag = tagById.value.get(st.tag_id)
       if (!tag) continue
       out.push({
@@ -194,13 +198,23 @@ export const useMainStore = defineStore('main', () => {
     if (entityTagsRes.success) entityTags.value = entityTagsRes.data
     if (scenesRes.success) scenes.value = scenesRes.data
     if (sceneTagsRes.success) sceneTags.value = sceneTagsRes.data
-    // Restore the project's active groups scene; the legacy activeScenarioId
-    // setting still works because scenes kept the scenario ids. Fall back to
-    // the first groups scene.
+    // Restore each view's active scene (the legacy activeScenarioId key still
+    // works for groups because scenes kept the scenario ids), falling back to
+    // the view's first scene.
     const saved = settingsRes.success ? settingsRes.data : {}
-    const savedId = saved['activeSceneId:groups'] ?? saved.activeScenarioId ?? null
-    activeSceneId.value =
-      groupsScenes.value.find((s) => s.id === savedId)?.id ?? groupsScenes.value[0]?.id ?? null
+    const pick = (view, legacyKey) => {
+      const savedId = saved[`activeSceneId:${view}`] ?? (legacyKey ? saved[legacyKey] : null)
+      const list = scenes.value.filter((s) => s.view === view)
+      return list.find((s) => s.id === savedId)?.id ?? list[0]?.id ?? null
+    }
+    activeSceneIds.value = {
+      groups: pick('groups', 'activeScenarioId'),
+      graph: pick('graph'),
+      timeline: pick('timeline')
+    }
+    // Restore the current-year override (used to live in the graphState blob)
+    const savedYear = parseInt(saved.userCurrentYear)
+    userCurrentYear.value = Number.isFinite(savedYear) && savedYear > 0 ? savedYear : null
   }
 
   async function createPerson(data) {
@@ -301,28 +315,28 @@ export const useMainStore = defineStore('main', () => {
     return res
   }
 
-  // ── Scene actions (groups view only for now) ──────────────────────────────
-  /** Create the default groups scene if the project has none yet. Concurrent
-   *  callers share one in-flight request so only a single default is ever
-   *  created. */
-  let ensureGroupsScenePromise = null
-  async function ensureGroupsScene() {
-    if (activeSceneId.value) return activeSceneId.value
-    if (!ensureGroupsScenePromise) {
-      ensureGroupsScenePromise = api
-        .invoke('scenes:create', { view: 'groups', name: 'Scenario 1' })
+  // ── Scene actions ──────────────────────────────────────────────────────────
+  /** Create a view's default scene if it has none yet (and make it active).
+   *  Concurrent callers share one in-flight request per view so only a single
+   *  default is ever created. */
+  const ensureScenePromises = {}
+  async function ensureScene(view, name, extra = {}) {
+    if (activeSceneIds.value[view]) return activeSceneIds.value[view]
+    if (!ensureScenePromises[view]) {
+      ensureScenePromises[view] = api
+        .invoke('scenes:create', { view, name, ...extra })
         .then((res) => {
           if (res.success) {
             scenes.value.push(res.data)
-            activeSceneId.value = res.data.id
+            setActiveScene(view, res.data.id)
           }
-          return activeSceneId.value
+          return activeSceneIds.value[view]
         })
         .finally(() => {
-          ensureGroupsScenePromise = null
+          ensureScenePromises[view] = null
         })
     }
-    return ensureGroupsScenePromise
+    return ensureScenePromises[view]
   }
 
   async function createScene(view, name, extra = {}) {
@@ -361,12 +375,14 @@ export const useMainStore = defineStore('main', () => {
   }
 
   async function deleteScene(id) {
+    const scene = scenes.value.find((s) => s.id === id)
     const res = await api.invoke('scenes:delete', { id })
     if (res.success) {
       scenes.value = scenes.value.filter((s) => s.id !== id)
       sceneTags.value = sceneTags.value.filter((row) => row.scene_id !== id)
-      if (activeSceneId.value === id) {
-        setActiveScene(groupsScenes.value[0]?.id ?? null)
+      if (scene && activeSceneIds.value[scene.view] === id) {
+        const next = scenes.value.find((s) => s.view === scene.view)
+        setActiveScene(scene.view, next?.id ?? null)
       }
     }
     return res
@@ -409,25 +425,26 @@ export const useMainStore = defineStore('main', () => {
     return res
   }
 
-  function setActiveScene(id) {
-    if (id === activeSceneId.value) return
-    activeSceneId.value = id
+  function setActiveScene(view, id) {
+    if (id === activeSceneIds.value[view]) return
+    activeSceneIds.value = { ...activeSceneIds.value, [view]: id }
     // Fire-and-forget persistence — switching stays instant
-    if (id) api.invoke('settings:set', { key: 'activeSceneId:groups', value: id })
+    if (id) api.invoke('settings:set', { key: `activeSceneId:${view}`, value: id })
   }
 
   // ── Group actions (the Groups view's verbs over tags + placements) ─────────
   /** Find the active scene's placement of a tag. */
   function placementOf(tagId) {
     return (
-      sceneTags.value.find((row) => row.scene_id === activeSceneId.value && row.tag_id === tagId) ||
-      null
+      sceneTags.value.find(
+        (row) => row.scene_id === activeSceneIds.value.groups && row.tag_id === tagId
+      ) || null
     )
   }
 
   /** Create a tag and place it in the active groups scene. Returns the tag. */
   async function createGroup({ name, color, icon, x = 0, y = 0 } = {}) {
-    const sceneId = await ensureGroupsScene()
+    const sceneId = await ensureScene('groups', 'Scenario 1')
     const tagRes = await createTag({ label: name, color, icon })
     if (!tagRes.success) return tagRes
     const placeRes = await addSceneTag(sceneId, tagRes.data.id, { x, y })
@@ -500,12 +517,12 @@ export const useMainStore = defineStore('main', () => {
   }
 
   // Set (or clear, with a falsy value) the explicit current year. Clearing
-  // reverts to auto-tracking the latest year in the data. Part of the saved
-  // layout, so an explicit change lights up the unsaved-layout indicator.
+  // reverts to auto-tracking the latest year in the data. Persisted as its
+  // own per-project setting.
   function setCurrentYear(year) {
     const y = parseInt(year)
     userCurrentYear.value = Number.isFinite(y) && y > 0 ? y : null
-    graphDirty.value = true
+    api.invoke('settings:set', { key: 'userCurrentYear', value: userCurrentYear.value })
   }
 
   function updateGraphSetting(key, value) {
@@ -555,6 +572,7 @@ export const useMainStore = defineStore('main', () => {
     scenes,
     sceneTags,
     activeSceneId,
+    activeSceneIds,
     draggingPersonId,
     selectedPersonId,
     modalOpen,
@@ -576,6 +594,8 @@ export const useMainStore = defineStore('main', () => {
     personCount,
     coupleCount,
     groupsScenes,
+    graphScenes,
+    timelineScenes,
     activeScene,
     activeGroups,
     tagsOf,
@@ -600,7 +620,7 @@ export const useMainStore = defineStore('main', () => {
     setGroupVisible,
     addPersonToGroup,
     removePersonFromGroup,
-    ensureGroupsScene,
+    ensureScene,
     createScene,
     renameScene,
     duplicateScene,
@@ -626,21 +646,6 @@ export const useMainStore = defineStore('main', () => {
     },
     clearGraphDirty() {
       graphDirty.value = false
-    },
-    async saveGraphState(graphState) {
-      await api.invoke('settings:set', { key: 'graphState', value: JSON.stringify(graphState) })
-      graphDirty.value = false
-    },
-    async loadGraphState() {
-      const res = await api.invoke('settings:getAll')
-      if (res.success && res.data.graphState) {
-        try {
-          return JSON.parse(res.data.graphState)
-        } catch {
-          return null
-        }
-      }
-      return null
     }
   }
 })
