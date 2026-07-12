@@ -8,6 +8,10 @@
       <div class="auth-grid"></div>
     </div>
 
+    <button class="auth-back" type="button" @click="emit('back')">
+      <span class="auth-back-arrow">←</span> Home
+    </button>
+
     <div class="auth-card" :class="{ shake: shaking }">
       <div class="auth-logo">
         <div class="auth-logo-mark">🌳</div>
@@ -161,9 +165,15 @@ import { useMainStore } from '../store/index.js'
 import { validateUsername, validatePassword } from '../../../shared/auth'
 import LegalModal from './LegalModal.vue'
 
+const props = defineProps({
+  // Which panel to open on: the landing page's "Sign in" vs "Get started"
+  initialMode: { type: String, default: 'login' }
+})
+const emit = defineEmits(['back'])
+
 const store = useMainStore()
 
-const mode = ref('login')
+const mode = ref(props.initialMode === 'register' ? 'register' : 'login')
 const username = ref('')
 const password = ref('')
 const confirmPassword = ref('')
@@ -331,6 +341,44 @@ async function continueAsGuest() {
   );
   background-size: 26px 26px;
   mask-image: radial-gradient(ellipse at center, black 0%, transparent 72%);
+}
+
+/* ── Back to the landing page ─────────────────────────────────────────────── */
+.auth-back {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(10px);
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.auth-back:hover {
+  color: var(--t1);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  transform: translateX(-2px);
+}
+
+.auth-back-arrow {
+  transition: transform 0.2s ease;
+}
+
+.auth-back:hover .auth-back-arrow {
+  transform: translateX(-3px);
 }
 
 /* ── The card ─────────────────────────────────────────────────────────────── */

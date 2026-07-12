@@ -1,6 +1,9 @@
 <template>
   <div class="app-shell">
     <header class="topbar">
+      <button class="home-btn" title="Homepage" @click="homeOpen = true">
+        <span class="home-btn-mark">🌳</span>
+      </button>
       <div class="project-tabs-area">
         <TransitionGroup name="tab" tag="div" class="project-tabs">
           <div
@@ -151,9 +154,25 @@
     <ExportModal :open="exportOpen" :capture="captureViewImage" @close="exportOpen = false" />
     <SettingsModal />
     <UserPage />
+    <!-- Landing page: what signed-out visitors meet first (marketing + mock
+         community gallery); its CTAs hand off to the AuthGate below. Signed-in
+         users can revisit it via the topbar home button (its nav then shows
+         the account chip and "Open editor" instead of sign-in CTAs). -->
+    <Transition name="auth-gate">
+      <HomePage
+        v-if="store.authReady && (store.authUser ? homeOpen : !authOpen)"
+        @signin="openAuth('login')"
+        @register="openAuth('register')"
+        @close="homeOpen = false"
+      />
+    </Transition>
     <!-- Sign-in gate: covers the workspace until a session exists -->
     <Transition name="auth-gate">
-      <AuthGate v-if="store.authReady && !store.authUser" />
+      <AuthGate
+        v-if="store.authReady && !store.authUser && authOpen"
+        :initial-mode="authMode"
+        @back="authOpen = false"
+      />
     </Transition>
     <!-- Cinematic loading curtain: sign in/out, project switch, open profile -->
     <Transition name="curtain">
@@ -168,7 +187,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useMainStore } from './store/index.js'
 import { useI18n } from './i18n'
 import { api } from './api'
@@ -185,6 +204,7 @@ import PersonModal from './components/PersonModal.vue'
 import PersonForm from './components/PersonForm.vue'
 import GraphSettings from './components/GraphSettings.vue'
 import AuthGate from './components/AuthGate.vue'
+import HomePage from './components/home/HomePage.vue'
 import AccountMenu from './components/AccountMenu.vue'
 import ExportModal from './components/ExportModal.vue'
 import SettingsModal from './components/SettingsModal.vue'
@@ -203,6 +223,26 @@ const renameInputRef = ref(null)
 const renamingId = ref(null)
 const renameValue = ref('')
 const dockCollapsed = ref(false)
+
+// Signed-out flow: the HomePage landing shows first; its CTAs open the
+// AuthGate in the right mode. Signing out lands back on the homepage.
+// Signed-in users can reopen the homepage from the topbar home button.
+const authOpen = ref(false)
+const authMode = ref('login')
+const homeOpen = ref(false)
+
+function openAuth(mode) {
+  authMode.value = mode
+  authOpen.value = true
+}
+
+watch(
+  () => store.authUser,
+  (user) => {
+    if (!user) authOpen.value = false
+    homeOpen.value = false
+  }
+)
 
 function openPalette() {
   paletteRef.value?.show?.()
@@ -415,6 +455,36 @@ onUnmounted(() => {
 
 .topbar > * {
   -webkit-app-region: no-drag;
+}
+
+/* App mark, doubling as the way back to the homepage */
+.home-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-left: 10px;
+  border: 1px solid rgba(108, 142, 245, 0.3);
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--adim), rgba(108, 142, 245, 0.24));
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.25s ease,
+    transform 0.2s ease;
+}
+
+.home-btn:hover {
+  border-color: rgba(108, 142, 245, 0.55);
+  box-shadow: 0 0 12px rgba(108, 142, 245, 0.3);
+  transform: translateY(-1px);
+}
+
+.home-btn-mark {
+  font-size: 16px;
+  line-height: 1;
 }
 
 .project-tabs-area {

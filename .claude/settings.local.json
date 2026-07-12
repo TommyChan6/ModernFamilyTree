@@ -226,7 +226,9 @@
       "Bash(git --no-pager diff --stat HEAD)",
       "PowerShell(npx prettier --write src/renderer/src/store/index.js src/renderer/src/components/TransitionCurtain.vue src/renderer/src/App.vue src/renderer/src/components/UserPage.vue src/renderer/src/components/AccountMenu.vue 2>&1)",
       "PowerShell(node -e \"try{console.log\\('pw-core:', require.resolve\\('playwright-core'\\)\\)}catch\\(e\\){console.log\\('no playwright-core'\\)}\"; \\(Get-Command msedge -ErrorAction SilentlyContinue\\).Source; Test-Path \"C:\\\\Program Files \\(x86\\)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\")",
-      "Bash(grep -E \"src/.*\\\\.\\(vue|js|ts\\)$\")"
+      "Bash(grep -E \"src/.*\\\\.\\(vue|js|ts\\)$\")",
+      "PowerShell(npx prettier --check \"src/renderer/src/components/home/ViewShowcase.vue\")",
+      "PowerShell(npx prettier --write \"src/renderer/src/App.vue\" \"src/renderer/src/components/home/HomePage.vue\")"
     ]
   }
 }
