@@ -4,8 +4,60 @@
 export interface Project {
   id: string
   name: string
+  /** Owning account. null on projects created before accounts existed —
+   *  the first registered user claims those. */
+  user_id?: string | null
   created_at: string
   updated_at: string
+}
+
+/** A registered account. Password fields follow src/shared/auth.ts
+ *  (PBKDF2-SHA256; per-user salt and iteration count). */
+export interface User {
+  id: string
+  /** Display form, as typed at registration. */
+  username: string
+  /** Lower-cased lookup key — usernames are unique case-insensitively. */
+  username_lower: string
+  password_hash: string
+  password_salt: string
+  password_iterations: number
+  /** Data tier — 'free' for now; paid tiers slot in later. */
+  plan: string
+  /** When the user accepted the Terms & Privacy Policy (registration). */
+  tos_accepted_at: string
+  /** Login throttling: consecutive failures + lockout expiry. */
+  failed_logins: number
+  locked_until: string | null
+  created_at: string
+}
+
+/** A signed-in device. The token is the bearer credential the renderer
+ *  attaches to every request (the local stand-in for a session cookie). */
+export interface Session {
+  token: string
+  user_id: string
+  created_at: string
+  expires_at: string
+}
+
+/** The User shape safe to send to the renderer — no credential material. */
+export interface PublicUser {
+  id: string
+  username: string
+  plan: string
+  created_at: string
+}
+
+/** Current consumption against the user's plan limits (for the account menu
+ *  and quota errors). */
+export interface UsageInfo {
+  projects: number
+  maxProjects: number
+  persons: number
+  maxPersons: number
+  images: number
+  maxImages: number
 }
 
 /** A structured, mutable date. Only the Gregorian calendar (usually just a
@@ -113,6 +165,9 @@ export interface ImageRecord {
 }
 
 export interface DB {
+  users: Record<string, User>
+  /** token → Session */
+  sessions: Record<string, Session>
   projects: Record<string, Project>
   activeProjectId: string | null
   persons: Record<string, Person>
@@ -133,6 +188,13 @@ export interface ApiResult<T = unknown> {
   success: boolean
   data?: T
   error?: string
+}
+
+/** Per-request context the shells resolve from the session token before
+ *  dispatching to a handler — the moral equivalent of `req.user`. */
+export interface AuthCtx {
+  user: User | null
+  token: string | null
 }
 
 /** Platform services the shared channel handlers need but cannot implement themselves. */

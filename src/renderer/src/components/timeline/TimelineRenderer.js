@@ -674,6 +674,97 @@ export class TimelineRenderer {
     if (this._tweening || entranceActive || this.aliveDots.count > 0) this.requestRedraw()
   }
 
+  // ── Image export ────────────────────────────────────────────────────────────
+  // Render one fully-settled frame at an arbitrary size/camera and return the
+  // three layers (year grid, GL world, labels/gutter) composited into a fresh
+  // canvas. Synchronous resize→draw→readback→restore, so the live canvases
+  // never show the export frame. `light` temporarily flips the document theme.
+  exportFrame({ width, height, camera2, light = null }) {
+    const doc = document.documentElement
+    const prevTheme = doc.dataset.theme
+    const wantLight = light == null ? this.light : light
+    const flip = wantLight !== this.light
+    const oldW = this.width || 1
+    const oldH = this.height || 1
+    const oldCam = this.camera2
+    const oldDpr = this.dpr
+    const oldMouseY = this.mouseY
+    const oldHover = this.hoverBadgeId
+    const uPR = this.avatars.material.uniforms.uPixelRatio
+    try {
+      if (flip) {
+        doc.dataset.theme = wantLight ? 'light' : 'dark'
+        this.light = wantLight
+        this._css.invalidate()
+        this.avatars.setThemeUniforms(wantLight)
+      }
+      this.dpr = 1
+      this.renderer.setPixelRatio(1)
+      uPR.value = 1
+      this.renderer.setSize(width, height, false)
+      this.width = width
+      this.height = height
+      this.camera.right = width
+      this.camera.bottom = height
+      this.camera.updateProjectionMatrix()
+      for (const c of [this._bgCanvas, this._fgCanvas]) {
+        c.width = width
+        c.height = height
+      }
+      this.camera2 = camera2
+      this.mouseY = null
+      this.hoverBadgeId = null
+
+      // Snap every tween/entrance/lane glide to its target so the capture is settled.
+      this._syncStyles()
+      for (const a of this._pAnim.values()) {
+        a.op = a.top
+        a.w = a.tw
+        a.s = a.ts
+        a.start = null
+      }
+      for (const a of this._mAnim.values()) {
+        a.op = a.top
+        a.w = a.tw
+      }
+      for (const a of this._bAnim.values()) {
+        a.op = a.top
+        a.w = a.tw
+      }
+      for (const a of this._laneX.values()) a.x = a.tx
+      this._entranceUntil = 0
+      this._writeBuffers()
+      this.atlas.flush()
+      this._drawBg()
+      this._drawFg()
+      this.renderer.render(this.scene, this.camera)
+
+      const out = document.createElement('canvas')
+      out.width = width
+      out.height = height
+      const g = out.getContext('2d')
+      g.drawImage(this._bgCanvas, 0, 0, width, height)
+      g.drawImage(this._glCanvas, 0, 0, width, height)
+      g.drawImage(this._fgCanvas, 0, 0, width, height)
+      return out
+    } finally {
+      if (flip) {
+        if (prevTheme == null) delete doc.dataset.theme
+        else doc.dataset.theme = prevTheme
+        this.light = !wantLight
+        this._css.invalidate()
+        this.avatars.setThemeUniforms(!wantLight)
+      }
+      this.dpr = oldDpr
+      this.renderer.setPixelRatio(oldDpr)
+      uPR.value = oldDpr
+      this.camera2 = oldCam
+      this.mouseY = oldMouseY
+      this.hoverBadgeId = oldHover
+      this.resize(oldW, oldH) // restores all three canvases + schedules a live redraw
+    }
+  }
+
   dispose() {
     this.disposed = true
     this._glCanvas?.removeEventListener('webglcontextlost', this._onContextLost)

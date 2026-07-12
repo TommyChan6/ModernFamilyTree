@@ -4,6 +4,7 @@ import fs from 'fs'
 import { randomUUID } from 'crypto'
 import { getDB } from './db.js'
 import { channelHandlers, WRITE_CHANNELS, nowStr } from '../shared/dbCore'
+import { PUBLIC_CHANNELS, resolveSession, unwrapRequest } from '../shared/auth'
 
 // The Electron shell around the shared data core (src/shared/dbCore.ts).
 // Every shared channel gets the same treatment: run the handler against the
@@ -36,10 +37,18 @@ export function registerHandlers(ipcMain, _app, dialog) {
   // ── All shared channels (projects/persons/relationships/factions/scenarios/
   //    images metadata/settings/globalSettings) ───────────────────────────────
   for (const [channel, handler] of Object.entries(channelHandlers)) {
-    ipcMain.handle(channel, async (_event, data) => {
+    ipcMain.handle(channel, async (_event, raw) => {
       try {
         const { db, save } = getDB()
-        const result = handler(db, data, env)
+        // Auth middleware, the same shape a hosted server would run: unwrap
+        // the request envelope, resolve the bearer token to a user, and
+        // reject non-public channels without a live session.
+        const { token, data } = unwrapRequest(raw)
+        const ctx = { user: resolveSession(db, token, nowStr()), token }
+        if (!ctx.user && !PUBLIC_CHANNELS.has(channel)) {
+          return { success: false, error: 'Not signed in' }
+        }
+        const result = await handler(db, data, env, ctx)
         if (WRITE_CHANNELS.has(channel)) save()
         return { success: true, data: result }
       } catch (err) {
@@ -54,9 +63,9 @@ export function registerHandlers(ipcMain, _app, dialog) {
   // thumbnail, so card/list views never decode or GPU-upload the full-resolution
   // photo while scrolling. Done in the renderer because Electron's nativeImage
   // can't decode WebP (the app's photo format) — Chromium can decode everything.
-  ipcMain.handle('images:bytes', async (_event, data) => {
+  ipcMain.handle('images:bytes', async (_event, raw) => {
     try {
-      const { filePath } = data
+      const { filePath } = unwrapRequest(raw).data || {}
       if (!filePath || !fs.existsSync(filePath)) return { success: false, error: 'missing' }
       return { success: true, data: fs.readFileSync(filePath) } // Buffer → Uint8Array in renderer
     } catch (err) {

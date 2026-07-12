@@ -96,7 +96,27 @@ data URLs — see `src/renderer/src/api/backends/local.ts`.
 wraps that in `{ success: true, data }` / `{ success: false, error }` — exceptions
 never cross the seam. Callers check `success` before reading `data`. The shell
 persists after any channel in `WRITE_CHANNELS` before returning. Writes tag new
-records with the active `project_id`; reads filter by it.
+records with the active `project_id`; reads filter by it. Handlers may be async
+(the auth ones are) — both shells `await` them.
+
+**Accounts & auth** (`src/shared/auth.ts` + the `auth:*` channels in `dbCore.ts`):
+the app is username/password gated, built website-shaped so the hosted backend can
+adopt it wholesale. Passwords are PBKDF2-SHA256 (Web Crypto, 600k iterations,
+per-user salt + stored iteration count); login is throttled (5 fails → 5-minute
+lock) and failures stay deliberately vague. `auth:register`/`auth:login` return a
+30-day bearer token; the api seam (`api/index.ts` + `api/session.ts`, token in
+localStorage) wraps EVERY `invoke` payload in a request envelope with that token —
+the local stand-in for a session cookie. Both shells run the same middleware:
+`unwrapRequest` → `resolveSession` → an `AuthCtx` (`{ user, token }`) passed as the
+handlers' 4th arg; channels outside `PUBLIC_CHANNELS` (auth + globalSettings) are
+rejected without a live session. Projects carry `user_id` (the first registered
+account claims pre-auth projects; ownership violations read as "not found"), and
+per-plan quotas (`PLAN_LIMITS` — people/projects/photos on the free tier) are
+enforced in `persons:create`/`projects:create`/`images:add`. UI: `AuthGate.vue`
+(sign in / register + `LegalModal.vue` Terms & Privacy), `AccountMenu.vue` (topbar
+chip: plan, usage bars, sign out); `App.vue` only loads data behind a restored
+session. When adding a channel, decide whether it needs `ctx` and NEVER return
+password/salt fields to the renderer.
 
 **State** (`src/renderer/src/store/index.js`): a single Pinia store `main` is the
 source of truth for `persons`, `relationships`, `tags`/`entityTags` (+ the
@@ -114,9 +134,13 @@ node and link in a handful of instanced draw calls, with an on-demand frame loop
 **outside Vue reactivity**: a plain `ctx` object holds the simulation and node data;
 nodes are mutated in place (`n.x/y/fx/fy`); `ticked()` just pokes the renderer.
 Layout math is kept in **pure functions** under `components/graph/` (`layoutAge.js`,
-`familyTreeLayout.ts`, `linkHelpers.js`) with no D3/Three or store dependency. Four
-layout types (free/organic/birth/generations); the type is a property of the active
-graph **Scene**, and each scene stores its own positions/config. Arrangements
+`familyTreeLayout.ts`, `linkHelpers.js`, `graph3d/layout3D.js`) with no D3/Three or
+store dependency. Five layout types (free/organic/birth/generations/space); the type
+is a property of the active graph **Scene**, and each scene stores its own
+positions/config. The `space` type is **experimental**: the graph in 3D
+(`Graph3DView.vue` + `components/graph/graph3d/`, d3-force-3d + OrbitControls),
+gated behind Advanced mode plus the topbar **🧪 Labs** toggle (`caps.space3d`);
+with the gate off it degrades to Free over the same positions. Arrangements
 autosave through `scenes:save`; a manual checkpoint (`checkpoint:save`/`revert`,
 Ctrl+S / Project ▾ menu) plus `hasUnsavedChanges` drive the close-confirmation
 prompt (wired from main via `window.__hasUnsavedChanges` / `window.__saveCheckpoint`
@@ -167,7 +191,12 @@ Vitest. `tests/db.test.js` covers the data layer (mocks Electron's `app` module 
 point `userData` at a temp dir and exercises `db.js` + the shared channel handlers:
 migrations, project scoping, cascade deletes, scene/checkpoint persistence, field
 integrity) — update it when
-changing `db.js`, `src/shared/dbCore.ts`, or the data shape. `tests/graphMath.test.js`,
+changing `db.js`, `src/shared/dbCore.ts`, or the data shape. `tests/auth.test.js`
+covers accounts (hashing, sessions, lockout, per-user scoping, quotas, the request
+envelope) — it dials PBKDF2 down via `__setPbkdf2IterationsForTesting`; update it
+with `src/shared/auth.ts` or the `auth:*` channels. `tests/setup.js` (wired in
+`vitest.config.js`) backfills `globalThis.crypto` for Node 18 workers.
+`tests/graphMath.test.js`,
 `tests/viewMath.test.js` and `tests/calendarMath.test.js` cover the pure view/date
 math (camera transforms, link curves, timeline layout, membership arc spans,
 DateValue ordinals). Rendering/interaction has no automated coverage —

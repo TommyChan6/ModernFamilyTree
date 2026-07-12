@@ -1,9 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '../api'
+import { setSessionToken, clearSessionToken, getSessionToken } from '../api/session'
 import { latestDataYear } from './currentYear.js'
 
 export const useMainStore = defineStore('main', () => {
+  // ── Account / session ─────────────────────────────────────────────────────
+  const authUser = ref(null) // { id, username, plan, created_at } or null
+  const authUsage = ref(null) // { projects, maxProjects, persons, … } or null
+  const authReady = ref(false) // true once the stored session was checked
+
   // ── Project management ────────────────────────────────────────────────────
   const projects = ref([])
   const activeProjectId = ref(null)
@@ -47,6 +53,10 @@ export const useMainStore = defineStore('main', () => {
   const activeView = ref('graph') // 'graph' | 'directory' | 'relationships' | 'timeline' | 'groups'
   // App-wide feature tier (progressive disclosure): 'simple' | 'standard' | 'advanced'
   const programMode = ref('standard')
+  // Labs: the explicit opt-in for experimental features (Advanced mode only).
+  const labsEnabled = ref(false)
+  // Whether the Space (3D) controls hints were already shown once.
+  const spaceHintSeen = ref(false)
 
   // Graph visual settings
   const graphSettings = ref({
@@ -145,9 +155,26 @@ export const useMainStore = defineStore('main', () => {
       focus: m !== 'simple',
       /** 'none' | 'basic' (no physics sliders) | 'full' */
       style: m === 'simple' ? 'none' : m === 'standard' ? 'basic' : 'full',
-      tags: m !== 'simple'
+      tags: m !== 'simple',
+      /** The Labs toggle itself is an Advanced-mode affordance… */
+      labs: m === 'advanced',
+      /** …and the experimental Space (3D) graph type needs it switched on too. */
+      space3d: m === 'advanced' && labsEnabled.value
     }
   })
+
+  function setLabsEnabled(on) {
+    labsEnabled.value = !!on
+    api.invoke('globalSettings:set', {
+      key: 'labsEnabled',
+      value: labsEnabled.value ? 'on' : 'off'
+    })
+  }
+
+  function markSpaceHintSeen() {
+    spaceHintSeen.value = true
+    api.invoke('globalSettings:set', { key: 'space3dHintSeen', value: 'yes' })
+  }
 
   function setProgramMode(mode) {
     if (!['simple', 'standard', 'advanced'].includes(mode) || mode === programMode.value) return
@@ -193,6 +220,73 @@ export const useMainStore = defineStore('main', () => {
     return out
   })
 
+  // ── Account actions ───────────────────────────────────────────────────────
+  // Auth mirrors the future hosted flow: register/login hand back a bearer
+  // token the api seam then attaches to every request. After either succeeds
+  // the user's data is (re)loaded exactly like a project switch.
+  async function restoreSession() {
+    try {
+      if (!getSessionToken()) return false
+      const res = await api.invoke('auth:session')
+      if (!res.success) {
+        clearSessionToken()
+        return false
+      }
+      authUser.value = res.data.user
+      authUsage.value = res.data.usage
+      return true
+    } finally {
+      authReady.value = true
+    }
+  }
+
+  async function completeSignIn(res) {
+    if (!res.success) return res
+    setSessionToken(res.data.token)
+    authUser.value = res.data.user
+    await loadProjects()
+    await loadAll()
+    refreshUsage()
+    return res
+  }
+
+  function register({ username, password, acceptedTerms }) {
+    return api.invoke('auth:register', { username, password, acceptedTerms }).then(completeSignIn)
+  }
+
+  function login({ username, password }) {
+    return api.invoke('auth:login', { username, password }).then(completeSignIn)
+  }
+
+  async function logout() {
+    await api.invoke('auth:logout')
+    clearSessionToken()
+    authUser.value = null
+    authUsage.value = null
+    // Drop everything owned by the account so the next sign-in starts clean
+    projects.value = []
+    activeProjectId.value = null
+    persons.value = []
+    relationships.value = []
+    tags.value = []
+    entityTags.value = []
+    scenes.value = []
+    sceneTags.value = []
+    activeSceneIds.value = { groups: null, graph: null, timeline: null }
+    selectedPersonId.value = null
+    modalOpen.value = false
+    formOpen.value = false
+    editingPerson.value = null
+    relPopup.value = null
+    checkpoint.value = null
+    userCurrentYear.value = null
+  }
+
+  async function refreshUsage() {
+    const res = await api.invoke('auth:usage')
+    if (res.success) authUsage.value = res.data
+  }
+
   // ── Project actions ───────────────────────────────────────────────────────
   async function loadProjects() {
     const res = await api.invoke('projects:getAll')
@@ -206,8 +300,10 @@ export const useMainStore = defineStore('main', () => {
     const res = await api.invoke('projects:create', { name: name || 'Unnamed Project' })
     if (res.success) {
       projects.value.push(res.data)
+      refreshUsage()
       return res.data
     }
+    if (res.error?.includes('limit')) alert(res.error)
     return null
   }
 
@@ -319,7 +415,12 @@ export const useMainStore = defineStore('main', () => {
 
   async function createPerson(data) {
     const res = await api.invoke('persons:create', data)
-    if (res.success) persons.value.push(res.data)
+    if (res.success) {
+      persons.value.push(res.data)
+      refreshUsage()
+    } else if (res.error?.includes('limit')) {
+      alert(res.error)
+    }
     return res
   }
 
@@ -655,6 +756,15 @@ export const useMainStore = defineStore('main', () => {
   }
 
   return {
+    // account
+    authUser,
+    authUsage,
+    authReady,
+    restoreSession,
+    register,
+    login,
+    logout,
+    refreshUsage,
     // project
     projects,
     activeProjectId,
@@ -693,6 +803,10 @@ export const useMainStore = defineStore('main', () => {
     programMode,
     caps,
     setProgramMode,
+    labsEnabled,
+    setLabsEnabled,
+    spaceHintSeen,
+    markSpaceHintSeen,
     // computed
     selectedPerson,
     personCount,

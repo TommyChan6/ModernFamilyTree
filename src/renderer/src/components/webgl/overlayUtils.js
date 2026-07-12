@@ -46,3 +46,24 @@ export function trunc(s, n) {
   s = s || 'Unnamed'
   return s.length > n ? s.slice(0, n - 1) + '…' : s
 }
+
+// Re-emit a CSS color (#rgb, #rrggbb or rgb()/rgba()) at the given alpha.
+export function withAlpha(color, a) {
+  color = (color || '').trim()
+  if (color.startsWith('#')) {
+    const full = color.length >= 7
+    const r = parseInt(full ? color.slice(1, 3) : color[1] + color[1], 16)
+    const g = parseInt(full ? color.slice(3, 5) : color[2] + color[2], 16)
+    const b = parseInt(full ? color.slice(5, 7) : color[3] + color[3], 16)
+    return `rgba(${r}, ${g}, ${b}, ${a})`
+  }
+  const m = color.match(/^rgba?\(([^)]+)\)$/)
+  if (m) {
+    const parts = m[1]
+      .split(',')
+      .slice(0, 3)
+      .map((s) => s.trim())
+    return `rgba(${parts.join(', ')}, ${a})`
+  }
+  return color
+}

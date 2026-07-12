@@ -341,6 +341,95 @@ export class WebGLGraphRenderer {
     if (this._nodeTweening || this._linkTweening) this.requestRedraw()
   }
 
+  // ── Image export ────────────────────────────────────────────────────────────
+  // Render one fully-settled frame at an arbitrary size/camera and return it as
+  // a fresh canvas (GL content + text overlay composited, transparent
+  // background). Entirely synchronous: the live canvas is resized, drawn, read
+  // back and restored before the browser ever paints, so nothing flashes.
+  // `light` temporarily flips the document theme for the capture (null = keep).
+  exportFrame({ width, height, transform, light = null, overlayOpts }) {
+    const doc = document.documentElement
+    const prevTheme = doc.dataset.theme
+    const wantLight = light == null ? this.overlay.light : light
+    const flip = wantLight !== this.overlay.light
+    const oldW = this.width || 1
+    const oldH = this.height || 1
+    const oldT = this.transform
+    const uPR = this.nodeLayer.material.uniforms.uPixelRatio
+    try {
+      if (flip) {
+        doc.dataset.theme = wantLight ? 'light' : 'dark'
+        this.nodeLayer.setThemeUniforms(wantLight)
+        this.overlay.setTheme(wantLight)
+      }
+      this.renderer.setPixelRatio(1)
+      uPR.value = 1
+      this.renderer.setSize(width, height, false)
+      this.camera.right = width
+      this.camera.bottom = height
+      this.camera.updateProjectionMatrix()
+      this.transform = transform
+      this.overlay.setCamera(transform)
+
+      // Snap every style tween to its target so the capture is settled.
+      this._syncNodeStyles()
+      for (const a of this._nodeAnim.values()) {
+        a.op = a.top
+        a.rad = a.trad
+        a.glow = a.tglow
+      }
+      this._stepNodes(0)
+      const nodes = this.nodes || []
+      for (let i = 0; i < nodes.length; i++) this.nodeLayer.setPosition(i, nodes[i].x, nodes[i].y)
+      this.nodeLayer.commitPositions()
+      this._syncLinkStyles()
+      for (const a of this._linkAnim.values()) {
+        a.op = a.top
+        a.w = a.tw
+        a.ar = a.tar
+        a.cr = a.tcr
+        a.cg = a.tcg
+        a.cb = a.tcb
+      }
+      const links = this.links || []
+      const gs = this.hooks.getSettings()
+      this.linkLayer.updateGeometry(links, gs, this._curLinkVisual)
+      this.linkLayer.updateStyles(links, this._curLinkVisual)
+      this.atlas.flush()
+
+      this.world.matrix.compose(
+        new THREE.Vector3(transform.x, transform.y, 0),
+        new THREE.Quaternion(),
+        new THREE.Vector3(transform.k, transform.k, 1)
+      )
+      this.world.matrixWorldNeedsUpdate = true
+      this.renderer.render(this.scene, this.camera)
+      this.overlay.resize(width, height, 1)
+      this.overlay.draw(overlayOpts)
+
+      const out = document.createElement('canvas')
+      out.width = width
+      out.height = height
+      const g = out.getContext('2d')
+      g.drawImage(this._glCanvas, 0, 0, width, height)
+      g.drawImage(this.overlay.canvas, 0, 0, width, height)
+      return out
+    } finally {
+      if (flip) {
+        if (prevTheme == null) delete doc.dataset.theme
+        else doc.dataset.theme = prevTheme
+        this.nodeLayer.setThemeUniforms(!wantLight)
+        this.overlay.setTheme(!wantLight)
+      }
+      this.renderer.setPixelRatio(this.dpr)
+      uPR.value = this.dpr
+      this.transform = oldT
+      this.overlay.setCamera(oldT)
+      this.resize(oldW, oldH) // restores renderer/camera/overlay sizes + schedules a live redraw
+      this.markAllDirty()
+    }
+  }
+
   dispose() {
     this.disposed = true
     this._glCanvas?.removeEventListener('webglcontextlost', this._onContextLost)

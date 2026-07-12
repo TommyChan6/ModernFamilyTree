@@ -48,6 +48,17 @@
         </div>
       </div>
 
+      <!-- Minimap (top-left, past the year gutter) -->
+      <MiniMap
+        v-if="placedCount"
+        ref="minimapRef"
+        class="tl-minimap"
+        :adapter="minimapAdapter"
+        :width="132"
+        :height="150"
+        :preserve-aspect="false"
+      />
+
       <!-- Floating search (matches the tree view) -->
       <div v-if="placedCount" class="tl-search" @pointerdown.stop @click.stop @wheel.stop>
         <span class="tl-search-icon">🔍</span>
@@ -174,7 +185,9 @@ import {
   Y_PAD
 } from './timeline/timelineLayout.js'
 import { TimelineRenderer } from './timeline/TimelineRenderer.js'
+import { withAlpha } from './webgl/overlayUtils.js'
 import SceneTabs from './SceneTabs.vue'
+import MiniMap from './MiniMap.vue'
 
 const store = useMainStore()
 
@@ -393,6 +406,63 @@ let startX = 0,
 
 function syncCamera() {
   renderer?.setCamera({ px: pxPerYear.value, ls: laneScale.value, tx: tx.value, ty: ty.value })
+  minimapRef.value?.redraw()
+}
+
+// ── Minimap (top-left) ──────────────────────────────────────────────────────
+// Minimap world = (laneX in unscaled px, year): the two axes share no unit, so
+// the projection stretches each independently (preserve-aspect off). Lifelines
+// draw as tiny gender-coloured strokes batched into one path per colour.
+const minimapRef = ref(null)
+const minimapAdapter = {
+  getBounds: () => {
+    const L = layout.value
+    if (!L.people.length) return null
+    return { minX: 0, minY: L.minYear, maxX: L.worldWBase, maxY: L.maxYear }
+  },
+  getView: () => ({
+    x: -tx.value / laneScale.value,
+    y: (-ty.value - Y_PAD) / pxPerYear.value + layout.value.minYear,
+    w: stageW.value / laneScale.value,
+    h: stageH.value / pxPerYear.value
+  }),
+  drawContent: (g, proj, colors) => {
+    void colors
+    const byColor = new Map()
+    for (const p of layout.value.people) {
+      const c = genderColor(p.gender)
+      let list = byColor.get(c)
+      if (!list) byColor.set(c, (list = []))
+      list.push(p)
+    }
+    g.lineWidth = 1.4
+    g.lineCap = 'round'
+    for (const [c, list] of byColor) {
+      g.strokeStyle = withAlpha(c, 0.6)
+      g.beginPath()
+      for (const p of list) {
+        const mx = p.laneX * proj.sx + proj.ox
+        g.moveTo(mx, p.birthYear * proj.sy + proj.oy)
+        g.lineTo(mx, Math.max(p.endYear, p.birthYear + 1) * proj.sy + proj.oy)
+      }
+      g.stroke()
+    }
+  },
+  panTo: (wx, wy, opts) => {
+    const px = pxPerYear.value
+    const ls = laneScale.value
+    const ntx = stageW.value / 2 - wx * ls
+    const nty = stageH.value / 2 - ((wy - layout.value.minYear) * px + Y_PAD)
+    if (opts?.smooth) {
+      tweenTo(px, ls, ntx, nty, 260)
+    } else {
+      cancelTween()
+      const c = clampVals(px, ls, ntx, nty)
+      tx.value = c.x
+      ty.value = c.y
+      syncCamera()
+    }
+  }
 }
 
 function clampVals(px, ls, x, y) {
@@ -591,6 +661,25 @@ function fitAll(animate = false) {
     syncCamera()
   }
 }
+
+// ── Image export ────────────────────────────────────────────────────────────
+// Capture the whole timeline, fit-all, at the requested pixel size (mirrors
+// fitAll() but against the export dimensions instead of the stage).
+function exportImage({ width, height, light = null }) {
+  const L = layout.value
+  if (!renderer || !L.people.length) return null
+  const px = Math.min(MAX_PX, Math.max(MIN_PX, (height - 160) / L.yearSpan))
+  const ls = Math.min(1, Math.max(MIN_LS, (width - GUTTER - 100) / L.worldWBase))
+  const cam = {
+    px,
+    ls,
+    tx: GUTTER + Math.max(20, (width - GUTTER - L.worldWBase * ls) / 2),
+    ty: Math.max(40, (height - (L.yearSpan * px + Y_PAD * 2)) / 2)
+  }
+  return renderer.exportFrame({ width, height, camera2: cam, light })
+}
+
+defineExpose({ exportImage })
 
 // ── Marriage year editing ───────────────────────────────────────────────────
 function trunc(s, n) {
@@ -795,6 +884,12 @@ onBeforeUnmount(() => {
 }
 
 /* ── Floating search (tree-view style) ───────────────────── */
+/* Minimap sits past the year-axis gutter so it never hides the year labels
+   (compound selector so it outweighs the MiniMap's own base styles) */
+.mini-map.tl-minimap {
+  left: 78px;
+}
+
 .tl-search {
   position: absolute;
   top: 14px;

@@ -12,6 +12,7 @@ import {
   migrateGraphStateToScenes,
   nowStr
 } from '../../../../shared/dbCore'
+import { PUBLIC_CHANNELS, resolveSession, unwrapRequest } from '../../../../shared/auth'
 
 // Browser-local backend: the same shared data core the Electron main process
 // runs (src/shared/dbCore.ts), persisted to IndexedDB instead of a file on
@@ -139,8 +140,9 @@ async function imageBytes(filePath: string): Promise<Uint8Array> {
 
 // ── The backend ──────────────────────────────────────────────────────────────
 export const localBackend: ApiBackend = {
-  async invoke(channel, data) {
+  async invoke(channel, raw) {
     try {
+      const { token, data } = unwrapRequest(raw)
       if (channel === 'images:openDialog') {
         return { success: true, data: await pickImageAsDataUrl() }
       }
@@ -152,7 +154,13 @@ export const localBackend: ApiBackend = {
       const handler = channelHandlers[channel]
       if (!handler) return { success: false, error: `Unknown channel: ${channel}` }
       const db = await getLocalDB()
-      const result = handler(db, data, env)
+      // The same auth middleware the Electron shell (and later the server)
+      // runs: token → user, and non-public channels require a live session.
+      const ctx = { user: resolveSession(db, token, nowStr()), token }
+      if (!ctx.user && !PUBLIC_CHANNELS.has(channel)) {
+        return { success: false, error: 'Not signed in' }
+      }
+      const result = await handler(db, data, env, ctx)
       if (WRITE_CHANNELS.has(channel)) void persist(db)
       return { success: true, data: result }
     } catch (err) {

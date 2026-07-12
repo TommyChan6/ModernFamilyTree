@@ -44,6 +44,41 @@ composable.
 | ⚡ Organic | `organic` | D3 force-directed layout (`forceLink`, `forceManyBody`, `forceCenter`, `forceCollide`). Dragging perturbs the simulation. |
 | 📅 Birth | `birth` | Y position is fixed by birth date (older = higher); X is free to drag. Draws year guide lines and a "Present" line. See [`layoutAge.js`](../src/renderer/src/components/graph/layoutAge.js). |
 | 🏛 Generations | `generations` | Hierarchical top-down layout computed from parent/child + spouse relationships. Nodes snap to generation rows; dragging between rows previews and creates new rows. See [`familyTreeLayout.ts`](../src/renderer/src/components/graph/familyTreeLayout.ts). |
+| 🪐 Space | `space` | **Experimental (Labs).** The graph in 3D — see [Space (3D)](#space-3d) below. |
+
+## Space (3D) {#space-3d}
+
+The experimental fifth type turns the graph into a perspective 3D scene. It is
+double-gated: the program mode must be **Advanced** AND the **🧪 Labs** toggle in
+the topbar must be on (`caps.space3d` in the store — `caps.labs` shows the toggle
+itself). With the gate off, a `space` scene degrades to Free over the same
+positions, so nothing is ever lost.
+
+- **Ownership split.** [`Graph3DView.vue`](../src/renderer/src/components/Graph3DView.vue)
+  mounts over the (hidden) 2D canvases and takes over the stage AND the scene's
+  working copy — GraphCanvas's snapshot machinery stands down while a space scene
+  is active and calls `writeBack()` on the 3D view before any scene/type/project
+  transition. Positions persist in the scene's normal `positions` map in the 2D
+  convention (y-down) **plus `z`**, converted through a pivot
+  ([`layout3D.js`](../src/renderer/src/components/graph/graph3d/layout3D.js) —
+  pure and unit-tested in `tests/graph3dMath.test.js`); camera + toggles live in
+  `config.space`. Switching types carries the arrangement both ways.
+- **Simulation.** `d3-force-3d` (the n-dimensional generalization of d3-force)
+  runs the same link/charge/center/collide recipe in the view component, exactly
+  mirroring the 2D Organic setup.
+- **Rendering.** [`Graph3DRenderer.js`](../src/renderer/src/components/graph/graph3d/Graph3DRenderer.js):
+  instanced camera-facing avatar discs (same visual identity as 2D, plus depth
+  fog, drawn back-to-front for correct translucency), instanced billboarded link
+  ribbons with world-unit dashes and arrowheads, a deterministic starfield, and a
+  projected-label overlay canvas. Frames are on-demand; idles at 0% CPU.
+- **Controls.** Standard 3D-app conventions via Three's OrbitControls (left-drag
+  orbit, right-drag pan, wheel dolly, inertial damping) plus node dragging in a
+  camera-parallel plane, click select, double-click fly-to, `F` fit, `R`
+  auto-rotate, `G` generation layers, `?` help. A hints card (auto-shown once,
+  `space3dHintSeen` global setting) documents all of it.
+- **Generation layers.** Toggling ≡ tweens every person onto a horizontal layer
+  per generation (oldest on top, translucent discs + captions), then relaxes
+  x/z with y pinned — the 3D cousin of the Generations type.
 
 Layout math lives in **pure functions** (`computeAgeYPositions`, `computeGenLayout`)
 that take data and dimensions and return target positions — no D3, no store, so they

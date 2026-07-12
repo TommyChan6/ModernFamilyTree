@@ -14,17 +14,36 @@
 //   images:bytes      — fs read vs fetch of a data: URL
 
 import type {
+  AuthCtx,
   DB,
   EntityTag,
   Env,
   ImageRecord,
   Person,
   Project,
+  PublicUser,
   Relationship,
   Scene,
   SceneTag,
-  Tag
+  Session,
+  Tag,
+  UsageInfo,
+  User
 } from './types'
+import {
+  SESSION_DAYS,
+  addDays,
+  clearFailedLogins,
+  generateSessionToken,
+  hashPassword,
+  isLockedOut,
+  limitsFor,
+  pruneSessions,
+  recordFailedLogin,
+  validatePassword,
+  validateUsername,
+  verifyPassword
+} from './auth'
 
 /** The pre-overhaul faction shape — consumed only by migrateFactionsToTags. */
 interface LegacyFaction {
@@ -59,6 +78,8 @@ function primaryImageOf(db: DB, personId: string): string | null {
 }
 
 export const EMPTY_DB = (): DB => ({
+  users: {},
+  sessions: {},
   projects: {},
   activeProjectId: null,
   persons: {},
@@ -519,23 +540,170 @@ export function createInitialDB(env: Env): DB {
   return db
 }
 
+// ── Auth helpers ──────────────────────────────────────────────────────────────
+
+function publicUser(u: User): PublicUser {
+  return { id: u.id, username: u.username, plan: u.plan, created_at: u.created_at }
+}
+
+/** All projects the user owns. Handlers scope everything else through the
+ *  active project, so project ownership is the enforcement point. */
+function projectsOf(db: DB, userId: string): Project[] {
+  return Object.values(db.projects).filter((p) => p.user_id === userId)
+}
+
+function usageOf(db: DB, user: User): UsageInfo {
+  const owned = new Set(projectsOf(db, user.id).map((p) => p.id))
+  const limits = limitsFor(user)
+  return {
+    projects: owned.size,
+    maxProjects: limits.maxProjects,
+    persons: Object.values(db.persons).filter((p) => owned.has(p.project_id)).length,
+    maxPersons: limits.maxPersons,
+    images: Object.values(db.images).filter((img) => owned.has(img.project_id)).length,
+    maxImages: limits.maxImages
+  }
+}
+
+/** Point activeProjectId at a project the user owns, creating (and seeding)
+ *  one when they own none — every signed-in user always has a project. */
+function ensureActiveProjectFor(db: DB, user: User, env: Env): void {
+  const active = db.activeProjectId ? db.projects[db.activeProjectId] : null
+  if (active && active.user_id === user.id) return
+  let target = projectsOf(db, user.id)[0]
+  if (!target) {
+    const id = env.uuid()
+    const now = env.nowStr()
+    target = { id, name: 'Unnamed Project', user_id: user.id, created_at: now, updated_at: now }
+    db.projects[id] = target
+    seedSampleData(db, id, env)
+  }
+  db.activeProjectId = target.id
+}
+
+function startSession(db: DB, user: User, env: Env): Session {
+  const now = env.nowStr()
+  const session: Session = {
+    token: generateSessionToken(),
+    user_id: user.id,
+    created_at: now,
+    expires_at: addDays(now, SESSION_DAYS)
+  }
+  db.sessions[session.token] = session
+  return session
+}
+
 // ── Channel handlers ─────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Handler = (db: DB, data: any, env: Env) => unknown
+type Handler = (db: DB, data: any, env: Env, ctx?: AuthCtx) => unknown
 
 export const channelHandlers: Record<string, Handler> = {
-  // ── projects ───────────────────────────────────────────────────────────────
-  'projects:getAll'(db) {
-    return { projects: sortByDate(Object.values(db.projects)), activeProjectId: db.activeProjectId }
+  // ── auth ───────────────────────────────────────────────────────────────────
+  // These mirror what the hosted server will expose: register/login hand back
+  // a bearer token, session validates it, logout revokes it. Handlers never
+  // return credential material, and login failures stay deliberately vague.
+  async 'auth:register'(db, data, env) {
+    const username = String(data?.username ?? '').trim()
+    const password = String(data?.password ?? '')
+    const usernameError = validateUsername(username)
+    if (usernameError) throw new Error(usernameError)
+    const passwordError = validatePassword(password)
+    if (passwordError) throw new Error(passwordError)
+    if (!data?.acceptedTerms) throw new Error('Please accept the Terms & Privacy Policy')
+    const lower = username.toLowerCase()
+    if (Object.values(db.users).some((u) => u.username_lower === lower)) {
+      throw new Error('That username is already taken')
+    }
+
+    const now = env.nowStr()
+    const user: User = {
+      id: env.uuid(),
+      username,
+      username_lower: lower,
+      ...(await hashPassword(password)),
+      plan: 'free',
+      tos_accepted_at: now,
+      failed_logins: 0,
+      locked_until: null,
+      created_at: now
+    }
+    const firstUser = Object.keys(db.users).length === 0
+    db.users[user.id] = user
+
+    // The first account adopts the projects made before accounts existed, so
+    // nobody's existing data is orphaned by the update. Later accounts start
+    // with their own (seeded) project via ensureActiveProjectFor.
+    if (firstUser) {
+      for (const p of Object.values(db.projects)) {
+        if (p.user_id == null) p.user_id = user.id
+      }
+    }
+    ensureActiveProjectFor(db, user, env)
+    pruneSessions(db, now)
+    const session = startSession(db, user, env)
+    return { user: publicUser(user), token: session.token, expires_at: session.expires_at }
   },
 
-  'projects:create'(db, data, env) {
+  async 'auth:login'(db, data, env) {
+    const username = String(data?.username ?? '')
+      .trim()
+      .toLowerCase()
+    const password = String(data?.password ?? '')
+    const now = env.nowStr()
+    const user = Object.values(db.users).find((u) => u.username_lower === username)
+    if (!user) throw new Error('Invalid username or password')
+    if (isLockedOut(user, now)) {
+      throw new Error('Too many failed attempts — try again in a few minutes')
+    }
+    const ok = await verifyPassword(password, user)
+    if (!ok) {
+      recordFailedLogin(user, now)
+      throw new Error('Invalid username or password')
+    }
+    clearFailedLogins(user)
+    ensureActiveProjectFor(db, user, env)
+    pruneSessions(db, now)
+    const session = startSession(db, user, env)
+    return { user: publicUser(user), token: session.token, expires_at: session.expires_at }
+  },
+
+  'auth:logout'(db, _data, _env, ctx) {
+    if (ctx?.token) delete db.sessions[ctx.token]
+    return { ok: true }
+  },
+
+  // Validates the stored token on startup and hands back the account + usage.
+  'auth:session'(db, _data, env, ctx) {
+    if (!ctx?.user) throw new Error('Not signed in')
+    ensureActiveProjectFor(db, ctx.user, env)
+    return { user: publicUser(ctx.user), usage: usageOf(db, ctx.user) }
+  },
+
+  'auth:usage'(db, _data, _env, ctx) {
+    if (!ctx?.user) throw new Error('Not signed in')
+    return usageOf(db, ctx.user)
+  },
+
+  // ── projects ───────────────────────────────────────────────────────────────
+  'projects:getAll'(db, _data, _env, ctx) {
+    const list = ctx?.user ? projectsOf(db, ctx.user.id) : Object.values(db.projects)
+    return { projects: sortByDate(list), activeProjectId: db.activeProjectId }
+  },
+
+  'projects:create'(db, data, env, ctx) {
+    if (ctx?.user) {
+      const limits = limitsFor(ctx.user)
+      if (projectsOf(db, ctx.user.id).length >= limits.maxProjects) {
+        throw new Error(`Free plan limit reached: ${limits.maxProjects} projects`)
+      }
+    }
     const id = env.uuid()
     const now = env.nowStr()
     const project: Project = {
       id,
       name: data?.name || 'Unnamed Project',
+      user_id: ctx?.user?.id ?? null,
       created_at: now,
       updated_at: now
     }
@@ -543,16 +711,20 @@ export const channelHandlers: Record<string, Handler> = {
     return project
   },
 
-  'projects:rename'(db, data, env) {
+  'projects:rename'(db, data, env, ctx) {
     const project = db.projects[data.id]
     if (!project) throw new Error('Project not found')
+    if (ctx?.user && project.user_id !== ctx.user.id) throw new Error('Project not found')
     project.name = data.name
     project.updated_at = env.nowStr()
     return project
   },
 
-  'projects:delete'(db, data, env) {
+  'projects:delete'(db, data, env, ctx) {
     const pid = data.id
+    if (ctx?.user && db.projects[pid] && db.projects[pid].user_id !== ctx.user.id) {
+      throw new Error('Project not found')
+    }
     // Remove all persons, relationships, tags (+joins), factions, scenarios,
     // images for this project
     for (const [id, p] of Object.entries(db.persons)) {
@@ -588,16 +760,22 @@ export const channelHandlers: Record<string, Handler> = {
     }
     delete db.projects[pid]
 
-    // Switch active to another project if needed
+    // Switch active to another project if needed (never to another user's)
     if (db.activeProjectId === pid) {
-      const remaining = Object.keys(db.projects)
+      const remaining = ctx?.user
+        ? projectsOf(db, ctx.user.id).map((p) => p.id)
+        : Object.keys(db.projects)
       db.activeProjectId = remaining.length > 0 ? remaining[0] : null
     }
     return { id: pid, newActiveProjectId: db.activeProjectId }
   },
 
-  'projects:setActive'(db, data) {
-    if (!db.projects[data.id]) throw new Error('Project not found')
+  'projects:setActive'(db, data, _env, ctx) {
+    const project = db.projects[data.id]
+    if (!project) throw new Error('Project not found')
+    // Ownership is enforced like a server would: someone else's project id is
+    // indistinguishable from a nonexistent one.
+    if (ctx?.user && project.user_id !== ctx.user.id) throw new Error('Project not found')
     db.activeProjectId = data.id
     return { activeProjectId: data.id }
   },
@@ -608,7 +786,13 @@ export const channelHandlers: Record<string, Handler> = {
     return list.map((p) => ({ ...p, primary_image: primaryImageOf(db, p.id) }))
   },
 
-  'persons:create'(db, data, env) {
+  'persons:create'(db, data, env, ctx) {
+    if (ctx?.user) {
+      const usage = usageOf(db, ctx.user)
+      if (usage.persons >= usage.maxPersons) {
+        throw new Error(`Free plan limit reached: ${usage.maxPersons} people`)
+      }
+    }
     const id = env.uuid()
     const now = env.nowStr()
     const person: Person = {
@@ -923,7 +1107,13 @@ export const channelHandlers: Record<string, Handler> = {
     return rows
   },
 
-  'images:add'(db, data, env) {
+  'images:add'(db, data, env, ctx) {
+    if (ctx?.user) {
+      const usage = usageOf(db, ctx.user)
+      if (usage.images >= usage.maxImages) {
+        throw new Error(`Free plan limit reached: ${usage.maxImages} photos`)
+      }
+    }
     const { personId, srcPath, isPrimary } = data
     const filePath = env.storeImageFile(srcPath)
     if (isPrimary) {
@@ -1045,6 +1235,10 @@ export const channelHandlers: Record<string, Handler> = {
 
 /** Channels that mutate the DB — the shell persists after handling one. */
 export const WRITE_CHANNELS = new Set([
+  'auth:register',
+  'auth:login',
+  'auth:logout',
+  'auth:session', // may repair activeProjectId on restore
   'projects:create',
   'projects:rename',
   'projects:delete',

@@ -46,6 +46,13 @@
       <button class="btn btn-ghost btn-sm" title="Jump to a person (Ctrl+K)" @click="openPalette">
         🔍 ⌘K
       </button>
+      <button
+        class="btn btn-ghost btn-sm"
+        title="Export an image of your tree"
+        @click="exportOpen = true"
+      >
+        🖼 Export
+      </button>
       <label class="mode-picker-wrap" title="Program mode — how much of the app is shown">
         <span class="mode-picker-label">Mode</span>
         <select
@@ -58,6 +65,22 @@
           <option value="advanced">Advanced</option>
         </select>
       </label>
+      <Transition name="labs">
+        <button
+          v-if="store.caps.labs"
+          class="labs-btn"
+          :class="{ 'labs-on': store.labsEnabled }"
+          :title="
+            store.labsEnabled
+              ? 'Labs is on — experimental features are available'
+              : 'Labs — switch on experimental features'
+          "
+          @click="store.setLabsEnabled(!store.labsEnabled)"
+        >
+          <span class="labs-flask">🧪</span>
+          <span class="labs-label">Labs</span>
+        </button>
+      </Transition>
       <button
         class="icon-btn"
         :title="store.theme === 'dark' ? 'Light mode' : 'Dark mode'"
@@ -65,6 +88,7 @@
       >
         {{ store.theme === 'dark' ? '☀' : '🌙' }}
       </button>
+      <AccountMenu v-if="store.authUser" />
     </header>
     <div class="workspace" :style="workspaceStyle">
       <IconRail />
@@ -88,6 +112,7 @@
         <Transition name="people-view">
           <TimelineView
             v-show="store.activeView === 'timeline'"
+            ref="timelineRef"
             :key="store.activeProjectId"
             :active="store.activeView === 'timeline'"
           />
@@ -95,6 +120,7 @@
         <Transition name="people-view">
           <FactionsView
             v-show="store.activeView === 'groups'"
+            ref="factionsRef"
             :key="store.activeProjectId"
             :active="store.activeView === 'groups'"
           />
@@ -115,6 +141,11 @@
     <PersonForm />
     <GraphSettings />
     <CommandPalette ref="paletteRef" />
+    <ExportModal :open="exportOpen" :capture="captureViewImage" @close="exportOpen = false" />
+    <!-- Sign-in gate: covers the workspace until a session exists -->
+    <Transition name="auth-gate">
+      <AuthGate v-if="store.authReady && !store.authUser" />
+    </Transition>
   </div>
 </template>
 
@@ -134,9 +165,15 @@ import RightDock from './components/RightDock.vue'
 import PersonModal from './components/PersonModal.vue'
 import PersonForm from './components/PersonForm.vue'
 import GraphSettings from './components/GraphSettings.vue'
+import AuthGate from './components/AuthGate.vue'
+import AccountMenu from './components/AccountMenu.vue'
+import ExportModal from './components/ExportModal.vue'
 
 const store = useMainStore()
 const graphRef = ref(null)
+const timelineRef = ref(null)
+const factionsRef = ref(null)
+const exportOpen = ref(false)
 const paletteRef = ref(null)
 const renameInputRef = ref(null)
 const renamingId = ref(null)
@@ -145,6 +182,14 @@ const dockCollapsed = ref(false)
 
 function openPalette() {
   paletteRef.value?.show?.()
+}
+
+// Image export: hand the modal a capture function so it can render any of the
+// WebGL views (they all stay mounted) offscreen at the requested size.
+function captureViewImage(view, opts) {
+  const target =
+    view === 'graph' ? graphRef.value : view === 'timeline' ? timelineRef.value : factionsRef.value
+  return target?.exportImage?.(opts) ?? null
 }
 
 // ── Save model: everything autosaves; Save commits a checkpoint you can
@@ -292,10 +337,18 @@ onMounted(async () => {
   if (globalRes.success && globalRes.data.programMode) {
     store.setProgramMode(globalRes.data.programMode)
   }
+  if (globalRes.success) {
+    store.labsEnabled = globalRes.data.labsEnabled === 'on'
+    store.spaceHintSeen = globalRes.data.space3dHintSeen === 'yes'
+  }
 
-  // Load projects first, then data
-  await store.loadProjects()
-  await store.loadAll()
+  // Data loads only behind a session; without one the AuthGate takes over and
+  // login/register do the loading themselves after they succeed.
+  const restored = await store.restoreSession()
+  if (restored) {
+    await store.loadProjects()
+    await store.loadAll()
+  }
 
   // Exit-dialog hooks for the Electron main process (src/main/index.js)
   window.__hasUnsavedChanges = () => store.hasUnsavedChanges
@@ -540,6 +593,66 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
+/* Labs (experimental features) toggle — Advanced mode only */
+.labs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--elevated);
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.3s ease;
+}
+.labs-btn:hover {
+  color: var(--t1);
+  background: var(--hover);
+}
+.labs-btn.labs-on {
+  color: var(--accent);
+  border-color: rgba(108, 142, 245, 0.45);
+  background: var(--adim);
+  box-shadow: 0 0 10px rgba(108, 142, 245, 0.25);
+}
+.labs-btn.labs-on .labs-flask {
+  animation: labs-bubble 0.5s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.labs-flask {
+  font-size: 13px;
+  line-height: 1;
+}
+@keyframes labs-bubble {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.35) rotate(-12deg);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.labs-enter-active,
+.labs-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.25s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+.labs-enter-from,
+.labs-leave-to {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
 .workspace {
   flex: 1 1 0;
   display: grid;
@@ -607,5 +720,22 @@ onUnmounted(() => {
 .resize-handle:active {
   background: var(--accent);
   opacity: 0.4;
+}
+
+/* Sign-in gate dissolve: the workspace is revealed as the gate fades away */
+.auth-gate-leave-active {
+  transition:
+    opacity 0.45s ease,
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.auth-gate-leave-to {
+  opacity: 0;
+  transform: scale(1.04);
+}
+.auth-gate-enter-active {
+  transition: opacity 0.25s ease;
+}
+.auth-gate-enter-from {
+  opacity: 0;
 }
 </style>

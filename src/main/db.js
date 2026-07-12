@@ -47,6 +47,8 @@ export function initDB() {
   if (migrateScenariosToScenes(_db)) save()
 
   // Migration: ensure all tables exist
+  _db.users = _db.users || {}
+  _db.sessions = _db.sessions || {}
   _db.projects = _db.projects || {}
   _db.persons = _db.persons || {}
   _db.relationships = _db.relationships || {}

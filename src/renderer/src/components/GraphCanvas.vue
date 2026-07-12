@@ -5,19 +5,60 @@
     @dragover.prevent="onDirectoryDragOver"
     @drop.prevent="onDirectoryDrop"
   >
-    <canvas ref="glCanvasEl" class="graph-gl"></canvas>
-    <canvas ref="overlayEl" class="graph-overlay"></canvas>
+    <canvas v-show="!spaceActive" ref="glCanvasEl" class="graph-gl"></canvas>
+    <canvas v-show="!spaceActive" ref="overlayEl" class="graph-overlay"></canvas>
+    <!-- Experimental Space (3D) type takes over the stage; the 2D canvases keep
+         their state hidden underneath, like the graph itself does across views -->
+    <Graph3DView
+      v-if="spaceActive"
+      :key="activeSceneId + ':' + reloadTick"
+      ref="graph3dRef"
+      :scene-id="activeSceneId"
+      :working="spaceWorking"
+      :search-query="searchQuery"
+      @persist="(id) => schedulePersist(id || activeSceneId)"
+    />
     <div class="graph-search" :class="{ 'clean-hide-up': store.cleanView }">
       <span class="search-icon">🔍</span>
       <input v-model="searchQuery" placeholder="Search family members…" @input="highlightSearch" />
     </div>
+    <MiniMap
+      v-if="!spaceActive && store.persons.length"
+      ref="minimapRef"
+      :adapter="minimapAdapter"
+      :class="{ 'clean-hide-left': store.cleanView }"
+    />
     <div class="bottom-bars" :class="{ 'clean-hide-down': store.cleanView }">
       <div class="graph-controls">
-        <button class="ctrl-btn" title="Zoom in" @click="zoomIn">＋</button>
-        <button class="ctrl-btn" title="Zoom out" @click="zoomOut">－</button>
+        <button
+          class="ctrl-btn"
+          title="Zoom in"
+          @click="spaceActive ? graph3dRef?.dollyIn() : zoomIn()"
+        >
+          ＋
+        </button>
+        <button
+          class="ctrl-btn"
+          title="Zoom out"
+          @click="spaceActive ? graph3dRef?.dollyOut() : zoomOut()"
+        >
+          －
+        </button>
         <div class="ctrl-sep"></div>
-        <button class="ctrl-btn" title="Fit all" @click="fitAll">⊡</button>
-        <button class="ctrl-btn" title="Reset view" @click="resetZoom">⊕</button>
+        <button
+          class="ctrl-btn"
+          title="Fit all"
+          @click="spaceActive ? graph3dRef?.fitAll() : fitAll()"
+        >
+          ⊡
+        </button>
+        <button
+          class="ctrl-btn"
+          title="Reset view"
+          @click="spaceActive ? graph3dRef?.resetView() : resetZoom()"
+        >
+          ⊕
+        </button>
         <div class="ctrl-sep"></div>
         <button
           v-for="m in visibleModes"
@@ -34,7 +75,7 @@
           class="ctrl-btn ctrl-btn-refresh"
           :class="{ 'ctrl-btn-refreshing': refreshSpinning }"
           title="Refresh layout — re-run the family tree algorithm"
-          @click="refreshLayout"
+          @click="spaceActive ? graph3dRef?.refreshLayout() : refreshLayout()"
         >
           <span class="refresh-icon">⟳</span>
         </button>
@@ -55,9 +96,35 @@
         >
           {{ store.lockLines ? '🔒' : '🔗' }}
         </button>
+        <template v-if="spaceActive">
+          <div class="ctrl-sep"></div>
+          <button
+            class="ctrl-btn"
+            :class="{ 'ctrl-btn-active': graph3dRef?.autoRotateOn }"
+            title="Auto-rotate (R)"
+            @click="graph3dRef?.toggleAutoRotate()"
+          >
+            🌀
+          </button>
+          <button
+            class="ctrl-btn"
+            :class="{ 'ctrl-btn-active': graph3dRef?.layeredOn }"
+            title="Generation layers (G)"
+            @click="graph3dRef?.toggleLayers()"
+          >
+            ≡
+          </button>
+          <button
+            class="ctrl-btn ctrl-btn-help"
+            title="How to navigate in 3D (?)"
+            @click="graph3dRef?.openHelp()"
+          >
+            ?
+          </button>
+        </template>
         <div class="ctrl-sep"></div>
         <button
-          v-if="store.caps.focus"
+          v-if="store.caps.focus && !spaceActive"
           class="ctrl-btn"
           :class="{ 'ctrl-btn-active': focusOpen }"
           title="Focus"
@@ -120,7 +187,7 @@
     </button>
     <!-- Highlights (Focus) popover, toggled from the tool pill -->
     <div
-      v-if="focusOpen && store.caps.focus"
+      v-if="focusOpen && store.caps.focus && !spaceActive"
       class="highlights-panel"
       :class="{ 'clean-hide-right': store.cleanView }"
     >
@@ -268,8 +335,12 @@ import {
 } from './graph/guideLines.js'
 import { useGraphAnimation } from './graph/useGraphAnimation.js'
 import { WebGLGraphRenderer } from './graph/webgl/WebGLGraphRenderer.js'
-import { screenToWorld } from './graph/webgl/coords.js'
+import { screenToWorld, nodesExtent, fitExtent } from './graph/webgl/coords.js'
+import { viewRectXYK } from './webgl/minimapMath'
+import { withAlpha } from './webgl/overlayUtils.js'
 import SceneTabs from './SceneTabs.vue'
+import Graph3DView from './Graph3DView.vue'
+import MiniMap from './MiniMap.vue'
 
 const store = useMainStore()
 const glCanvasEl = ref(null)
@@ -284,28 +355,62 @@ const modes = [
   { id: 'custom', label: '✋ Free', title: 'Free — nodes stay where you put them' },
   { id: 'auto', label: '⚡ Organic', title: 'Organic — force-directed layout' },
   { id: 'age', label: '📅 Birth', title: 'Birth — vertical position by birth date' },
-  { id: 'generation', label: '🏛 Generations', title: 'Generations — top-down hierarchy' }
+  { id: 'generation', label: '🏛 Generations', title: 'Generations — top-down hierarchy' },
+  { id: 'space', label: '🪐 Space', title: 'Space — experimental 3D layout (Labs)' }
 ]
 
-// Program-mode gating: Simple offers the Organic type only
-const visibleModes = computed(() =>
-  store.caps.typePicker ? modes : modes.filter((m) => m.id === 'auto')
-)
+// Program-mode gating: Simple offers the Organic type only; the experimental
+// Space type additionally needs Advanced mode + the Labs toggle (caps.space3d).
+const visibleModes = computed(() => {
+  if (!store.caps.typePicker) return modes.filter((m) => m.id === 'auto')
+  return store.caps.space3d ? modes : modes.filter((m) => m.id !== 'space')
+})
 
 // ── Scenes ──────────────────────────────────────────────────────────────────
 // The graph runs off view:'graph' Scenes: each carries a layout *type*
 // (free/organic/birth/generations) plus its node positions and config. The
 // interaction code below still thinks in the legacy internal mode ids, so map
 // scene types onto them (labels get their user-facing rename in Phase 7).
-const MODE_TO_TYPE = { custom: 'free', auto: 'organic', age: 'birth', generation: 'generations' }
-const TYPE_TO_MODE = { free: 'custom', organic: 'auto', birth: 'age', generations: 'generation' }
+const MODE_TO_TYPE = {
+  custom: 'free',
+  auto: 'organic',
+  age: 'birth',
+  generation: 'generations',
+  space: 'space'
+}
+const TYPE_TO_MODE = {
+  free: 'custom',
+  organic: 'auto',
+  birth: 'age',
+  generations: 'generation',
+  space: 'space'
+}
 
 const graphScenes = computed(() => store.graphScenes)
 const activeSceneId = computed(() => store.activeSceneIds.graph)
 const activeScene = computed(
   () => graphScenes.value.find((s) => s.id === activeSceneId.value) || null
 )
-const currentMode = computed(() => TYPE_TO_MODE[activeScene.value?.type] || 'auto')
+const currentMode = computed(() => {
+  const mode = TYPE_TO_MODE[activeScene.value?.type] || 'auto'
+  // A 'space' scene degrades gracefully to Free when the experimental type is
+  // gated off (Labs off / not Advanced): same positions, no 3D.
+  if (mode === 'space' && !store.caps.space3d) return 'custom'
+  return mode
+})
+
+// ── Experimental Space (3D) handoff ─────────────────────────────────────────
+// While a space scene is active, Graph3DView owns the stage AND the working
+// copy: the 2D snapshot machinery stands down (see snapshotActiveScene).
+const spaceActive = computed(() => currentMode.value === 'space')
+const graph3dRef = ref(null)
+// Bumped by reloadScenes() (checkpoint revert) so the 3D view re-reads the
+// recreated working copy — the working Map itself is not reactive.
+const reloadTick = ref(0)
+const spaceWorking = computed(() => {
+  void reloadTick.value
+  return workingOf(activeSceneId.value)
+})
 
 // Live working copies of each scene's arrangement, mutated as the user drags
 // and persisted by Save Layout (Phase 5.4 turns this into autosave).
@@ -346,6 +451,49 @@ let hoverId = null // node currently hovered (for glow)
 let couplesHiSet = null // ids highlighted by the Marriage filter, or null
 
 const { cancelAnimation, animateToPositionsWithReset } = useGraphAnimation(ctx)
+
+// ── Minimap (top-left) ──────────────────────────────────────────────────────
+// Reads the hot ctx directly and pans by driving the shared d3.zoom behaviour,
+// so the camera transform stays the single source of truth.
+const minimapRef = ref(null)
+const minimapAdapter = {
+  getBounds: () => nodesExtent(ctx.nodesData),
+  getView: () => {
+    const el = ctx.containerRef
+    return viewRectXYK(ctx.transform, el?.clientWidth || 0, el?.clientHeight || 0)
+  },
+  drawContent: (g, proj, colors) => {
+    const sel = store.selectedPersonId
+    let selNode = null
+    g.fillStyle = withAlpha(colors.t2, 0.55)
+    for (const n of ctx.nodesData) {
+      if (n.id === sel) {
+        selNode = n
+        continue
+      }
+      g.fillRect(n.x * proj.sx + proj.ox - 1, n.y * proj.sy + proj.oy - 1, 2, 2)
+    }
+    if (selNode) {
+      g.fillStyle = colors.accent
+      g.beginPath()
+      g.arc(selNode.x * proj.sx + proj.ox, selNode.y * proj.sy + proj.oy, 2.5, 0, Math.PI * 2)
+      g.fill()
+    }
+  },
+  panTo: (wx, wy, opts) => {
+    const el = ctx.containerRef
+    if (!el || !ctx.zoomBehavior || !ctx.zoomSelection) return
+    const k = ctx.transform.k
+    const t = d3.zoomIdentity
+      .translate(el.clientWidth / 2 - wx * k, el.clientHeight / 2 - wy * k)
+      .scale(k)
+    if (opts?.smooth) {
+      ctx.zoomSelection.transition().duration(260).call(ctx.zoomBehavior.transform, t)
+    } else {
+      ctx.zoomSelection.interrupt().call(ctx.zoomBehavior.transform, t)
+    }
+  }
+}
 
 // ── Emphasis ────────────────────────────────────────────────────────────────
 function emphVisual() {
@@ -526,6 +674,9 @@ const relPopupStatus = computed(() =>
 // active scene's working copy. All the legacy per-mode snapshot entry points
 // funnel here — a scene has exactly one arrangement.
 function snapshotActiveScene() {
+  // In the Space (3D) type the 3D view owns the arrangement and writes the
+  // working copy itself — snapshotting the (stale) 2D nodes would clobber it.
+  if (currentMode.value === 'space') return
   const w = workingOf(activeSceneId.value)
   if (!w) return
   const snap = {}
@@ -577,6 +728,13 @@ function enterActiveScene() {
   activeEmphasis.value = w?.config?.emphasis || 'neutral'
   removeGuides(ctx)
   const mode = currentMode.value
+  if (mode === 'space') {
+    // Graph3DView (mounted by spaceActive) enters the scene itself; just make
+    // sure the hidden 2D stage is quiet.
+    ctx.simulation.stop()
+    removeCurrentYearLine(ctx)
+    return
+  }
   if (mode === 'auto') enterAutoMode()
   else if (mode === 'custom') enterCustomMode()
   else if (mode === 'age') enterAgeMode()
@@ -588,6 +746,7 @@ function enterActiveScene() {
 function switchScene(id) {
   if (id === activeSceneId.value) return
   cancelAnimation()
+  graph3dRef.value?.writeBack?.() // fold in a live 3D arrangement first
   if (ctx.nodesData.length) saveCurrentState()
   store.setActiveScene('graph', id)
   enterActiveScene()
@@ -596,11 +755,18 @@ function switchScene(id) {
 // New scene: keeps the current type and starts from the current positions
 // (the old "add state" behaviour).
 async function addScene() {
+  graph3dRef.value?.writeBack?.()
   if (ctx.nodesData.length) saveCurrentState()
   const snap = {}
-  ctx.nodesData.forEach((n) => {
-    snap[n.id] = { x: n.x, y: n.y }
-  })
+  if (spaceActive.value) {
+    // The 3D view's working copy is the truth for a space scene.
+    const w = workingOf(activeSceneId.value)
+    Object.assign(snap, JSON.parse(JSON.stringify(w?.positions || {})))
+  } else {
+    ctx.nodesData.forEach((n) => {
+      snap[n.id] = { x: n.x, y: n.y }
+    })
+  }
   const config = {}
   if (currentMode.value === 'generation') {
     config.genRowYValues = [...ctx.genRowYValues]
@@ -620,6 +786,7 @@ async function addScene() {
 async function duplicateActiveScene() {
   const id = activeSceneId.value
   if (!id) return
+  graph3dRef.value?.writeBack?.()
   saveCurrentState()
   await persistScene(id) // the copy must include unsaved working changes
   const res = await store.duplicateScene(id)
@@ -652,6 +819,7 @@ function ticked() {
   if (!ctx.renderer) return
   ctx.renderer.invalidatePicker()
   ctx.renderer.requestRedraw()
+  minimapRef.value?.redraw()
 }
 ctx.ticked = ticked
 ctx.requestRedraw = () => ctx.renderer?.requestRedraw()
@@ -828,6 +996,7 @@ function initGraph() {
     .on('zoom', (e) => {
       ctx.transform = { x: e.transform.x, y: e.transform.y, k: e.transform.k }
       ctx.renderer.setCamera(ctx.transform)
+      minimapRef.value?.redraw()
     })
   ctx.zoomSelection = d3.select(overlayEl.value)
   ctx.zoomSelection.call(ctx.zoomBehavior)
@@ -899,6 +1068,7 @@ function updateGraph() {
   if (currentMode.value === 'auto') ctx.simulation.alpha(hadNew ? 0.3 : 0.1).restart()
   recomputeCouplesSet()
   ctx.renderer.setData(ctx.nodesData, ctx.linksData)
+  minimapRef.value?.redraw()
 }
 
 // ── Interaction: zoom + node drag + hover + click ────────────────────────────
@@ -1118,12 +1288,22 @@ function switchMode(newMode) {
   const scene = activeScene.value
   if (!scene) return
   cancelAnimation()
+  // Leaving the 3D stage: fold its live arrangement into the working copy
+  // BEFORE the mode flips (the 2D entry below animates to these positions).
+  if (currentMode.value === 'space') graph3dRef.value?.writeBack?.()
   if (ctx.nodesData.length) saveCurrentState()
   removeGuides(ctx)
 
   const type = MODE_TO_TYPE[newMode]
   scene.type = type // optimistic — currentMode flips immediately
   store.saveScene({ id: scene.id, type })
+
+  if (newMode === 'space') {
+    // Graph3DView mounts via spaceActive and enters the scene itself.
+    ctx.simulation.stop()
+    removeCurrentYearLine(ctx)
+    return
+  }
 
   if (!ctx.nodesData.length) return
   ctx.activeSnapshot =
@@ -1486,6 +1666,7 @@ async function flushLayout() {
     persistTimer = null
     pendingPersistId = null
   }
+  graph3dRef.value?.writeBack?.() // live 3D arrangement → working copy
   if (ctx.nodesData.length) saveCurrentState()
   for (const sceneId of working.keys()) {
     await persistScene(sceneId)
@@ -1509,10 +1690,29 @@ async function initScenes() {
 async function reloadScenes() {
   cancelAnimation()
   working.clear()
+  reloadTick.value++ // remount an active 3D scene onto the reverted arrangement
   await initScenes()
 }
 
-defineExpose({ flushLayout, reloadScenes })
+// Capture the whole graph, fit-all, at the requested pixel size (for the image
+// export). Returns a fresh canvas or null when there is nothing to draw.
+function exportImage({ width, height, light = null }) {
+  if (!ctx.renderer || !ctx.nodesData.length) return null
+  const ext = nodesExtent(ctx.nodesData)
+  // Generous zoom-in cap: a small tree may fill a large poster (everything is
+  // drawn resolution-independently, so it stays crisp).
+  const maxK = Math.max(2, (2.5 * width) / 1200)
+  const t = fitExtent(ext.minX, ext.minY, ext.maxX, ext.maxY, width, height, 80, maxK)
+  return ctx.renderer.exportFrame({
+    width,
+    height,
+    transform: t,
+    light,
+    overlayOpts: ctx.renderer.hooks.overlayOpts()
+  })
+}
+
+defineExpose({ flushLayout, reloadScenes, exportImage })
 
 let scenesInitialized = false
 
@@ -1552,6 +1752,14 @@ watch(
 watch(
   () => store.selectedPersonId,
   () => markNodeStyles()
+)
+// Labs switched off (or mode dropped below Advanced) while a space scene is
+// open: re-enter it as its 2D fallback (Free over the same positions).
+watch(
+  () => store.caps.space3d,
+  (on) => {
+    if (!on && activeScene.value?.type === 'space') enterActiveScene()
+  }
 )
 watch(
   () => store.lockNodes,
@@ -1711,6 +1919,10 @@ watch(
   width: 1px;
   background: var(--border);
   margin: 3px 2px;
+}
+.ctrl-btn-help {
+  font-weight: 700;
+  font-size: 13px;
 }
 .ctrl-btn-refresh .refresh-icon {
   display: inline-block;
@@ -1917,6 +2129,13 @@ watch(
 }
 .clean-hide-right {
   transform: translateX(calc(100% + 30px));
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Compound selector so it outweighs the MiniMap's own base styles */
+.mini-map.clean-hide-left {
+  transform: translateX(calc(-100% - 30px));
   opacity: 0;
   pointer-events: none;
 }

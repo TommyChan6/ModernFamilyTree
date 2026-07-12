@@ -557,6 +557,93 @@ export class FactionsRenderer {
     if (this._tweening || entranceActive || this._ambient) this.requestRedraw()
   }
 
+  // ── Image export ────────────────────────────────────────────────────────────
+  // Render one fully-settled frame at an arbitrary size/camera and return it as
+  // a fresh canvas (GL zones/threads/nodes + the 2D overlay composited,
+  // transparent background). Synchronous resize→draw→readback→restore, so the
+  // live canvases never show the export frame. `light` temporarily flips the
+  // document theme for the capture (null = keep the current one).
+  exportFrame({ width, height, transform, light = null }) {
+    const doc = document.documentElement
+    const prevTheme = doc.dataset.theme
+    const isLight = prevTheme === 'light'
+    const wantLight = light == null ? isLight : light
+    const flip = wantLight !== isLight
+    const oldW = this.width || 1
+    const oldH = this.height || 1
+    const oldT = this.transform
+    const oldDpr = this.dpr
+    const uPR = this.nodes.material.uniforms.uPixelRatio
+    try {
+      if (flip) {
+        doc.dataset.theme = wantLight ? 'light' : 'dark'
+        this._css.invalidate()
+        this.nodes.setThemeUniforms(wantLight)
+      }
+      this.dpr = 1
+      this.renderer.setPixelRatio(1)
+      uPR.value = 1
+      this.renderer.setSize(width, height, false)
+      this.width = width
+      this.height = height
+      this.camera.right = width
+      this.camera.bottom = height
+      this.camera.updateProjectionMatrix()
+      this._overlayCanvas.width = width
+      this._overlayCanvas.height = height
+      this.transform = transform
+
+      // Snap every tween/entrance to its target so the capture is settled.
+      this._syncStyles()
+      for (const a of this._pAnim.values()) {
+        a.op = a.top
+        a.s = a.ts
+        a.start = null
+      }
+      for (const a of this._zAnim.values()) {
+        a.op = a.top
+        a.s = a.ts
+        a.fillA = a.tFillA
+        a.ringA = a.tRingA
+        a.ringW = a.tRingW
+        a.dropA = a.tDropA
+        a.ps = a.tps
+      }
+      this._entranceUntil = 0
+      this._writeBuffers()
+      this.atlas.flush()
+      this._drawOverlay()
+
+      this.world.matrix.compose(
+        new THREE.Vector3(transform.x, transform.y, 0),
+        new THREE.Quaternion(),
+        new THREE.Vector3(transform.k, transform.k, 1)
+      )
+      this.world.matrixWorldNeedsUpdate = true
+      this.renderer.render(this.scene, this.camera)
+
+      const out = document.createElement('canvas')
+      out.width = width
+      out.height = height
+      const g = out.getContext('2d')
+      g.drawImage(this._glCanvas, 0, 0, width, height)
+      g.drawImage(this._overlayCanvas, 0, 0, width, height)
+      return out
+    } finally {
+      if (flip) {
+        if (prevTheme == null) delete doc.dataset.theme
+        else doc.dataset.theme = prevTheme
+        this._css.invalidate()
+        this.nodes.setThemeUniforms(!wantLight)
+      }
+      this.dpr = oldDpr
+      this.renderer.setPixelRatio(oldDpr)
+      uPR.value = oldDpr
+      this.transform = oldT
+      this.resize(oldW, oldH) // restores GL + overlay canvases + schedules a live redraw
+    }
+  }
+
   dispose() {
     this.disposed = true
     this._glCanvas?.removeEventListener('webglcontextlost', this._onContextLost)

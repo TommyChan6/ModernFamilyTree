@@ -61,6 +61,9 @@
         </button>
       </div>
 
+      <!-- Minimap (top-left) -->
+      <MiniMap v-if="visibleFactions.length" ref="minimapRef" :adapter="minimapAdapter" />
+
       <!-- Zoom controls -->
       <div v-if="activeFactions.length" class="fx-controls" @pointerdown.stop @click.stop>
         <button class="fx-ctrl-btn" title="Zoom in" @click="zoomBy(1.3333)">＋</button>
@@ -271,7 +274,9 @@ import {
   membershipArcSpans
 } from './factions/factionLayout.js'
 import { FactionsRenderer } from './factions/webgl/FactionsRenderer.js'
+import { withAlpha } from './webgl/overlayUtils.js'
 import SceneTabs from './SceneTabs.vue'
+import MiniMap from './MiniMap.vue'
 
 const store = useMainStore()
 
@@ -311,6 +316,72 @@ const panning = ref(false)
 let renderer = null
 function syncCam() {
   renderer?.setCamera({ x: tx.value, y: ty.value, k: k.value })
+  minimapRef.value?.redraw()
+}
+
+// ── Minimap (top-left) ──────────────────────────────────────────────────────
+// Group rings draw as tinted discs in their own colour, members as small dots;
+// dragging the frame pans the same camera the stage gestures drive.
+const minimapRef = ref(null)
+const minimapAdapter = {
+  getBounds: () => {
+    const zones = zonesData()
+    if (!zones.length && !simNodes.length) return null
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity
+    for (const z of zones) {
+      minX = Math.min(minX, z.x - z.r)
+      minY = Math.min(minY, z.y - z.r)
+      maxX = Math.max(maxX, z.x + z.r)
+      maxY = Math.max(maxY, z.y + z.r)
+    }
+    for (const n of simNodes) {
+      minX = Math.min(minX, n.x)
+      minY = Math.min(minY, n.y)
+      maxX = Math.max(maxX, n.x)
+      maxY = Math.max(maxY, n.y)
+    }
+    return { minX, minY, maxX, maxY }
+  },
+  getView: () => ({
+    x: -tx.value / k.value,
+    y: -ty.value / k.value,
+    w: stageW.value / k.value,
+    h: stageH.value / k.value
+  }),
+  drawContent: (g, proj, colors) => {
+    for (const z of zonesData()) {
+      const mx = z.x * proj.sx + proj.ox
+      const my = z.y * proj.sy + proj.oy
+      const mr = Math.max(2, z.r * proj.sx)
+      g.beginPath()
+      g.arc(mx, my, mr, 0, Math.PI * 2)
+      g.fillStyle = withAlpha(z.color, 0.16)
+      g.fill()
+      g.strokeStyle = withAlpha(z.color, 0.55)
+      g.lineWidth = 1
+      g.stroke()
+    }
+    g.fillStyle = withAlpha(colors.t2, 0.7)
+    for (const n of simNodes) {
+      g.fillRect(n.x * proj.sx + proj.ox - 1, n.y * proj.sy + proj.oy - 1, 2, 2)
+    }
+  },
+  panTo: (wx, wy, opts) => {
+    const nk = k.value
+    const ntx = stageW.value / 2 - wx * nk
+    const nty = stageH.value / 2 - wy * nk
+    if (opts?.smooth) {
+      tweenView(nk, ntx, nty, 260)
+    } else {
+      cancelTween()
+      tx.value = ntx
+      ty.value = nty
+      syncCam()
+    }
+  }
 }
 
 // ── Interaction state ───────────────────────────────────────────────────────
@@ -359,6 +430,7 @@ let glideT0 = 0
 function repaint() {
   renderer?.markGeomDirty()
   renderer?.requestRedraw()
+  minimapRef.value?.redraw()
 }
 
 function startZoneTweens(entries) {
@@ -869,6 +941,45 @@ function fitAll(animate = false) {
     syncCam()
   }
 }
+
+// ── Image export ────────────────────────────────────────────────────────────
+// Capture the whole stage, fit-all, at the requested pixel size (mirrors
+// fitAll()'s zone bounds but against the export dimensions, with margins that
+// scale with the output instead of the on-screen clamp).
+function exportImage({ width, height, light = null }) {
+  const fs = visibleFactions.value
+  if (!renderer || (!fs.length && !simNodes.length)) return null
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity
+  for (const f of fs) {
+    const p = getZonePos(f)
+    const r = factionRadius((f.member_ids || []).length)
+    minX = Math.min(minX, p.x - r)
+    minY = Math.min(minY, p.y - r - 44) // room for the header pill
+    maxX = Math.max(maxX, p.x + r)
+    maxY = Math.max(maxY, p.y + r)
+  }
+  for (const n of simNodes) {
+    minX = Math.min(minX, n.x - 30)
+    minY = Math.min(minY, n.y - 30)
+    maxX = Math.max(maxX, n.x + 30)
+    maxY = Math.max(maxY, n.y + 40)
+  }
+  const w = Math.max(200, maxX - minX)
+  const h = Math.max(200, maxY - minY)
+  const maxK = Math.max(3, (2.5 * width) / 1200)
+  const nk = Math.max(0.02, Math.min(maxK, Math.min((width * 0.9) / w, (height * 0.9) / h)))
+  const transform = {
+    x: width / 2 - ((minX + maxX) / 2) * nk,
+    y: height / 2 - ((minY + maxY) / 2) * nk,
+    k: nk
+  }
+  return renderer.exportFrame({ width, height, transform, light })
+}
+
+defineExpose({ exportImage })
 
 // ── Faction ring dragging ───────────────────────────────────────────────────
 let zoneDrag = null
