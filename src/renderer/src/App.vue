@@ -155,6 +155,15 @@
     <Transition name="auth-gate">
       <AuthGate v-if="store.authReady && !store.authUser" />
     </Transition>
+    <!-- Cinematic loading curtain: sign in/out, project switch, open profile -->
+    <Transition name="curtain">
+      <TransitionCurtain
+        v-if="store.curtain.active"
+        :kind="store.curtain.kind"
+        :label="store.curtain.label"
+        :sub="store.curtain.sub"
+      />
+    </Transition>
   </div>
 </template>
 
@@ -180,6 +189,7 @@ import AccountMenu from './components/AccountMenu.vue'
 import ExportModal from './components/ExportModal.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import UserPage from './components/UserPage.vue'
+import TransitionCurtain from './components/TransitionCurtain.vue'
 import TimeSlider from './components/time/TimeSlider.vue'
 
 const store = useMainStore()
@@ -754,5 +764,25 @@ onUnmounted(() => {
 }
 .auth-gate-enter-from {
   opacity: 0;
+}
+
+/* Loading curtain: irises in, then lifts away to reveal what loaded behind it */
+.curtain-enter-active {
+  transition:
+    opacity 0.35s ease,
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.curtain-leave-active {
+  transition:
+    opacity 0.5s ease,
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.curtain-enter-from {
+  opacity: 0;
+  transform: scale(1.06);
+}
+.curtain-leave-to {
+  opacity: 0;
+  transform: scale(1.08);
 }
 </style>

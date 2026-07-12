@@ -37,6 +37,11 @@ export const useMainStore = defineStore('main', () => {
   const settingsOpen = ref(false) // graph "Style" side panel
   const appSettingsOpen = ref(false) // the app-wide Settings modal (language, help, feedback)
   const userPageOpen = ref(false) // the full-screen profile / account page
+  // Cinematic transition curtain: a full-screen animated overlay shown during
+  // sign in / out, project switches, and opening the profile. It doubles as a
+  // loading screen — `runWithCurtain` keeps it up for the work plus a minimum
+  // play time so the animation always completes. { active, kind, label, sub }.
+  const curtain = ref({ active: false, kind: 'login', label: '', sub: '' })
   // Display language. The i18n `locale` ref is the source of truth for
   // rendering; this store field mirrors it so components already wired to the
   // store stay reactive, and persistence flows through globalSettings.
@@ -237,6 +242,22 @@ export const useMainStore = defineStore('main', () => {
     return out
   })
 
+  // Run an async task behind the transition curtain. The curtain shows the
+  // given kind/label, stays up for at least `min` ms so the animation plays in
+  // full even on instant operations, and comes down once the work is done.
+  async function runWithCurtain(kind, label, task, opts = {}) {
+    const { min = 900, sub = '' } = opts
+    curtain.value = { active: true, kind, label, sub }
+    const started = Date.now()
+    try {
+      return await (typeof task === 'function' ? task() : task)
+    } finally {
+      const wait = Math.max(0, min - (Date.now() - started))
+      if (wait) await new Promise((r) => setTimeout(r, wait))
+      curtain.value = { ...curtain.value, active: false }
+    }
+  }
+
   // ── Account actions ───────────────────────────────────────────────────────
   // Auth mirrors the future hosted flow: register/login hand back a bearer
   // token the api seam then attaches to every request. After either succeeds
@@ -271,8 +292,18 @@ export const useMainStore = defineStore('main', () => {
     if (authUser.value?.plan === 'guest' && programMode.value === 'advanced') {
       programMode.value = 'standard'
     }
-    await loadProjects()
-    await loadAll()
+    const name = authUser.value?.display_name || authUser.value?.username
+    const welcome =
+      authUser.value?.plan === 'guest' ? 'Welcome, guest' : `Welcome${name ? ', ' + name : ''}`
+    await runWithCurtain(
+      'login',
+      welcome,
+      async () => {
+        await loadProjects()
+        await loadAll()
+      },
+      { min: 1200, sub: 'Growing your family tree…' }
+    )
     refreshUsage()
     return res
   }
@@ -290,28 +321,36 @@ export const useMainStore = defineStore('main', () => {
   }
 
   async function logout() {
-    await api.invoke('auth:logout')
-    clearSessionToken()
-    authUser.value = null
-    authUsage.value = null
-    // Drop everything owned by the account so the next sign-in starts clean
-    projects.value = []
-    activeProjectId.value = null
-    persons.value = []
-    relationships.value = []
-    tags.value = []
-    entityTags.value = []
-    scenes.value = []
-    sceneTags.value = []
-    activeSceneIds.value = { groups: null, graph: null, timeline: null }
-    selectedPersonId.value = null
-    modalOpen.value = false
-    formOpen.value = false
+    // Close the profile page first so it doesn't linger over the curtain.
     userPageOpen.value = false
-    editingPerson.value = null
-    relPopup.value = null
-    checkpoint.value = null
-    userCurrentYear.value = null
+    await runWithCurtain(
+      'logout',
+      'Signing out…',
+      async () => {
+        await api.invoke('auth:logout')
+        clearSessionToken()
+        authUser.value = null
+        authUsage.value = null
+        // Drop everything owned by the account so the next sign-in starts clean
+        projects.value = []
+        activeProjectId.value = null
+        persons.value = []
+        relationships.value = []
+        tags.value = []
+        entityTags.value = []
+        scenes.value = []
+        sceneTags.value = []
+        activeSceneIds.value = { groups: null, graph: null, timeline: null }
+        selectedPersonId.value = null
+        modalOpen.value = false
+        formOpen.value = false
+        editingPerson.value = null
+        relPopup.value = null
+        checkpoint.value = null
+        userCurrentYear.value = null
+      },
+      { min: 950, sub: 'See you soon' }
+    )
   }
 
   async function refreshUsage() {
@@ -378,19 +417,27 @@ export const useMainStore = defineStore('main', () => {
 
   async function switchProject(id) {
     if (id === activeProjectId.value) return
-    const res = await api.invoke('projects:setActive', { id })
-    if (res.success) {
-      activeProjectId.value = id
-      // Reset UI state
-      selectedPersonId.value = null
-      modalOpen.value = false
-      formOpen.value = false
-      editingPerson.value = null
-      relPopup.value = null
-      userCurrentYear.value = null // revert to auto; restored from the project's saved layout
-      // Reload data for new project
-      await loadAll()
-    }
+    const target = projects.value.find((p) => p.id === id)
+    await runWithCurtain(
+      'switch',
+      target?.name ? `Opening ${target.name}` : 'Switching project…',
+      async () => {
+        const res = await api.invoke('projects:setActive', { id })
+        if (res.success) {
+          activeProjectId.value = id
+          // Reset UI state
+          selectedPersonId.value = null
+          modalOpen.value = false
+          formOpen.value = false
+          editingPerson.value = null
+          relPopup.value = null
+          userCurrentYear.value = null // revert to auto; restored from the project's saved layout
+          // Reload data for new project
+          await loadAll()
+        }
+      },
+      { min: 850, sub: 'Loading people & relationships…' }
+    )
   }
 
   // ── Data actions ──────────────────────────────────────────────────────────
@@ -776,6 +823,21 @@ export const useMainStore = defineStore('main', () => {
     userPageOpen.value = typeof open === 'boolean' ? open : !userPageOpen.value
   }
 
+  // Open the profile page behind the curtain so the (brief) fetch of the
+  // per-project overview is hidden and the entrance feels deliberate.
+  function openUserPage() {
+    return runWithCurtain(
+      'profile',
+      'Your profile',
+      async () => {
+        userPageOpen.value = true
+        // Give the page a beat to mount and kick off its overview fetch.
+        await new Promise((r) => setTimeout(r, 80))
+      },
+      { min: 700, sub: 'Gathering your account…' }
+    )
+  }
+
   // Switch the display language app-wide and remember it. Guards against
   // unknown codes so a stale/garbage stored value can't wedge the UI.
   function setLanguage(code) {
@@ -866,6 +928,9 @@ export const useMainStore = defineStore('main', () => {
     settingsOpen,
     appSettingsOpen,
     userPageOpen,
+    curtain,
+    runWithCurtain,
+    openUserPage,
     language,
     graphSettings,
     lockNodes,

@@ -362,15 +362,17 @@ const usageRows = computed(() => {
 const overview = ref([])
 
 async function openProject(id) {
-  if (id !== store.activeProjectId) await store.switchProject(id)
+  // Close the page first so the switch curtain lifts onto the workspace,
+  // not onto a profile page that then animates away.
   close()
+  if (id !== store.activeProjectId) await store.switchProject(id)
 }
 
 async function newProject() {
   const project = await store.createProject()
   if (project) {
-    await store.switchProject(project.id)
     close()
+    await store.switchProject(project.id)
   }
 }
 

@@ -87,7 +87,7 @@ function toggle() {
 
 function openProfile() {
   open.value = false
-  store.toggleUserPage(true)
+  store.openUserPage()
 }
 
 function openLegal() {
