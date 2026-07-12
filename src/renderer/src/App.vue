@@ -43,26 +43,30 @@
         @import="handleImport"
       />
       <div class="topbar-spacer"></div>
-      <button class="btn btn-ghost btn-sm" title="Jump to a person (Ctrl+K)" @click="openPalette">
+      <button
+        class="btn btn-ghost btn-sm"
+        :title="t('topbar.search') + ' (Ctrl+K)'"
+        @click="openPalette"
+      >
         🔍 ⌘K
       </button>
       <button
         class="btn btn-ghost btn-sm"
-        title="Export an image of your tree"
+        :title="t('topbar.exportImage')"
         @click="exportOpen = true"
       >
-        🖼 Export
+        🖼 {{ t('topbar.export') }}
       </button>
-      <label class="mode-picker-wrap" title="Program mode — how much of the app is shown">
-        <span class="mode-picker-label">Mode</span>
+      <label class="mode-picker-wrap" :title="t('topbar.modeHint')">
+        <span class="mode-picker-label">{{ t('topbar.mode') }}</span>
         <select
           class="mode-picker"
           :value="store.programMode"
           @change="store.setProgramMode($event.target.value)"
         >
-          <option value="simple">Simple</option>
-          <option value="standard">Standard</option>
-          <option value="advanced">Advanced</option>
+          <option value="simple">{{ t('mode.simple') }}</option>
+          <option value="standard">{{ t('mode.standard') }}</option>
+          <option value="advanced">{{ t('mode.advanced') }}</option>
         </select>
       </label>
       <Transition name="labs">
@@ -70,23 +74,22 @@
           v-if="store.caps.labs"
           class="labs-btn"
           :class="{ 'labs-on': store.labsEnabled }"
-          :title="
-            store.labsEnabled
-              ? 'Labs is on — experimental features are available'
-              : 'Labs — switch on experimental features'
-          "
+          :title="store.labsEnabled ? t('topbar.labsOn') : t('topbar.labsOff')"
           @click="store.setLabsEnabled(!store.labsEnabled)"
         >
           <span class="labs-flask">🧪</span>
-          <span class="labs-label">Labs</span>
+          <span class="labs-label">{{ t('topbar.labs') }}</span>
         </button>
       </Transition>
       <button
         class="icon-btn"
-        :title="store.theme === 'dark' ? 'Light mode' : 'Dark mode'"
+        :title="store.theme === 'dark' ? t('topbar.lightMode') : t('topbar.darkMode')"
         @click="store.setTheme(store.theme === 'dark' ? 'light' : 'dark')"
       >
         {{ store.theme === 'dark' ? '☀' : '🌙' }}
+      </button>
+      <button class="icon-btn" :title="t('topbar.settingsHint')" @click="store.toggleAppSettings()">
+        ⚙
       </button>
       <AccountMenu v-if="store.authUser" />
     </header>
@@ -125,6 +128,8 @@
             :active="store.activeView === 'groups'"
           />
         </Transition>
+        <!-- Time Travel slider (graph + timeline views; decides its own visibility) -->
+        <TimeSlider />
       </div>
       <div
         v-if="!dockCollapsed"
@@ -142,6 +147,7 @@
     <GraphSettings />
     <CommandPalette ref="paletteRef" />
     <ExportModal :open="exportOpen" :capture="captureViewImage" @close="exportOpen = false" />
+    <SettingsModal />
     <!-- Sign-in gate: covers the workspace until a session exists -->
     <Transition name="auth-gate">
       <AuthGate v-if="store.authReady && !store.authUser" />
@@ -152,6 +158,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useMainStore } from './store/index.js'
+import { useI18n } from './i18n'
 import { api } from './api'
 import IconRail from './components/IconRail.vue'
 import ProjectMenu from './components/ProjectMenu.vue'
@@ -168,8 +175,11 @@ import GraphSettings from './components/GraphSettings.vue'
 import AuthGate from './components/AuthGate.vue'
 import AccountMenu from './components/AccountMenu.vue'
 import ExportModal from './components/ExportModal.vue'
+import SettingsModal from './components/SettingsModal.vue'
+import TimeSlider from './components/time/TimeSlider.vue'
 
 const store = useMainStore()
+const { t } = useI18n()
 const graphRef = ref(null)
 const timelineRef = ref(null)
 const factionsRef = ref(null)
@@ -336,6 +346,9 @@ onMounted(async () => {
   }
   if (globalRes.success && globalRes.data.programMode) {
     store.setProgramMode(globalRes.data.programMode)
+  }
+  if (globalRes.success && globalRes.data.language) {
+    store.setLanguage(globalRes.data.language)
   }
   if (globalRes.success) {
     store.labsEnabled = globalRes.data.labsEnabled === 'on'

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { api } from '../api'
 import { setSessionToken, clearSessionToken, getSessionToken } from '../api/session'
 import { latestDataYear } from './currentYear.js'
+import { locale, setLocale, isSupportedLocale } from '../i18n'
 
 export const useMainStore = defineStore('main', () => {
   // ── Account / session ─────────────────────────────────────────────────────
@@ -30,7 +31,12 @@ export const useMainStore = defineStore('main', () => {
   const formOpen = ref(false)
   const editingPerson = ref(null)
   const theme = ref('dark')
-  const settingsOpen = ref(false)
+  const settingsOpen = ref(false) // graph "Style" side panel
+  const appSettingsOpen = ref(false) // the app-wide Settings modal (language, help, feedback)
+  // Display language. The i18n `locale` ref is the source of truth for
+  // rendering; this store field mirrors it so components already wired to the
+  // store stay reactive, and persistence flows through globalSettings.
+  const language = ref(locale.value)
   const lockNodes = ref(false)
   const lockLines = ref(false)
   const relPopup = ref(null)
@@ -158,6 +164,9 @@ export const useMainStore = defineStore('main', () => {
       tags: m !== 'simple',
       /** The Labs toggle itself is an Advanced-mode affordance… */
       labs: m === 'advanced',
+      /** Extra Time Travel transport (speed / reverse / event skip / loop);
+       *  the slider itself is available in every mode. */
+      timeControls: m === 'advanced',
       /** …and the experimental Space (3D) graph type needs it switched on too. */
       space3d: m === 'advanced' && labsEnabled.value
     }
@@ -717,6 +726,19 @@ export const useMainStore = defineStore('main', () => {
     settingsOpen.value = !settingsOpen.value
   }
 
+  function toggleAppSettings(open) {
+    appSettingsOpen.value = typeof open === 'boolean' ? open : !appSettingsOpen.value
+  }
+
+  // Switch the display language app-wide and remember it. Guards against
+  // unknown codes so a stale/garbage stored value can't wedge the UI.
+  function setLanguage(code) {
+    if (!isSupportedLocale(code)) return
+    language.value = code
+    setLocale(code)
+    api.invoke('globalSettings:set', { key: 'language', value: code })
+  }
+
   // Set (or clear, with a falsy value) the explicit current year. Clearing
   // reverts to auto-tracking the latest year in the data. Persisted as its
   // own per-project setting.
@@ -791,6 +813,8 @@ export const useMainStore = defineStore('main', () => {
     editingPerson,
     theme,
     settingsOpen,
+    appSettingsOpen,
+    language,
     graphSettings,
     lockNodes,
     cleanView,
@@ -855,6 +879,8 @@ export const useMainStore = defineStore('main', () => {
     closeForm,
     setTheme,
     toggleSettings,
+    toggleAppSettings,
+    setLanguage,
     setCurrentYear,
     updateGraphSetting,
     resetGraphSettings,

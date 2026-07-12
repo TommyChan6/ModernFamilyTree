@@ -185,11 +185,13 @@ import {
   Y_PAD
 } from './timeline/timelineLayout.js'
 import { TimelineRenderer } from './timeline/TimelineRenderer.js'
+import { useTimeTravel } from './time/useTimeTravel'
 import { withAlpha } from './webgl/overlayUtils.js'
 import SceneTabs from './SceneTabs.vue'
 import MiniMap from './MiniMap.vue'
 
 const store = useMainStore()
+const tt = useTimeTravel()
 
 // ── Scenes (a single default scene for now; manual positions come later) ────
 async function addTimelineScene() {
@@ -352,14 +354,18 @@ const relatedSet = computed(() => {
 })
 
 // ── Per-item visual targets consumed (and tweened) by the renderer ──────────
+// Time travel: anything that appears after the scrubbed year fades to 0 (the
+// renderer tweens the change); lifeline *growth* up to the year is handled by
+// the renderer itself via the getTimeYear hook.
 function personVisual(p) {
   const hovered = hoverId.value === p.id
   const lit = searchOn.value && searchSet.value.has(p.id)
   const selected = store.selectedPersonId === p.id
+  const notYet = p.birthYear > tt.gateYear.value
   return {
-    opacity: isDimmed(p.id) ? 0.22 : 1,
+    opacity: notYet ? 0 : isDimmed(p.id) ? 0.22 : 1,
     lineWidth: hovered || lit || selected ? 9 : 6,
-    avatarScale: hovered ? 1.15 : 1,
+    avatarScale: notYet ? 0.6 : hovered ? 1.15 : 1,
     glow: hovered ? 0.5 : 0,
     selected,
     color: genderColor(p.gender),
@@ -368,7 +374,8 @@ function personVisual(p) {
 }
 
 function marriageVisual(m) {
-  const group = connDimmed(m.ids) ? 0.12 : 1
+  const notYet = m.year > tt.gateYear.value
+  const group = notYet ? 0 : connDimmed(m.ids) ? 0.12 : 1
   const lit = hoverId.value && m.ids.includes(hoverId.value)
   const base = m.estimated ? 0.35 : m.divorced ? 0.5 : 0.8
   const dash = m.estimated ? [2, 5] : m.divorced ? [6, 5] : [0, 0]
@@ -384,7 +391,8 @@ function marriageVisual(m) {
 }
 
 function birthVisual(b) {
-  const group = connDimmed(b.ids) ? 0.08 : 1
+  const notYet = b.year > tt.gateYear.value
+  const group = notYet ? 0 : connDimmed(b.ids) ? 0.08 : 1
   const lit = hoverId.value && b.ids.includes(hoverId.value)
   return {
     lineOpacity: (lit ? 0.95 : 0.55) * group,
@@ -562,7 +570,8 @@ function onStageMove(e) {
   const badge = renderer?.badgeAt(p.x, p.y) || null
   hoverBadge.value = badge ? badge.id : null
   renderer?.setHoverBadge(hoverBadge.value)
-  const person = badge ? null : renderer?.personAt(p.x, p.y)
+  let person = badge ? null : renderer?.personAt(p.x, p.y)
+  if (person && person.birthYear > tt.gateYear.value) person = null // hidden by Time travel
   const id = person ? person.id : null
   if (id !== hoverId.value) {
     hoverId.value = id
@@ -593,7 +602,7 @@ function onStageClick(e) {
     return
   }
   const person = renderer?.personAt(p.x, p.y)
-  if (person) {
+  if (person && person.birthYear <= tt.gateYear.value) {
     mEdit.value = null
     store.selectPerson(person.id)
     return
@@ -728,7 +737,8 @@ onMounted(() => {
       personVisual,
       marriageVisual,
       birthVisual,
-      getRefYear: () => refYear.value
+      getRefYear: () => refYear.value,
+      getTimeYear: () => tt.year.value // null = time travel off
     }
   })
   renderer.setTheme(store.theme === 'light')
@@ -782,6 +792,11 @@ watch(layout, (L) => {
   })
 })
 watch([hoverId, searchSet, () => store.selectedPersonId, colors], () => renderer?.markStylesDirty())
+// Time travel: re-sync per scrub/playback step while on screen; switching back
+// in re-syncs too (the view stays mounted, hidden, and time may have moved).
+watch([() => tt.year.value, () => props.active], ([, on]) => {
+  if (on) renderer?.markStylesDirty()
+})
 watch(
   () => store.theme,
   () => renderer?.setTheme(store.theme === 'light')

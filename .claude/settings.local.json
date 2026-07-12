@@ -206,7 +206,14 @@
       "Read(//c/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/41aa3c51-8ec0-49a1-b300-a532474cf3c0/scratchpad/**)",
       "Bash(node drive.cjs)",
       "PowerShell(npx prettier --write src/renderer/src/components/ExportModal.vue)",
-      "PowerShell(npm run typecheck 2>&1)"
+      "PowerShell(npm run typecheck 2>&1)",
+      "Bash(xargs grep -l \"DateValue\\\\|ordinal\\\\|calendarMath\")",
+      "Bash(xargs grep -l \"^export function\\\\|^export const\\\\|useGraph\\\\|useTimeline\")",
+      "Bash(node -e \"try{console.log\\(require\\('playwright-core/package.json'\\).version\\)}catch\\(e\\){console.log\\('no playwright-core'\\)}\")",
+      "Bash(node -e \"try{console.log\\(require\\('electron/package.json'\\).version\\)}catch\\(e\\){console.log\\('no electron'\\)}\")",
+      "Bash(node \"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/f3fb90a1-bf10-42b5-9fd0-4515ee7c1153/scratchpad/drive.cjs\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\({name:p.name,version:p.version,author:p.author,productName:p.productName,description:p.description}\\)\\)\")",
+      "PowerShell(npx prettier --write src/renderer/src/App.vue src/renderer/src/components/SettingsModal.vue src/renderer/src/i18n/locales/en.js 2>&1)"
     ]
   }
 }

@@ -334,6 +334,8 @@ import {
   cancelGuideTimers
 } from './graph/guideLines.js'
 import { useGraphAnimation } from './graph/useGraphAnimation.js'
+import { useTimeTravel } from './time/useTimeTravel'
+import { toOrdinal } from '../../../shared/calendarMath'
 import { WebGLGraphRenderer } from './graph/webgl/WebGLGraphRenderer.js'
 import { screenToWorld, nodesExtent, fitExtent } from './graph/webgl/coords.js'
 import { viewRectXYK } from './webgl/minimapMath'
@@ -343,6 +345,7 @@ import Graph3DView from './Graph3DView.vue'
 import MiniMap from './MiniMap.vue'
 
 const store = useMainStore()
+const tt = useTimeTravel()
 const glCanvasEl = ref(null)
 const overlayEl = ref(null)
 const containerEl = ref(null)
@@ -837,6 +840,26 @@ function ageOf(d) {
   return age >= 0 ? age : null
 }
 
+// ── Time travel ─────────────────────────────────────────────────────────────
+// While the Time slider is active (tt.gateYear < Infinity) people not yet born
+// and relationships not yet formed collapse to opacity 0 (the renderer's style
+// tweens animate the pop-in/out); the freshly-appeared get a glow/width flash.
+// Nodes stay in the simulation either way so positions never reshuffle while
+// scrubbing. `_tBirth` / `_tAppear` are stamped in updateGraph().
+const FRESH_YEARS = 1.6
+
+function nodeTimeHidden(n) {
+  return n._tBirth != null && n._tBirth > tt.gateYear.value
+}
+
+function linkTimeHidden(d) {
+  if (tt.gateYear.value === Infinity) return false
+  // After the simulation wires links, source/target are the node objects.
+  if (typeof d.source === 'object' && nodeTimeHidden(d.source)) return true
+  if (typeof d.target === 'object' && nodeTimeHidden(d.target)) return true
+  return d._tAppear != null && d._tAppear > tt.gateYear.value
+}
+
 // ── Per-node / per-link visual descriptors (single source of truth for styling) ──────
 // These reproduce the old SVG renderNodes/renderLinks styling, including the Highlights
 // panel filters, but as plain values consumed by the WebGL layers each redraw.
@@ -872,6 +895,19 @@ function nodeVisual(n) {
   const q = searchQuery.value.toLowerCase().trim()
   if (q && !(n.name || '').toLowerCase().includes(q)) opacityMul *= 0.2
 
+  const tY = tt.gateYear.value
+  let timeGlow = false
+  if (tY !== Infinity) {
+    if (n._tBirth == null) {
+      opacityMul *= 0.45 // undated people can't "appear" — keep them as faint context
+    } else if (n._tBirth > tY) {
+      opacityMul = 0
+      radiusMul *= 0.2 // scale-in pop when the tween brings them back
+    } else if (tY - n._tBirth < FRESH_YEARS) {
+      timeGlow = true // birth flash while time flows past them
+    }
+  }
+
   return {
     radius: gs.nodeRadius * radiusMul,
     fill,
@@ -880,7 +916,7 @@ function nodeVisual(n) {
     borderA: selected ? 0.95 : 0.18,
     opacity: gs.nodeOpacity * opacityMul,
     selected,
-    glow: selected || (hoverId === n.id && gs.glowOnHover) ? 1 : 0,
+    glow: selected || timeGlow || (hoverId === n.id && gs.glowOnHover) ? 1 : 0,
     imageUrl: n.primary_image ? getImageUrl(n.primary_image) : null
   }
 }
@@ -932,6 +968,19 @@ function linkVisual(d) {
     }
   }
 
+  const tY = tt.gateYear.value
+  let timeHidden = false
+  if (tY !== Infinity) {
+    if (linkTimeHidden(d)) {
+      opacity = 0
+      timeHidden = true // arrowheads don't fade with opacity — shrink them away too
+    } else if (d._tAppear != null && tY - d._tAppear < FRESH_YEARS) {
+      // Just formed/born: a brief width + opacity surge as time flows past
+      width *= 1.6
+      opacity = Math.min(1, opacity * 1.6)
+    }
+  }
+
   const dashStr = getDashArray(d)
   let dashLen = 0,
     dashGap = 0
@@ -950,7 +999,7 @@ function linkVisual(d) {
     dashLen,
     dashGap,
     arrowColor: marker ? markerColor(marker, gs) : null,
-    arrowSize: isPatMat ? 14 : 9
+    arrowSize: timeHidden ? 0 : isPatMat ? 14 : 9
   }
 }
 
@@ -1055,11 +1104,29 @@ function updateGraph() {
 
   const hadNew = newNodes.length > ctx.nodesData.length
   ctx.nodesData = newNodes
-  ctx.linksData = store.relationships.map((r) => ({
-    ...r,
-    source: r.person_a_id,
-    target: r.person_b_id
-  }))
+  // Stamp the Time-travel ordinals: a person appears at their birth; a spouse
+  // link at its formed date (else when both partners exist); a parent/child or
+  // adopted link when the child (person_b) is born.
+  newNodes.forEach((n) => {
+    n._tBirth = toOrdinal(n.birth)
+  })
+  const birthOrdById = new Map(newNodes.map((n) => [n.id, n._tBirth]))
+  ctx.linksData = store.relationships.map((r) => {
+    let appear = toOrdinal(r.formed)
+    const ba = birthOrdById.get(r.person_a_id) ?? null
+    const bb = birthOrdById.get(r.person_b_id) ?? null
+    if (r.type === 'spouse') {
+      if (appear == null) appear = ba != null && bb != null ? Math.max(ba, bb) : null
+    } else {
+      appear = bb ?? appear
+    }
+    return {
+      ...r,
+      source: r.person_a_id,
+      target: r.person_b_id,
+      _tAppear: appear
+    }
+  })
   // Drop stale interaction refs to nodes that no longer exist.
   if (hoverId && !newNodes.some((n) => n.id === hoverId)) hoverId = null
   if (drag && !newNodes.includes(drag.node)) drag = null
@@ -1087,11 +1154,18 @@ function hitRadius() {
   return store.graphSettings.nodeRadius
 }
 
+// Picker that ignores nodes hidden by the Time slider (they're invisible but
+// still live in the quadtree, since they never leave the simulation).
+function pickVisibleNode(wx, wy) {
+  const n = ctx.renderer?.pickNode(wx, wy, hitRadius())
+  return n && nodeTimeHidden(n) ? null : n
+}
+
 function zoomFilter(event) {
   if (event.type === 'wheel') return !event.ctrlKey
   if (event.button != null && event.button !== 0) return false
   const w = clientToWorld(event.clientX, event.clientY)
-  const hit = ctx.renderer?.pickNode(w.x, w.y, hitRadius())
+  const hit = pickVisibleNode(w.x, w.y)
   if (hit && !store.lockNodes) return false // grabbing a node -> no pan
   return true
 }
@@ -1116,7 +1190,7 @@ function removePointerHandlers() {
 function onPointerDown(e) {
   if (e.button !== 0) return
   const w = clientToWorld(e.clientX, e.clientY)
-  const node = ctx.renderer?.pickNode(w.x, w.y, hitRadius())
+  const node = pickVisibleNode(w.x, w.y)
   if (node && !store.lockNodes) {
     drag = { node, moved: false, downX: e.clientX, downY: e.clientY }
     grab = { dx: w.x - node.x, dy: w.y - node.y }
@@ -1206,14 +1280,15 @@ function onPointerUp(_e) {
   // Click (press with no meaningful movement) → select node / open rel popup / deselect.
   if (pending && !pending.moved) {
     const w = clientToWorld(pending.downX, pending.downY)
-    const node = ctx.renderer?.pickNode(w.x, w.y, hitRadius())
+    const node = pickVisibleNode(w.x, w.y)
     if (node) {
       if (!store.lockNodes) {
         store.relPopup = null
         store.selectPerson(node.id)
       }
     } else {
-      const link = store.lockLines ? null : ctx.renderer?.pickLink(w.x, w.y, store.graphSettings)
+      let link = store.lockLines ? null : ctx.renderer?.pickLink(w.x, w.y, store.graphSettings)
+      if (link && linkTimeHidden(link)) link = null
       if (link) {
         const rect = ctx.containerRef.getBoundingClientRect()
         store.relPopup = {
@@ -1266,7 +1341,7 @@ function onDirectoryDrop(e) {
 function onHoverMove(e) {
   if (drag) return
   const w = clientToWorld(e.clientX, e.clientY)
-  const node = ctx.renderer?.pickNode(w.x, w.y, hitRadius())
+  const node = pickVisibleNode(w.x, w.y)
   const id = node ? node.id : null
   if (id !== hoverId) {
     hoverId = id
@@ -1753,6 +1828,14 @@ watch(
   () => store.selectedPersonId,
   () => markNodeStyles()
 )
+// Time travel: re-sync styles per scrub/playback step, but only while this view
+// is actually on screen (it stays mounted, hidden, behind the other views);
+// watching activeView too re-syncs on the way back in if time moved meanwhile.
+watch([() => tt.gateYear.value, () => store.activeView], ([, view]) => {
+  if (view !== 'graph' || spaceActive.value) return
+  markNodeStyles()
+  markLinkStyles()
+})
 // Labs switched off (or mode dropped below Advanced) while a space scene is
 // open: re-enter it as its 2D fallback (Free over the same positions).
 watch(

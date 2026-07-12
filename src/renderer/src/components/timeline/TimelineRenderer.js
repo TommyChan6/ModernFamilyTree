@@ -347,6 +347,9 @@ export class TimelineRenderer {
     const c = this._colors()
     const accentRGB = rgb(c.accent)
     const surfaceRGB = rgb(c.surface)
+    // Time travel: lifelines only grow up to the scrubbed year (null = off), so
+    // playing the slider makes lives visibly extend downward frame by frame.
+    const tYear = this.hooks.getTimeYear ? this.hooks.getTimeYear() : null
 
     // People: lifelines + dead caps + alive dots + avatar pins.
     let capI = L.people.length
@@ -358,11 +361,14 @@ export class TimelineRenderer {
       const ent = this._entrance(a)
       const op = a.op * ent.e
       const x = this.sx(this._lane(p.id, p.laneX))
+      const endYear = tYear == null ? p.endYear : Math.min(p.endYear, Math.max(tYear, p.birthYear))
       const y0 = this.sy(p.birthYear) + ent.yOff
-      const y1 = Math.max(this.sy(p.endYear), this.sy(p.birthYear) + 8) + ent.yOff
+      const y1 = Math.max(this.sy(endYear), this.sy(p.birthYear) + 8) + ent.yOff
       this.lines.set(i, x, y0, x, y1, a.w, v.fillRGB, op * 0.85)
       if (p.dead) {
-        this.lines.set(capI++, x - 7, y1, x + 7, y1, 3, v.fillRGB, op * 0.9)
+        // The death cap only lands once time has actually reached the death year.
+        const capOp = tYear != null && tYear < p.endYear ? 0 : op * 0.9
+        this.lines.set(capI++, x - 7, y1, x + 7, y1, 3, v.fillRGB, capOp)
       } else {
         this.aliveDots.set(aliveI++, x, y1, 4.5, v.fillRGB, op, 1)
       }
@@ -482,6 +488,32 @@ export class TimelineRenderer {
       ctx.setLineDash([])
       ctx.globalAlpha = 1
     }
+
+    // Time-travel curtain: everything past the scrubbed year is "the future" —
+    // dim the grid there and mark the frontier with a glowing edge. (The world
+    // content beyond it is already faded/clamped by the style hooks, so dimming
+    // the bg canvas is enough even though it sits behind the GL canvas.)
+    const tYear = this.hooks.getTimeYear ? this.hooks.getTimeYear() : null
+    if (tYear != null) {
+      const cy = this.sy(tYear)
+      if (cy < this.height) {
+        ctx.fillStyle = this.light ? 'rgba(245, 246, 250, 0.6)' : 'rgba(8, 10, 16, 0.55)'
+        ctx.fillRect(0, Math.max(0, cy), this.width, this.height - Math.max(0, cy))
+      }
+      if (cy >= -30 && cy <= this.height + 30) {
+        ctx.save()
+        ctx.globalAlpha = 0.9
+        ctx.strokeStyle = c.accent
+        ctx.lineWidth = 1.8
+        ctx.shadowColor = c.accent
+        ctx.shadowBlur = 12
+        ctx.beginPath()
+        ctx.moveTo(0, cy)
+        ctx.lineTo(this.width, cy)
+        ctx.stroke()
+        ctx.restore()
+      }
+    }
   }
 
   // ── Labels / badges / gutter (fg canvas) ────────────────────────────────────
@@ -600,6 +632,21 @@ export class TimelineRenderer {
       ctx.font = `700 10.5px ${font}`
       ctx.textAlign = 'center'
       ctx.fillText(String(refYear), GUTTER / 2 + 1, nowY + 1)
+    }
+
+    // Time-travel year chip: a filled accent pill riding the curtain edge.
+    const tYear = this.hooks.getTimeYear ? this.hooks.getTimeYear() : null
+    if (tYear != null) {
+      const cy = this.sy(tYear)
+      if (cy >= -30 && cy <= this.height + 30) {
+        ctx.fillStyle = c.accent
+        roundRect(ctx, 6, cy - 10, GUTTER - 14, 20, 7)
+        ctx.fill()
+        ctx.fillStyle = '#fff'
+        ctx.font = `800 10.5px ${font}`
+        ctx.textAlign = 'center'
+        ctx.fillText(String(Math.floor(tYear)), GUTTER / 2 + 1, cy + 1)
+      }
     }
 
     if (this.mouseY != null) {

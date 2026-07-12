@@ -5,7 +5,7 @@
       :key="v.id"
       class="rail-btn"
       :class="{ active: store.activeView === v.id }"
-      :title="v.label"
+      :title="t('rail.' + v.id)"
       @click="store.activeView = v.id"
     >
       <span class="rail-icon">{{ v.icon }}</span>
@@ -13,7 +13,7 @@
 
     <div class="rail-sep"></div>
 
-    <button class="rail-btn" title="Add person" @click="store.openForm()">
+    <button class="rail-btn" :title="t('rail.addPerson')" @click="store.openForm()">
       <span class="rail-icon">＋</span>
     </button>
 
@@ -23,7 +23,7 @@
       v-if="store.caps.style !== 'none'"
       class="rail-btn"
       :class="{ active: store.settingsOpen }"
-      title="Style"
+      :title="t('rail.style')"
       @click="store.toggleSettings()"
     >
       <span class="rail-icon">⚙</span>
@@ -34,18 +34,20 @@
 <script setup>
 import { computed } from 'vue'
 import { useMainStore } from '../store/index.js'
+import { useI18n } from '../i18n'
 
 // The slim left icon rail: the five views + add + settings. Everything that
 // used to live in the old left sidebar (stats, export/import, save, the
 // Present date) now lives in the Project ▾ menu.
 const store = useMainStore()
+const { t } = useI18n()
 
 const views = [
-  { id: 'graph', icon: '🕸', label: 'Graph' },
-  { id: 'directory', icon: '👥', label: 'Directory' },
-  { id: 'relationships', icon: '🔗', label: 'Relationships' },
-  { id: 'timeline', icon: '📅', label: 'Timeline' },
-  { id: 'groups', icon: '⬡', label: 'Groups' }
+  { id: 'graph', icon: '🕸' },
+  { id: 'directory', icon: '👥' },
+  { id: 'relationships', icon: '🔗' },
+  { id: 'timeline', icon: '📅' },
+  { id: 'groups', icon: '⬡' }
 ]
 // Program-mode gating: Simple shows Graph + Directory only
 const visibleViews = computed(() => views.filter((v) => store.caps.views.includes(v.id)))
