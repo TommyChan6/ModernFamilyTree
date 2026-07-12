@@ -10,6 +10,9 @@ export const useMainStore = defineStore('main', () => {
   const authUser = ref(null) // { id, username, plan, created_at } or null
   const authUsage = ref(null) // { projects, maxProjects, persons, … } or null
   const authReady = ref(false) // true once the stored session was checked
+  // A passwordless "look around" visitor. Guests are held to Standard mode —
+  // Advanced (physics, Labs, 3D) is a signed-in-account affordance.
+  const isGuest = computed(() => authUser.value?.plan === 'guest')
 
   // ── Project management ────────────────────────────────────────────────────
   const projects = ref([])
@@ -151,7 +154,10 @@ export const useMainStore = defineStore('main', () => {
   //   Standard: all views, scenes, Focus + basic Style, manual tags
   //   Advanced: everything (full Style incl. physics sliders)
   const caps = computed(() => {
-    const m = programMode.value
+    // Guests never get Advanced — clamp the effective mode so every derived
+    // capability (Labs, full Style, 3D Space, extra time controls) folds back
+    // to Standard in one place.
+    const m = isGuest.value && programMode.value === 'advanced' ? 'standard' : programMode.value
     return {
       views:
         m === 'simple'
@@ -188,6 +194,7 @@ export const useMainStore = defineStore('main', () => {
 
   function setProgramMode(mode) {
     if (!['simple', 'standard', 'advanced'].includes(mode) || mode === programMode.value) return
+    if (mode === 'advanced' && isGuest.value) return // Advanced is off-limits to guests
     programMode.value = mode
     api.invoke('globalSettings:set', { key: 'programMode', value: mode })
     // A hidden view must never stay active
@@ -244,6 +251,11 @@ export const useMainStore = defineStore('main', () => {
       }
       authUser.value = res.data.user
       authUsage.value = res.data.usage
+      // A restored guest may carry a persisted Advanced setting (device-level,
+      // applied before the session resolves) — clamp to Standard, same as sign-in.
+      if (authUser.value?.plan === 'guest' && programMode.value === 'advanced') {
+        programMode.value = 'standard'
+      }
       return true
     } finally {
       authReady.value = true
@@ -254,6 +266,11 @@ export const useMainStore = defineStore('main', () => {
     if (!res.success) return res
     setSessionToken(res.data.token)
     authUser.value = res.data.user
+    // A persisted Advanced setting is device-level; a guest may inherit it.
+    // Clamp to Standard locally without overwriting the device preference.
+    if (authUser.value?.plan === 'guest' && programMode.value === 'advanced') {
+      programMode.value = 'standard'
+    }
     await loadProjects()
     await loadAll()
     refreshUsage()
@@ -266,6 +283,10 @@ export const useMainStore = defineStore('main', () => {
 
   function login({ username, password }) {
     return api.invoke('auth:login', { username, password }).then(completeSignIn)
+  }
+
+  function guestLogin() {
+    return api.invoke('auth:guest').then(completeSignIn)
   }
 
   async function logout() {
@@ -807,9 +828,11 @@ export const useMainStore = defineStore('main', () => {
     authUser,
     authUsage,
     authReady,
+    isGuest,
     restoreSession,
     register,
     login,
+    guestLogin,
     logout,
     refreshUsage,
     updateProfile,

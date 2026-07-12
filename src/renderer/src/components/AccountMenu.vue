@@ -60,9 +60,12 @@ const rootRef = ref(null)
 
 const shownName = computed(() => store.authUser?.display_name || store.authUser?.username || '')
 const initial = computed(() => (shownName.value[0] || '?').toUpperCase())
-const planLabel = computed(() =>
-  store.authUser?.plan === 'free' ? 'Free plan' : store.authUser?.plan
-)
+const planLabel = computed(() => {
+  const plan = store.authUser?.plan
+  if (plan === 'free') return 'Free plan'
+  if (plan === 'guest') return 'Guest'
+  return plan
+})
 
 // Per-username hue, overridable from the profile page (lib/avatar.js)
 const avatarStyle = computed(() => avatarStyleFor(store.authUser))

@@ -121,11 +121,27 @@
           <p v-if="error" class="auth-error">{{ error }}</p>
         </Transition>
 
-        <button class="auth-submit" type="submit" :disabled="busy">
+        <button class="auth-submit" type="submit" :disabled="busy || guestBusy">
           <span v-if="!busy">{{ mode === 'login' ? 'Sign in' : 'Create account' }}</span>
           <span v-else class="auth-spinner"></span>
         </button>
       </form>
+
+      <div class="auth-divider"><span>or</span></div>
+
+      <button
+        class="auth-guest"
+        type="button"
+        :disabled="busy || guestBusy"
+        @click="continueAsGuest"
+      >
+        <span v-if="!guestBusy" class="auth-guest-inner">
+          <span class="auth-guest-icon">👋</span>
+          Continue as guest
+        </span>
+        <span v-else class="auth-spinner dark"></span>
+      </button>
+      <p class="auth-guest-note">Explore with sample data — Advanced mode stays locked.</p>
 
       <p class="auth-foot">
         Your data stays on this device — see the
@@ -155,6 +171,7 @@ const acceptedTerms = ref(false)
 const showPassword = ref(false)
 const error = ref('')
 const busy = ref(false)
+const guestBusy = ref(false)
 const shaking = ref(false)
 const legalOpen = ref(false)
 const legalTab = ref('terms')
@@ -219,6 +236,18 @@ async function submit() {
     if (!res.success) fail(res.error || 'Something went wrong')
   } finally {
     busy.value = false
+  }
+}
+
+async function continueAsGuest() {
+  if (busy.value || guestBusy.value) return
+  error.value = ''
+  guestBusy.value = true
+  try {
+    const res = await store.guestLogin()
+    if (!res.success) fail(res.error || 'Could not start a guest session')
+  } finally {
+    guestBusy.value = false
   }
 }
 </script>
@@ -686,6 +715,122 @@ async function submit() {
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   vertical-align: -3px;
+}
+
+.auth-spinner.dark {
+  border-color: var(--adim);
+  border-top-color: var(--accent);
+}
+
+/* ── "or" divider + guest button ──────────────────────────────────────────── */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 14px;
+  color: var(--t3);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
+
+.auth-guest {
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  padding: 11px;
+  background: var(--elevated);
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    transform 0.18s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+/* sweeping shine that glides across on hover */
+.auth-guest::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--accent) 22%, transparent) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.6s ease;
+}
+
+.auth-guest:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(108, 142, 245, 0.45);
+  background: var(--hover);
+}
+
+.auth-guest:hover:not(:disabled)::after {
+  transform: translateX(120%);
+}
+
+.auth-guest:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.auth-guest:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.auth-guest-inner {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-guest-icon {
+  font-size: 15px;
+  animation: guest-wave 2.4s ease-in-out infinite;
+  transform-origin: 70% 80%;
+}
+
+@keyframes guest-wave {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0deg);
+  }
+  10%,
+  30% {
+    transform: rotate(14deg);
+  }
+  20%,
+  40% {
+    transform: rotate(-8deg);
+  }
+}
+
+.auth-guest-note {
+  margin: 9px 0 0;
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--t3);
 }
 
 @keyframes spin {

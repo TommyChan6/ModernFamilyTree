@@ -141,10 +141,20 @@ const spaceOn = computed(() => {
 })
 const visible = computed(
   () =>
+    // Time Travel is a Standard/Advanced affordance — Simple mode keeps the
+    // stage uncluttered.
+    store.programMode !== 'simple' &&
     (store.activeView === 'graph' || store.activeView === 'timeline') &&
     !spaceOn.value &&
     !!rangeRef.value
 )
+
+// If the slider gets hidden mid-scrub (e.g. dropping into Simple mode, or a
+// view switch), snap back to the present so the hidden state can't strand the
+// data in the past.
+watch(visible, (isVisible) => {
+  if (!isVisible && active.value) tt.stop()
+})
 
 const range = computed(() => rangeRef.value || { minYear: 0, maxYear: 1 })
 const pct = computed(() => tt.progress.value * 100)

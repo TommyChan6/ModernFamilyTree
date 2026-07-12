@@ -66,7 +66,9 @@
         >
           <option value="simple">{{ t('mode.simple') }}</option>
           <option value="standard">{{ t('mode.standard') }}</option>
-          <option value="advanced">{{ t('mode.advanced') }}</option>
+          <option value="advanced" :disabled="store.isGuest">
+            {{ t('mode.advanced') }}{{ store.isGuest ? ' 🔒' : '' }}
+          </option>
         </select>
       </label>
       <Transition name="labs">

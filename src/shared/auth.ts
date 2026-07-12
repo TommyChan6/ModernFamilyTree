@@ -215,6 +215,7 @@ export function unwrapRequest(raw: unknown): { token: string | null; data: unkno
 export const PUBLIC_CHANNELS = new Set([
   'auth:register',
   'auth:login',
+  'auth:guest',
   'auth:logout',
   'auth:session',
   'globalSettings:getAll',

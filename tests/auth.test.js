@@ -135,6 +135,36 @@ describe('auth:login', () => {
   })
 })
 
+describe('auth:guest', () => {
+  it('starts a passwordless guest session on the guest plan with a project', () => {
+    const res = channelHandlers['auth:guest'](db, undefined, env)
+    expect(res.user.plan).toBe('guest')
+    expect(res.user.username).toBe('Guest')
+    expect(res.user.password_hash).toBeUndefined()
+    expect(res.token).toMatch(/^[0-9a-f]{64}$/)
+    expect(resolveSession(db, res.token, NOW)?.id).toBe(res.user.id)
+    // A guest always lands on a project they own.
+    expect(db.projects[db.activeProjectId].user_id).toBe(res.user.id)
+  })
+
+  it('reuses the single shared guest account across sign-ins', () => {
+    const a = channelHandlers['auth:guest'](db, undefined, env)
+    const b = channelHandlers['auth:guest'](db, undefined, env)
+    expect(b.user.id).toBe(a.user.id)
+    expect(b.token).not.toBe(a.token) // fresh session each time
+    expect(Object.values(db.users).filter((u) => u.plan === 'guest')).toHaveLength(1)
+  })
+
+  it('cannot collide with a registered login (guest key is unregisterable)', async () => {
+    channelHandlers['auth:guest'](db, undefined, env)
+    // 'guest (visitor)' can never be produced by validateUsername, so a real
+    // account named "guest" coexists without ambiguity.
+    const reg = await register(db, 'guest', 'password123')
+    expect(reg.user.plan).toBe('free')
+    expect(Object.values(db.users)).toHaveLength(2)
+  })
+})
+
 describe('sessions', () => {
   it('auth:session returns the user and usage for a live token', async () => {
     const { token } = await register(db, 'alice')
@@ -379,6 +409,7 @@ describe('request envelope', () => {
     expect(PUBLIC_CHANNELS.has('persons:getAll')).toBe(false)
     expect(PUBLIC_CHANNELS.has('projects:getAll')).toBe(false)
     expect(PUBLIC_CHANNELS.has('auth:login')).toBe(true)
+    expect(PUBLIC_CHANNELS.has('auth:guest')).toBe(true)
     expect(PUBLIC_CHANNELS.has('globalSettings:getAll')).toBe(true)
   })
 })

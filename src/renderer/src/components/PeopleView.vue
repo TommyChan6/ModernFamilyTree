@@ -31,6 +31,122 @@
             {{ opt.label }}
           </button>
         </div>
+
+        <button
+          class="pv-filter-btn"
+          :class="{ active: filtersOpen || activeFilterCount > 0 }"
+          @click="filtersOpen = !filtersOpen"
+        >
+          <span class="pv-filter-icon" :class="{ open: filtersOpen }">⚙</span>
+          Filters
+          <Transition name="pv-badge">
+            <span v-if="activeFilterCount" class="pv-filter-badge">{{ activeFilterCount }}</span>
+          </Transition>
+        </button>
+      </div>
+    </div>
+
+    <!-- Facet panel: slides open, grouped chip rows over the live roster -->
+    <div class="pv-filters" :class="{ open: filtersOpen }">
+      <div class="pv-filters-inner">
+        <div class="pv-facet">
+          <span class="pv-facet-label">Life</span>
+          <div class="pv-chips">
+            <button
+              class="pv-chip"
+              :class="{ on: lifeFilter === 'all' }"
+              @click="lifeFilter = 'all'"
+            >
+              All
+            </button>
+            <button
+              class="pv-chip life-living"
+              :class="{ on: lifeFilter === 'living' }"
+              @click="lifeFilter = lifeFilter === 'living' ? 'all' : 'living'"
+            >
+              <span class="pv-chip-dot"></span>Living
+              <span class="pv-chip-n">{{ lifeCounts.living }}</span>
+            </button>
+            <button
+              class="pv-chip life-deceased"
+              :class="{ on: lifeFilter === 'deceased' }"
+              @click="lifeFilter = lifeFilter === 'deceased' ? 'all' : 'deceased'"
+            >
+              <span class="pv-chip-dot"></span>Remembered
+              <span class="pv-chip-n">{{ lifeCounts.deceased }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="genderOptions.length > 1" class="pv-facet">
+          <span class="pv-facet-label">Gender</span>
+          <div class="pv-chips">
+            <button
+              v-for="g in genderOptions"
+              :key="g.key"
+              class="pv-chip"
+              :class="{ on: genderSel.has(g.key) }"
+              :style="{ '--chip-c': g.color }"
+              @click="toggleSet(genderSel, g.key)"
+            >
+              <span class="pv-chip-glyph" :style="{ color: g.color }">{{ g.glyph }}</span>
+              {{ g.label }}
+              <span class="pv-chip-n">{{ g.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="pv-facet">
+          <span class="pv-facet-label">Ties</span>
+          <div class="pv-chips">
+            <button
+              class="pv-chip"
+              :class="{ on: connFilter === 'all' }"
+              @click="connFilter = 'all'"
+            >
+              Everyone
+            </button>
+            <button
+              class="pv-chip"
+              :class="{ on: connFilter === 'connected' }"
+              @click="connFilter = connFilter === 'connected' ? 'all' : 'connected'"
+            >
+              🔗 Connected
+            </button>
+            <button
+              class="pv-chip"
+              :class="{ on: connFilter === 'isolated' }"
+              @click="connFilter = connFilter === 'isolated' ? 'all' : 'isolated'"
+            >
+              🌱 Unlinked
+            </button>
+          </div>
+        </div>
+
+        <div v-if="store.caps.tags && tagOptions.length" class="pv-facet">
+          <span class="pv-facet-label">Groups</span>
+          <div class="pv-chips">
+            <button
+              v-for="t in tagOptions"
+              :key="t.id"
+              class="pv-chip"
+              :class="{ on: tagSel.has(t.id) }"
+              :style="{ '--chip-c': t.color }"
+              @click="toggleSet(tagSel, t.id)"
+            >
+              <span class="pv-chip-dot" :style="{ background: t.color }"></span>
+              <span v-if="t.icon" class="pv-chip-emoji">{{ t.icon }}</span
+              >{{ t.label }}
+              <span class="pv-chip-n">{{ t.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <Transition name="pv-clear">
+          <button v-if="activeFilterCount" class="pv-clear" @click="clearFilters">
+            ✕ Clear {{ activeFilterCount }} filter{{ activeFilterCount > 1 ? 's' : '' }}
+          </button>
+        </Transition>
       </div>
     </div>
 
@@ -98,6 +214,83 @@ const sortOptions = [
   { id: 'birth', label: 'Year' },
   { id: 'age', label: 'Age' }
 ]
+
+// ── Filters ───────────────────────────────────────────────────────────────
+// A tucked-away panel of live facets over the roster: life status, gender,
+// how connected a person is, and (outside Simple mode) group membership.
+// Every facet reads counts off the current data so empty options never show.
+const filtersOpen = ref(false)
+const lifeFilter = ref('all') // 'all' | 'living' | 'deceased'
+const connFilter = ref('all') // 'all' | 'connected' | 'isolated'
+const genderSel = ref(new Set())
+const tagSel = ref(new Set())
+
+const isDeceased = (p) => !!(p.death && (p.death.year != null || p.death.precision))
+
+const genderKey = (p) => (p.gender || '').trim().toLowerCase()
+function genderMeta(k) {
+  if (k === 'male') return { label: 'Male', color: store.graphSettings.maleColor, glyph: '♂' }
+  if (k === 'female') return { label: 'Female', color: store.graphSettings.femaleColor, glyph: '♀' }
+  if (k === '') return { label: 'Unknown', color: store.graphSettings.unknownColor, glyph: '?' }
+  return {
+    label: k[0].toUpperCase() + k.slice(1),
+    color: store.graphSettings.unknownColor,
+    glyph: '⚧'
+  }
+}
+// Distinct genders present, ordered male → female → others → unknown, each with a count.
+const genderOptions = computed(() => {
+  const counts = new Map()
+  for (const p of store.persons) {
+    const k = genderKey(p)
+    counts.set(k, (counts.get(k) || 0) + 1)
+  }
+  const order = (k) => (k === 'male' ? 0 : k === 'female' ? 1 : k === '' ? 3 : 2)
+  return [...counts.entries()]
+    .map(([k, count]) => ({ key: k, count, ...genderMeta(k) }))
+    .sort((a, b) => order(a.key) - order(b.key) || a.label.localeCompare(b.label))
+})
+
+// Group (tag) facets — only those with at least one person, busiest first.
+const tagOptions = computed(() => {
+  const personIds = new Set(store.persons.map((p) => p.id))
+  return store.tags
+    .map((t) => {
+      const members = store.membersOf.get(t.id) || []
+      const count = members.reduce((n, id) => n + (personIds.has(id) ? 1 : 0), 0)
+      return { id: t.id, label: t.label, color: t.color || 'var(--accent)', icon: t.icon, count }
+    })
+    .filter((t) => t.count > 0)
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+})
+
+const lifeCounts = computed(() => {
+  let living = 0
+  let deceased = 0
+  for (const p of store.persons) isDeceased(p) ? deceased++ : living++
+  return { living, deceased }
+})
+
+function toggleSet(setRef, value) {
+  const next = new Set(setRef.value)
+  next.has(value) ? next.delete(value) : next.add(value)
+  setRef.value = next
+}
+
+const activeFilterCount = computed(
+  () =>
+    (lifeFilter.value !== 'all' ? 1 : 0) +
+    (connFilter.value !== 'all' ? 1 : 0) +
+    genderSel.value.size +
+    tagSel.value.size
+)
+
+function clearFilters() {
+  lifeFilter.value = 'all'
+  connFilter.value = 'all'
+  genderSel.value = new Set()
+  tagSel.value = new Set()
+}
 const sortIndex = computed(() =>
   Math.max(
     0,
@@ -134,6 +327,23 @@ const displayed = computed(() => {
         (p.occupation || '').toLowerCase().includes(q) ||
         (p.location || '').toLowerCase().includes(q)
     )
+  }
+  if (lifeFilter.value !== 'all') {
+    const wantDead = lifeFilter.value === 'deceased'
+    list = list.filter((p) => isDeceased(p) === wantDead)
+  }
+  if (genderSel.value.size) {
+    list = list.filter((p) => genderSel.value.has(genderKey(p)))
+  }
+  if (connFilter.value !== 'all') {
+    const wantConnected = connFilter.value === 'connected'
+    list = list.filter((p) => stats(p.id).kin > 0 === wantConnected)
+  }
+  if (tagSel.value.size) {
+    list = list.filter((p) => {
+      const tags = store.tagsOf.get(p.id)
+      return tags ? tags.some((t) => tagSel.value.has(t.id)) : false
+    })
   }
   const arr = [...list]
   const ry = refYear.value
@@ -205,7 +415,7 @@ function replayEntrance() {
     animWindow.value = false
   }, 1300)
 }
-watch([query, sortBy], () => {
+watch([query, sortBy, lifeFilter, connFilter, genderSel, tagSel], () => {
   listVersion.value++
   replayEntrance()
   // A new result set reads from the top; jump there before the stagger plays.
@@ -378,6 +588,213 @@ onBeforeUnmount(() => {
 }
 .pv-sort-opt.active {
   color: #fff;
+}
+
+/* ── Filter toggle button ────────────────────────────────── */
+.pv-filter-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--elevated);
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 0.18s,
+    background 0.18s,
+    border-color 0.18s;
+}
+.pv-filter-btn:hover {
+  color: var(--t1);
+  background: var(--hover);
+}
+.pv-filter-btn.active {
+  color: var(--t1);
+  border-color: rgba(108, 142, 245, 0.45);
+}
+.pv-filter-icon {
+  font-size: 13px;
+  transition: transform 0.4s cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+.pv-filter-icon.open {
+  transform: rotate(90deg);
+}
+.pv-filter-badge {
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+.pv-badge-enter-active,
+.pv-badge-leave-active {
+  transition:
+    transform 0.24s cubic-bezier(0.34, 1.5, 0.5, 1),
+    opacity 0.2s ease;
+}
+.pv-badge-enter-from,
+.pv-badge-leave-to {
+  transform: scale(0);
+  opacity: 0;
+}
+
+/* ── Facet panel (grid-rows slide-open) ──────────────────── */
+.pv-filters {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-rows: 0fr;
+  background: var(--glass-soft);
+  border-bottom: 1px solid transparent;
+  transition:
+    grid-template-rows 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.34s ease;
+  z-index: 2;
+}
+.pv-filters.open {
+  grid-template-rows: 1fr;
+  border-bottom-color: var(--border);
+}
+.pv-filters-inner {
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  padding: 0 22px;
+  transition: padding 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.pv-filters.open .pv-filters-inner {
+  padding: 14px 22px;
+}
+
+.pv-facet {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.pv-facet-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+.pv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pv-chip {
+  --chip-c: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--elevated);
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.16s,
+    color 0.16s,
+    border-color 0.16s,
+    transform 0.16s;
+}
+.pv-chip:hover {
+  transform: translateY(-1px);
+  color: var(--t1);
+}
+.pv-chip.on {
+  background: color-mix(in srgb, var(--chip-c) 16%, transparent);
+  border-color: color-mix(in srgb, var(--chip-c) 50%, transparent);
+  color: var(--t1);
+}
+.pv-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--chip-c);
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+.pv-chip.on .pv-chip-dot {
+  transform: scale(1.25);
+}
+.pv-chip-glyph {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+.pv-chip-emoji {
+  font-size: 12px;
+}
+.pv-chip-n {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--t3);
+  font-variant-numeric: tabular-nums;
+}
+.pv-chip.on .pv-chip-n {
+  color: color-mix(in srgb, var(--chip-c) 80%, var(--t1));
+}
+.life-living {
+  --chip-c: var(--green);
+}
+.life-deceased {
+  --chip-c: var(--t3);
+}
+
+.pv-clear {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  background: transparent;
+  color: var(--t3);
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.pv-clear:hover {
+  color: #ef5350;
+  background: rgba(239, 83, 80, 0.1);
+}
+.pv-clear-enter-active,
+.pv-clear-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.pv-clear-enter-from,
+.pv-clear-leave-to {
+  opacity: 0;
+  transform: translateX(-6px);
 }
 
 /* ── Scrollable grid ─────────────────────────────────────── */

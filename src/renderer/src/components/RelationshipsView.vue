@@ -43,11 +43,128 @@
         </div>
 
         <button
+          class="rv-filter-btn"
+          :class="{ active: filtersOpen || activeFilterCount > 0 }"
+          @click="filtersOpen = !filtersOpen"
+        >
+          <span class="rv-filter-icon" :class="{ open: filtersOpen }">⚙</span>
+          Filters
+          <Transition name="rv-badge">
+            <span v-if="activeFilterCount" class="rv-filter-badge">{{ activeFilterCount }}</span>
+          </Transition>
+        </button>
+
+        <button
           class="btn btn-primary btn-sm"
           @click="editing?.id === 'new' ? cancelEdit() : startAdd()"
         >
           {{ editing?.id === 'new' ? '✕ Cancel' : '＋ Add Relationship' }}
         </button>
+      </div>
+    </div>
+
+    <!-- Secondary facet panel: slides open beneath the toolbar -->
+    <div class="rv-filters" :class="{ open: filtersOpen }">
+      <div class="rv-filters-inner">
+        <div class="rv-facet">
+          <span class="rv-facet-label">Dates</span>
+          <div class="rv-facet-chips">
+            <button
+              class="rv-fchip"
+              :class="{ on: dateFilter === 'all' }"
+              @click="dateFilter = 'all'"
+            >
+              Any
+            </button>
+            <button
+              class="rv-fchip"
+              :class="{ on: dateFilter === 'dated' }"
+              @click="dateFilter = dateFilter === 'dated' ? 'all' : 'dated'"
+            >
+              📅 Dated
+            </button>
+            <button
+              class="rv-fchip"
+              :class="{ on: dateFilter === 'undated' }"
+              @click="dateFilter = dateFilter === 'undated' ? 'all' : 'undated'"
+            >
+              〰 Undated
+            </button>
+          </div>
+        </div>
+
+        <div v-if="hasSpouses" class="rv-facet">
+          <span class="rv-facet-label">Marriage</span>
+          <div class="rv-facet-chips">
+            <button
+              class="rv-fchip"
+              :class="{ on: marriageFilter === 'all' }"
+              @click="marriageFilter = 'all'"
+            >
+              Any
+            </button>
+            <button
+              class="rv-fchip m-current"
+              :class="{ on: marriageFilter === 'current' }"
+              @click="marriageFilter = marriageFilter === 'current' ? 'all' : 'current'"
+            >
+              💍 Together
+            </button>
+            <button
+              class="rv-fchip m-ended"
+              :class="{ on: marriageFilter === 'ended' }"
+              @click="marriageFilter = marriageFilter === 'ended' ? 'all' : 'ended'"
+            >
+              💔 Ended
+            </button>
+          </div>
+        </div>
+
+        <div v-if="store.caps.tags && groupOptions.length" class="rv-facet rv-facet-groups">
+          <span class="rv-facet-label">Group lens</span>
+          <div class="rv-facet-chips">
+            <button
+              v-for="g in groupOptions"
+              :key="g.id"
+              class="rv-fchip"
+              :class="{ on: groupSel.has(g.id) }"
+              :style="{ '--fchip-c': g.color }"
+              @click="toggleGroup(g.id)"
+            >
+              <span class="rv-fchip-dot" :style="{ background: g.color }"></span>
+              <span v-if="g.icon" class="rv-fchip-emoji">{{ g.icon }}</span
+              >{{ g.label }}
+            </button>
+          </div>
+          <Transition name="rv-clear">
+            <div
+              v-if="groupSel.size"
+              class="rv-endpoints"
+              title="Which endpoints must be in the group"
+            >
+              <button
+                class="rv-seg"
+                :class="{ on: groupMode === 'either' }"
+                @click="groupMode = 'either'"
+              >
+                Either
+              </button>
+              <button
+                class="rv-seg"
+                :class="{ on: groupMode === 'both' }"
+                @click="groupMode = 'both'"
+              >
+                Both
+              </button>
+            </div>
+          </Transition>
+        </div>
+
+        <Transition name="rv-clear">
+          <button v-if="activeFilterCount" class="rv-clear" @click="clearFilters">
+            ✕ Clear {{ activeFilterCount }} filter{{ activeFilterCount > 1 ? 's' : '' }}
+          </button>
+        </Transition>
       </div>
     </div>
 
@@ -414,6 +531,54 @@ const query = ref('')
 const typeFilter = ref('all') // 'all' | 'parent_child' | 'spouse' | 'adopted' | 'issues'
 const sortKey = ref('type')
 const sortDir = ref(1)
+
+// ── Secondary filters (the sliding facet panel) ─────────────────────────────
+// Complements the type chips: whether the bond is dated, marriage state, and a
+// "group lens" that narrows to bonds touching (or bridging) chosen groups.
+const filtersOpen = ref(false)
+const dateFilter = ref('all') // 'all' | 'dated' | 'undated'
+const marriageFilter = ref('all') // 'all' | 'current' | 'ended'
+const groupSel = ref(new Set())
+const groupMode = ref('either') // 'either' | 'both' endpoints in a chosen group
+
+const hasSpouses = computed(() => store.relationships.some((r) => r.type === 'spouse'))
+
+// Group facets — tags with at least one member person, busiest first.
+const groupOptions = computed(() => {
+  const personIds = new Set(store.persons.map((p) => p.id))
+  return store.tags
+    .map((t) => {
+      const members = store.membersOf.get(t.id) || []
+      const count = members.reduce((n, id) => n + (personIds.has(id) ? 1 : 0), 0)
+      return { id: t.id, label: t.label, color: t.color || 'var(--accent)', icon: t.icon, count }
+    })
+    .filter((t) => t.count > 0)
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+})
+
+function personInSelectedGroup(personId) {
+  const tags = store.tagsOf.get(personId)
+  return tags ? tags.some((t) => groupSel.value.has(t.id)) : false
+}
+
+function toggleGroup(id) {
+  const next = new Set(groupSel.value)
+  next.has(id) ? next.delete(id) : next.add(id)
+  groupSel.value = next
+}
+
+const activeFilterCount = computed(
+  () =>
+    (dateFilter.value !== 'all' ? 1 : 0) +
+    (marriageFilter.value !== 'all' ? 1 : 0) +
+    groupSel.value.size
+)
+
+function clearFilters() {
+  dateFilter.value = 'all'
+  marriageFilter.value = 'all'
+  groupSel.value = new Set()
+}
 const editing = ref(null) // { id: 'new' | relId, person_a_id, person_b_id, type, formed_year, status }
 const editError = ref('')
 
@@ -551,6 +716,24 @@ const rows = computed(() => {
         (x.a?.name || '').toLowerCase().includes(q) || (x.b?.name || '').toLowerCase().includes(q)
     )
   }
+  if (dateFilter.value !== 'all') {
+    const wantDated = dateFilter.value === 'dated'
+    list = list.filter((x) => !!x.rel.formed?.year === wantDated)
+  }
+  if (marriageFilter.value !== 'all') {
+    // Marriage state only applies to spouse bonds, so this narrows to marriages.
+    const wantEnded = marriageFilter.value === 'ended'
+    list = list.filter(
+      (x) => x.rel.type === 'spouse' && (x.rel.status === 'divorced') === wantEnded
+    )
+  }
+  if (groupSel.value.size) {
+    list = list.filter((x) => {
+      const aIn = x.a ? personInSelectedGroup(x.a.id) : false
+      const bIn = x.b ? personInSelectedGroup(x.b.id) : false
+      return groupMode.value === 'both' ? aIn && bIn : aIn || bIn
+    })
+  }
   const dir = sortDir.value
   const nm = (p) => (p?.name || '').toLowerCase()
   const yr = (r) => r.formed?.year || 9e9
@@ -631,14 +814,17 @@ const animWindow = ref(true)
 let animTimer = setTimeout(() => {
   animWindow.value = false
 }, 1100)
-watch([query, typeFilter, sortKey, sortDir], () => {
-  listVersion.value++
-  animWindow.value = true
-  clearTimeout(animTimer)
-  animTimer = setTimeout(() => {
-    animWindow.value = false
-  }, 1100)
-})
+watch(
+  [query, typeFilter, sortKey, sortDir, dateFilter, marriageFilter, groupSel, groupMode],
+  () => {
+    listVersion.value++
+    animWindow.value = true
+    clearTimeout(animTimer)
+    animTimer = setTimeout(() => {
+      animWindow.value = false
+    }, 1100)
+  }
+)
 
 let ro = null
 onMounted(() => {
@@ -828,6 +1014,220 @@ async function toggleStatus(row) {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+/* ── Filter toggle button + facet panel ──────────────────── */
+.rv-filter-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--elevated);
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 0.18s,
+    background 0.18s,
+    border-color 0.18s;
+}
+.rv-filter-btn:hover {
+  color: var(--t1);
+  background: var(--hover);
+}
+.rv-filter-btn.active {
+  color: var(--t1);
+  border-color: rgba(108, 142, 245, 0.45);
+}
+.rv-filter-icon {
+  font-size: 13px;
+  transition: transform 0.4s cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+.rv-filter-icon.open {
+  transform: rotate(90deg);
+}
+.rv-filter-badge {
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+.rv-badge-enter-active,
+.rv-badge-leave-active {
+  transition:
+    transform 0.24s cubic-bezier(0.34, 1.5, 0.5, 1),
+    opacity 0.2s ease;
+}
+.rv-badge-enter-from,
+.rv-badge-leave-to {
+  transform: scale(0);
+  opacity: 0;
+}
+
+.rv-filters {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-rows: 0fr;
+  background: var(--glass-soft);
+  border-bottom: 1px solid transparent;
+  transition:
+    grid-template-rows 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.34s ease;
+  z-index: 2;
+}
+.rv-filters.open {
+  grid-template-rows: 1fr;
+  border-bottom-color: var(--border);
+}
+.rv-filters-inner {
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 22px;
+  padding: 0 22px;
+  transition: padding 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.rv-filters.open .rv-filters-inner {
+  padding: 13px 22px;
+}
+.rv-facet {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.rv-facet-groups {
+  flex-wrap: wrap;
+}
+.rv-facet-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+.rv-facet-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.rv-fchip {
+  --fchip-c: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--elevated);
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.16s,
+    color 0.16s,
+    border-color 0.16s,
+    transform 0.16s;
+}
+.rv-fchip:hover {
+  transform: translateY(-1px);
+  color: var(--t1);
+}
+.rv-fchip.on {
+  background: color-mix(in srgb, var(--fchip-c) 16%, transparent);
+  border-color: color-mix(in srgb, var(--fchip-c) 50%, transparent);
+  color: var(--t1);
+}
+.rv-fchip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fchip-c);
+  flex-shrink: 0;
+}
+.rv-fchip-emoji {
+  font-size: 12px;
+}
+.m-current {
+  --fchip-c: var(--green);
+}
+.m-ended {
+  --fchip-c: var(--pink);
+}
+.rv-endpoints {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--elevated);
+}
+.rv-seg {
+  border: none;
+  background: transparent;
+  color: var(--t3);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.rv-seg.on {
+  background: var(--accent);
+  color: #fff;
+}
+.rv-clear {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  background: transparent;
+  color: var(--t3);
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.rv-clear:hover {
+  color: #ef5350;
+  background: rgba(239, 83, 80, 0.1);
+}
+.rv-clear-enter-active,
+.rv-clear-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.rv-clear-enter-from,
+.rv-clear-leave-to {
+  opacity: 0;
+  transform: translateX(-6px);
 }
 
 .rv-search {

@@ -218,7 +218,12 @@
       "Bash(node verify-userpage.mjs)",
       "PowerShell(Get-NetTCPConnection -LocalPort 4173,4199 -State Listen | ForEach-Object { $p = Get-Process -Id $_.OwningProcess; \"{0} pid={1} path={2}\" -f $_.LocalPort, $p.Id, $p.Path })",
       "PowerShell(\\(Get-CimInstance Win32_Process -Filter \"ProcessId=47396\"\\).CommandLine; \\(Get-CimInstance Win32_Process -Filter \"ProcessId=58216\"\\).CommandLine)",
-      "Bash(node recheck-layout.mjs)"
+      "Bash(node recheck-layout.mjs)",
+      "PowerShell(npx vitest run tests/auth.test.js 2>&1)",
+      "PowerShell(npx prettier --write src/renderer/src/components/PeopleView.vue src/renderer/src/components/RelationshipsView.vue src/renderer/src/store/index.js src/renderer/src/components/AuthGate.vue src/renderer/src/components/AccountMenu.vue src/renderer/src/App.vue src/renderer/src/components/time/TimeSlider.vue src/shared/dbCore.ts src/shared/auth.ts tests/auth.test.js 2>&1)",
+      "PowerShell(npx prettier --check src/renderer/src/store/index.js 2>&1)",
+      "Bash(git --no-pager diff --stat)",
+      "Bash(git --no-pager diff --stat HEAD)"
     ]
   }
 }

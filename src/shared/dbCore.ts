@@ -677,6 +677,38 @@ export const channelHandlers: Record<string, Handler> = {
     return { user: publicUser(user), token: session.token, expires_at: session.expires_at }
   },
 
+  // Passwordless "just let me look around" access. A single shared guest
+  // account (plan 'guest') is reused across guest sign-ins so its sample data
+  // persists and the users table doesn't grow one row per visit. Guests are
+  // gated out of Advanced mode client-side (the plan is the signal). When the
+  // hosted backend lands this becomes an anonymous/ephemeral session.
+  'auth:guest'(db, _data, env) {
+    const now = env.nowStr()
+    let user = Object.values(db.users).find((u) => u.plan === 'guest')
+    if (!user) {
+      user = {
+        id: env.uuid(),
+        username: 'Guest',
+        // A key no real account can register (usernames can't contain spaces),
+        // so guest access never collides with a registered login.
+        username_lower: 'guest (visitor)',
+        password_hash: '',
+        password_salt: '',
+        password_iterations: 0,
+        plan: 'guest',
+        tos_accepted_at: now,
+        failed_logins: 0,
+        locked_until: null,
+        created_at: now
+      }
+      db.users[user.id] = user
+    }
+    ensureActiveProjectFor(db, user, env)
+    pruneSessions(db, now)
+    const session = startSession(db, user, env)
+    return { user: publicUser(user), token: session.token, expires_at: session.expires_at }
+  },
+
   'auth:logout'(db, _data, _env, ctx) {
     if (ctx?.token) delete db.sessions[ctx.token]
     return { ok: true }
@@ -1304,6 +1336,7 @@ export const channelHandlers: Record<string, Handler> = {
 export const WRITE_CHANNELS = new Set([
   'auth:register',
   'auth:login',
+  'auth:guest',
   'auth:logout',
   'auth:session', // may repair activeProjectId on restore
   'auth:updateProfile',
