@@ -157,6 +157,116 @@ describe('sessions', () => {
   })
 })
 
+describe('auth:updateProfile', () => {
+  it('sets display name, bio, and avatar hue; returns no credentials', async () => {
+    const { token } = await register(db, 'alice')
+    const res = channelHandlers['auth:updateProfile'](
+      db,
+      { display_name: '  Alice L.  ', bio: 'Family historian', avatar_hue: 205 },
+      env,
+      ctxFor(db, token)
+    )
+    expect(res.display_name).toBe('Alice L.')
+    expect(res.bio).toBe('Family historian')
+    expect(res.avatar_hue).toBe(205)
+    expect(res.password_hash).toBeUndefined()
+    const stored = Object.values(db.users)[0]
+    expect(stored.display_name).toBe('Alice L.')
+  })
+
+  it('clears fields with empty strings / null hue, and leaves omitted fields alone', async () => {
+    const { token } = await register(db, 'alice')
+    const ctx = ctxFor(db, token)
+    channelHandlers['auth:updateProfile'](db, { display_name: 'Alice', bio: 'hi' }, env, ctx)
+    const res = channelHandlers['auth:updateProfile'](
+      db,
+      { display_name: '', avatar_hue: null },
+      env,
+      ctx
+    )
+    expect(res.display_name).toBeNull()
+    expect(res.avatar_hue).toBeNull()
+    expect(res.bio).toBe('hi') // untouched — not in the payload
+  })
+
+  it('rejects over-long fields, bad hues, and missing sessions', async () => {
+    const { token } = await register(db, 'alice')
+    const ctx = ctxFor(db, token)
+    expect(() =>
+      channelHandlers['auth:updateProfile'](db, { display_name: 'x'.repeat(41) }, env, ctx)
+    ).toThrow(/at most 40/)
+    expect(() =>
+      channelHandlers['auth:updateProfile'](db, { bio: 'x'.repeat(281) }, env, ctx)
+    ).toThrow(/at most 280/)
+    expect(() => channelHandlers['auth:updateProfile'](db, { avatar_hue: 400 }, env, ctx)).toThrow(
+      /Invalid avatar/
+    )
+    expect(() => channelHandlers['auth:updateProfile'](db, { display_name: 'x' }, env)).toThrow(
+      /Not signed in/
+    )
+  })
+})
+
+describe('auth:changePassword', () => {
+  it('requires the correct current password and a valid new one', async () => {
+    const { token } = await register(db, 'alice', 'password123')
+    const ctx = ctxFor(db, token)
+    await expect(
+      channelHandlers['auth:changePassword'](
+        db,
+        { currentPassword: 'wrong-wrong', newPassword: 'newpassword1' },
+        env,
+        ctx
+      )
+    ).rejects.toThrow(/Current password is incorrect/)
+    await expect(
+      channelHandlers['auth:changePassword'](
+        db,
+        { currentPassword: 'password123', newPassword: 'short' },
+        env,
+        ctx
+      )
+    ).rejects.toThrow(/at least 8/)
+  })
+
+  it('re-hashes the password and revokes every other session', async () => {
+    const { token, user } = await register(db, 'alice', 'password123')
+    // A second signed-in device
+    const other = await channelHandlers['auth:login'](
+      db,
+      { username: 'alice', password: 'password123' },
+      env
+    )
+    await channelHandlers['auth:changePassword'](
+      db,
+      { currentPassword: 'password123', newPassword: 'brand-new-pass' },
+      env,
+      ctxFor(db, token)
+    )
+    const stored = db.users[user.id]
+    expect(await verifyPassword('brand-new-pass', stored)).toBe(true)
+    expect(await verifyPassword('password123', stored)).toBe(false)
+    expect(resolveSession(db, token, NOW)?.id).toBe(user.id) // this device stays
+    expect(resolveSession(db, other.token, NOW)).toBeNull() // the other is out
+  })
+})
+
+describe('projects:overview', () => {
+  it('returns only the user’s projects, each with its counts', async () => {
+    const alice = await register(db, 'alice')
+    const alicePid = db.activeProjectId
+    await register(db, 'bob') // bob's seeded project must not leak into alice's view
+    const res = channelHandlers['projects:overview'](db, undefined, env, ctxFor(db, alice.token))
+    expect(res.projects).toHaveLength(1)
+    const p = res.projects[0]
+    expect(p.id).toBe(alicePid)
+    const seeded = Object.values(db.persons).filter((x) => x.project_id === alicePid).length
+    expect(p.counts.persons).toBe(seeded)
+    expect(p.counts.relationships).toBeGreaterThan(0)
+    expect(p.counts.images).toBe(0)
+  })
+})
+
 describe('per-user scoping and ownership', () => {
   it('projects:getAll only returns the requesting user’s projects', async () => {
     const alice = await register(db, 'alice')

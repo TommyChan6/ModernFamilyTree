@@ -29,6 +29,12 @@ export interface User {
   /** Login throttling: consecutive failures + lockout expiry. */
   failed_logins: number
   locked_until: string | null
+  /** Profile: optional friendly name shown instead of the username. */
+  display_name?: string | null
+  /** Profile: short free-form "about me" blurb. */
+  bio?: string | null
+  /** Profile: avatar hue override (0–359). null = derive from the username. */
+  avatar_hue?: number | null
   created_at: string
 }
 
@@ -46,6 +52,32 @@ export interface PublicUser {
   id: string
   username: string
   plan: string
+  display_name: string | null
+  bio: string | null
+  avatar_hue: number | null
+  created_at: string
+}
+
+/** One project's headline numbers for the profile page's project cards. */
+export interface ProjectOverview extends Project {
+  counts: { persons: number; relationships: number; images: number }
+}
+
+// ── Sharing (planned) ─────────────────────────────────────────────────────────
+// Not implemented yet — the profile page shows a preview of it. When the hosted
+// backend lands, a `shares` table of these rows drives both "share a project"
+// and "share an image of a project"; the profile page becomes its manager.
+export type ShareVisibility = 'private' | 'link' | 'public'
+
+export interface ProjectShare {
+  id: string
+  project_id: string
+  user_id: string
+  /** 'project' shares live data read-only; 'image' shares a rendered snapshot. */
+  kind: 'project' | 'image'
+  visibility: ShareVisibility
+  /** Unguessable slug for link sharing (`/s/<slug>`). */
+  slug: string
   created_at: string
 }
 

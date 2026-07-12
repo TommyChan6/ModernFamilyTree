@@ -105,6 +105,66 @@ export default {
     note: '这将打开你的邮件应用并预填留言 — 不会自动发送任何内容。',
     empty: '请先写一段简短的留言，再发送。'
   },
+  account: {
+    myProfile: '我的主页',
+    back: '返回应用',
+    memberSince: '注册于 {date}',
+    planFree: '免费版',
+    profile: {
+      title: '个人资料',
+      desc: '你在应用中的展示形象 — 分享功能上线后，也会展示给你分享的对象。',
+      displayName: '显示名称',
+      displayNamePh: '希望我们如何称呼你？',
+      bio: '关于你',
+      bioPh: '简单介绍一下你自己或你的家谱研究……',
+      avatar: '头像颜色',
+      auto: '自动 — 根据用户名生成',
+      save: '保存资料',
+      saved: '已保存'
+    },
+    security: {
+      title: '安全',
+      desc: '你的登录信息。修改密码后，其他设备将被退出登录。',
+      username: '用户名',
+      usernameNote: '用户名无法更改。',
+      currentPassword: '当前密码',
+      newPassword: '新密码',
+      confirmPassword: '再次输入新密码',
+      change: '修改密码',
+      changed: '密码已修改 — 你的其他设备已退出登录。',
+      mismatch: '两次输入的新密码不一致',
+      signOut: '退出登录'
+    },
+    usage: {
+      title: '套餐与用量',
+      desc: '当前套餐包含的内容以及你已使用的额度。',
+      people: '成员',
+      projects: '项目',
+      photos: '照片'
+    },
+    projects: {
+      title: '你的项目',
+      desc: '你创建的所有内容都在这里。点击项目即可打开。',
+      open: '打开',
+      current: '当前打开',
+      updated: '更新于 {date}',
+      new: '新建项目'
+    },
+    sharing: {
+      title: '分享',
+      soon: '即将推出',
+      desc: '分享项目的只读链接，或发布家谱的快照图片。功能上线后，你将在这里管理所有已分享的内容。',
+      kindProject: '项目链接',
+      kindImage: '图片快照',
+      visibility: {
+        private: '私密',
+        link: '拥有链接的任何人',
+        public: '公开'
+      },
+      copyLink: '复制链接',
+      mockNote: '这是计划功能的预览 — 目前尚未分享任何内容，你的所有数据仍保存在本地设备上。'
+    }
+  },
   about: {
     title: '关于家谱',
     tagline: '一款本地优先的家庭与关系图谱工具。',

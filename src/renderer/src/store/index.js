@@ -33,6 +33,7 @@ export const useMainStore = defineStore('main', () => {
   const theme = ref('dark')
   const settingsOpen = ref(false) // graph "Style" side panel
   const appSettingsOpen = ref(false) // the app-wide Settings modal (language, help, feedback)
+  const userPageOpen = ref(false) // the full-screen profile / account page
   // Display language. The i18n `locale` ref is the source of truth for
   // rendering; this store field mirrors it so components already wired to the
   // store stay reactive, and persistence flows through globalSettings.
@@ -285,6 +286,7 @@ export const useMainStore = defineStore('main', () => {
     selectedPersonId.value = null
     modalOpen.value = false
     formOpen.value = false
+    userPageOpen.value = false
     editingPerson.value = null
     relPopup.value = null
     checkpoint.value = null
@@ -294,6 +296,25 @@ export const useMainStore = defineStore('main', () => {
   async function refreshUsage() {
     const res = await api.invoke('auth:usage')
     if (res.success) authUsage.value = res.data
+  }
+
+  // Profile fields only (display name / bio / avatar hue) — the handler
+  // returns the fresh PublicUser, which replaces authUser wholesale.
+  async function updateProfile(fields) {
+    const res = await api.invoke('auth:updateProfile', fields)
+    if (res.success) authUser.value = res.data
+    return res
+  }
+
+  function changePassword({ currentPassword, newPassword }) {
+    return api.invoke('auth:changePassword', { currentPassword, newPassword })
+  }
+
+  // Per-project headline counts for the profile page's project cards.
+  // Returned (not stored) — the page fetches fresh numbers each open.
+  async function fetchProjectsOverview() {
+    const res = await api.invoke('projects:overview')
+    return res.success ? res.data.projects : []
   }
 
   // ── Project actions ───────────────────────────────────────────────────────
@@ -730,6 +751,10 @@ export const useMainStore = defineStore('main', () => {
     appSettingsOpen.value = typeof open === 'boolean' ? open : !appSettingsOpen.value
   }
 
+  function toggleUserPage(open) {
+    userPageOpen.value = typeof open === 'boolean' ? open : !userPageOpen.value
+  }
+
   // Switch the display language app-wide and remember it. Guards against
   // unknown codes so a stale/garbage stored value can't wedge the UI.
   function setLanguage(code) {
@@ -787,6 +812,9 @@ export const useMainStore = defineStore('main', () => {
     login,
     logout,
     refreshUsage,
+    updateProfile,
+    changePassword,
+    fetchProjectsOverview,
     // project
     projects,
     activeProjectId,
@@ -814,6 +842,7 @@ export const useMainStore = defineStore('main', () => {
     theme,
     settingsOpen,
     appSettingsOpen,
+    userPageOpen,
     language,
     graphSettings,
     lockNodes,
@@ -880,6 +909,7 @@ export const useMainStore = defineStore('main', () => {
     setTheme,
     toggleSettings,
     toggleAppSettings,
+    toggleUserPage,
     setLanguage,
     setCurrentYear,
     updateGraphSetting,

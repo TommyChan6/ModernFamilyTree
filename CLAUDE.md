@@ -114,9 +114,12 @@ account claims pre-auth projects; ownership violations read as "not found"), and
 per-plan quotas (`PLAN_LIMITS` — people/projects/photos on the free tier) are
 enforced in `persons:create`/`projects:create`/`images:add`. UI: `AuthGate.vue`
 (sign in / register + `LegalModal.vue` Terms & Privacy), `AccountMenu.vue` (topbar
-chip: plan, usage bars, sign out); `App.vue` only loads data behind a restored
-session. When adding a channel, decide whether it needs `ctx` and NEVER return
-password/salt fields to the renderer.
+chip: plan, usage bars, sign out), `UserPage.vue` (full-screen profile page —
+profile fields via `auth:updateProfile`, password via `auth:changePassword`,
+project cards via `projects:overview`, plus a disabled preview of the planned
+sharing feature; see the `ProjectShare` placeholder in `types.ts`); `App.vue`
+only loads data behind a restored session. When adding a channel, decide whether
+it needs `ctx` and NEVER return password/salt fields to the renderer.
 
 **State** (`src/renderer/src/store/index.js`): a single Pinia store `main` is the
 source of truth for `persons`, `relationships`, `tags`/`entityTags` (+ the

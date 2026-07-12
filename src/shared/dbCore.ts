@@ -21,6 +21,7 @@ import type {
   ImageRecord,
   Person,
   Project,
+  ProjectOverview,
   PublicUser,
   Relationship,
   Scene,
@@ -543,7 +544,15 @@ export function createInitialDB(env: Env): DB {
 // ── Auth helpers ──────────────────────────────────────────────────────────────
 
 function publicUser(u: User): PublicUser {
-  return { id: u.id, username: u.username, plan: u.plan, created_at: u.created_at }
+  return {
+    id: u.id,
+    username: u.username,
+    plan: u.plan,
+    display_name: u.display_name ?? null,
+    bio: u.bio ?? null,
+    avatar_hue: u.avatar_hue ?? null,
+    created_at: u.created_at
+  }
 }
 
 /** All projects the user owns. Handlers scope everything else through the
@@ -685,10 +694,68 @@ export const channelHandlers: Record<string, Handler> = {
     return usageOf(db, ctx.user)
   },
 
+  // Profile fields only — username, plan, and credentials have their own flows.
+  'auth:updateProfile'(db, data, _env, ctx) {
+    if (!ctx?.user) throw new Error('Not signed in')
+    const user = ctx.user
+    if ('display_name' in (data ?? {})) {
+      const name = String(data.display_name ?? '').trim()
+      if (name.length > 40) throw new Error('Display name must be at most 40 characters')
+      user.display_name = name || null
+    }
+    if ('bio' in (data ?? {})) {
+      const bio = String(data.bio ?? '').trim()
+      if (bio.length > 280) throw new Error('Bio must be at most 280 characters')
+      user.bio = bio || null
+    }
+    if ('avatar_hue' in (data ?? {})) {
+      const hue = data.avatar_hue
+      if (hue == null) user.avatar_hue = null
+      else {
+        const n = Number(hue)
+        if (!Number.isFinite(n) || n < 0 || n >= 360) throw new Error('Invalid avatar colour')
+        user.avatar_hue = Math.round(n)
+      }
+    }
+    return publicUser(user)
+  },
+
+  // Verifies the current password, re-hashes with a fresh salt, and revokes
+  // every OTHER session — the standard "log out my other devices" semantics.
+  async 'auth:changePassword'(db, data, _env, ctx) {
+    if (!ctx?.user) throw new Error('Not signed in')
+    const user = ctx.user
+    const current = String(data?.currentPassword ?? '')
+    const next = String(data?.newPassword ?? '')
+    if (!(await verifyPassword(current, user))) throw new Error('Current password is incorrect')
+    const passwordError = validatePassword(next)
+    if (passwordError) throw new Error(passwordError)
+    Object.assign(user, await hashPassword(next))
+    for (const [token, s] of Object.entries(db.sessions)) {
+      if (s.user_id === user.id && token !== ctx.token) delete db.sessions[token]
+    }
+    return { ok: true }
+  },
+
   // ── projects ───────────────────────────────────────────────────────────────
   'projects:getAll'(db, _data, _env, ctx) {
     const list = ctx?.user ? projectsOf(db, ctx.user.id) : Object.values(db.projects)
     return { projects: sortByDate(list), activeProjectId: db.activeProjectId }
+  },
+
+  // Each owned project with its headline counts — the profile page's cards.
+  'projects:overview'(db, _data, _env, ctx) {
+    const list = ctx?.user ? projectsOf(db, ctx.user.id) : Object.values(db.projects)
+    const counts = (pid: string) => ({
+      persons: Object.values(db.persons).filter((p) => p.project_id === pid).length,
+      relationships: Object.values(db.relationships).filter((r) => r.project_id === pid).length,
+      images: Object.values(db.images).filter((img) => img.project_id === pid).length
+    })
+    const projects: ProjectOverview[] = sortByDate(list).map((p) => ({
+      ...p,
+      counts: counts(p.id)
+    }))
+    return { projects, activeProjectId: db.activeProjectId }
   },
 
   'projects:create'(db, data, env, ctx) {
@@ -1239,6 +1306,8 @@ export const WRITE_CHANNELS = new Set([
   'auth:login',
   'auth:logout',
   'auth:session', // may repair activeProjectId on restore
+  'auth:updateProfile',
+  'auth:changePassword',
   'projects:create',
   'projects:rename',
   'projects:delete',

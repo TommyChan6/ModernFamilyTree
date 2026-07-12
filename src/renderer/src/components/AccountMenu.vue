@@ -2,7 +2,7 @@
   <div ref="rootRef" class="account">
     <button class="account-chip" :class="{ open }" :title="store.authUser.username" @click="toggle">
       <span class="account-avatar" :style="avatarStyle">{{ initial }}</span>
-      <span class="account-name">{{ store.authUser.username }}</span>
+      <span class="account-name">{{ shownName }}</span>
       <span class="account-caret" :class="{ flipped: open }">▾</span>
     </button>
 
@@ -11,7 +11,7 @@
         <div class="menu-head">
           <span class="account-avatar big" :style="avatarStyle">{{ initial }}</span>
           <div class="menu-head-text">
-            <div class="menu-username">{{ store.authUser.username }}</div>
+            <div class="menu-username">{{ shownName }}</div>
             <div class="menu-plan">
               <span class="plan-badge">{{ planLabel }}</span>
             </div>
@@ -35,6 +35,7 @@
         </div>
 
         <div class="menu-sep"></div>
+        <button class="menu-item" @click="openProfile">👤 {{ t('account.myProfile') }}</button>
         <button class="menu-item" @click="openLegal">📄 Terms &amp; Privacy</button>
         <button class="menu-item danger" @click="signOut">↩ Sign out</button>
       </div>
@@ -47,28 +48,24 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMainStore } from '../store/index.js'
+import { useI18n } from '../i18n'
+import { avatarStyleFor } from '../lib/avatar.js'
 import LegalModal from './LegalModal.vue'
 
 const store = useMainStore()
+const { t } = useI18n()
 const open = ref(false)
 const legalOpen = ref(false)
 const rootRef = ref(null)
 
-const initial = computed(() => (store.authUser?.username?.[0] || '?').toUpperCase())
+const shownName = computed(() => store.authUser?.display_name || store.authUser?.username || '')
+const initial = computed(() => (shownName.value[0] || '?').toUpperCase())
 const planLabel = computed(() =>
   store.authUser?.plan === 'free' ? 'Free plan' : store.authUser?.plan
 )
 
-// Stable per-username hue so each account gets its own avatar colour
-const avatarStyle = computed(() => {
-  const name = store.authUser?.username || ''
-  let hash = 0
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0
-  const hue = ((hash % 360) + 360) % 360
-  return {
-    background: `linear-gradient(135deg, hsl(${hue}, 62%, 52%), hsl(${(hue + 40) % 360}, 62%, 42%))`
-  }
-})
+// Per-username hue, overridable from the profile page (lib/avatar.js)
+const avatarStyle = computed(() => avatarStyleFor(store.authUser))
 
 const usageRows = computed(() => {
   const u = store.authUsage
@@ -83,6 +80,11 @@ const usageRows = computed(() => {
 function toggle() {
   open.value = !open.value
   if (open.value) store.refreshUsage()
+}
+
+function openProfile() {
+  open.value = false
+  store.toggleUserPage(true)
 }
 
 function openLegal() {

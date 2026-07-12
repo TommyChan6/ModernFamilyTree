@@ -213,7 +213,12 @@
       "Bash(node -e \"try{console.log\\(require\\('electron/package.json'\\).version\\)}catch\\(e\\){console.log\\('no electron'\\)}\")",
       "Bash(node \"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/f3fb90a1-bf10-42b5-9fd0-4515ee7c1153/scratchpad/drive.cjs\")",
       "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\({name:p.name,version:p.version,author:p.author,productName:p.productName,description:p.description}\\)\\)\")",
-      "PowerShell(npx prettier --write src/renderer/src/App.vue src/renderer/src/components/SettingsModal.vue src/renderer/src/i18n/locales/en.js 2>&1)"
+      "PowerShell(npx prettier --write src/renderer/src/App.vue src/renderer/src/components/SettingsModal.vue src/renderer/src/i18n/locales/en.js 2>&1)",
+      "Bash(sed -i 's/localhost:4173/localhost:4199/' verify-userpage.mjs)",
+      "Bash(node verify-userpage.mjs)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 4173,4199 -State Listen | ForEach-Object { $p = Get-Process -Id $_.OwningProcess; \"{0} pid={1} path={2}\" -f $_.LocalPort, $p.Id, $p.Path })",
+      "PowerShell(\\(Get-CimInstance Win32_Process -Filter \"ProcessId=47396\"\\).CommandLine; \\(Get-CimInstance Win32_Process -Filter \"ProcessId=58216\"\\).CommandLine)",
+      "Bash(node recheck-layout.mjs)"
     ]
   }
 }

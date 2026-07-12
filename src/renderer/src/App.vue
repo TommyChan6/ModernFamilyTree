@@ -148,6 +148,7 @@
     <CommandPalette ref="paletteRef" />
     <ExportModal :open="exportOpen" :capture="captureViewImage" @close="exportOpen = false" />
     <SettingsModal />
+    <UserPage />
     <!-- Sign-in gate: covers the workspace until a session exists -->
     <Transition name="auth-gate">
       <AuthGate v-if="store.authReady && !store.authUser" />
@@ -176,6 +177,7 @@ import AuthGate from './components/AuthGate.vue'
 import AccountMenu from './components/AccountMenu.vue'
 import ExportModal from './components/ExportModal.vue'
 import SettingsModal from './components/SettingsModal.vue'
+import UserPage from './components/UserPage.vue'
 import TimeSlider from './components/time/TimeSlider.vue'
 
 const store = useMainStore()

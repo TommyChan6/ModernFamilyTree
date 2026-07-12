@@ -105,6 +105,66 @@ export default {
     note: '這會開啟你的電子郵件應用程式並預先填入留言 — 不會自動傳送任何內容。',
     empty: '請先寫一段簡短的留言，再傳送。'
   },
+  account: {
+    myProfile: '我的主頁',
+    back: '返回應用程式',
+    memberSince: '註冊於 {date}',
+    planFree: '免費版',
+    profile: {
+      title: '個人資料',
+      desc: '你在應用程式中的展示形象 — 分享功能推出後，也會展示給你分享的對象。',
+      displayName: '顯示名稱',
+      displayNamePh: '希望我們如何稱呼你？',
+      bio: '關於你',
+      bioPh: '簡單介紹一下你自己或你的家譜研究……',
+      avatar: '頭像顏色',
+      auto: '自動 — 依使用者名稱產生',
+      save: '儲存資料',
+      saved: '已儲存'
+    },
+    security: {
+      title: '安全性',
+      desc: '你的登入資訊。變更密碼後，其他裝置將被登出。',
+      username: '使用者名稱',
+      usernameNote: '使用者名稱無法變更。',
+      currentPassword: '目前密碼',
+      newPassword: '新密碼',
+      confirmPassword: '再次輸入新密碼',
+      change: '變更密碼',
+      changed: '密碼已變更 — 你的其他裝置已登出。',
+      mismatch: '兩次輸入的新密碼不一致',
+      signOut: '登出'
+    },
+    usage: {
+      title: '方案與用量',
+      desc: '目前方案包含的內容以及你已使用的額度。',
+      people: '成員',
+      projects: '專案',
+      photos: '照片'
+    },
+    projects: {
+      title: '你的專案',
+      desc: '你建立的所有內容都在這裡。點擊專案即可開啟。',
+      open: '開啟',
+      current: '目前開啟',
+      updated: '更新於 {date}',
+      new: '新增專案'
+    },
+    sharing: {
+      title: '分享',
+      soon: '即將推出',
+      desc: '分享專案的唯讀連結，或發佈家譜的快照圖片。功能推出後，你將在這裡管理所有已分享的內容。',
+      kindProject: '專案連結',
+      kindImage: '圖片快照',
+      visibility: {
+        private: '私密',
+        link: '擁有連結的任何人',
+        public: '公開'
+      },
+      copyLink: '複製連結',
+      mockNote: '這是計畫功能的預覽 — 目前尚未分享任何內容，你的所有資料仍保存在本機裝置上。'
+    }
+  },
   about: {
     title: '關於家譜',
     tagline: '一款以本機為優先的家庭與關係圖譜工具。',

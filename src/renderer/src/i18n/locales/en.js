@@ -109,6 +109,67 @@ export default {
     note: 'This opens your email app with the message pre-filled — nothing is sent automatically.',
     empty: 'Write a short message first, then send.'
   },
+  account: {
+    myProfile: 'My profile',
+    back: 'Back to the app',
+    memberSince: 'Member since {date}',
+    planFree: 'Free plan',
+    profile: {
+      title: 'Profile',
+      desc: 'How you appear in the app — and, once sharing arrives, to the people you share with.',
+      displayName: 'Display name',
+      displayNamePh: 'How should we address you?',
+      bio: 'About you',
+      bioPh: 'A short line about you or your family research…',
+      avatar: 'Avatar colour',
+      auto: 'Automatic — derived from your username',
+      save: 'Save profile',
+      saved: 'Saved'
+    },
+    security: {
+      title: 'Security',
+      desc: 'Your sign-in details. Changing the password signs out your other devices.',
+      username: 'Username',
+      usernameNote: 'Usernames can’t be changed.',
+      currentPassword: 'Current password',
+      newPassword: 'New password',
+      confirmPassword: 'Repeat new password',
+      change: 'Change password',
+      changed: 'Password changed — your other devices were signed out.',
+      mismatch: 'The new passwords don’t match',
+      signOut: 'Sign out'
+    },
+    usage: {
+      title: 'Plan & usage',
+      desc: 'What your current plan includes and how much of it you’re using.',
+      people: 'People',
+      projects: 'Projects',
+      photos: 'Photos'
+    },
+    projects: {
+      title: 'Your projects',
+      desc: 'Everything you’ve created, in one place. Click a project to open it.',
+      open: 'Open',
+      current: 'Open now',
+      updated: 'Updated {date}',
+      new: 'New project'
+    },
+    sharing: {
+      title: 'Sharing',
+      soon: 'Coming soon',
+      desc: 'Share a read-only link to a project, or publish snapshot images of your tree. Once it lands, this is where you’ll manage everything you’ve shared.',
+      kindProject: 'Project link',
+      kindImage: 'Image snapshot',
+      visibility: {
+        private: 'Private',
+        link: 'Anyone with the link',
+        public: 'Public'
+      },
+      copyLink: 'Copy link',
+      mockNote:
+        'This is a preview of the planned feature — nothing is shared yet, and all of your data stays on this device.'
+    }
+  },
   about: {
     title: 'About Family Tree',
     tagline: 'A local-first family & relationship mapper.',
