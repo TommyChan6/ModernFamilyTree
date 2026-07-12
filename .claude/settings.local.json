@@ -228,7 +228,14 @@
       "PowerShell(node -e \"try{console.log\\('pw-core:', require.resolve\\('playwright-core'\\)\\)}catch\\(e\\){console.log\\('no playwright-core'\\)}\"; \\(Get-Command msedge -ErrorAction SilentlyContinue\\).Source; Test-Path \"C:\\\\Program Files \\(x86\\)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\")",
       "Bash(grep -E \"src/.*\\\\.\\(vue|js|ts\\)$\")",
       "PowerShell(npx prettier --check \"src/renderer/src/components/home/ViewShowcase.vue\")",
-      "PowerShell(npx prettier --write \"src/renderer/src/App.vue\" \"src/renderer/src/components/home/HomePage.vue\")"
+      "PowerShell(npx prettier --write \"src/renderer/src/App.vue\" \"src/renderer/src/components/home/HomePage.vue\")",
+      "Bash(node -e \"require.resolve\\('playwright-core'\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173/)",
+      "Bash(netstat -ano)",
+      "Bash(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\72789bcb-c1d6-4208-9e5f-81f529f3f88d\\\\scratchpad\\\\verify-character.mjs\")",
+      "Bash(npx vue-tsc *)",
+      "Bash(curl -s \"http://localhost:5173/src/components/character/CharacterView.vue\")",
+      "Bash(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\72789bcb-c1d6-4208-9e5f-81f529f3f88d\\\\scratchpad\\\\verify-empty.mjs\")"
     ]
   }
 }

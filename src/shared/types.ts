@@ -193,7 +193,53 @@ export interface ImageRecord {
   /** Desktop: absolute path under userData/images. Web: a data: URL. */
   file_path: string
   is_primary: boolean
+  /** Where the image came from: '' = user-picked photo; 'character' = a
+   *  portrait rendered from a CharacterDoc (re-saving replaces it). */
+  source?: string
   created_at: string
+}
+
+// ── Characters (experimental — the Character view, Advanced + Labs) ──────────
+/** One slot's chosen part + adjustments. Parts are referenced BY ID within the
+ *  doc's style pack — never by geometry — so the same doc can later render
+ *  through a different backend (e.g. 3D) or an updated part library. */
+export interface CharacterSlotState {
+  /** A part id within the doc's style pack; null = slot intentionally empty. */
+  partId: string | null
+  /** Uniform scale about the slot's socket (anchor) point. */
+  scale: number
+  flip?: boolean
+}
+
+/** A buildable portrait for a person. A person can own several (e.g. young /
+ *  adult / old looks); at most one carries is_portrait and feeds the app's
+ *  avatar pipeline (via an images row with source 'character'). Rendering is
+ *  backend-agnostic: the doc stores part ids, palette channels, and morph
+ *  values only. */
+export interface CharacterDoc {
+  id: string
+  project_id: string
+  person_id: string
+  /** Schema version for future migration. */
+  version: 1
+  /** User label ("Young Ellen", "Coronation", …). */
+  label: string
+  /** Which style pack the parts belong to (e.g. 'cartoon'). */
+  style_id: string
+  /** Explicitly chosen to feed the person's avatar (≤1 per person). */
+  is_portrait: boolean
+  /** Optional age range (inclusive years) so the timeline can pick the right
+   *  look for a moment; null = ageless. */
+  age_from: number | null
+  age_to: number | null
+  /** slot id → chosen part + adjustments (only slots the user touched). */
+  parts: Record<string, CharacterSlotState>
+  /** palette channel (skin/hair/eyes/outfitA/outfitB/accent) → hex color. */
+  palette: Record<string, string>
+  /** Body morphs, each −1..1 (0 = the style's default proportions). */
+  morph: { height: number; build: number; headSize: number }
+  created_at: string
+  updated_at: string
 }
 
 export interface DB {
@@ -209,6 +255,7 @@ export interface DB {
   scenes: Record<string, Scene>
   scene_tags: Record<string, SceneTag>
   images: Record<string, ImageRecord>
+  characters: Record<string, CharacterDoc>
   /** `${projectId}:key` → value for per-project settings */
   settings: Record<string, unknown>
   /** theme, etc. */

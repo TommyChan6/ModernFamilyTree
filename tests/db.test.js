@@ -1529,3 +1529,123 @@ describe('Data integrity', () => {
     expect(() => getDB()).not.toThrow()
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Characters (experimental Character view)', () => {
+  const makeDoc = (db, personId, extra = {}) =>
+    channelHandlers['characters:save'](
+      db,
+      {
+        person_id: personId,
+        label: 'Look 1',
+        style_id: 'cartoon',
+        parts: { hair: { partId: 'hair-short', scale: 1 } },
+        palette: { skin: '#f2c9a0' },
+        morph: { height: 0, build: 0, headSize: 0 },
+        ...extra
+      },
+      handlerEnv
+    )
+
+  it('characters:save creates a doc scoped to the active project', () => {
+    initDB()
+    const { db, activeProjectId } = getDB()
+    const [personId] = Object.keys(db.persons)
+    const doc = makeDoc(db, personId)
+    expect(doc.id).toBeDefined()
+    expect(doc.project_id).toBe(activeProjectId)
+    expect(doc.person_id).toBe(personId)
+    expect(doc.is_portrait).toBe(false)
+    expect(doc.version).toBe(1)
+    expect(channelHandlers['characters:getAll'](db)).toHaveLength(1)
+  })
+
+  it('characters:save rejects an unknown person', () => {
+    initDB()
+    const { db } = getDB()
+    expect(() => makeDoc(db, 'nope')).toThrow('Person not found')
+  })
+
+  it('characters:save with an id patches only the given fields', () => {
+    initDB()
+    const { db } = getDB()
+    const [personId] = Object.keys(db.persons)
+    const doc = makeDoc(db, personId)
+    const updated = channelHandlers['characters:save'](
+      db,
+      { id: doc.id, label: 'Old Me', age_from: 60, age_to: '' },
+      handlerEnv
+    )
+    expect(updated.label).toBe('Old Me')
+    expect(updated.age_from).toBe(60)
+    expect(updated.age_to).toBeNull()
+    expect(updated.parts.hair.partId).toBe('hair-short') // untouched
+    expect(updated.person_id).toBe(personId)
+  })
+
+  it('characters:setPortrait is exclusive per person and can be cleared', () => {
+    initDB()
+    const { db } = getDB()
+    const [p1, p2] = Object.keys(db.persons)
+    const a = makeDoc(db, p1)
+    const b = makeDoc(db, p1, { label: 'Look 2' })
+    const other = makeDoc(db, p2)
+
+    channelHandlers['characters:setPortrait'](db, { personId: p1, characterId: a.id }, handlerEnv)
+    expect(db.characters[a.id].is_portrait).toBe(true)
+    expect(db.characters[b.id].is_portrait).toBe(false)
+
+    channelHandlers['characters:setPortrait'](db, { personId: p1, characterId: b.id }, handlerEnv)
+    expect(db.characters[a.id].is_portrait).toBe(false)
+    expect(db.characters[b.id].is_portrait).toBe(true)
+    expect(db.characters[other.id].is_portrait).toBe(false) // other person untouched
+
+    channelHandlers['characters:setPortrait'](db, { personId: p1, characterId: null }, handlerEnv)
+    expect(db.characters[b.id].is_portrait).toBe(false)
+
+    expect(() =>
+      channelHandlers['characters:setPortrait'](
+        db,
+        { personId: p1, characterId: 'nope' },
+        handlerEnv
+      )
+    ).toThrow('Character not found')
+  })
+
+  it('deleting a person cascades its character docs; others stay', () => {
+    initDB()
+    const { db } = getDB()
+    const [p1, p2] = Object.keys(db.persons)
+    makeDoc(db, p1)
+    makeDoc(db, p1, { label: 'Look 2' })
+    const keep = makeDoc(db, p2)
+
+    channelHandlers['persons:delete'](db, { id: p1 }, handlerEnv)
+
+    const remaining = Object.values(db.characters)
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0].id).toBe(keep.id)
+  })
+
+  it('deleting a project cascades its character docs', () => {
+    initDB()
+    const { db, activeProjectId } = getDB()
+    const [personId] = Object.keys(db.persons)
+    makeDoc(db, personId)
+    expect(Object.keys(db.characters)).toHaveLength(1)
+
+    channelHandlers['projects:delete'](db, { id: activeProjectId }, handlerEnv)
+    expect(Object.keys(db.characters)).toHaveLength(0)
+  })
+
+  it('characters:getAll only returns the active project’s docs', () => {
+    initDB()
+    const { db } = getDB()
+    const [personId] = Object.keys(db.persons)
+    makeDoc(db, personId)
+
+    const other = channelHandlers['projects:create'](db, { name: 'Other' }, handlerEnv)
+    channelHandlers['projects:setActive'](db, { id: other.id }, handlerEnv)
+    expect(channelHandlers['characters:getAll'](db)).toHaveLength(0)
+  })
+})

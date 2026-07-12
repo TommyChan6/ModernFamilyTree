@@ -57,6 +57,7 @@ export function initDB() {
   _db.scenes = _db.scenes || {}
   _db.scene_tags = _db.scene_tags || {}
   _db.images = _db.images || {}
+  _db.characters = _db.characters || {}
   _db.settings = _db.settings || {}
   _db.globalSettings = _db.globalSettings || {}
 

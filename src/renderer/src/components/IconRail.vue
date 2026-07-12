@@ -47,9 +47,11 @@ const views = [
   { id: 'directory', icon: '👥' },
   { id: 'relationships', icon: '🔗' },
   { id: 'timeline', icon: '📅' },
-  { id: 'groups', icon: '⬡' }
+  { id: 'groups', icon: '⬡' },
+  { id: 'character', icon: '🎭' } // experimental — Advanced + 🧪 Labs only
 ]
-// Program-mode gating: Simple shows Graph + Directory only
+// Program-mode gating: Simple shows Graph + Directory only; the Character
+// view appears only when caps.views includes it (Advanced + Labs).
 const visibleViews = computed(() => views.filter((v) => store.caps.views.includes(v.id)))
 </script>
 

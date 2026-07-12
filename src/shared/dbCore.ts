@@ -15,6 +15,7 @@
 
 import type {
   AuthCtx,
+  CharacterDoc,
   DB,
   EntityTag,
   Env,
@@ -66,6 +67,13 @@ function sortByDate<T extends { created_at: string }>(arr: T[]): T[] {
   return arr.slice().sort((a, b) => (a.created_at > b.created_at ? 1 : -1))
 }
 
+/** Coerce a form value to a finite number, or null (empty / garbage input). */
+function numOrNull(v: unknown): number | null {
+  if (v == null || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
 /** Filter a table down to rows belonging to the active project. */
 function forProject<T extends { project_id: string }>(db: DB, table: Record<string, T>): T[] {
   return Object.values(table).filter((item) => item.project_id === db.activeProjectId)
@@ -90,6 +98,7 @@ export const EMPTY_DB = (): DB => ({
   scenes: {},
   scene_tags: {},
   images: {},
+  characters: {},
   settings: {},
   globalSettings: {}
 })
@@ -853,6 +862,9 @@ export const channelHandlers: Record<string, Handler> = {
         delete db.images[iid]
       }
     }
+    for (const [cid, c] of Object.entries(db.characters || {})) {
+      if (c.project_id === pid) delete db.characters[cid]
+    }
     // Remove project-scoped settings
     for (const key of Object.keys(db.settings)) {
       if (key.startsWith(`${pid}:`)) delete db.settings[key]
@@ -940,6 +952,9 @@ export const channelHandlers: Record<string, Handler> = {
         env.removeImageFile(img.file_path)
         delete db.images[iid]
       }
+    }
+    for (const [cid, c] of Object.entries(db.characters || {})) {
+      if (c.person_id === data.id) delete db.characters[cid]
     }
     cascadeEntityTags(db, { entityId: data.id })
     delete db.persons[data.id]
@@ -1227,6 +1242,7 @@ export const channelHandlers: Record<string, Handler> = {
       person_id: personId,
       file_path: filePath,
       is_primary: !!isPrimary,
+      source: data.source || '',
       created_at: env.nowStr()
     }
     db.images[id] = img
@@ -1250,6 +1266,77 @@ export const channelHandlers: Record<string, Handler> = {
       delete db.images[imageId]
     }
     return { imageId }
+  },
+
+  // ── characters (experimental — buildable portraits; Character view) ────────
+  // A person can own several docs (different looks / age ranges); at most one
+  // is the portrait. Docs store part IDS within a style pack — no geometry —
+  // so they stay renderer-agnostic (see docs/CHARACTER_VIEW_PROPOSAL.md).
+  'characters:getAll'(db) {
+    return sortByDate(forProject(db, db.characters || {}))
+  },
+
+  // Upsert: with a known id, patch the given fields; without one, create.
+  'characters:save'(db, data, env) {
+    db.characters = db.characters || {}
+    const now = env.nowStr()
+    const existing = data?.id ? db.characters[data.id] : null
+    if (existing) {
+      if (data.label !== undefined) existing.label = String(data.label)
+      if (data.style_id !== undefined) existing.style_id = String(data.style_id)
+      if (data.age_from !== undefined) existing.age_from = numOrNull(data.age_from)
+      if (data.age_to !== undefined) existing.age_to = numOrNull(data.age_to)
+      if (data.parts !== undefined) existing.parts = data.parts
+      if (data.palette !== undefined) existing.palette = data.palette
+      if (data.morph !== undefined) existing.morph = data.morph
+      existing.updated_at = now
+      return existing
+    }
+    if (!data?.person_id || !db.persons[data.person_id]) throw new Error('Person not found')
+    const id = data.id || env.uuid()
+    const doc: CharacterDoc = {
+      id,
+      project_id: db.activeProjectId as string,
+      person_id: data.person_id,
+      version: 1,
+      label: data.label || 'Look 1',
+      style_id: data.style_id || 'cartoon',
+      is_portrait: false,
+      age_from: numOrNull(data.age_from),
+      age_to: numOrNull(data.age_to),
+      parts: data.parts || {},
+      palette: data.palette || {},
+      morph: data.morph || { height: 0, build: 0, headSize: 0 },
+      created_at: now,
+      updated_at: now
+    }
+    db.characters[id] = doc
+    return doc
+  },
+
+  'characters:delete'(db, data) {
+    if (db.characters) delete db.characters[data.id]
+    return { id: data.id }
+  },
+
+  // Mark one of a person's docs as THE portrait (clearing the others), or
+  // clear it entirely with characterId: null. The caller separately pushes a
+  // rendered image through images:add — this only tracks which doc it was.
+  'characters:setPortrait'(db, data, env) {
+    const { personId, characterId } = data
+    const now = env.nowStr()
+    let target: CharacterDoc | null = null
+    for (const c of Object.values(db.characters || {})) {
+      if (c.person_id !== personId) continue
+      const want = characterId != null && c.id === characterId
+      if (c.is_portrait !== want) {
+        c.is_portrait = want
+        c.updated_at = now
+      }
+      if (want) target = c
+    }
+    if (characterId != null && !target) throw new Error('Character not found')
+    return { personId, characterId: target?.id ?? null }
   },
 
   // ── checkpoint (manual save point over the autosaved working copy) ─────────
@@ -1370,6 +1457,9 @@ export const WRITE_CHANNELS = new Set([
   'images:add',
   'images:setPrimary',
   'images:delete',
+  'characters:save',
+  'characters:delete',
+  'characters:setPortrait',
   'settings:set',
   'globalSettings:set'
 ])

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { api } from '../api'
 import { setSessionToken, clearSessionToken, getSessionToken } from '../api/session'
 import { latestDataYear } from './currentYear.js'
@@ -25,6 +25,7 @@ export const useMainStore = defineStore('main', () => {
   const entityTags = ref([]) // the entity↔tag membership join rows
   const scenes = ref([]) // every saved Scene of the project, all views
   const sceneTags = ref([]) // tag placements ("Groups"): {id, scene_id, tag_id, x, y, visible}
+  const characters = ref([]) // CharacterDocs (experimental Character view)
   // Which scene is open, per spatial view ('groups' | 'graph' | 'timeline').
   const activeSceneIds = ref({ groups: null, graph: null, timeline: null })
   const draggingPersonId = ref(null) // person being dragged from the member list
@@ -163,11 +164,20 @@ export const useMainStore = defineStore('main', () => {
     // capability (Labs, full Style, 3D Space, extra time controls) folds back
     // to Standard in one place.
     const m = isGuest.value && programMode.value === 'advanced' ? 'standard' : programMode.value
+    const labs = m === 'advanced' && labsEnabled.value
     return {
       views:
         m === 'simple'
           ? ['graph', 'directory']
-          : ['graph', 'directory', 'relationships', 'timeline', 'groups'],
+          : [
+              'graph',
+              'directory',
+              'relationships',
+              'timeline',
+              'groups',
+              // The experimental Character view rides the same gate as Space 3D
+              ...(labs ? ['character'] : [])
+            ],
       scenes: m !== 'simple',
       typePicker: m !== 'simple',
       focus: m !== 'simple',
@@ -180,7 +190,9 @@ export const useMainStore = defineStore('main', () => {
        *  the slider itself is available in every mode. */
       timeControls: m === 'advanced',
       /** …and the experimental Space (3D) graph type needs it switched on too. */
-      space3d: m === 'advanced' && labsEnabled.value
+      space3d: labs,
+      /** The experimental Character view (buildable portraits). */
+      character: labs
     }
   })
 
@@ -191,6 +203,12 @@ export const useMainStore = defineStore('main', () => {
       value: labsEnabled.value ? 'on' : 'off'
     })
   }
+
+  // A hidden view must never stay active — whatever hid it (mode change, Labs
+  // switched off, the guest clamp on sign-in), fall back to the graph.
+  watch(caps, (c) => {
+    if (!c.views.includes(activeView.value)) activeView.value = 'graph'
+  })
 
   function markSpaceHintSeen() {
     spaceHintSeen.value = true
@@ -340,6 +358,7 @@ export const useMainStore = defineStore('main', () => {
         entityTags.value = []
         scenes.value = []
         sceneTags.value = []
+        characters.value = []
         activeSceneIds.value = { groups: null, graph: null, timeline: null }
         selectedPersonId.value = null
         modalOpen.value = false
@@ -442,22 +461,32 @@ export const useMainStore = defineStore('main', () => {
 
   // ── Data actions ──────────────────────────────────────────────────────────
   async function loadAll() {
-    const [personsRes, relsRes, tagsRes, entityTagsRes, scenesRes, sceneTagsRes, settingsRes] =
-      await Promise.all([
-        api.invoke('persons:getAll'),
-        api.invoke('relationships:getAll'),
-        api.invoke('tags:getAll'),
-        api.invoke('entity_tags:getAll'),
-        api.invoke('scenes:getAll'),
-        api.invoke('scene_tags:getAll'),
-        api.invoke('settings:getAll')
-      ])
+    const [
+      personsRes,
+      relsRes,
+      tagsRes,
+      entityTagsRes,
+      scenesRes,
+      sceneTagsRes,
+      charactersRes,
+      settingsRes
+    ] = await Promise.all([
+      api.invoke('persons:getAll'),
+      api.invoke('relationships:getAll'),
+      api.invoke('tags:getAll'),
+      api.invoke('entity_tags:getAll'),
+      api.invoke('scenes:getAll'),
+      api.invoke('scene_tags:getAll'),
+      api.invoke('characters:getAll'),
+      api.invoke('settings:getAll')
+    ])
     if (personsRes.success) persons.value = personsRes.data
     if (relsRes.success) relationships.value = relsRes.data
     if (tagsRes.success) tags.value = tagsRes.data
     if (entityTagsRes.success) entityTags.value = entityTagsRes.data
     if (scenesRes.success) scenes.value = scenesRes.data
     if (sceneTagsRes.success) sceneTags.value = sceneTagsRes.data
+    if (charactersRes.success) characters.value = charactersRes.data
     // Restore each view's active scene (the legacy activeScenarioId key still
     // works for groups because scenes kept the scenario ids), falling back to
     // the view's first scene.
@@ -787,6 +816,36 @@ export const useMainStore = defineStore('main', () => {
     return removeEntityTag(personId, tagId)
   }
 
+  // ── Character actions (experimental Character view) ────────────────────────
+  /** Upsert a CharacterDoc (create without an id; patch with one). */
+  async function saveCharacter(data) {
+    const res = await api.invoke('characters:save', data)
+    if (res.success) {
+      const idx = characters.value.findIndex((c) => c.id === res.data.id)
+      if (idx !== -1) characters.value[idx] = res.data
+      else characters.value.push(res.data)
+    }
+    return res
+  }
+
+  async function deleteCharacter(id) {
+    const res = await api.invoke('characters:delete', { id })
+    if (res.success) characters.value = characters.value.filter((c) => c.id !== id)
+    return res
+  }
+
+  /** Mark one of a person's docs as THE portrait (null clears). The rendered
+   *  image itself goes through the images pipeline separately (CharacterView). */
+  async function setCharacterPortrait(personId, characterId) {
+    const res = await api.invoke('characters:setPortrait', { personId, characterId })
+    if (res.success) {
+      characters.value = characters.value.map((c) =>
+        c.person_id === personId ? { ...c, is_portrait: c.id === characterId } : c
+      )
+    }
+    return res
+  }
+
   function selectPerson(id) {
     selectedPersonId.value = id
     modalOpen.value = !!id
@@ -916,6 +975,7 @@ export const useMainStore = defineStore('main', () => {
     entityTags,
     scenes,
     sceneTags,
+    characters,
     activeSceneId,
     activeSceneIds,
     draggingPersonId,
@@ -990,6 +1050,9 @@ export const useMainStore = defineStore('main', () => {
     moveSceneTag,
     setSceneTagVisible,
     removeSceneTag,
+    saveCharacter,
+    deleteCharacter,
+    setCharacterPortrait,
     selectPerson,
     openForm,
     closeModal,

@@ -133,6 +133,14 @@
             :active="store.activeView === 'groups'"
           />
         </Transition>
+        <!-- Experimental Character view (Advanced + Labs). Canvas-2D — cheap to
+             recreate, so plain v-if; edits live in the DB, not the component. -->
+        <Transition name="people-view">
+          <CharacterView
+            v-if="store.activeView === 'character' && store.caps.character"
+            :key="store.activeProjectId"
+          />
+        </Transition>
         <!-- Time Travel slider (graph + timeline views; decides its own visibility) -->
         <TimeSlider />
       </div>
@@ -199,6 +207,7 @@ import PeopleView from './components/PeopleView.vue'
 import RelationshipsView from './components/RelationshipsView.vue'
 import TimelineView from './components/TimelineView.vue'
 import FactionsView from './components/FactionsView.vue'
+import CharacterView from './components/character/CharacterView.vue'
 import RightDock from './components/RightDock.vue'
 import PersonModal from './components/PersonModal.vue'
 import PersonForm from './components/PersonForm.vue'

@@ -16,8 +16,18 @@ import { PUBLIC_CHANNELS, resolveSession, unwrapRequest } from '../shared/auth'
 const env = {
   uuid: randomUUID,
   nowStr,
-  // Copy a picked image into userData/images and return its stored path.
+  // Persist an image into userData/images and return its stored path. Accepts
+  // either a picked file's path (copied) or a data: URL (decoded and written —
+  // how renderer-generated images like character portraits arrive).
   storeImageFile(srcPath) {
+    if (srcPath.startsWith('data:')) {
+      const m = /^data:image\/([a-z0-9+.-]+);base64,(.+)$/i.exec(srcPath)
+      if (!m) throw new Error('Unsupported image data URL')
+      const ext = m[1] === 'jpeg' ? 'jpg' : m[1] === 'svg+xml' ? 'svg' : m[1]
+      const destPath = path.join(app.getPath('userData'), 'images', `${randomUUID()}.${ext}`)
+      fs.writeFileSync(destPath, Buffer.from(m[2], 'base64'))
+      return destPath
+    }
     const filename = randomUUID() + path.extname(srcPath)
     const destPath = path.join(app.getPath('userData'), 'images', filename)
     fs.copyFileSync(srcPath, destPath)
