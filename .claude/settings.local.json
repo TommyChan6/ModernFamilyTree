@@ -235,7 +235,15 @@
       "Bash(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\72789bcb-c1d6-4208-9e5f-81f529f3f88d\\\\scratchpad\\\\verify-character.mjs\")",
       "Bash(npx vue-tsc *)",
       "Bash(curl -s \"http://localhost:5173/src/components/character/CharacterView.vue\")",
-      "Bash(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\72789bcb-c1d6-4208-9e5f-81f529f3f88d\\\\scratchpad\\\\verify-empty.mjs\")"
+      "Bash(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\72789bcb-c1d6-4208-9e5f-81f529f3f88d\\\\scratchpad\\\\verify-empty.mjs\")",
+      "PowerShell(npm run format 2>&1)",
+      "PowerShell(npm run lint:fix 2>&1)",
+      "PowerShell(node -e \"console.log\\(require\\('playwright-core/package.json'\\).version\\)\" 2>$null)",
+      "PowerShell(node -e \"const p=require\\('./package.json'\\); console.log\\('electron', p.devDependencies.electron\\)\")",
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\60e61358-7a8c-4d25-9b96-336be7be8491\\\\scratchpad\\\\drive.mjs\")",
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\60e61358-7a8c-4d25-9b96-336be7be8491\\\\scratchpad\\\\drive2.mjs\")",
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\60e61358-7a8c-4d25-9b96-336be7be8491\\\\scratchpad\\\\driveWeb.mjs\")",
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\60e61358-7a8c-4d25-9b96-336be7be8491\\\\scratchpad\\\\drive3.mjs\")"
     ]
   }
 }

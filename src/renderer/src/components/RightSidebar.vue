@@ -38,7 +38,9 @@
             </svg>
           </div>
           <div class="person-info">
-            <div class="person-name">{{ row.p.name }}</div>
+            <div class="person-name" :class="{ unnamed: !row.p.name }">
+              {{ row.p.name || 'Unnamed' }}
+            </div>
             <div class="person-meta">
               <span v-if="row.p.birth?.year">b. {{ row.p.birth.year }}</span>
               <span v-if="row.p.birth?.year && row.p.occupation"> · </span>
@@ -59,7 +61,7 @@
     <!-- Add Person Footer -->
     <div class="sidebar-footer">
       <button class="btn btn-primary" style="width: 100%" @click="store.openForm()">
-        ＋ Add Person
+        ＋ Add {{ store.noun }}
       </button>
     </div>
   </aside>
@@ -100,7 +102,7 @@ const filteredPersons = computed(() => {
   if (!q) return store.persons
   return store.persons.filter(
     (p) =>
-      p.name.toLowerCase().includes(q) ||
+      (p.name || '').toLowerCase().includes(q) ||
       (p.occupation || '').toLowerCase().includes(q) ||
       (p.location || '').toLowerCase().includes(q)
   )
@@ -307,6 +309,12 @@ function avatarGradient(gender) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.person-name.unnamed {
+  color: var(--t3);
+  font-style: italic;
+  font-weight: 500;
 }
 
 .person-meta {

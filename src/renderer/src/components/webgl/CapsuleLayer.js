@@ -143,7 +143,7 @@ function createCapsuleMaterial() {
 
       void main() {
         float d = length(vec2(vAlong - clamp(vAlong, 0.0, vLen), vPerp));
-        float aa = fwidth(d) * 1.2 + 0.001;
+        float aa = fwidth(d) * 1.5 + 0.0012;
         float alpha = 1.0 - smoothstep(vHalfW - aa, vHalfW + aa, d);
         if (vDash.x > 0.0) {
           float period = vDash.x + vDash.y;

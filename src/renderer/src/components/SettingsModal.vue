@@ -74,6 +74,24 @@
 
               <div class="sm-field">
                 <div class="sm-field-head">
+                  <span class="sm-field-icon">🏷️</span>
+                  <div>
+                    <div class="sm-field-title">{{ t('settings.noun.title') }}</div>
+                    <p class="sm-field-desc">{{ t('settings.noun.desc') }}</p>
+                  </div>
+                </div>
+                <input
+                  class="sm-noun-input"
+                  type="text"
+                  maxlength="24"
+                  :value="store.noun"
+                  :placeholder="t('settings.noun.placeholder')"
+                  @change="store.setNoun($event.target.value)"
+                />
+              </div>
+
+              <div class="sm-field">
+                <div class="sm-field-head">
                   <span class="sm-field-icon">🧩</span>
                   <div>
                     <div class="sm-field-title">{{ t('settings.programMode.title') }}</div>
@@ -434,6 +452,23 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 }
 
 /* Segmented controls */
+.sm-noun-input {
+  width: 220px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--elevated);
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.sm-noun-input:focus {
+  border-color: var(--accent);
+}
+
 .sm-segment {
   display: inline-flex;
   gap: 3px;

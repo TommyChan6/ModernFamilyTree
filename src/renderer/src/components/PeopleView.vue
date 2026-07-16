@@ -833,7 +833,7 @@ onBeforeUnmount(() => {
   right: 0;
   display: grid;
   gap: var(--gap, 22px);
-  grid-auto-rows: var(--card-h, 330px);
+  grid-auto-rows: var(--card-h, 297px);
   justify-content: center;
   padding: 0 var(--pad, 24px);
   will-change: transform;

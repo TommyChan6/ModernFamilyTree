@@ -460,13 +460,24 @@ const { cancelAnimation, animateToPositionsWithReset } = useGraphAnimation(ctx)
 // so the camera transform stays the single source of truth.
 const minimapRef = ref(null)
 const minimapAdapter = {
-  getBounds: () => nodesExtent(ctx.nodesData),
+  // The minimap works in render-space (logical × view stretch) so its dot cloud and
+  // viewport box match the stretched on-screen layout; the uniform camera (x,y,k)
+  // maps that space to the screen, so getView/panTo need no stretch awareness.
+  getBounds: () => {
+    const e = nodesExtent(ctx.nodesData)
+    if (!e) return e
+    const sx = ctx.transform.sx ?? 1,
+      sy = ctx.transform.sy ?? 1
+    return { minX: e.minX * sx, minY: e.minY * sy, maxX: e.maxX * sx, maxY: e.maxY * sy }
+  },
   getView: () => {
     const el = ctx.containerRef
     return viewRectXYK(ctx.transform, el?.clientWidth || 0, el?.clientHeight || 0)
   },
   drawContent: (g, proj, colors) => {
     const sel = store.selectedPersonId
+    const gsx = ctx.transform.sx ?? 1,
+      gsy = ctx.transform.sy ?? 1
     let selNode = null
     g.fillStyle = withAlpha(colors.t2, 0.55)
     for (const n of ctx.nodesData) {
@@ -474,12 +485,18 @@ const minimapAdapter = {
         selNode = n
         continue
       }
-      g.fillRect(n.x * proj.sx + proj.ox - 1, n.y * proj.sy + proj.oy - 1, 2, 2)
+      g.fillRect(n.x * gsx * proj.sx + proj.ox - 1, n.y * gsy * proj.sy + proj.oy - 1, 2, 2)
     }
     if (selNode) {
       g.fillStyle = colors.accent
       g.beginPath()
-      g.arc(selNode.x * proj.sx + proj.ox, selNode.y * proj.sy + proj.oy, 2.5, 0, Math.PI * 2)
+      g.arc(
+        selNode.x * gsx * proj.sx + proj.ox,
+        selNode.y * gsy * proj.sy + proj.oy,
+        2.5,
+        0,
+        Math.PI * 2
+      )
       g.fill()
     }
   },
@@ -841,15 +858,17 @@ function ageOf(d) {
 }
 
 // ── Time travel ─────────────────────────────────────────────────────────────
-// While the Time slider is active (tt.gateYear < Infinity) people not yet born
-// and relationships not yet formed collapse to opacity 0 (the renderer's style
-// tweens animate the pop-in/out); the freshly-appeared get a glow/width flash.
-// Nodes stay in the simulation either way so positions never reshuffle while
-// scrubbing. `_tBirth` / `_tAppear` are stamped in updateGraph().
+// While the Time slider is active (tt.gateYear < Infinity) people outside the
+// framed window — not yet born, or born before the start nub — collapse to
+// opacity 0 (the renderer's style tweens animate the pop-in/out); the freshly-
+// appeared get a glow/width flash. Nodes stay in the simulation either way so
+// positions never reshuffle while scrubbing. `_tBirth` / `_tAppear` are stamped
+// in updateGraph().
 const FRESH_YEARS = 1.6
 
 function nodeTimeHidden(n) {
-  return n._tBirth != null && n._tBirth > tt.gateYear.value
+  if (n._tBirth == null) return false
+  return n._tBirth > tt.gateYear.value || n._tBirth < tt.gateStartYear.value
 }
 
 function linkTimeHidden(d) {
@@ -857,7 +876,8 @@ function linkTimeHidden(d) {
   // After the simulation wires links, source/target are the node objects.
   if (typeof d.source === 'object' && nodeTimeHidden(d.source)) return true
   if (typeof d.target === 'object' && nodeTimeHidden(d.target)) return true
-  return d._tAppear != null && d._tAppear > tt.gateYear.value
+  if (d._tAppear == null) return false
+  return d._tAppear > tt.gateYear.value || d._tAppear < tt.gateStartYear.value
 }
 
 // ── Per-node / per-link visual descriptors (single source of truth for styling) ──────
@@ -866,9 +886,8 @@ function linkTimeHidden(d) {
 function nodeVisual(n) {
   const gs = store.graphSettings
   const selected = store.selectedPersonId === n.id
-  const fill = selected
-    ? d3.color(nodeColor(n.gender, gs))?.brighter(0.4)?.toString() || nodeColor(n.gender, gs)
-    : nodeColor(n.gender, gs)
+  const baseFill = nodeColor(n.gender, gs, n.gender_t)
+  const fill = selected ? d3.color(baseFill)?.brighter(0.4)?.toString() || baseFill : baseFill
 
   let opacityMul = 1,
     radiusMul = 1
@@ -896,24 +915,27 @@ function nodeVisual(n) {
   if (q && !(n.name || '').toLowerCase().includes(q)) opacityMul *= 0.2
 
   const tY = tt.gateYear.value
+  const tStart = tt.gateStartYear.value
   let timeGlow = false
   if (tY !== Infinity) {
     if (n._tBirth == null) {
       opacityMul *= 0.45 // undated people can't "appear" — keep them as faint context
-    } else if (n._tBirth > tY) {
+    } else if (n._tBirth > tY || n._tBirth < tStart) {
       opacityMul = 0
-      radiusMul *= 0.2 // scale-in pop when the tween brings them back
+      radiusMul *= 0.2 // scale-in pop when the tween brings them back into the window
     } else if (tY - n._tBirth < FRESH_YEARS) {
       timeGlow = true // birth flash while time flows past them
     }
   }
 
+  // Highlight-slot ring: a colored border (selection still wins).
+  const hl = n.highlight ? n.highlight.color || '#f5a623' : null
   return {
     radius: gs.nodeRadius * radiusMul,
     fill,
-    border: selected ? '#6c8ef5' : '#ffffff',
-    borderPx: selected ? 3 : 1.5,
-    borderA: selected ? 0.95 : 0.18,
+    border: selected ? '#6c8ef5' : hl || '#ffffff',
+    borderPx: selected ? 3 : hl ? 2.6 : 1.5,
+    borderA: selected ? 0.95 : hl ? 0.92 : 0.18,
     opacity: gs.nodeOpacity * opacityMul,
     selected,
     glow: selected || timeGlow || (hoverId === n.id && gs.glowOnHover) ? 1 : 0,
@@ -1043,12 +1065,21 @@ function initGraph() {
     .scaleExtent([0.1, 4])
     .filter(zoomFilter)
     .on('zoom', (e) => {
-      ctx.transform = { x: e.transform.x, y: e.transform.y, k: e.transform.k }
+      // d3 owns pan/uniform-zoom (x,y,k); the per-axis stretch (sx,sy) is layered
+      // on outside d3 by onStretchWheel — carry it across so it isn't wiped here.
+      ctx.transform = {
+        x: e.transform.x,
+        y: e.transform.y,
+        k: e.transform.k,
+        sx: ctx.transform.sx ?? 1,
+        sy: ctx.transform.sy ?? 1
+      }
       ctx.renderer.setCamera(ctx.transform)
       minimapRef.value?.redraw()
     })
   ctx.zoomSelection = d3.select(overlayEl.value)
   ctx.zoomSelection.call(ctx.zoomBehavior)
+  overlayEl.value.addEventListener('wheel', onStretchWheel, { passive: false })
   installPointerHandlers()
 
   ctx.simulation = d3
@@ -1162,12 +1193,58 @@ function pickVisibleNode(wx, wy) {
 }
 
 function zoomFilter(event) {
-  if (event.type === 'wheel') return !event.ctrlKey
+  // Plain wheel → d3 uniform zoom. Shift/Ctrl/Cmd wheel is directional stretch,
+  // handled by onStretchWheel instead, so keep d3 out of it.
+  if (event.type === 'wheel') return !event.ctrlKey && !event.shiftKey && !event.metaKey
   if (event.button != null && event.button !== 0) return false
   const w = clientToWorld(event.clientX, event.clientY)
   const hit = pickVisibleNode(w.x, w.y)
   if (hit && !store.lockNodes) return false // grabbing a node -> no pan
   return true
+}
+
+// Directional zoom: Shift+wheel stretches the layout horizontally, Ctrl/Cmd+wheel
+// vertically (mirrors the Timeline's axis-lock feel). The stretch lives on the
+// camera transform as sx/sy and is baked into positions by the renderer, so nodes
+// stay perfectly round and link strokes keep a uniform width. The point under the
+// cursor is held fixed on the stretched axis; we push the anchored pan back through
+// d3 so its internal transform stays in sync with ours.
+const STRETCH_MIN = 0.25
+const STRETCH_MAX = 4
+function onStretchWheel(e) {
+  const horiz = e.shiftKey
+  const vert = e.ctrlKey || e.metaKey
+  if (!horiz && !vert) return // plain wheel → let d3 do uniform zoom
+  if (spaceActive.value) return // 3D space owns its own camera
+  e.preventDefault()
+  const rect = overlayEl.value.getBoundingClientRect()
+  const mx = e.clientX - rect.left
+  const my = e.clientY - rect.top
+  // Shift+wheel reports its delta on deltaX in Chromium; fall back to it.
+  const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX
+  const factor = Math.exp(-delta * 0.0022)
+  const t = ctx.transform
+  let sx = t.sx ?? 1,
+    sy = t.sy ?? 1
+  let tx = t.x,
+    ty = t.y
+  if (horiz) {
+    const ns = Math.min(STRETCH_MAX, Math.max(STRETCH_MIN, sx * factor))
+    tx = mx - (mx - tx) * (ns / sx)
+    sx = ns
+  }
+  if (vert) {
+    const ns = Math.min(STRETCH_MAX, Math.max(STRETCH_MIN, sy * factor))
+    ty = my - (my - ty) * (ns / sy)
+    sy = ns
+  }
+  ctx.transform.sx = sx
+  ctx.transform.sy = sy
+  // Re-emit through d3 with the anchored pan; the zoom handler rebuilds
+  // ctx.transform and preserves the sx/sy we just set.
+  ctx.zoomSelection
+    ?.interrupt()
+    .call(ctx.zoomBehavior.transform, d3.zoomIdentity.translate(tx, ty).scale(t.k))
 }
 
 function installPointerHandlers() {
@@ -1182,6 +1259,7 @@ function removePointerHandlers() {
   if (el) {
     el.removeEventListener('pointerdown', onPointerDown)
     el.removeEventListener('pointermove', onHoverMove)
+    el.removeEventListener('wheel', onStretchWheel)
   }
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerup', onPointerUp)
@@ -1692,6 +1770,10 @@ function zoomOut() {
   ctx.zoomSelection?.transition().duration(300).call(ctx.zoomBehavior.scaleBy, 0.77)
 }
 function resetZoom() {
+  // Clear any directional stretch too — the zoom handler preserves whatever
+  // sx/sy is on ctx.transform, so reset it before re-emitting the transform.
+  ctx.transform.sx = 1
+  ctx.transform.sy = 1
   if (!ctx.nodesData.length || !ctx.containerRef) {
     ctx.zoomSelection?.transition().duration(400).call(ctx.zoomBehavior.transform, d3.zoomIdentity)
     return
@@ -1708,6 +1790,8 @@ function resetZoom() {
 }
 function fitAll() {
   if (!ctx.nodesData.length || !ctx.containerRef) return
+  ctx.transform.sx = 1 // fit the undistorted layout — drop any directional stretch
+  ctx.transform.sy = 1
   const { width, height } = ctx.containerRef.getBoundingClientRect()
   const xs = ctx.nodesData.map((d) => d.x),
     ys = ctx.nodesData.map((d) => d.y)
@@ -1831,11 +1915,14 @@ watch(
 // Time travel: re-sync styles per scrub/playback step, but only while this view
 // is actually on screen (it stays mounted, hidden, behind the other views);
 // watching activeView too re-syncs on the way back in if time moved meanwhile.
-watch([() => tt.gateYear.value, () => store.activeView], ([, view]) => {
-  if (view !== 'graph' || spaceActive.value) return
-  markNodeStyles()
-  markLinkStyles()
-})
+watch(
+  [() => tt.gateYear.value, () => tt.gateStartYear.value, () => store.activeView],
+  ([, , view]) => {
+    if (view !== 'graph' || spaceActive.value) return
+    markNodeStyles()
+    markLinkStyles()
+  }
+)
 // Labs switched off (or mode dropped below Advanced) while a space scene is
 // open: re-enter it as its 2D fallback (Free over the same positions).
 watch(

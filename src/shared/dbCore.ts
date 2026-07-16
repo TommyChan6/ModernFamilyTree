@@ -19,6 +19,7 @@ import type {
   DB,
   EntityTag,
   Env,
+  FieldDef,
   ImageRecord,
   Person,
   Project,
@@ -28,10 +29,26 @@ import type {
   Scene,
   SceneTag,
   Session,
+  SlotName,
   Tag,
   UsageInfo,
   User
 } from './types'
+import {
+  CREATABLE_FIELD_TYPES,
+  adoptLegacyPersonData,
+  defsForProject,
+  ensureProjectFields,
+  isSingleSlot,
+  recomputeSnapshots,
+  removeValue,
+  sanitizeConfig,
+  slotAccepts,
+  upsertValue,
+  valuesForPerson
+} from './fields'
+
+export { migrateFieldSystem } from './fields'
 import {
   SESSION_DAYS,
   addDays,
@@ -92,6 +109,8 @@ export const EMPTY_DB = (): DB => ({
   projects: {},
   activeProjectId: null,
   persons: {},
+  field_defs: {},
+  field_values: {},
   relationships: {},
   tags: {},
   entity_tags: {},
@@ -532,6 +551,11 @@ export function seedSampleData(db: DB, projectId: string, env: Env): void {
   addR(p1, c2, 'parent_child')
   addR(p2, c1, 'parent_child')
   addR(p2, c2, 'parent_child')
+
+  // Stand the project up on the trait system: default locked defs (name/
+  // gender/birth/death slots + occupation/location/bio) and the sample
+  // persons' columns adopted as trait values.
+  ensureProjectFields(db, projectId, env)
 }
 
 /** Fresh, seeded database for a first run (used by the browser-local backend). */
@@ -612,6 +636,33 @@ function startSession(db: DB, user: User, env: Env): Session {
 }
 
 // ── Channel handlers ─────────────────────────────────────────────────────────
+
+/** One person-payload entry point for both the legacy column contract
+ *  (name/birth/death/gender/bio/occupation/location keys → system defs) and
+ *  the trait contract (`values: [{ field_id, value, timeframe?,
+ *  display_in_graph? }]` + `removals: [fieldId]`), then refresh the person's
+ *  derived snapshot columns. */
+function applyPersonPayload(db: DB, env: Env, person: Person, data: Record<string, unknown>): void {
+  adoptLegacyPersonData(db, env, person, data)
+  if (Array.isArray(data.values)) {
+    for (const v of data.values as Array<Record<string, unknown>>) {
+      const fieldId = String(v.field_id ?? v.fieldId ?? '')
+      if (!db.field_defs[fieldId]) continue
+      upsertValue(db, env, person.id, fieldId, v)
+    }
+  }
+  if (Array.isArray(data.removals)) {
+    for (const fieldId of data.removals as string[]) removeValue(db, person.id, fieldId)
+  }
+  recomputeSnapshots(db, [person.id])
+}
+
+/** Ids of every person in the active project (snapshot-recompute targets). */
+function projectPersonIds(db: DB): string[] {
+  return Object.values(db.persons)
+    .filter((p) => p.project_id === db.activeProjectId)
+    .map((p) => p.id)
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Handler = (db: DB, data: any, env: Env, ctx?: AuthCtx) => unknown
@@ -816,6 +867,8 @@ export const channelHandlers: Record<string, Handler> = {
       updated_at: now
     }
     db.projects[id] = project
+    // Even an empty project starts on the trait system (locked default defs).
+    ensureProjectFields(db, id, env)
     return project
   },
 
@@ -838,8 +891,14 @@ export const channelHandlers: Record<string, Handler> = {
     for (const [id, p] of Object.entries(db.persons)) {
       if (p.project_id === pid) {
         cascadeEntityTags(db, { entityId: id })
+        for (const [vid, v] of Object.entries(db.field_values)) {
+          if (v.person_id === id) delete db.field_values[vid]
+        }
         delete db.persons[id]
       }
+    }
+    for (const [fid, def] of Object.entries(db.field_defs)) {
+      if (def.project_id === pid) delete db.field_defs[fid]
     }
     for (const [rid, r] of Object.entries(db.relationships)) {
       if (r.project_id === pid) delete db.relationships[rid]
@@ -920,6 +979,7 @@ export const channelHandlers: Record<string, Handler> = {
       updated_at: now
     }
     db.persons[id] = person
+    applyPersonPayload(db, env, person, data)
     return { ...person, primary_image: null }
   },
 
@@ -938,6 +998,7 @@ export const channelHandlers: Record<string, Handler> = {
       updated_at: env.nowStr()
     }
     db.persons[data.id] = updated
+    applyPersonPayload(db, env, updated, data)
     return { ...updated, primary_image: primaryImageOf(db, data.id) }
   },
 
@@ -946,6 +1007,9 @@ export const channelHandlers: Record<string, Handler> = {
       if (rel.person_a_id === data.id || rel.person_b_id === data.id) {
         delete db.relationships[rid]
       }
+    }
+    for (const [vid, v] of Object.entries(db.field_values)) {
+      if (v.person_id === data.id) delete db.field_values[vid]
     }
     for (const [iid, img] of Object.entries(db.images)) {
       if (img.person_id === data.id) {
@@ -959,6 +1023,192 @@ export const channelHandlers: Record<string, Handler> = {
     cascadeEntityTags(db, { entityId: data.id })
     delete db.persons[data.id]
     return { id: data.id }
+  },
+
+  // ── fields (the trait system: defs + per-person values) ────────────────────
+  'fields:list'(db) {
+    const defs = defsForProject(db, db.activeProjectId as string)
+    const personIds = new Set(projectPersonIds(db))
+    const values = Object.values(db.field_values).filter((v) => personIds.has(v.person_id))
+    return { defs, values }
+  },
+
+  // Create a def. `personId` attaches it to that person right away (value may
+  // be null — "attached but empty"), which is how an unlocked trait added on a
+  // form survives being saved blank.
+  'fields:createDef'(db, data, env) {
+    const type = data?.type
+    if (!CREATABLE_FIELD_TYPES.includes(type)) throw new Error('Unknown trait type')
+    const id = env.uuid()
+    const now = env.nowStr()
+    const siblings = defsForProject(db, db.activeProjectId as string)
+    const def: FieldDef = {
+      id,
+      project_id: db.activeProjectId as string,
+      label: String(data?.label || 'New trait'),
+      type,
+      config: sanitizeConfig(type, data?.config),
+      locked: !!data?.locked,
+      order: siblings.length ? siblings[siblings.length - 1].order + 1 : 0,
+      has_timeframe: false,
+      slot: null,
+      slot_order: 0,
+      icon: String(data?.icon || ''),
+      unit: String(data?.unit || ''),
+      sys: '',
+      created_at: now,
+      updated_at: now
+    }
+    db.field_defs[id] = def
+    let value = null
+    if (data?.personId && db.persons[data.personId]) {
+      value = upsertValue(db, env, data.personId, id, { value: data?.value ?? null })
+      recomputeSnapshots(db, [data.personId])
+    }
+    return { def, value }
+  },
+
+  'fields:updateDef'(db, data, env) {
+    const def = db.field_defs[data?.id]
+    if (!def) throw new Error('Trait not found')
+    if (data.locked === false && def.slot) {
+      throw new Error('Remove the trait from its slot before unlocking it')
+    }
+    if (data.label !== undefined) def.label = String(data.label)
+    if (data.config !== undefined) def.config = sanitizeConfig(def.type, data.config)
+    if (data.locked !== undefined) def.locked = !!data.locked
+    if (data.has_timeframe !== undefined) def.has_timeframe = !!data.has_timeframe
+    if (data.icon !== undefined) def.icon = String(data.icon)
+    if (data.unit !== undefined) def.unit = String(data.unit)
+    def.updated_at = env.nowStr()
+    // Label/config/unit feed the composed labels — refresh the project.
+    recomputeSnapshots(db, projectPersonIds(db))
+    return def
+  },
+
+  'fields:deleteDef'(db, data) {
+    const def = db.field_defs[data?.id]
+    if (!def) throw new Error('Trait not found')
+    let removedValues = 0
+    for (const [vid, v] of Object.entries(db.field_values)) {
+      if (v.field_id === def.id) {
+        delete db.field_values[vid]
+        removedValues++
+      }
+    }
+    delete db.field_defs[def.id]
+    recomputeSnapshots(db, projectPersonIds(db))
+    return { id: def.id, removedValues }
+  },
+
+  // One project-wide ordering: orderedIds is the full desired sequence.
+  'fields:reorderDefs'(db, data, env) {
+    const orderedIds: string[] = Array.isArray(data?.orderedIds) ? data.orderedIds : []
+    const now = env.nowStr()
+    orderedIds.forEach((id, idx) => {
+      const def = db.field_defs[id]
+      if (def && def.project_id === db.activeProjectId && def.order !== idx) {
+        def.order = idx
+        def.updated_at = now
+      }
+    })
+    return defsForProject(db, db.activeProjectId as string)
+  },
+
+  // Move a def into / out of a slot. Slotting auto-locks; single slots evict
+  // the current occupant back to the plain list.
+  'fields:setSlot'(db, data, env) {
+    const def = db.field_defs[data?.fieldId]
+    if (!def) throw new Error('Trait not found')
+    const slot: SlotName | null = data?.slot ?? null
+    const now = env.nowStr()
+    if (slot != null) {
+      if (!slotAccepts(slot, def.type)) {
+        throw new Error(
+          slot === 'name'
+            ? 'Only text traits can appear in the graph name'
+            : `A ${def.type.replace('_', ' ')} trait cannot go in the ${slot} slot`
+        )
+      }
+      if (isSingleSlot(slot)) {
+        for (const other of Object.values(db.field_defs)) {
+          if (other.project_id === def.project_id && other.slot === slot && other.id !== def.id) {
+            other.slot = null
+            other.slot_order = 0
+            other.updated_at = now
+          }
+        }
+      }
+      const nameSiblings = Object.values(db.field_defs).filter(
+        (d) => d.project_id === def.project_id && d.slot === 'name' && d.id !== def.id
+      )
+      def.slot = slot
+      def.slot_order =
+        data?.slotOrder ??
+        (slot === 'name' ? Math.max(-1, ...nameSiblings.map((d) => d.slot_order)) + 1 : 0)
+      def.locked = true
+    } else {
+      def.slot = null
+      def.slot_order = 0
+    }
+    def.updated_at = now
+    recomputeSnapshots(db, projectPersonIds(db))
+    return defsForProject(db, db.activeProjectId as string)
+  },
+
+  'fields:setValue'(db, data, env) {
+    if (!db.persons[data?.personId]) throw new Error('Person not found')
+    const row = upsertValue(db, env, data.personId, data.fieldId, data)
+    recomputeSnapshots(db, [data.personId])
+    const person = db.persons[data.personId]
+    return { value: row, person: { ...person, primary_image: primaryImageOf(db, person.id) } }
+  },
+
+  // Batch write for form save: upserts + removals, one snapshot recompute.
+  'fields:setValues'(db, data, env) {
+    const person = db.persons[data?.personId]
+    if (!person) throw new Error('Person not found')
+    applyPersonPayload(db, env, person, data)
+    return {
+      person: { ...person, primary_image: primaryImageOf(db, person.id) },
+      values: valuesForPerson(db, person.id)
+    }
+  },
+
+  'fields:removeValue'(db, data) {
+    const person = db.persons[data?.personId]
+    if (!person) throw new Error('Person not found')
+    removeValue(db, data.personId, data.fieldId)
+    recomputeSnapshots(db, [data.personId])
+    return {
+      personId: data.personId,
+      fieldId: data.fieldId,
+      person: { ...person, primary_image: primaryImageOf(db, person.id) }
+    }
+  },
+
+  // Bulk "show in graph" across every person holding this trait. Locked defs
+  // only — the option is meaningless for a one-person trait.
+  'fields:applyDisplayAll'(db, data, env) {
+    const def = db.field_defs[data?.fieldId]
+    if (!def) throw new Error('Trait not found')
+    if (!def.locked) throw new Error('Lock the trait to apply this everywhere')
+    const on = !!data?.on
+    const now = env.nowStr()
+    const personIds: string[] = []
+    for (const v of Object.values(db.field_values)) {
+      if (v.field_id === def.id && v.display_in_graph !== on) {
+        v.display_in_graph = on
+        v.updated_at = now
+        personIds.push(v.person_id)
+      }
+    }
+    recomputeSnapshots(db, personIds)
+    return {
+      fieldId: def.id,
+      on,
+      values: Object.values(db.field_values).filter((v) => v.field_id === def.id)
+    }
   },
 
   // ── relationships ──────────────────────────────────────────────────────────
@@ -1235,6 +1485,13 @@ export const channelHandlers: Record<string, Handler> = {
         if (img.person_id === personId) img.is_primary = false
       }
     }
+    const role = ['portrait', 'fullbody', 'background'].includes(data.role) ? data.role : ''
+    if (role) {
+      // One image per named slot — the previous occupant becomes an extra.
+      for (const img of Object.values(db.images)) {
+        if (img.person_id === personId && img.role === role) img.role = ''
+      }
+    }
     const id = env.uuid()
     const img: ImageRecord = {
       id,
@@ -1242,11 +1499,27 @@ export const channelHandlers: Record<string, Handler> = {
       person_id: personId,
       file_path: filePath,
       is_primary: !!isPrimary,
+      role,
       source: data.source || '',
       created_at: env.nowStr()
     }
     db.images[id] = img
     return img
+  },
+
+  // Assign an existing image to a named slot ('' clears it back to an extra).
+  'images:setRole'(db, data) {
+    const { imageId, personId } = data
+    const role = ['portrait', 'fullbody', 'background', ''].includes(data.role) ? data.role : ''
+    const target = db.images[imageId]
+    if (!target) throw new Error('Image not found')
+    if (role) {
+      for (const img of Object.values(db.images)) {
+        if (img.person_id === personId && img.role === role) img.role = ''
+      }
+    }
+    target.role = role
+    return target
   },
 
   'images:setPrimary'(db, data) {
@@ -1435,6 +1708,15 @@ export const WRITE_CHANNELS = new Set([
   'persons:create',
   'persons:update',
   'persons:delete',
+  'fields:createDef',
+  'fields:updateDef',
+  'fields:deleteDef',
+  'fields:reorderDefs',
+  'fields:setSlot',
+  'fields:setValue',
+  'fields:setValues',
+  'fields:removeValue',
+  'fields:applyDisplayAll',
   'relationships:create',
   'relationships:update',
   'relationships:delete',
@@ -1455,6 +1737,7 @@ export const WRITE_CHANNELS = new Set([
   'checkpoint:save',
   'checkpoint:revert',
   'images:add',
+  'images:setRole',
   'images:setPrimary',
   'images:delete',
   'characters:save',

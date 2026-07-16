@@ -7,20 +7,22 @@
 
 import { toOrdinal } from '../../../../shared/calendarMath'
 
-export const CARD_W = 196 // card width (px)
-export const CARD_H = 330 // card height (px)
+export const CARD_W = 210 // card width (px) — A4 short edge (210mm) at 1px/mm
+export const CARD_H = 297 // card height (px) — A4 long edge (297mm): portrait A4 aspect
 export const GAP = 22 // gap between cards, both axes (px)
 export const PAD = 24 // padding around the grid (px)
 export const OVERSCAN_ROWS = 2 // extra card rows kept mounted above/below the viewport
+export const MAX_COLS = 6 // never lay out more than this many cards per row
 
 export const ROW_H = CARD_H + GAP // vertical distance between card rows (px)
 
 // How many columns of fixed-width cards fit in `availWidth` px of content box
 // (the grid's horizontal padding has already been subtracted). Always ≥ 1 so the
-// layout never collapses while the container is still being measured (width 0).
-export function columnCount(availWidth, cardW = CARD_W, gap = GAP) {
+// layout never collapses while the container is still being measured (width 0),
+// and capped at MAX_COLS so very wide screens don't sprawl into tiny rows.
+export function columnCount(availWidth, cardW = CARD_W, gap = GAP, maxCols = MAX_COLS) {
   if (!(availWidth > 0)) return 1
-  return Math.max(1, Math.floor((availWidth + gap) / (cardW + gap)))
+  return Math.min(maxCols, Math.max(1, Math.floor((availWidth + gap) / (cardW + gap))))
 }
 
 // Total scrollable height for `count` cards laid out in `cols` columns — the

@@ -121,9 +121,34 @@ sharing feature; see the `ProjectShare` placeholder in `types.ts`); `App.vue`
 only loads data behind a restored session. When adding a channel, decide whether
 it needs `ctx` and NEVER return password/salt fields to the renderer.
 
+**The trait system** (`src/shared/fields.ts` + the `fields:*` channels): every
+person property is a user-defined typed **FieldDef** (text/boolean/number/
+number_range/select/slider/date/date_range; `custom_date*` reserved for custom
+calendars) with per-person **FieldValue** rows — all optional. Defs are
+project-scoped; `locked` = rendered on every form; five **slots**
+(name/gender/birth/death/highlight) drive graph rendering — gender resolves to
+a 0..1 gradient position (`gender_t`) between the Style panel's male/female
+colors. The legacy Person columns (`name`, `birth`, `death`, `gender`,
+bio/occupation/location, plus `graph_label` and `highlight`) are **derived
+snapshots** recomputed by `recomputeSnapshots()` on every trait write, so views
+and layout math read them unchanged — never write them directly.
+`persons:create/update` still accept the legacy column payload (adapted onto
+the system defs via `sys` keys) and/or a `values` array.
+`migrateFieldSystem` gives old projects default locked defs and adopts their
+column values; the seed and `projects:create` do the same for new ones. The
+Add/Edit Person form (`PersonForm.vue` + `components/personForm/`) is a
+two-panel sheet: live node preview, Slot Dock, drag-reorderable trait list,
+searchable `PersonPicker` (inline person creation — also used in
+RelationshipsView), named image slots (`ImageRecord.role`), typed tags. UI
+labels come from `store.noun` (per-project setting; the data layer stays
+"person"). **Payloads crossing `api.invoke` must be plain JSON** — Vue
+reactive proxies make Electron IPC throw "An object could not be cloned".
+Tests: `tests/fields.test.js`.
+
 **State** (`src/renderer/src/store/index.js`): a single Pinia store `main` is the
-source of truth for `persons`, `relationships`, `tags`/`entityTags` (+ the
-`tagsOf`/`membersOf` index Maps), `scenes`/`sceneTags` (+ per-view
+source of truth for `persons`, `fieldDefs`/`fieldValues` (+ the
+`fieldDefById`/`fieldValuesOf` index Maps), `relationships`, `tags`/`entityTags`
+(+ the `tagsOf`/`membersOf` index Maps), `scenes`/`sceneTags` (+ per-view
 `activeSceneIds`), `projects`, the `programMode` capability flags (`caps`), UI
 flags, and `graphSettings`.
 Actions do the IPC round-trip and optimistically update reactive arrays only after

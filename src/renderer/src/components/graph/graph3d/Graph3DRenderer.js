@@ -52,7 +52,7 @@ export class Graph3DRenderer {
 
     this.renderer = new THREE.WebGLRenderer({ canvas: glCanvas, alpha: true, antialias: true })
     this.renderer.setClearColor(0x000000, 0)
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2)
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2.5)
     this.renderer.setPixelRatio(this.dpr)
 
     this.scene = new THREE.Scene()

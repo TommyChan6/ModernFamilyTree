@@ -15,7 +15,7 @@ here, read them roughly in this order:
 | [developer.md](./developer.md) | Setup, scripts, project layout, testing, build internals. |
 | [contributing.md](./contributing.md) | Branch/PR workflow and the definition of done. |
 | [design.md](./design.md) | Product vision, UX principles, the visual design system, roadmap. |
-| [WILD_IDEAS.md](./WILD_IDEAS.md) | Blue-sky brainstorm — future & wild ideas, status of what's captured, and new concepts to grow into. |
+| [WILD_IDEAS.md](./WILD_IDEAS.md) | Blue-sky brainstorm — future & wild ideas, status of what's captured, new concepts to grow into, and profitability bets by audience/ROI/risk. |
 
 ### How the docs fit together
 

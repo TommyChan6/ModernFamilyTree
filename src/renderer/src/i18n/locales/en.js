@@ -110,6 +110,11 @@ export default {
       title: 'Program mode',
       desc: 'Controls how many features are shown. Simple keeps things focused; Advanced unlocks every tool.'
     },
+    noun: {
+      title: 'What do you call them?',
+      desc: 'The word this project uses for its entries — Person, Character, Ship, House… Applies to this project only.',
+      placeholder: 'Person'
+    },
     close: 'Close'
   },
   help: {

@@ -106,7 +106,9 @@ export class LinkLayer {
 
   // Per-frame: recompute ribbon vertex positions + arc length from current node positions.
   // `visual(d)` returns { width, arrowColorRGB:[r,g,b]|null, arrowSize } (already tweened).
-  updateGeometry(links, gs, visual) {
+  // `sx`/`sy` are the view stretch (default 1): the centreline is stretched with the
+  // layout while the ribbon half-width stays uniform, so strokes never fatten by angle.
+  updateGeometry(links, gs, visual, sx = 1, sy = 1) {
     if (!this._a.position || !links.length) return // nothing allocated / no links yet
     for (let j = 0; j < links.length; j++) {
       const d = links[j]
@@ -116,24 +118,25 @@ export class LinkLayer {
       const base = j * VPL
       let acc = 0
       for (let i = 0; i <= SEG; i++) {
-        const p = points[i]
+        const px = points[i].x * sx,
+          py = points[i].y * sy
         const prev = points[Math.max(0, i - 1)],
           next = points[Math.min(SEG, i + 1)]
-        let tx = next.x - prev.x,
-          ty = next.y - prev.y
+        let tx = (next.x - prev.x) * sx,
+          ty = (next.y - prev.y) * sy
         const tl = Math.hypot(tx, ty) || 1
         tx /= tl
         ty /= tl
         const nx = -ty,
           ny = tx
-        if (i > 0) acc += Math.hypot(p.x - points[i - 1].x, p.y - points[i - 1].y)
+        if (i > 0) acc += Math.hypot(px - points[i - 1].x * sx, py - points[i - 1].y * sy)
         const li = (base + i * 2) * 3,
           ri = (base + i * 2 + 1) * 3
-        this.position[li] = p.x + nx * halfW
-        this.position[li + 1] = p.y + ny * halfW
+        this.position[li] = px + nx * halfW
+        this.position[li + 1] = py + ny * halfW
         this.position[li + 2] = 0
-        this.position[ri] = p.x - nx * halfW
-        this.position[ri + 1] = p.y - ny * halfW
+        this.position[ri] = px - nx * halfW
+        this.position[ri + 1] = py - ny * halfW
         this.position[ri + 2] = 0
         this.arc[base + i * 2] = acc
         this.arc[base + i * 2 + 1] = acc
@@ -141,15 +144,16 @@ export class LinkLayer {
 
       // Arrowhead at the target end, pulled back by the node radius, along the end tangent.
       if (vis.arrowColorRGB) {
-        const T = points[SEG]
-        let dx = T.x - control.x,
-          dy = T.y - control.y
+        const Tx = points[SEG].x * sx,
+          Ty = points[SEG].y * sy
+        let dx = Tx - control.x * sx,
+          dy = Ty - control.y * sy
         const dl = Math.hypot(dx, dy) || 1
         dx /= dl
         dy /= dl
         const r = gs.nodeRadius
-        this.aPos[j * 2] = T.x - dx * (r + 1)
-        this.aPos[j * 2 + 1] = T.y - dy * (r + 1)
+        this.aPos[j * 2] = Tx - dx * (r + 1)
+        this.aPos[j * 2 + 1] = Ty - dy * (r + 1)
         this.aAngle[j] = Math.atan2(dy, dx)
         this.aScale[j] = vis.arrowSize
         const col = vis.arrowColorRGB

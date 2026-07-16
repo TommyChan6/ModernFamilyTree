@@ -103,7 +103,7 @@ export function createNode3DMaterial({ atlasTexture }) {
 
       void main() {
         float d = length(vCorner);
-        float aa = fwidth(d) * 1.2 + 0.0008;
+        float aa = fwidth(d) * 1.5 + 0.0012;
 
         // ---- fill / avatar ----
         float inside = 1.0 - smoothstep(R - aa, R + aa, d);
@@ -131,11 +131,14 @@ export function createNode3DMaterial({ atlasTexture }) {
           col = over(vec4(uGlowColor, sel * 0.95), col);
         }
 
-        // ---- hover/select glow halo ----
+        // ---- hover/select glow halo (ring hugging the node edge) ----
         if (vGlow > 0.001) {
           float halo = smoothstep(R * 1.5, R, d) * (1.0 - inside);
           col.rgb += uGlowColor * halo * vGlow * 0.6;
-          col.a = max(col.a, halo * vGlow * 0.5);
+          // 'over' compositing, not max(): max() dips the alpha at the fill/halo
+          // crossover and leaves a thin see-through band that looks like aliasing.
+          float glowA = halo * vGlow * 0.5;
+          col.a = col.a + glowA * (1.0 - col.a);
         }
 
         // ---- depth fog: recede into the scene colour ----

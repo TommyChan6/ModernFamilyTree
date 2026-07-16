@@ -46,8 +46,8 @@ import {
 
 const props = defineProps({
   adapter: { type: Object, required: true },
-  width: { type: Number, default: 172 },
-  height: { type: Number, default: 118 },
+  width: { type: Number, default: 208 },
+  height: { type: Number, default: 142 },
   preserveAspect: { type: Boolean, default: true }
 })
 

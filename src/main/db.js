@@ -10,7 +10,8 @@ import {
   migrateYearsToDateValues,
   migrateScenariosToScenes,
   migrateFactionsToTags,
-  migrateGraphStateToScenes
+  migrateGraphStateToScenes,
+  migrateFieldSystem
 } from '../shared/dbCore'
 
 // DB shape and the sample-family seed live in src/shared/dbCore.ts so the
@@ -51,6 +52,8 @@ export function initDB() {
   _db.sessions = _db.sessions || {}
   _db.projects = _db.projects || {}
   _db.persons = _db.persons || {}
+  _db.field_defs = _db.field_defs || {}
+  _db.field_values = _db.field_values || {}
   _db.relationships = _db.relationships || {}
   _db.tags = _db.tags || {}
   _db.entity_tags = _db.entity_tags || {}
@@ -150,6 +153,12 @@ export function initDB() {
     _db.activeProjectId = Object.keys(_db.projects)[0]
     save()
   }
+
+  // Migration: fixed person columns → the trait system (default locked defs
+  // per project + per-person values; the columns live on as derived snapshots).
+  // Runs last so every earlier migration path (single-container adoption,
+  // tree rename, DateValues) is already in its final shape.
+  if (migrateFieldSystem(_db, { uuid: randomUUID, nowStr })) save()
 }
 
 export function getDB() {
@@ -159,6 +168,8 @@ export function getDB() {
     projects: _db.projects,
     activeProjectId: _db.activeProjectId,
     persons: _db.persons,
+    fieldDefs: _db.field_defs,
+    fieldValues: _db.field_values,
     relationships: _db.relationships,
     tags: _db.tags,
     entityTags: _db.entity_tags,

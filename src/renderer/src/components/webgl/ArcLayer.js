@@ -142,7 +142,7 @@ function createArcMaterial() {
 
       void main() {
         float d = length(vCorner);
-        float aa = fwidth(d) * 1.2 + 0.001;
+        float aa = fwidth(d) * 1.5 + 0.0012;
         float ring = 1.0 - smoothstep(vHalfW - aa, vHalfW + aa, abs(d - vRadius));
         float ang = atan(vCorner.y, vCorner.x) - uTime * vSpin;
         float rel = mod(ang - vA0, TAU);

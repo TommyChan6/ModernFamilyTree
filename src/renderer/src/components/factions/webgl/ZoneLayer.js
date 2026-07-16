@@ -155,7 +155,7 @@ function createZoneMaterial() {
 
       void main() {
         float d = length(vCorner);
-        float aa = fwidth(d) * 1.2 + 0.001;
+        float aa = fwidth(d) * 1.5 + 0.0012;
         float fill = (1.0 - smoothstep(vR - aa, vR + aa, d)) * vFillA;
         float ring = (1.0 - smoothstep(vRingW * 0.5, vRingW * 0.5 + aa, abs(d - vR))) * vRingA;
         float alpha = max(fill, ring);

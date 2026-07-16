@@ -2,17 +2,25 @@
 //
 // The graph uses a screen-space, y-DOWN world (identical to the old SVG group and to
 // what d3-force computes). A d3.zoom transform { x, y, k } maps world → screen exactly
-// like the old `rootGroup.attr('transform', ...)` did:
+// like the old `rootGroup.attr('transform', ...)` did. Optional per-axis stretch
+// factors { sx, sy } (default 1) let the view squash/spread the layout along one axis
+// without distorting node discs or link strokes — the renderer bakes the same stretch
+// into node/link positions while keeping the zoom `k` uniform, so this stays the single
+// source of truth for the mapping:
 //
-//     screenX = worldX * k + x
-//     screenY = worldY * k + y
+//     screenX = worldX * sx * k + x
+//     screenY = worldY * sy * k + y
 
 export function worldToScreen(wx, wy, t) {
-  return { x: wx * t.k + t.x, y: wy * t.k + t.y }
+  const sx = t.sx ?? 1,
+    sy = t.sy ?? 1
+  return { x: wx * sx * t.k + t.x, y: wy * sy * t.k + t.y }
 }
 
 export function screenToWorld(px, py, t) {
-  return { x: (px - t.x) / t.k, y: (py - t.y) / t.k }
+  const sx = t.sx ?? 1,
+    sy = t.sy ?? 1
+  return { x: (px - t.x) / (t.k * sx), y: (py - t.y) / (t.k * sy) }
 }
 
 // Fit-to-extent: given the world-space bounding box of the nodes and the viewport size,

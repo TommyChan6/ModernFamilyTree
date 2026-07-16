@@ -299,6 +299,183 @@ Highest delight-or-value per unit effort, given what's already built:
 5. **C1 — Procedural dynasty generator.** The zero-cost answer to "AI builder," and it fills
    the gallery.
 
+---
+
+## Part 4 — Ideas that make money
+
+*A deliberately commercial brainstorm. The app is zero-cost **today** (see
+[`CLAUDE.md`](../CLAUDE.md)) and monetization is a decided-later question
+([`MID_DEVELOPMENT.md`](./MID_DEVELOPMENT.md) §11), but the docs are explicit that we should
+**build the hooks now**. This section imagines who would pay, what for, and what could go
+wrong. Everything here is speculative — a menu, not a plan.*
+
+New tags for this section:
+
+| Tag | Meaning |
+|-----|---------|
+| 💰💰💰 / 💰💰 / 💰 | Revenue potential relative to build+run effort (ROI: high / medium / low) |
+| ⚠️ **low/med/high** | Risk (execution, legal, churn, or dependence on a deferred cost) |
+| 👥 **Audience** | The imaginary persona(s) it targets (see below) |
+
+### The imaginary target audiences
+
+Five personas the whole app can be aimed at. Each has a different wallet and a different
+reason to open it.
+
+| Persona | Who | What they'll pay for | Willingness to pay |
+|---------|-----|----------------------|--------------------|
+| **🧓 Margaret, the family historian** | 55–75, organizing decades of genealogy for her descendants | Privacy, permanence, print-quality output, "never lose this" | **High** — this is her legacy; price-insensitive |
+| **✍️ Devi, the indie novelist / worldbuilder** | Writing a multi-book series with a large cast | Tools that keep her canon straight; anything that saves plotting time | **Medium** — pays for tools that earn their keep, hates subscriptions |
+| **🛡️ Marco, the fandom wiki maintainer** | Runs a community around a big franchise | Embeds, collaboration, canonical shared trees, traffic to his wiki | **Low personally, high in aggregate** — monetize the *audience*, not him |
+| **🎲 Priya, the TTRPG game master** | Runs a long D&D/worldbuilding campaign | NPC dynasties, faction webs, session-prep speed | **Medium** — already pays for VTT tools & content |
+| **🏛️ An institution** | School, library, small museum, estate-planning firm | Site licenses, teaching material, client deliverables, compliance | **High per seat, slow to close** — B2B money, B2B sales cycle |
+
+### Consumer revenue (B2C)
+
+**P1. "Pro" tier — private trees, scale, and export** 💰💰💰 · ⚠️ low · 👥 Margaret, Devi
+The obvious base: free tier is public/limited; **Pro** unlocks private trees, large
+person/photo quotas, GEDCOM + high-res image export, and the AI/procedural builders. The
+`PLAN_LIMITS` quota machinery **already exists** in `dbCore.ts` — the hooks are half-built.
+*ROI:* the standard freemium SaaS engine; recurring, compounding. *Risk:* low technically;
+the real risk is a free tier so generous no one upgrades — gate *scale and privacy*, never
+core joy. 💸 Requires the deferred payment/billing stack (Stripe → needs card details).
+
+**P2. Print-on-demand heirlooms** 💰💰💰 · ⚠️ med · 👥 Margaret
+The **reunion pack** (G2), the **fan chart** (D1), and the **family fingerprint** (D4) are
+already print-shaped. Sell them as **physical products**: a bound family-history book, a
+framed poster-size fan chart, name-tag packs shipped for a reunion. Margaret spends
+$60–150 without blinking on a keepsake for her grandchildren. *ROI:* high margin, high
+emotional willingness-to-pay, and it monetizes users who'd never buy software. *Risk:*
+medium — fulfillment/print partner (Printful/Lulu-style) adds ops and a physical-goods
+returns/quality surface; 💸 partner is pay-per-order, not free.
+
+**P3. Legacy vault — "your family's memory, guaranteed to outlive you"** 💰💰💰 · ⚠️ high · 👥 Margaret
+Build on **memory capsules** (E1) and the **time capsule** (E3): a premium, backed-up,
+inheritable archive with a *"pass it on"* handoff to named heirs and a dead-man's-switch that
+releases capsules on a date or an event. *ROI:* the highest willingness-to-pay in the whole
+app — permanence is worth a *lot* to this persona, and it justifies annual (even prepaid
+multi-year / "perpetual") pricing. *Risk:* **high, and mostly a promise problem** — you are
+guaranteeing durability and post-death delivery; that's storage cost, a real backup/DR
+obligation, and a trust/liability burden (what if you shut down?). Escrow/export guarantees
+and a clear ToS are mandatory. Don't ship the promise you can't keep.
+
+**P4. Style & content packs (one-time purchases)** 💰💰 · ⚠️ low · 👥 Devi, Priya, Margaret
+The Character view's **StylePack** architecture is a *storefront waiting to happen*: sell art
+styles (anime, renaissance, ink-wash), **heraldry/crest packs** (C4), name-corpus packs for
+C2, map backdrops for the map view. Non-recurring, no billing-relationship friction, appeals
+to the buy-once crowd (Devi). *ROI:* medium, compounds as the catalog grows; marginal cost
+per sale ≈ 0. *Risk:* low — the risk is *supply*: each pack is real art/design labor
+(the proposal flags "five styles is a large art undertaking"). Could open a **creator
+marketplace** (P8) to offload that.
+
+**P5. AI credits, sold not bundled** 💰💰 · ⚠️ med · 👥 Devi, Priya
+The Claude-API tree-builder is deferred *because* it's pay-per-use. Flip that from a cost into
+a product: sell **AI credits** (prose bios, "generate a feuding noble house," photo→tree
+vision import) at a margin over API cost. The pay-per-use nature stops being a liability
+because the user funds it. *ROI:* medium, scales with usage, self-funding by design. *Risk:*
+medium — 💸 needs the paid API and billing; margins must cover token cost; quality/abuse
+controls required. **Procedural generation (C1) is the zero-cost hedge** to ship the *feature*
+before the paid version.
+
+**P6. "Try your real family" — the DNA-kit cross-sell** 💰💰 · ⚠️ high · 👥 Margaret
+Affiliate/referral revenue steering genealogy users toward DNA test kits or records
+subscriptions (the Ancestry/MyHeritage ecosystem), enabled by **GEDCOM interop** (planned).
+*ROI:* affiliate commissions on genealogy products are substantial and require zero
+fulfillment on our side. *Risk:* **high** — data-privacy optics of pairing family data with
+DNA marketing are radioactive in the EU (author is in Norway); must be opt-in, transparent,
+and never share user data. Reputationally fragile; approach with tongs.
+
+### Community & network revenue
+
+**P7. Sponsored / verified canonical trees** 💰💰 · ⚠️ med · 👥 Marco + franchise owners
+Once public trees + the **Explore** gallery exist, a franchise (game studio, publisher,
+streaming show) pays for an **official verified tree** of their universe — a marketing surface
+that also drives our traffic. *ROI:* medium-high per deal, and it doubles as gallery seed +
+credibility. *Risk:* medium — sales-driven (not self-serve), and it collides with the
+fan-content IP grey zone ([`MID_DEVELOPMENT.md`](./MID_DEVELOPMENT.md) §11): a sponsored
+*official* tree is fine, but fan-made trees of the same IP nearby need a clear DMCA stance.
+
+**P8. Creator marketplace (take a cut)** 💰💰💰 · ⚠️ high · 👥 all creators
+Let artists sell StylePacks (P4), name corpora, and templates; we take a percentage. Turns
+the supply risk of P4 into a *revenue stream* and a moat (best styles live here). *ROI:*
+high at scale — marketplace economics, we don't produce the goods. *Risk:* **high** — classic
+chicken-and-egg (no buyers without sellers, no sellers without buyers), plus payout
+infrastructure, content moderation, and IP-policing of user-submitted art. Only viable *after*
+a real audience exists; premature = dead marketplace.
+
+**P9. Embeds as a growth-and-lead engine** 💰💰 · ⚠️ low · 👥 Marco, Devi
+The planned **embeddable widget** on a novelist's site or a fandom wiki is free *distribution*.
+Monetize with a subtle "Made with FamilyTree" backlink (removable on Pro — P1), and treat
+every embed as a funnel to sign-ups. *ROI:* indirect but compounding — this is the cheapest
+user-acquisition channel the product has. *Risk:* low; mostly just don't let free embeds
+cannibalize Pro. **The single best "free" monetization lever** because it grows the top of
+the funnel that feeds every other tier.
+
+### Institutional revenue (B2C → B2B)
+
+**P10. Classroom / education edition** 💰💰 · ⚠️ med · 👥 institutions, teachers
+Bundle the **quiz/puzzle mode** (F2), **guess-who** (F3), the **kinship calculator** (A1), and
+the **Mendelian trait simulator** (C3) into a teacher-facing edition: history (map real
+dynasties), biology (inheritance), literature (map a novel's cast). Site license per
+classroom/school. *ROI:* medium — education budgets are real but procurement is slow and
+price-sensitive. *Risk:* medium — long sales cycle, strict child-data-privacy law (FERPA/
+COPPA/GDPR-K), accessibility (WCAG) becomes a hard requirement not a nice-to-have.
+
+**P11. Estate & legacy-planning white-label** 💰💰💰 · ⚠️ high · 👥 institutions (law/finance)
+The **legacy vault** (P3) + a lineage/beneficiary map is a tool estate lawyers and family
+offices would license to visualize succession for clients. *ROI:* very high per seat — this
+is professional software billed at professional rates. *Risk:* **high** — B2B compliance,
+data-handling guarantees, support obligations, and a credibility bar a hobby project doesn't
+clear overnight. A "someday, if the product proves itself" bet, listed for completeness.
+
+**P12. "Powered-by" API / data licensing** 💰💰 · ⚠️ med · 👥 institutions, other apps
+The planned **public API** could be a paid product: museums, TTRPG platforms (Priya's VTT),
+or writing tools license our relationship-graph engine or curated public-tree data. *ROI:*
+medium — B2B recurring, few-but-large customers. *Risk:* medium — support burden, rate-limit/
+abuse management, and it commits us to API stability we'd otherwise iterate freely on.
+
+### How to think about it (the portfolio view)
+
+```mermaid
+quadrantChart
+    title ROI vs. Risk — where to place bets
+    x-axis "Low risk" --> "High risk"
+    y-axis "Low ROI" --> "High ROI"
+    quadrant-1 "Bet big"
+    quadrant-2 "Quick wins"
+    quadrant-3 "Fill-ins"
+    quadrant-4 "Only later"
+    "Pro tier (P1)": [0.2, 0.85]
+    "Print heirlooms (P2)": [0.45, 0.8]
+    "Embeds funnel (P9)": [0.15, 0.55]
+    "Style packs (P4)": [0.25, 0.5]
+    "AI credits (P5)": [0.5, 0.55]
+    "Legacy vault (P3)": [0.8, 0.9]
+    "Marketplace (P8)": [0.82, 0.8]
+    "Estate white-label (P11)": [0.85, 0.88]
+    "DNA cross-sell (P6)": [0.8, 0.55]
+    "Sponsored trees (P7)": [0.55, 0.6]
+```
+
+**If you only monetized three:** **P1 (Pro tier)** as the recurring base — the quota hooks
+already exist; **P9 (embeds)** as the near-free growth engine that feeds P1; and **P2 (print
+heirlooms)** as the high-margin surprise that monetizes the emotional users who'd never pay
+for software. All three sidestep the scariest risks (P3/P8/P11 are "prove the product first").
+
+**Cross-cutting risks to keep in view:**
+- 💸 **The cost wall.** Every recurring-revenue idea needs the deferred billing stack (Stripe
+  et al. require card details) — they're blocked until the zero-cost rule is lifted. One-time
+  and affiliate models (P2/P4/P6) can partly route around it.
+- ⚖️ **Real-people data + money is the danger zone.** Charging for, or advertising against,
+  data about living relatives who never consented multiplies the GDPR exposure already flagged
+  in §11. Fiction/historical monetization (Devi, Priya, Marco) carries far less legal risk than
+  real-family monetization (Margaret) — a reason to lead commercially with the *creative*
+  audience even though Margaret has the deeper wallet.
+- 🎁 **Free-tier gravity.** The whole product's charm is immediacy; gate scale, privacy,
+  permanence, and pro output — never the first delightful hour.
+
+---
+
 > These are aspirational, not commitments — see [`contributing.md`](./contributing.md) before
 > starting anything large, and check it still fits the zero-cost + web-parity constraints in
 > [`CLAUDE.md`](../CLAUDE.md).

@@ -139,7 +139,9 @@ export class TextGuideOverlay {
       const op = opts.labelOpacityOf ? opts.labelOpacityOf(n) : 1
       if (op <= 0.01) continue
       const y = s.y + (gs.nodeRadius + 14) * t.k
-      const first = n.name ? n.name.split(' ')[0] : ''
+      // The trait system composes the full node label (name-slot words + any
+      // "show in graph" values); pre-trait nodes fall back to the first name.
+      const first = n.graph_label ?? (n.name ? n.name.split(' ')[0] : '')
       ctx.globalAlpha = op
       ctx.font = `500 ${fontPx}px system-ui, sans-serif`
       ctx.fillStyle = opts.selectedId === n.id ? c.sel : c.name

@@ -44,7 +44,7 @@ export class WebGLGraphRenderer {
 
     this.renderer = new THREE.WebGLRenderer({ canvas: glCanvas, alpha: true, antialias: true })
     this.renderer.setClearColor(0x000000, 0)
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2)
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2.5)
     this.renderer.setPixelRatio(this.dpr)
 
     this.scene = new THREE.Scene()
@@ -313,12 +313,18 @@ export class WebGLGraphRenderer {
 
     if (this._nodeTweening) this._nodeTweening = this._stepNodes(dt)
 
+    // Per-axis view stretch (default 1): baked into positions here so node discs
+    // and link strokes keep uniform screen size while the layout spreads/squashes.
+    const sx = this.transform.sx ?? 1,
+      sy = this.transform.sy ?? 1
+
     // Per-frame positions (only on frames actually requested).
-    for (let i = 0; i < nodes.length; i++) this.nodeLayer.setPosition(i, nodes[i].x, nodes[i].y)
+    for (let i = 0; i < nodes.length; i++)
+      this.nodeLayer.setPosition(i, nodes[i].x * sx, nodes[i].y * sy)
     this.nodeLayer.commitPositions()
 
     if (this._linkTweening) this._linkTweening = this._stepLinks(dt)
-    this.linkLayer.updateGeometry(links, gs, this._curLinkVisual)
+    this.linkLayer.updateGeometry(links, gs, this._curLinkVisual, sx, sy)
     if (this._linkTweening || this._linkStyleWrite) {
       this.linkLayer.updateStyles(links, this._curLinkVisual)
       this._linkStyleWrite = false

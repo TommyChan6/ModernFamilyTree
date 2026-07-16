@@ -1,241 +1,279 @@
 <template>
-  <Transition name="slide">
-    <div v-if="store.formOpen" class="form-backdrop" @click.self="store.closeForm()">
-      <div class="form-panel">
-        <!-- Header -->
-        <div class="form-header">
-          <h2 class="form-title">{{ formTitle }}</h2>
-          <button class="icon-btn" @click="store.closeForm()">✕</button>
-        </div>
-
-        <!-- Scrollable body -->
-        <div class="form-body">
-          <!-- Basic Info -->
-          <div class="form-section">
-            <div class="form-section-label">Basic Information</div>
-            <div class="form-row">
-              <div class="form-field">
-                <label class="field-label">First Name <span class="required">*</span></label>
-                <input
-                  v-model="form.firstName"
-                  placeholder="e.g. John"
-                  :class="{ 'input-error': errors.firstName }"
-                  @input="errors.firstName = ''"
-                />
-                <span v-if="errors.firstName" class="error-text">{{ errors.firstName }}</span>
-              </div>
-              <div class="form-field">
-                <label class="field-label">Last Name</label>
-                <input v-model="form.lastName" placeholder="e.g. Smith" />
-              </div>
-            </div>
-
-            <div class="form-field">
-              <label class="field-label">Gender</label>
-              <select v-model="form.gender">
-                <option value="unknown">Unknown</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-              </select>
-            </div>
-
-            <div class="form-row">
-              <div class="form-field">
-                <label class="field-label">Birth Year</label>
-                <input
-                  v-model.number="form.birthYear"
-                  type="number"
-                  placeholder="e.g. 1950"
-                  min="1"
-                  max="2100"
-                />
-              </div>
-              <div class="form-field">
-                <label class="field-label">Death Year</label>
-                <input
-                  v-model.number="form.deathYear"
-                  type="number"
-                  placeholder="e.g. 2020"
-                  min="1"
-                  max="2100"
-                />
-              </div>
-            </div>
-
-            <div class="form-field">
-              <label class="field-label">Occupation</label>
-              <input v-model="form.occupation" placeholder="e.g. Engineer, Teacher…" />
-            </div>
-
-            <div class="form-field">
-              <label class="field-label">Location</label>
-              <input v-model="form.location" placeholder="e.g. New York, NY" />
-            </div>
-
-            <div class="form-field">
-              <label class="field-label">Biography</label>
-              <textarea
-                v-model="form.bio"
-                placeholder="A short biography or notes about this person…"
-                rows="3"
-              ></textarea>
-            </div>
-          </div>
-
-          <!-- Tags (existing persons only — a new person has no id to join on yet) -->
-          <div v-if="store.editingPerson && store.caps.tags" class="form-section">
-            <div class="form-section-label">Tags</div>
-            <TagChipsEditor :entity-id="store.editingPerson.id" />
-          </div>
-
-          <!-- Relationships -->
-          <div class="form-section">
-            <div class="form-section-label">Relationships</div>
-
-            <!-- Existing relationships (edit mode) -->
-            <div v-if="store.editingPerson && existingRels.length > 0" class="existing-rels">
-              <div v-for="rel in existingRels" :key="rel.id" class="rel-card">
-                <div class="rel-card-top">
-                  <span class="chip-rel-type">{{ rel.roleLabel }}</span>
-                  <span class="chip-person-name">{{ rel.otherName }}</span>
-                  <span v-if="rel.status === 'divorced'" class="chip-divorced">Divorced</span>
-                  <button class="chip-remove" @click="removeExistingRel(rel.id)">✕</button>
-                </div>
-                <div class="rel-card-fields">
-                  <div v-if="rel.relType === 'spouse'" class="rel-inline-field">
-                    <label class="rel-field-label">Status</label>
-                    <select
-                      :value="rel.status"
-                      class="rel-mini-select"
-                      @change="updateExistingRelStatus(rel.id, $event.target.value)"
-                    >
-                      <option value="active">Married</option>
-                      <option value="divorced">Divorced</option>
-                    </select>
-                  </div>
-                  <div class="rel-inline-field">
-                    <label class="rel-field-label">{{
-                      rel.relType === 'spouse' ? 'Married' : 'Since'
-                    }}</label>
-                    <input
-                      type="number"
-                      :value="rel.formedDate"
-                      class="rel-mini-input"
-                      placeholder="Year"
-                      min="1"
-                      max="2100"
-                      @change="updateExistingRelDate(rel.id, $event.target.value)"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Pending new relationships -->
-            <div v-if="pendingLinks.length > 0" class="existing-rels">
-              <div
-                v-for="(link, idx) in pendingLinks"
-                :key="'p' + idx"
-                class="rel-card rel-card-new"
+  <Transition name="sheet">
+    <div v-if="store.formOpen" class="pf-backdrop" @click.self="cancel">
+      <div class="pf-sheet" role="dialog" aria-modal="true">
+        <!-- ── Left rail: live preview ─────────────────────────────────── -->
+        <aside class="pf-rail">
+          <div class="pf-rail-aurora"></div>
+          <div class="pf-rail-inner">
+            <NodePreview
+              :label="labelLive"
+              :color="colorLive"
+              :ring-color="ringLive"
+              :image="portraitUrl"
+            />
+            <div v-if="lifeLive" class="pf-rail-life">{{ lifeLive }}</div>
+            <div v-if="railTags.length" class="pf-rail-tags">
+              <span
+                v-for="tag in railTags"
+                :key="tag.id"
+                class="pf-rail-tag"
+                :style="{ '--tc': tag.color }"
               >
-                <div class="rel-card-top">
-                  <span class="chip-rel-type">{{ relTypeLabel(link.relType) }}</span>
-                  <span class="chip-person-name">{{ personName(link.personId) }}</span>
-                  <button class="chip-remove" @click="removeLink(idx)">✕</button>
-                </div>
-                <div class="rel-card-fields">
-                  <div v-if="link.relType === 'spouse_of'" class="rel-inline-field">
-                    <label class="rel-field-label">Status</label>
-                    <select v-model="link.divorced" class="rel-mini-select">
-                      <option :value="false">Married</option>
-                      <option :value="true">Divorced</option>
-                    </select>
-                  </div>
-                  <div class="rel-inline-field">
-                    <label class="rel-field-label">{{
-                      link.relType === 'spouse_of' ? 'Married' : 'Since'
-                    }}</label>
-                    <input
-                      v-model.number="link.formedDate"
-                      type="number"
-                      class="rel-mini-input"
-                      placeholder="Year"
-                      min="1"
-                      max="2100"
-                    />
-                  </div>
-                </div>
-              </div>
+                {{ tag.icon ? tag.icon + ' ' : '' }}{{ tag.label }}
+              </span>
             </div>
-
-            <div class="link-add-row">
-              <select v-model="newLink.personId" class="link-select">
-                <option value="">Select person…</option>
-                <option v-for="p in availablePersons" :key="p.id" :value="p.id">
-                  {{ p.name }}
-                </option>
-              </select>
-              <select v-model="newLink.relType" class="link-select">
-                <option value="child_of">Is child of</option>
-                <option value="parent_of">Is parent of</option>
-                <option value="spouse_of">Is spouse of</option>
-                <option value="adopted_by">Was adopted by</option>
-              </select>
-              <button class="btn btn-ghost btn-sm" :disabled="!newLink.personId" @click="addLink">
-                ＋ Add
-              </button>
-            </div>
+            <div class="pf-rail-note">live preview</div>
           </div>
+        </aside>
 
-          <!-- Photos -->
-          <div class="form-section">
-            <div class="form-section-label">Photos</div>
-            <div v-if="!store.editingPerson && pendingPhotoPaths.length === 0" class="photo-hint">
-              Photos can be added after creating the person.
-            </div>
-            <div v-if="store.editingPerson">
-              <div v-if="photos.length > 0" class="photo-gallery">
-                <div
-                  v-for="photo in photos"
-                  :key="photo.id"
-                  class="photo-thumb"
-                  :class="{ primary: photo.is_primary }"
-                >
-                  <img :src="photoUrl(photo.file_path)" :alt="'Photo'" />
-                  <div class="photo-overlay">
-                    <button
-                      v-if="!photo.is_primary"
-                      class="photo-action-btn photo-star-btn"
-                      title="Set as primary"
-                      @click="setPrimary(photo)"
-                    >
-                      ★
-                    </button>
-                    <span v-else class="photo-primary-icon">★</span>
-                    <button
-                      class="photo-action-btn photo-delete-btn"
-                      title="Delete photo"
-                      @click="deletePhoto(photo)"
-                    >
+        <!-- ── Right pane ──────────────────────────────────────────────── -->
+        <div class="pf-pane">
+          <header class="pf-header">
+            <h2 class="pf-title">{{ formTitle }}</h2>
+            <nav class="pf-nav">
+              <button
+                v-for="s in sections"
+                :key="s.id"
+                class="pf-nav-chip"
+                type="button"
+                @click="scrollToSection(s.id)"
+              >
+                {{ s.label }}
+              </button>
+            </nav>
+            <button class="pf-close" type="button" title="Close" @click="cancel">✕</button>
+          </header>
+
+          <div ref="bodyEl" class="pf-body">
+            <!-- ═ Identity: the slot dock ═ -->
+            <section :ref="(el) => (sectionEls.identity = el)" class="pf-section">
+              <div class="pf-section-label">Identity slots</div>
+              <SlotDock
+                ref="dockRef"
+                :defs="store.fieldDefs"
+                :draft="draft"
+                :drag-state="drag"
+                @update="updateDraft"
+              />
+            </section>
+
+            <!-- ═ Traits ═ -->
+            <section :ref="(el) => (sectionEls.traits = el)" class="pf-section">
+              <div class="pf-section-label">
+                Traits
+                <span class="pf-section-hint">hold ⠿ to reorder · drop on a slot to assign</span>
+              </div>
+              <TransitionGroup name="fl" tag="div" class="pf-field-list">
+                <FieldRow
+                  v-for="def in listDefs"
+                  :key="def.id"
+                  :data-def-id="def.id"
+                  class="pf-field-row"
+                  :class="{ ghosted: drag.active && drag.defId === def.id }"
+                  :def="def"
+                  :draft="draftOf(def.id)"
+                  :advanced="advanced"
+                  :attached="attachedNow.has(def.id)"
+                  @update="updateDraft(def.id, $event)"
+                  @drag-start="startDrag(def, $event)"
+                  @remove-from-person="removeFromPerson(def.id)"
+                />
+              </TransitionGroup>
+              <AddFieldBar @create="createTrait" />
+            </section>
+
+            <!-- ═ Relationships ═ -->
+            <section :ref="(el) => (sectionEls.relations = el)" class="pf-section">
+              <div class="pf-section-label">Relationships</div>
+
+              <div v-if="store.editingPerson && existingRels.length > 0" class="pf-rels">
+                <div v-for="rel in existingRels" :key="rel.id" class="pf-rel-card">
+                  <div class="pf-rel-top">
+                    <span class="pf-rel-type">{{ rel.roleLabel }}</span>
+                    <span class="pf-rel-name">{{ rel.otherName }}</span>
+                    <span v-if="rel.status === 'divorced'" class="pf-rel-divorced">Divorced</span>
+                    <button class="pf-rel-x" type="button" @click="removeExistingRel(rel.id)">
                       ✕
                     </button>
                   </div>
-                  <div v-if="photo.is_primary" class="primary-badge">Primary</div>
+                  <div class="pf-rel-fields">
+                    <label v-if="rel.relType === 'spouse'" class="pf-rel-field">
+                      <span>Status</span>
+                      <select
+                        :value="rel.status"
+                        @change="updateExistingRelStatus(rel.id, $event.target.value)"
+                      >
+                        <option value="active">Married</option>
+                        <option value="divorced">Divorced</option>
+                      </select>
+                    </label>
+                    <label class="pf-rel-field">
+                      <span>{{ rel.relType === 'spouse' ? 'Married' : 'Since' }}</span>
+                      <input
+                        type="number"
+                        :value="rel.formedDate"
+                        placeholder="Year"
+                        @change="updateExistingRelDate(rel.id, $event.target.value)"
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
-              <button class="btn btn-ghost btn-sm" style="margin-top: 8px" @click="addPhoto">
-                + Add Photo
-              </button>
-            </div>
+
+              <TransitionGroup v-if="pendingLinks.length" name="fl" tag="div" class="pf-rels">
+                <div
+                  v-for="(link, idx) in pendingLinks"
+                  :key="link.key"
+                  class="pf-rel-card pf-rel-new"
+                >
+                  <div class="pf-rel-top">
+                    <span class="pf-rel-type">{{ relTypeLabel(link.relType) }}</span>
+                    <span class="pf-rel-name">{{ personName(link.personId) }}</span>
+                    <span class="pf-rel-pending">new</span>
+                    <button class="pf-rel-x" type="button" @click="pendingLinks.splice(idx, 1)">
+                      ✕
+                    </button>
+                  </div>
+                  <div class="pf-rel-fields">
+                    <label v-if="link.relType === 'spouse_of'" class="pf-rel-field">
+                      <span>Status</span>
+                      <select v-model="link.divorced">
+                        <option :value="false">Married</option>
+                        <option :value="true">Divorced</option>
+                      </select>
+                    </label>
+                    <label class="pf-rel-field">
+                      <span>{{ link.relType === 'spouse_of' ? 'Married' : 'Since' }}</span>
+                      <input v-model.number="link.formedDate" type="number" placeholder="Year" />
+                    </label>
+                  </div>
+                </div>
+              </TransitionGroup>
+
+              <!-- intent buttons -->
+              <div class="pf-intents">
+                <button
+                  v-for="intent in INTENTS"
+                  :key="intent.relType"
+                  type="button"
+                  class="pf-intent"
+                  :class="{ active: pickerFor === intent.relType }"
+                  @click="pickerFor = pickerFor === intent.relType ? null : intent.relType"
+                >
+                  <span class="pf-intent-glyph">{{ intent.glyph }}</span> {{ intent.label }}
+                </button>
+              </div>
+              <Transition name="fl">
+                <PersonPicker
+                  v-if="pickerFor"
+                  class="pf-picker"
+                  :exclude="excludedPersonIds"
+                  :placeholder="pickerPlaceholder"
+                  @pick="addLink"
+                  @cancel="pickerFor = null"
+                />
+              </Transition>
+            </section>
+
+            <!-- ═ Images ═ -->
+            <section :ref="(el) => (sectionEls.images = el)" class="pf-section">
+              <div class="pf-section-label">Images</div>
+              <div v-if="!store.editingPerson" class="pf-hint">
+                Images can be added after creating — save first.
+              </div>
+              <template v-else>
+                <div class="pf-img-slots">
+                  <div
+                    v-for="slot in IMAGE_SLOTS"
+                    :key="slot.role"
+                    class="pf-img-slot"
+                    :class="[`pf-img-${slot.role}`, { filled: !!imageForRole(slot.role) }]"
+                    :title="slot.hint"
+                    @click="!imageForRole(slot.role) && addPhotoWithRole(slot.role)"
+                  >
+                    <template v-if="imageForRole(slot.role)">
+                      <img :src="photoUrl(imageForRole(slot.role).file_path)" alt="" />
+                      <button
+                        class="pf-img-x"
+                        type="button"
+                        title="Remove image"
+                        @click.stop="deletePhoto(imageForRole(slot.role))"
+                      >
+                        ✕
+                      </button>
+                    </template>
+                    <template v-else>
+                      <span class="pf-img-glyph">{{ slot.glyph }}</span>
+                      <span class="pf-img-label">{{ slot.label }}</span>
+                    </template>
+                  </div>
+                </div>
+                <div class="pf-extras">
+                  <div v-for="photo in extraPhotos" :key="photo.id" class="pf-extra">
+                    <img :src="photoUrl(photo.file_path)" alt="" />
+                    <div class="pf-extra-overlay">
+                      <button
+                        v-for="slot in IMAGE_SLOTS"
+                        :key="slot.role"
+                        class="pf-extra-btn"
+                        type="button"
+                        :title="`Use as ${slot.label.toLowerCase()}`"
+                        @click="setRole(photo, slot.role)"
+                      >
+                        {{ slot.glyph }}
+                      </button>
+                      <button
+                        class="pf-extra-btn pf-extra-del"
+                        type="button"
+                        title="Delete"
+                        @click="deletePhoto(photo)"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                  <button class="pf-extra-add" type="button" @click="addPhotoWithRole('')">
+                    ＋<span>extra</span>
+                  </button>
+                </div>
+              </template>
+            </section>
+
+            <!-- ═ Tags ═ -->
+            <section
+              v-if="store.caps.tags"
+              :ref="(el) => (sectionEls.tags = el)"
+              class="pf-section"
+            >
+              <div class="pf-section-label">Tags</div>
+              <div v-if="!store.editingPerson" class="pf-hint">
+                Tags can be added after creating — save first.
+              </div>
+              <TagChipsEditor v-else :entity-id="store.editingPerson.id" />
+            </section>
           </div>
+
+          <footer class="pf-footer">
+            <span v-if="formError" class="pf-error">{{ formError }}</span>
+            <button class="btn btn-ghost" type="button" @click="cancel">Cancel</button>
+            <button class="btn btn-primary" type="button" :disabled="submitting" @click="save">
+              {{ submitting ? 'Saving…' : store.editingPerson ? 'Save changes' : 'Create' }}
+            </button>
+          </footer>
         </div>
 
-        <!-- Footer -->
-        <div class="form-footer">
-          <button class="btn btn-ghost" @click="store.closeForm()">Cancel</button>
-          <button class="btn btn-primary" :disabled="submitting" @click="handleSubmit">
-            {{ submitting ? 'Saving…' : store.editingPerson ? 'Save Changes' : 'Create Person' }}
-          </button>
+        <!-- drag ghost -->
+        <div
+          v-if="drag.active"
+          class="pf-ghost"
+          :class="{
+            valid: drag.overSlot && drag.overValid,
+            invalid: drag.overSlot && !drag.overValid
+          }"
+          :style="{ left: drag.x + 'px', top: drag.y + 'px' }"
+        >
+          ⠿ {{ drag.label }}
         </div>
       </div>
     </div>
@@ -243,48 +281,371 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { api } from '../api'
-import { yearDate } from '../../../shared/calendarMath'
+import { yearDate, format as formatDate } from '../../../shared/calendarMath'
+import {
+  coerceValue,
+  composeGraphLabel,
+  composeName,
+  genderInfo,
+  highlightFrom,
+  lerpColorHex,
+  slotAccepts
+} from '../../../shared/fields'
+import NodePreview from './personForm/NodePreview.vue'
+import SlotDock from './personForm/SlotDock.vue'
+import FieldRow from './personForm/FieldRow.vue'
+import AddFieldBar from './personForm/AddFieldBar.vue'
+import PersonPicker from './personForm/PersonPicker.vue'
 import TagChipsEditor from './TagChipsEditor.vue'
 
 const store = useMainStore()
 
-const form = ref({
-  firstName: '',
-  lastName: '',
-  gender: 'unknown',
-  birthYear: null,
-  deathYear: null,
-  occupation: '',
-  location: '',
-  bio: ''
-})
-
-const errors = ref({ firstName: '' })
-const submitting = ref(false)
-const pendingLinks = ref([])
-const newLink = ref({ personId: '', relType: 'child_of', formedDate: '', divorced: false })
-const photos = ref([])
-const pendingPhotoPaths = ref([]) // file paths queued for new persons
-const existingRels = ref([])
-
-const formTitle = computed(() => {
-  if (store.editingPerson) return `Edit: ${store.editingPerson.name}`
-  return 'Add Person'
-})
-
-// Filter out self and already-linked persons from the dropdown
-const availablePersons = computed(() => {
-  const editId = store.editingPerson?.id
-  const linkedIds = new Set()
-  if (editId) {
-    existingRels.value.forEach((r) => linkedIds.add(r.otherId))
+const INTENTS = [
+  { relType: 'child_of', label: 'Parent', glyph: '↑', hint: 'Who is a parent of this person?' },
+  { relType: 'parent_of', label: 'Child', glyph: '↓', hint: 'Who is a child of this person?' },
+  { relType: 'spouse_of', label: 'Spouse', glyph: '⚭', hint: 'Who is their spouse?' },
+  {
+    relType: 'adopted_by',
+    label: 'Adoptive parent',
+    glyph: '☂',
+    hint: 'Who adopted this person?'
   }
-  pendingLinks.value.forEach((l) => linkedIds.add(l.personId))
-  return store.persons.filter((p) => p.id !== editId && !linkedIds.has(p.id))
+]
+
+const IMAGE_SLOTS = [
+  { role: 'portrait', glyph: '☺', label: 'Portrait', hint: 'Head & shoulders — the avatar' },
+  { role: 'fullbody', glyph: '🧍', label: 'Full body', hint: 'Standing figure' },
+  { role: 'background', glyph: '🏞', label: 'Background', hint: 'A scene or backdrop' }
+]
+
+const sections = [
+  { id: 'identity', label: 'Identity' },
+  { id: 'traits', label: 'Traits' },
+  { id: 'relations', label: 'Relations' },
+  { id: 'images', label: 'Images' },
+  { id: 'tags', label: 'Tags' }
+]
+
+// ── form state ────────────────────────────────────────────────────────────────
+const draft = reactive({}) // fieldId → { value, display_in_graph, timeframe }
+const attachedNow = ref(new Set()) // unlocked defs visible on this form
+const removalsPending = ref(new Set())
+const sessionDefIds = ref(new Set()) // defs created during this open (cleanup on cancel)
+let origRows = new Map()
+
+const pendingLinks = ref([])
+const pickerFor = ref(null)
+const photos = ref([])
+const existingRels = ref([])
+const submitting = ref(false)
+const formError = ref('')
+
+const bodyEl = ref(null)
+const dockRef = ref(null)
+const sectionEls = reactive({})
+
+const advanced = computed(() => store.programMode === 'advanced')
+const formTitle = computed(() =>
+  store.editingPerson ? `Edit: ${store.editingPerson.name || 'Unnamed'}` : `Add ${store.noun}`
+)
+
+const clone = (v) => (v == null ? null : JSON.parse(JSON.stringify(v)))
+
+function draftOf(id) {
+  if (!draft[id]) draft[id] = { value: null, display_in_graph: false, timeframe: null }
+  return draft[id]
+}
+
+function updateDraft(fieldId, patch) {
+  Object.assign(draftOf(fieldId), patch)
+}
+
+// The plain trait list: everything unslotted; unlocked ones only when attached.
+const listDefs = computed(() => {
+  const ordered = localOrder.value
+    .map((id) => store.fieldDefs.find((d) => d.id === id))
+    .filter(Boolean)
+  return ordered.filter(
+    (d) =>
+      !d.slot &&
+      !removalsPending.value.has(d.id) &&
+      (d.locked || attachedNow.value.has(d.id) || sessionDefIds.value.has(d.id))
+  )
 })
+
+// ── populate on open ──────────────────────────────────────────────────────────
+async function populate(person) {
+  formError.value = ''
+  pendingLinks.value = []
+  pickerFor.value = null
+  removalsPending.value = new Set()
+  sessionDefIds.value = new Set()
+  Object.keys(draft).forEach((k) => delete draft[k])
+  origRows = new Map()
+  const attached = new Set()
+
+  if (person) {
+    const rows = store.fieldValuesOf.get(person.id)
+    for (const def of store.fieldDefs) {
+      const row = rows?.get(def.id)
+      draft[def.id] = {
+        value: clone(row?.value ?? null),
+        display_in_graph: !!row?.display_in_graph,
+        timeframe: clone(row?.timeframe ?? null)
+      }
+      if (row) {
+        origRows.set(def.id, row)
+        if (!def.locked) attached.add(def.id)
+      }
+    }
+    existingRels.value = buildExistingRels(person.id)
+    const res = await api.invoke('images:getByPerson', { personId: person.id })
+    photos.value = res.success ? res.data : []
+  } else {
+    for (const def of store.fieldDefs) {
+      draft[def.id] = { value: null, display_in_graph: false, timeframe: null }
+    }
+    existingRels.value = []
+    photos.value = []
+  }
+  attachedNow.value = attached
+  syncLocalOrder()
+}
+
+watch(
+  () => store.formOpen,
+  (open) => {
+    if (open) populate(store.editingPerson)
+  }
+)
+watch(
+  () => store.editingPerson,
+  (person) => {
+    if (store.formOpen) populate(person)
+  }
+)
+// Keep draft entries in sync when defs appear (created / unslotted elsewhere).
+watch(
+  () => store.fieldDefs.length,
+  () => {
+    for (const def of store.fieldDefs) draftOf(def.id)
+    syncLocalOrder()
+  }
+)
+
+// ── live preview ──────────────────────────────────────────────────────────────
+const valueOfLive = (fieldId) => draft[fieldId]?.value ?? null
+const nameLive = computed(() => composeName(store.fieldDefs, valueOfLive))
+const labelLive = computed(() =>
+  composeGraphLabel(
+    nameLive.value,
+    store.fieldDefs,
+    valueOfLive,
+    (id) => !!draft[id]?.display_in_graph
+  )
+)
+const colorLive = computed(() => {
+  const def = store.fieldDefs.find((d) => d.slot === 'gender')
+  const t = def ? genderInfo(def, coerceValue(def, valueOfLive(def.id))).t : null
+  const gs = store.graphSettings
+  return t == null ? gs.unknownColor : lerpColorHex(gs.maleColor, gs.femaleColor, t)
+})
+const ringLive = computed(() => {
+  const def = store.fieldDefs.find((d) => d.slot === 'highlight')
+  if (!def) return null
+  const hl = highlightFrom(def, coerceValue(def, valueOfLive(def.id)))
+  return hl ? hl.color : null
+})
+const lifeLive = computed(() => {
+  const of = (slot) => {
+    const def = store.fieldDefs.find((d) => d.slot === slot)
+    if (!def) return ''
+    const v = coerceValue(def, valueOfLive(def.id))
+    if (v == null) return ''
+    if (def.type === 'date') return formatDate(v)
+    if (def.type === 'number') return String(v)
+    if (def.type === 'number_range') return `${v.a ?? '?'}–${v.b ?? '?'}`
+    if (def.type === 'date_range') return `${formatDate(v.from) || '?'}–${formatDate(v.to) || '?'}`
+    return ''
+  }
+  const b = of('birth')
+  const d = of('death')
+  return b || d ? `${b || '·'} — ${d || 'present'}` : ''
+})
+const portraitUrl = computed(() => {
+  const img = imageForRole('portrait')
+  return img ? api.getImageUrl(img.file_path) : null
+})
+const railTags = computed(() =>
+  store.editingPerson ? store.tagsOf.get(store.editingPerson.id) || [] : []
+)
+
+// ── drag: reorder within the list, drop on a slot bay ─────────────────────────
+const localOrder = ref([])
+function syncLocalOrder() {
+  localOrder.value = store.fieldDefs
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map((d) => d.id)
+}
+
+const drag = reactive({
+  active: false,
+  defId: null,
+  defType: null,
+  label: '',
+  x: 0,
+  y: 0,
+  overSlot: null,
+  overValid: false,
+  moved: false
+})
+
+function startDrag(def, e) {
+  drag.active = true
+  drag.defId = def.id
+  drag.defType = def.type
+  drag.label = def.label
+  drag.x = e.clientX + 12
+  drag.y = e.clientY - 8
+  drag.overSlot = null
+  drag.moved = false
+  window.addEventListener('pointermove', onDragMove)
+  window.addEventListener('pointerup', onDragEnd, { once: true })
+}
+
+function onDragMove(e) {
+  drag.x = e.clientX + 12
+  drag.y = e.clientY - 8
+  const slot = dockRef.value?.bayAt(e.clientX, e.clientY) ?? null
+  drag.overSlot = slot
+  drag.overValid = slot ? slotAccepts(slot, drag.defType) : false
+  if (slot) return
+  // hovering the list: shift the dragged row to the pointer position
+  const rows = bodyEl.value?.querySelectorAll('.pf-field-row')
+  if (!rows?.length) return
+  let targetId = null
+  for (const el of rows) {
+    const r = el.getBoundingClientRect()
+    if (e.clientY < r.top + r.height / 2) {
+      targetId = el.dataset.defId
+      break
+    }
+  }
+  const ids = localOrder.value.filter((id) => id !== drag.defId)
+  const visible = listDefs.value.map((d) => d.id).filter((id) => id !== drag.defId)
+  let insertAfter // id to insert after within localOrder
+  if (targetId && targetId !== drag.defId) {
+    const vi = visible.indexOf(targetId)
+    insertAfter = vi > 0 ? visible[vi - 1] : null
+  } else if (!targetId) {
+    insertAfter = visible[visible.length - 1] ?? null
+  } else {
+    return
+  }
+  const at = insertAfter == null ? 0 : ids.indexOf(insertAfter) + 1
+  ids.splice(at, 0, drag.defId)
+  if (ids.join() !== localOrder.value.join()) {
+    localOrder.value = ids
+    drag.moved = true
+  }
+}
+
+async function onDragEnd() {
+  window.removeEventListener('pointermove', onDragMove)
+  const { defId, overSlot, overValid, moved } = drag
+  drag.active = false
+  if (overSlot) {
+    if (overValid) {
+      const res = await store.setFieldSlot(defId, overSlot)
+      if (!res.success) flashError(res.error)
+    } else {
+      flashError(
+        overSlot === 'name'
+          ? 'Only text traits can appear in the graph name'
+          : `That trait type can't go in the ${overSlot} slot`
+      )
+    }
+    syncLocalOrder()
+  } else if (moved) {
+    await store.reorderFieldDefs(localOrder.value)
+  }
+}
+
+let errTimer = null
+function flashError(msg) {
+  formError.value = msg
+  clearTimeout(errTimer)
+  errTimer = setTimeout(() => (formError.value = ''), 3200)
+}
+
+onBeforeUnmount(() => window.removeEventListener('pointermove', onDragMove))
+
+// ── traits: create / remove ───────────────────────────────────────────────────
+async function createTrait({ label, type, locked, config }) {
+  const res = await store.createFieldDef({
+    label,
+    type,
+    locked,
+    config,
+    personId: store.editingPerson?.id
+  })
+  if (res.success) {
+    const id = res.data.def.id
+    sessionDefIds.value = new Set([...sessionDefIds.value, id])
+    attachedNow.value = new Set([...attachedNow.value, id])
+    draftOf(id)
+    syncLocalOrder()
+  }
+}
+
+function removeFromPerson(fieldId) {
+  removalsPending.value = new Set([...removalsPending.value, fieldId])
+}
+
+// ── relationships ─────────────────────────────────────────────────────────────
+const pickerPlaceholder = computed(() => {
+  const intent = INTENTS.find((i) => i.relType === pickerFor.value)
+  return intent ? intent.hint : 'Type a name…'
+})
+
+const excludedPersonIds = computed(() => {
+  const ids = new Set()
+  if (store.editingPerson) ids.add(store.editingPerson.id)
+  existingRels.value.forEach((r) => ids.add(r.otherId))
+  pendingLinks.value.forEach((l) => ids.add(l.personId))
+  return [...ids]
+})
+
+let linkKey = 0
+function addLink(person) {
+  pendingLinks.value.push({
+    key: `l${linkKey++}`,
+    personId: person.id,
+    relType: pickerFor.value,
+    formedDate: '',
+    divorced: false
+  })
+  pickerFor.value = null
+}
+
+function relTypeLabel(relType) {
+  return (
+    {
+      child_of: 'Child of',
+      parent_of: 'Parent of',
+      spouse_of: 'Spouse of',
+      adopted_by: 'Adopted by'
+    }[relType] || relType
+  )
+}
+
+function personName(pid) {
+  return store.persons.find((x) => x.id === pid)?.name || 'Unnamed'
+}
 
 function buildExistingRels(personId) {
   const rels = []
@@ -294,17 +655,15 @@ function buildExistingRels(personId) {
     const other = store.persons.find((p) => p.id === otherId)
     if (!other) return
     let roleLabel = ''
-    if (r.type === 'spouse') {
-      roleLabel = 'Spouse of'
-    } else if (r.type === 'parent_child') {
+    if (r.type === 'spouse') roleLabel = 'Spouse of'
+    else if (r.type === 'parent_child')
       roleLabel = r.person_a_id === personId ? 'Parent of' : 'Child of'
-    } else if (r.type === 'adopted') {
+    else if (r.type === 'adopted')
       roleLabel = r.person_a_id === personId ? 'Adoptive parent of' : 'Adopted by'
-    }
     rels.push({
       id: r.id,
       otherId,
-      otherName: other.name,
+      otherName: other.name || 'Unnamed',
       roleLabel,
       relType: r.type,
       status: r.status || 'active',
@@ -332,590 +691,826 @@ async function updateExistingRelDate(relId, val) {
   if (rel) rel.formedDate = formedDate
 }
 
-// (Re)fill the form from the person being edited, or blank it for Add.
-async function populate(person) {
-  if (person) {
-    const parts = person.name.trim().split(/\s+/)
-    form.value = {
-      firstName: parts.slice(0, -1).join(' ') || parts[0] || '',
-      lastName: parts.length > 1 ? parts[parts.length - 1] : '',
-      gender: person.gender || 'unknown',
-      birthYear: person.birth?.year || null,
-      deathYear: person.death?.year || null,
-      occupation: person.occupation || '',
-      location: person.location || '',
-      bio: person.bio || ''
+async function createPendingLinks(selfId) {
+  for (const link of pendingLinks.value) {
+    let person_a_id, person_b_id, type
+    if (link.relType === 'child_of') {
+      person_a_id = link.personId
+      person_b_id = selfId
+      type = 'parent_child'
+    } else if (link.relType === 'parent_of') {
+      person_a_id = selfId
+      person_b_id = link.personId
+      type = 'parent_child'
+    } else if (link.relType === 'spouse_of') {
+      person_a_id = selfId
+      person_b_id = link.personId
+      type = 'spouse'
+    } else {
+      person_a_id = link.personId
+      person_b_id = selfId
+      type = 'adopted'
     }
-    errors.value.firstName = ''
-    existingRels.value = buildExistingRels(person.id)
-    pendingLinks.value = []
-    // Load photos
-    const res = await api.invoke('images:getByPerson', { personId: person.id })
-    if (res.success) photos.value = res.data
-    else photos.value = []
-  } else {
-    form.value = {
-      firstName: '',
-      lastName: '',
-      gender: 'unknown',
-      birthYear: null,
-      deathYear: null,
-      occupation: '',
-      location: '',
-      bio: ''
-    }
-    errors.value.firstName = ''
-    pendingLinks.value = []
-    existingRels.value = []
-    photos.value = []
+    await store.createRelationship({
+      person_a_id,
+      person_b_id,
+      type,
+      status: link.divorced ? 'divorced' : 'active',
+      formed: yearDate(link.formedDate)
+    })
   }
 }
 
-// Reset the form every time it OPENS (not only when the edited person
-// changes) — otherwise the always-mounted form keeps stale text from a prior
-// open when you click Add again (editingPerson null → null is not a change).
-// editingPerson is set before formOpen in the store's openForm/selectPerson,
-// so it's current here.
-watch(
-  () => store.formOpen,
-  (open) => {
-    if (open) populate(store.editingPerson)
-  }
-)
-// Also re-fill if the edited person switches while the form is already open.
-watch(
-  () => store.editingPerson,
-  (person) => {
-    if (store.formOpen) populate(person)
-  }
-)
-
-function fullName() {
-  const first = form.value.firstName.trim()
-  const last = form.value.lastName.trim()
-  return last ? `${first} ${last}` : first
-}
-
-function relTypeLabel(relType) {
-  const map = {
-    child_of: 'Child of',
-    parent_of: 'Parent of',
-    spouse_of: 'Spouse of',
-    adopted_by: 'Adopted by'
-  }
-  return map[relType] || relType
-}
-
-function personName(pid) {
-  const p = store.persons.find((x) => x.id === pid)
-  return p ? p.name : pid
-}
-
-function addLink() {
-  if (!newLink.value.personId) return
-  pendingLinks.value.push({ ...newLink.value })
-  newLink.value = { personId: '', relType: 'child_of', formedDate: '', divorced: false }
-}
-
-function removeLink(idx) {
-  pendingLinks.value.splice(idx, 1)
-}
-
+// ── images ────────────────────────────────────────────────────────────────────
 function photoUrl(filePath) {
   return api.getImageUrl(filePath) || ''
 }
 
-async function addPhoto() {
+function imageForRole(role) {
+  const byRole = photos.value.find((p) => p.role === role)
+  if (byRole) return byRole
+  if (role === 'portrait') return photos.value.find((p) => p.is_primary) || null
+  return null
+}
+
+const extraPhotos = computed(() => {
+  const taken = new Set(
+    IMAGE_SLOTS.map((s) => imageForRole(s.role))
+      .filter(Boolean)
+      .map((p) => p.id)
+  )
+  return photos.value.filter((p) => !taken.has(p.id))
+})
+
+async function addPhotoWithRole(role) {
   if (!store.editingPerson) return
-  const res = await api.invoke('images:openDialog')
-  if (!res.success || !res.data) return
-  const srcPath = res.data
-  const isPrimary = photos.value.length === 0
-  const addRes = await api.invoke('images:add', {
+  const dlg = await api.invoke('images:openDialog')
+  if (!dlg.success || !dlg.data) return
+  const isPrimary = role === 'portrait' || photos.value.length === 0
+  const res = await api.invoke('images:add', {
     personId: store.editingPerson.id,
-    srcPath,
-    isPrimary
+    srcPath: dlg.data,
+    isPrimary,
+    role
   })
-  if (addRes.success) {
-    photos.value.push(addRes.data)
-    if (isPrimary) {
-      const idx = store.persons.findIndex((p) => p.id === store.editingPerson.id)
-      if (idx !== -1)
-        store.persons[idx] = { ...store.persons[idx], primary_image: addRes.data.file_path }
-    }
+  if (res.success) {
+    if (isPrimary) photos.value.forEach((p) => (p.is_primary = false))
+    photos.value.push(res.data)
+    if (isPrimary) patchStorePrimary(res.data.file_path)
   }
 }
 
-async function setPrimary(photo) {
-  if (!store.editingPerson) return
-  await api.invoke('images:setPrimary', { imageId: photo.id, personId: store.editingPerson.id })
-  photos.value.forEach((p) => {
-    p.is_primary = p.id === photo.id ? 1 : 0
+async function setRole(photo, role) {
+  const res = await api.invoke('images:setRole', {
+    imageId: photo.id,
+    personId: store.editingPerson.id,
+    role
   })
-  // Update person's primary_image in the store so the graph node updates
-  const idx = store.persons.findIndex((p) => p.id === store.editingPerson.id)
-  if (idx !== -1) store.persons[idx] = { ...store.persons[idx], primary_image: photo.file_path }
+  if (!res.success) return
+  photos.value.forEach((p) => {
+    if (p.role === role) p.role = ''
+    if (p.id === photo.id) p.role = role
+  })
+  if (role === 'portrait') {
+    await api.invoke('images:setPrimary', { imageId: photo.id, personId: store.editingPerson.id })
+    photos.value.forEach((p) => (p.is_primary = p.id === photo.id))
+    patchStorePrimary(photo.file_path)
+  }
 }
 
 async function deletePhoto(photo) {
   await api.invoke('images:delete', { imageId: photo.id })
   photos.value = photos.value.filter((p) => p.id !== photo.id)
-  if (photo.is_primary && store.editingPerson) {
-    // If remaining photos exist, make the first one primary
-    if (photos.value.length > 0) {
-      await setPrimary(photos.value[0])
+  if (photo.is_primary) {
+    const next = imageForRole('portrait') || photos.value[0]
+    if (next) {
+      await api.invoke('images:setPrimary', { imageId: next.id, personId: store.editingPerson.id })
+      photos.value.forEach((p) => (p.is_primary = p.id === next.id))
+      patchStorePrimary(next.file_path)
     } else {
-      const idx = store.persons.findIndex((p) => p.id === store.editingPerson.id)
-      if (idx !== -1) store.persons[idx] = { ...store.persons[idx], primary_image: null }
+      patchStorePrimary(null)
     }
   }
 }
 
-function validate() {
-  let ok = true
-  if (!form.value.firstName.trim()) {
-    errors.value.firstName = 'First name is required.'
-    ok = false
-  }
-  return ok
+function patchStorePrimary(filePath) {
+  const idx = store.persons.findIndex((p) => p.id === store.editingPerson?.id)
+  if (idx !== -1) store.persons[idx] = { ...store.persons[idx], primary_image: filePath }
 }
 
-async function handleSubmit() {
-  if (!validate()) return
+// ── save / cancel ─────────────────────────────────────────────────────────────
+function collectChanges() {
+  const values = []
+  const removals = [...removalsPending.value]
+  for (const def of store.fieldDefs) {
+    const d = draft[def.id]
+    if (!d || removalsPending.value.has(def.id)) continue
+    const orig = origRows.get(def.id)
+    const now = [d.value ?? null, !!d.display_in_graph, d.timeframe ?? null]
+    const was = [orig?.value ?? null, !!orig?.display_in_graph, orig?.timeframe ?? null]
+    const empty = now[0] == null && !now[1] && now[2] == null
+    if (JSON.stringify(now) === JSON.stringify(was)) {
+      // unchanged — but a brand-new person keeps its session traits attached
+      if (!store.editingPerson && empty && sessionDefIds.value.has(def.id)) {
+        values.push({ field_id: def.id, value: null })
+      }
+      continue
+    }
+    if (empty && orig && def.locked) removals.push(def.id)
+    else
+      values.push({
+        field_id: def.id,
+        // clone() strips Vue reactivity — raw Proxies can't cross the IPC boundary
+        value: clone(d.value),
+        display_in_graph: !!d.display_in_graph,
+        timeframe: clone(d.timeframe)
+      })
+  }
+  return { values, removals }
+}
+
+async function save() {
   submitting.value = true
-
+  formError.value = ''
   try {
-    const personData = {
-      name: fullName(),
-      // The form edits just a year for now; store it as a year-precision DateValue
-      birth: yearDate(form.value.birthYear),
-      death: yearDate(form.value.deathYear),
-      gender: form.value.gender,
-      bio: form.value.bio,
-      occupation: form.value.occupation,
-      location: form.value.location
-    }
-
+    const { values, removals } = collectChanges()
     if (store.editingPerson) {
-      // Update existing
-      await store.updatePerson({ id: store.editingPerson.id, ...personData })
-      // Create any new pending relationships
-      for (const link of pendingLinks.value) {
-        let person_a_id, person_b_id, type
-        const editId = store.editingPerson.id
-        if (link.relType === 'child_of') {
-          person_a_id = link.personId
-          person_b_id = editId
-          type = 'parent_child'
-        } else if (link.relType === 'parent_of') {
-          person_a_id = editId
-          person_b_id = link.personId
-          type = 'parent_child'
-        } else if (link.relType === 'spouse_of') {
-          person_a_id = editId
-          person_b_id = link.personId
-          type = 'spouse'
-        } else if (link.relType === 'adopted_by') {
-          person_a_id = link.personId
-          person_b_id = editId
-          type = 'adopted'
-        }
-        await store.createRelationship({
-          person_a_id,
-          person_b_id,
-          type,
-          status: link.divorced ? 'divorced' : 'active',
-          formed: yearDate(link.formedDate)
-        })
-      }
+      const res = await store.setFieldValues(store.editingPerson.id, values, removals)
+      if (!res.success) return flashError(res.error || 'Could not save')
+      await createPendingLinks(store.editingPerson.id)
     } else {
-      // Create new
-      const res = await store.createPerson(personData)
-      if (res.success) {
-        const newPersonId = res.data.id
-        // Create pending relationships
-        for (const link of pendingLinks.value) {
-          let person_a_id, person_b_id, type
-
-          if (link.relType === 'child_of') {
-            person_a_id = link.personId
-            person_b_id = newPersonId
-            type = 'parent_child'
-          } else if (link.relType === 'parent_of') {
-            person_a_id = newPersonId
-            person_b_id = link.personId
-            type = 'parent_child'
-          } else if (link.relType === 'spouse_of') {
-            person_a_id = newPersonId
-            person_b_id = link.personId
-            type = 'spouse'
-          } else if (link.relType === 'adopted_by') {
-            person_a_id = link.personId
-            person_b_id = newPersonId
-            type = 'adopted'
-          }
-
-          await store.createRelationship({
-            person_a_id,
-            person_b_id,
-            type,
-            status: link.divorced ? 'divorced' : 'active',
-            formed: yearDate(link.formedDate)
-          })
-        }
-      }
+      const res = await store.createPerson({ values })
+      if (!res.success) return flashError(res.error || 'Could not create')
+      await createPendingLinks(res.data.id)
+      store.refreshFields()
     }
-
     store.closeForm()
   } finally {
     submitting.value = false
   }
 }
+
+async function cancel() {
+  // A cancelled Add leaves no orphans: unlocked, unslotted defs created this
+  // session with no stored values are removed again.
+  if (!store.editingPerson) {
+    for (const id of sessionDefIds.value) {
+      const def = store.fieldDefs.find((d) => d.id === id)
+      const hasValues = store.fieldValues.some((v) => v.field_id === id)
+      if (def && !def.locked && !def.slot && !hasValues) await store.deleteFieldDef(id)
+    }
+  }
+  store.closeForm()
+}
+
+function scrollToSection(id) {
+  sectionEls[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 </script>
 
 <style scoped>
-.form-backdrop {
+.pf-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: stretch;
-  justify-content: flex-end;
-  z-index: 200;
-}
-
-.form-panel {
-  width: 420px;
-  max-width: 100vw;
-  background: var(--surface);
-  border-left: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
-  overflow: hidden;
-}
-
-.form-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-.form-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--t1);
-}
-
-.form-body {
-  flex: 1 1 0;
-  overflow-y: auto;
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.form-section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.form-section-label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: var(--t3);
-  padding-bottom: 2px;
-  border-bottom: 1px solid var(--border);
-}
-
-.form-row {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  place-items: center;
+  z-index: 200;
+  padding: 24px;
 }
 
-.form-field {
+.pf-sheet {
+  width: min(880px, 96vw);
+  height: min(88vh, 780px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
   display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.field-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--t2);
-}
-
-.required {
-  color: #ef5350;
-}
-
-.input-error {
-  border-color: #ef5350 !important;
-}
-
-.error-text {
-  font-size: 11px;
-  color: #ef5350;
-  margin-top: 2px;
-}
-
-/* Pending relationship links */
-.pending-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.pending-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: var(--adim);
-  border: 1px solid rgba(108, 142, 245, 0.2);
-  border-radius: 16px;
-  padding: 4px 10px 4px 10px;
-  font-size: 12px;
-  color: var(--accent);
-}
-
-.chip-rel-type {
-  font-weight: 700;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  opacity: 0.8;
-}
-
-.chip-person-name {
-  color: var(--t1);
-}
-
-.chip-remove {
-  background: none;
-  border: none;
-  color: var(--t3);
-  cursor: pointer;
-  font-size: 11px;
-  padding: 0;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  margin-left: 2px;
-}
-
-.chip-remove:hover {
-  color: #ef5350;
-}
-
-.pending-chip-new {
-  border-color: rgba(76, 175, 114, 0.25);
-  background: rgba(76, 175, 114, 0.08);
-}
-
-.link-add-row {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-
-.link-select {
-  flex: 1;
-  min-width: 120px;
-  font-size: 12px;
-}
-
-/* Photo gallery */
-.photo-gallery {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.photo-thumb {
-  width: 72px;
-  height: 72px;
-  border-radius: 8px;
   overflow: hidden;
   position: relative;
-  border: 2px solid var(--border);
-  flex-shrink: 0;
 }
 
-.photo-thumb.primary {
-  border-color: var(--accent);
+/* entrance */
+.sheet-enter-active {
+  transition: opacity 0.25s ease;
 }
-
-.photo-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.sheet-leave-active {
+  transition: opacity 0.18s ease;
 }
-
-.photo-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+.sheet-enter-active .pf-sheet {
+  animation: sheet-in 0.34s cubic-bezier(0.26, 1.3, 0.5, 1);
+}
+.sheet-leave-active .pf-sheet {
+  animation: sheet-out 0.18s ease forwards;
+}
+.sheet-enter-from,
+.sheet-leave-to {
   opacity: 0;
+}
+@keyframes sheet-in {
+  from {
+    transform: translateY(22px) scale(0.965);
+    opacity: 0;
+  }
+}
+@keyframes sheet-out {
+  to {
+    transform: translateY(12px) scale(0.98);
+    opacity: 0;
+  }
+}
+
+/* ── left rail ── */
+.pf-rail {
+  width: 232px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  transition: opacity 0.15s;
 }
-
-.photo-thumb:hover .photo-overlay {
-  opacity: 1;
-}
-
-.photo-action-btn {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  border-radius: 5px;
-  width: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 12px;
-  transition: background 0.12s;
-}
-
-.photo-action-btn:hover {
-  background: rgba(255, 255, 255, 0.35);
-}
-
-.photo-delete-btn:hover {
-  background: rgba(239, 83, 80, 0.5);
-}
-
-.primary-badge {
+.pf-rail-aurora {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(108, 142, 245, 0.85);
-  font-size: 8px;
-  font-weight: 700;
-  color: #fff;
-  text-align: center;
-  padding: 2px 0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.photo-star-btn {
-  color: #ffd54f !important;
-}
-
-.photo-primary-icon {
-  color: #ffd54f;
-  font-size: 14px;
-  line-height: 1;
+  inset: -40%;
+  background:
+    radial-gradient(38% 30% at 30% 25%, var(--adim), transparent 70%),
+    radial-gradient(
+      30% 26% at 72% 62%,
+      color-mix(in srgb, var(--pink) 12%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      34% 30% at 42% 86%,
+      color-mix(in srgb, var(--green) 9%, transparent),
+      transparent 70%
+    );
+  animation: aurora 16s ease-in-out infinite alternate;
   pointer-events: none;
 }
+@keyframes aurora {
+  from {
+    transform: rotate(0deg) scale(1);
+  }
+  to {
+    transform: rotate(8deg) scale(1.15);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-rail-aurora {
+    animation: none;
+  }
+}
+.pf-rail-inner {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px 16px;
+}
+.pf-rail-life {
+  font-size: 11px;
+  color: var(--t2);
+  letter-spacing: 0.4px;
+}
+.pf-rail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+}
+.pf-rail-tag {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--tc);
+  background: color-mix(in srgb, var(--tc) 13%, transparent);
+  color: var(--t1);
+}
+.pf-rail-note {
+  position: absolute;
+  bottom: 12px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--t3);
+}
 
-.photo-hint {
+/* ── right pane ── */
+.pf-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pf-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.pf-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+.pf-nav {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.pf-nav-chip {
+  border: none;
+  background: transparent;
+  color: var(--t3);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.pf-nav-chip:hover {
+  color: var(--t1);
+  background: var(--hover);
+}
+.pf-close {
+  border: none;
+  background: transparent;
+  color: var(--t3);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+.pf-close:hover {
+  color: var(--t1);
+  background: var(--hover);
+}
+
+.pf-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  scroll-behavior: smooth;
+}
+.pf-section {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  scroll-margin-top: 8px;
+}
+.pf-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+  color: var(--t3);
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.pf-section-hint {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0.2px;
+  font-size: 9.5px;
+  margin-left: auto;
+}
+.pf-hint {
   font-size: 12px;
   color: var(--t3);
   font-style: italic;
-  padding: 4px 0;
 }
 
-/* Relationship cards */
-.existing-rels {
+/* trait list + FLIP */
+.pf-field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fl-move,
+.fl-enter-active,
+.fl-leave-active {
+  transition:
+    transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1),
+    opacity 0.2s;
+}
+.fl-enter-from {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+}
+.fl-leave-to {
+  opacity: 0;
+  transform: scale(0.97);
+}
+.fl-leave-active {
+  position: absolute;
+  width: 100%;
+}
+.pf-field-row.ghosted {
+  opacity: 0.35;
+  filter: saturate(0.5);
+}
+
+/* drag ghost */
+.pf-ghost {
+  position: fixed;
+  z-index: 400;
+  pointer-events: none;
+  padding: 7px 13px;
+  border-radius: 10px;
+  background: var(--elevated);
+  border: 1px solid var(--accent);
+  color: var(--t1);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  transform: rotate(1.5deg);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.pf-ghost.valid {
+  border-color: var(--green);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--green) 30%, transparent);
+}
+.pf-ghost.invalid {
+  border-color: #ef5350;
+  animation: ghost-shake 0.3s;
+}
+@keyframes ghost-shake {
+  25% {
+    transform: rotate(1.5deg) translateX(-3px);
+  }
+  75% {
+    transform: rotate(1.5deg) translateX(3px);
+  }
+}
+
+/* relationships */
+.pf-rels {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  position: relative;
 }
-
-.rel-card {
+.pf-rel-card {
   background: var(--elevated);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 9px 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
 }
-
-.rel-card-new {
-  border-color: rgba(76, 175, 114, 0.25);
-  background: rgba(76, 175, 114, 0.05);
+.pf-rel-new {
+  border-color: color-mix(in srgb, var(--green) 30%, transparent);
+  background: color-mix(in srgb, var(--green) 6%, var(--elevated));
 }
-
-.rel-card-top {
+.pf-rel-top {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   flex-wrap: wrap;
 }
-
-.chip-divorced {
+.pf-rel-type {
+  font-weight: 700;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--accent);
+}
+.pf-rel-name {
+  color: var(--t1);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.pf-rel-divorced {
   font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
   color: #ef5350;
   background: rgba(239, 83, 80, 0.12);
   padding: 2px 7px;
   border-radius: 8px;
 }
-
-.rel-card-fields {
+.pf-rel-pending {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 14%, transparent);
+  padding: 2px 7px;
+  border-radius: 8px;
+}
+.pf-rel-x {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--t3);
+  cursor: pointer;
+  font-size: 11px;
+}
+.pf-rel-x:hover {
+  color: #ef5350;
+}
+.pf-rel-fields {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
 }
-
-.rel-inline-field {
+.pf-rel-field {
   display: flex;
   flex-direction: column;
   gap: 3px;
   flex: 1;
   min-width: 90px;
+  max-width: 160px;
 }
-
-.rel-field-label {
+.pf-rel-field span {
   font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--t3);
 }
-
-.rel-mini-select {
+.pf-rel-field input,
+.pf-rel-field select {
   font-size: 11px;
   padding: 5px 8px;
-  min-width: 0;
   border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--t1);
+  outline: none;
 }
 
-.rel-mini-input {
-  font-size: 11px;
-  padding: 5px 8px;
-  min-width: 0;
-  border-radius: 6px;
+.pf-intents {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.pf-intent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 1.5px dashed var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
+}
+.pf-intent:hover {
+  transform: translateY(-1.5px);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pf-intent.active {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--adim);
+  color: var(--accent);
+}
+.pf-intent-glyph {
+  font-size: 13px;
+}
+.pf-picker {
+  margin-top: 2px;
+}
+
+/* image slots */
+.pf-img-slots {
+  display: grid;
+  grid-template-columns: 108px 108px 1fr;
+  gap: 10px;
+  align-items: stretch;
+}
+.pf-img-slot {
+  position: relative;
+  border: 1.5px dashed var(--border);
+  border-radius: 12px;
+  min-height: 118px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--elevated) 40%, transparent);
+  transition:
+    border-color 0.2s,
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.pf-img-slot:not(.filled):hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+.pf-img-slot:not(.filled)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.05) 50%,
+    transparent 60%
+  );
+  background-size: 220% 100%;
+  animation: shimmer 2.8s linear infinite;
+}
+@keyframes shimmer {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -90% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-img-slot::after {
+    animation: none;
+  }
+}
+.pf-img-portrait {
+  border-radius: 50% / 42%;
+}
+.pf-img-slot.filled {
+  border-style: solid;
+  cursor: default;
+}
+.pf-img-slot img {
+  position: absolute;
+  inset: 0;
   width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: img-settle 0.35s cubic-bezier(0.26, 1.2, 0.5, 1);
+}
+@keyframes img-settle {
+  from {
+    transform: scale(1.12);
+    opacity: 0;
+  }
+}
+.pf-img-glyph {
+  font-size: 21px;
+  opacity: 0.75;
+}
+.pf-img-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--t3);
+}
+.pf-img-x {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  border: none;
+  border-radius: 6px;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.pf-img-slot:hover .pf-img-x {
+  opacity: 1;
 }
 
-/* Footer */
-.form-footer {
+.pf-extras {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.pf-extra {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  border-radius: 9px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.pf-extra img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pf-extra-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.pf-extra:hover .pf-extra-overlay {
+  opacity: 1;
+}
+.pf-extra-btn {
+  border: none;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border-radius: 5px;
+  width: 18px;
+  height: 18px;
+  font-size: 9px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.pf-extra-btn:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+.pf-extra-del:hover {
+  background: rgba(239, 83, 80, 0.65);
+}
+.pf-extra-add {
+  width: 62px;
+  height: 62px;
+  border: 1.5px dashed var(--border);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--t3);
+  font-family: var(--font);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.pf-extra-add span {
+  font-size: 8.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.pf-extra-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* footer */
+.pf-footer {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  padding: 14px 20px;
+  padding: 12px 18px;
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+}
+.pf-error {
+  margin-right: auto;
+  font-size: 11.5px;
+  color: #ef5350;
+  animation: fr-slide 0.2s ease-out;
+}
+@keyframes fr-slide {
+  from {
+    transform: translateY(3px);
+    opacity: 0;
+  }
 }
 </style>

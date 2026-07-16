@@ -109,6 +109,11 @@ export default {
       title: '程序模式',
       desc: '控制显示多少功能。简易模式保持界面精简；高级模式解锁所有工具。'
     },
+    noun: {
+      title: '成员的称呼',
+      desc: '此项目对条目的称呼——人物、角色、船舰、家族……仅应用于此项目。',
+      placeholder: 'Person'
+    },
     close: '关闭'
   },
   help: {

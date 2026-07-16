@@ -20,6 +20,8 @@ export const useMainStore = defineStore('main', () => {
 
   // ── State ──────────────────────────────────────────────────────────────────
   const persons = ref([])
+  const fieldDefs = ref([]) // trait definitions (FieldDef[]), ordered by `order`
+  const fieldValues = ref([]) // per-person trait values (FieldValue[])
   const relationships = ref([])
   const tags = ref([])
   const entityTags = ref([]) // the entity↔tag membership join rows
@@ -67,6 +69,9 @@ export const useMainStore = defineStore('main', () => {
   // autosaves; this is what Revert goes back to. null = never saved one.
   const checkpoint = ref(null)
   const activeView = ref('graph') // 'graph' | 'directory' | 'relationships' | 'timeline' | 'groups'
+  // What this project calls its entries ('Person', 'Character', 'Ship'…).
+  // Per-project setting; the data layer keeps saying "person" regardless.
+  const noun = ref('Person')
   // App-wide feature tier (progressive disclosure): 'simple' | 'standard' | 'advanced'
   const programMode = ref('standard')
   // Labs: the explicit opt-in for experimental features (Advanced mode only).
@@ -131,6 +136,17 @@ export const useMainStore = defineStore('main', () => {
     for (const row of entityTags.value) {
       if (!m.has(row.tag_id)) m.set(row.tag_id, [])
       m.get(row.tag_id).push(row.entity_id)
+    }
+    return m
+  })
+  // Trait lookups: fieldDefById.get(id) → FieldDef;
+  // fieldValuesOf.get(personId) → Map(fieldId → FieldValue)
+  const fieldDefById = computed(() => new Map(fieldDefs.value.map((d) => [d.id, d])))
+  const fieldValuesOf = computed(() => {
+    const m = new Map()
+    for (const v of fieldValues.value) {
+      if (!m.has(v.person_id)) m.set(v.person_id, new Map())
+      m.get(v.person_id).set(v.field_id, v)
     }
     return m
   })
@@ -353,6 +369,8 @@ export const useMainStore = defineStore('main', () => {
         projects.value = []
         activeProjectId.value = null
         persons.value = []
+        fieldDefs.value = []
+        fieldValues.value = []
         relationships.value = []
         tags.value = []
         entityTags.value = []
@@ -463,6 +481,7 @@ export const useMainStore = defineStore('main', () => {
   async function loadAll() {
     const [
       personsRes,
+      fieldsRes,
       relsRes,
       tagsRes,
       entityTagsRes,
@@ -472,6 +491,7 @@ export const useMainStore = defineStore('main', () => {
       settingsRes
     ] = await Promise.all([
       api.invoke('persons:getAll'),
+      api.invoke('fields:list'),
       api.invoke('relationships:getAll'),
       api.invoke('tags:getAll'),
       api.invoke('entity_tags:getAll'),
@@ -481,6 +501,10 @@ export const useMainStore = defineStore('main', () => {
       api.invoke('settings:getAll')
     ])
     if (personsRes.success) persons.value = personsRes.data
+    if (fieldsRes.success) {
+      fieldDefs.value = fieldsRes.data.defs
+      fieldValues.value = fieldsRes.data.values
+    }
     if (relsRes.success) relationships.value = relsRes.data
     if (tagsRes.success) tags.value = tagsRes.data
     if (entityTagsRes.success) entityTags.value = entityTagsRes.data
@@ -501,6 +525,8 @@ export const useMainStore = defineStore('main', () => {
       graph: pick('graph'),
       timeline: pick('timeline')
     }
+    // Restore the project's noun for its entries (default 'Person')
+    noun.value = typeof saved.noun === 'string' && saved.noun.trim() ? saved.noun.trim() : 'Person'
     // Restore the current-year override (used to live in the graphState blob)
     const savedYear = parseInt(saved.userCurrentYear)
     userCurrentYear.value = Number.isFinite(savedYear) && savedYear > 0 ? savedYear : null
@@ -544,6 +570,7 @@ export const useMainStore = defineStore('main', () => {
     const res = await api.invoke('persons:create', data)
     if (res.success) {
       persons.value.push(res.data)
+      refreshFields() // the payload was adopted into trait values server-side
       refreshUsage()
     } else if (res.error?.includes('limit')) {
       alert(res.error)
@@ -556,6 +583,7 @@ export const useMainStore = defineStore('main', () => {
     if (res.success) {
       const idx = persons.value.findIndex((p) => p.id === data.id)
       if (idx !== -1) persons.value[idx] = res.data
+      refreshFields()
     }
     return res
   }
@@ -564,6 +592,7 @@ export const useMainStore = defineStore('main', () => {
     const res = await api.invoke('persons:delete', { id })
     if (res.success) {
       persons.value = persons.value.filter((p) => p.id !== id)
+      fieldValues.value = fieldValues.value.filter((v) => v.person_id !== id)
       relationships.value = relationships.value.filter(
         (r) => r.person_a_id !== id && r.person_b_id !== id
       )
@@ -573,6 +602,89 @@ export const useMainStore = defineStore('main', () => {
         modalOpen.value = false
       }
     }
+    return res
+  }
+
+  // ── Trait actions (field defs + per-person values) ─────────────────────────
+  /** Re-fetch defs + values wholesale — def-level mutations recompute every
+   *  person's snapshot server-side, so persons refresh alongside. */
+  async function refreshFields({ withPersons = false } = {}) {
+    const [fieldsRes, personsRes] = await Promise.all([
+      api.invoke('fields:list'),
+      withPersons ? api.invoke('persons:getAll') : Promise.resolve(null)
+    ])
+    if (fieldsRes.success) {
+      fieldDefs.value = fieldsRes.data.defs
+      fieldValues.value = fieldsRes.data.values
+    }
+    if (personsRes?.success) persons.value = personsRes.data
+  }
+
+  async function createFieldDef(data) {
+    const res = await api.invoke('fields:createDef', data)
+    if (res.success) {
+      fieldDefs.value.push(res.data.def)
+      if (res.data.value) fieldValues.value.push(res.data.value)
+    }
+    return res
+  }
+
+  async function updateFieldDef(patch) {
+    const res = await api.invoke('fields:updateDef', patch)
+    if (res.success) {
+      const idx = fieldDefs.value.findIndex((d) => d.id === patch.id)
+      if (idx !== -1) fieldDefs.value[idx] = res.data
+      refreshFields({ withPersons: true })
+    }
+    return res
+  }
+
+  async function deleteFieldDef(id) {
+    const res = await api.invoke('fields:deleteDef', { id })
+    if (res.success) {
+      fieldDefs.value = fieldDefs.value.filter((d) => d.id !== id)
+      fieldValues.value = fieldValues.value.filter((v) => v.field_id !== id)
+      refreshFields({ withPersons: true })
+    }
+    return res
+  }
+
+  async function reorderFieldDefs(orderedIds) {
+    // Optimistic: reorder locally, then persist.
+    const byId = new Map(fieldDefs.value.map((d) => [d.id, d]))
+    fieldDefs.value = orderedIds.map((id) => byId.get(id)).filter(Boolean)
+    const res = await api.invoke('fields:reorderDefs', { orderedIds })
+    if (res.success) fieldDefs.value = res.data
+    return res
+  }
+
+  async function setFieldSlot(fieldId, slot, slotOrder) {
+    const res = await api.invoke('fields:setSlot', { fieldId, slot, slotOrder })
+    if (res.success) {
+      fieldDefs.value = res.data
+      refreshFields({ withPersons: true })
+    }
+    return res
+  }
+
+  /** Batch-save one person's trait values (the form's save path).
+   *  values: [{ field_id, value, timeframe?, display_in_graph? }],
+   *  removals: [fieldId]. */
+  async function setFieldValues(personId, values, removals = []) {
+    const res = await api.invoke('fields:setValues', { personId, values, removals })
+    if (res.success) {
+      const idx = persons.value.findIndex((p) => p.id === personId)
+      if (idx !== -1) persons.value[idx] = res.data.person
+      fieldValues.value = fieldValues.value
+        .filter((v) => v.person_id !== personId)
+        .concat(res.data.values)
+    }
+    return res
+  }
+
+  async function applyFieldDisplayAll(fieldId, on) {
+    const res = await api.invoke('fields:applyDisplayAll', { fieldId, on })
+    if (res.success) refreshFields({ withPersons: true })
     return res
   }
 
@@ -915,6 +1027,13 @@ export const useMainStore = defineStore('main', () => {
     api.invoke('settings:set', { key: 'userCurrentYear', value: userCurrentYear.value })
   }
 
+  /** Rename what this project calls its entries (blank reverts to 'Person'). */
+  function setNoun(word) {
+    const w = String(word ?? '').trim()
+    noun.value = w || 'Person'
+    api.invoke('settings:set', { key: 'noun', value: noun.value })
+  }
+
   function updateGraphSetting(key, value) {
     graphSettings.value[key] = value
     api.invoke('settings:set', { key: `graph_${key}`, value: JSON.stringify(value) })
@@ -970,6 +1089,10 @@ export const useMainStore = defineStore('main', () => {
     switchProject,
     // state
     persons,
+    fieldDefs,
+    fieldValues,
+    fieldDefById,
+    fieldValuesOf,
     relationships,
     tags,
     entityTags,
@@ -1001,6 +1124,8 @@ export const useMainStore = defineStore('main', () => {
     lockLines,
     relPopup,
     activeView,
+    noun,
+    setNoun,
     programMode,
     caps,
     setProgramMode,
@@ -1024,6 +1149,14 @@ export const useMainStore = defineStore('main', () => {
     createPerson,
     updatePerson,
     deletePerson,
+    refreshFields,
+    createFieldDef,
+    updateFieldDef,
+    deleteFieldDef,
+    reorderFieldDefs,
+    setFieldSlot,
+    setFieldValues,
+    applyFieldDisplayAll,
     createRelationship,
     updateRelationship,
     deleteRelationship,

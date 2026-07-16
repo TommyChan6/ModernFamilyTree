@@ -54,8 +54,8 @@
         ref="minimapRef"
         class="tl-minimap"
         :adapter="minimapAdapter"
-        :width="132"
-        :height="150"
+        :width="158"
+        :height="180"
         :preserve-aspect="false"
       />
 
@@ -361,7 +361,7 @@ function personVisual(p) {
   const hovered = hoverId.value === p.id
   const lit = searchOn.value && searchSet.value.has(p.id)
   const selected = store.selectedPersonId === p.id
-  const notYet = p.birthYear > tt.gateYear.value
+  const notYet = p.birthYear > tt.gateYear.value || p.birthYear < tt.gateStartYear.value
   return {
     opacity: notYet ? 0 : isDimmed(p.id) ? 0.22 : 1,
     lineWidth: hovered || lit || selected ? 9 : 6,
@@ -374,7 +374,7 @@ function personVisual(p) {
 }
 
 function marriageVisual(m) {
-  const notYet = m.year > tt.gateYear.value
+  const notYet = m.year > tt.gateYear.value || m.year < tt.gateStartYear.value
   const group = notYet ? 0 : connDimmed(m.ids) ? 0.12 : 1
   const lit = hoverId.value && m.ids.includes(hoverId.value)
   const base = m.estimated ? 0.35 : m.divorced ? 0.5 : 0.8
@@ -391,7 +391,7 @@ function marriageVisual(m) {
 }
 
 function birthVisual(b) {
-  const notYet = b.year > tt.gateYear.value
+  const notYet = b.year > tt.gateYear.value || b.year < tt.gateStartYear.value
   const group = notYet ? 0 : connDimmed(b.ids) ? 0.08 : 1
   const lit = hoverId.value && b.ids.includes(hoverId.value)
   return {
@@ -571,7 +571,9 @@ function onStageMove(e) {
   hoverBadge.value = badge ? badge.id : null
   renderer?.setHoverBadge(hoverBadge.value)
   let person = badge ? null : renderer?.personAt(p.x, p.y)
-  if (person && person.birthYear > tt.gateYear.value) person = null // hidden by Time travel
+  // hidden by Time travel — outside the framed [start, end] window
+  if (person && (person.birthYear > tt.gateYear.value || person.birthYear < tt.gateStartYear.value))
+    person = null
   const id = person ? person.id : null
   if (id !== hoverId.value) {
     hoverId.value = id
@@ -602,7 +604,11 @@ function onStageClick(e) {
     return
   }
   const person = renderer?.personAt(p.x, p.y)
-  if (person && person.birthYear <= tt.gateYear.value) {
+  if (
+    person &&
+    person.birthYear <= tt.gateYear.value &&
+    person.birthYear >= tt.gateStartYear.value
+  ) {
     mEdit.value = null
     store.selectPerson(person.id)
     return
@@ -794,7 +800,7 @@ watch(layout, (L) => {
 watch([hoverId, searchSet, () => store.selectedPersonId, colors], () => renderer?.markStylesDirty())
 // Time travel: re-sync per scrub/playback step while on screen; switching back
 // in re-syncs too (the view stays mounted, hidden, and time may have moved).
-watch([() => tt.year.value, () => props.active], ([, on]) => {
+watch([() => tt.year.value, () => tt.startYear.value, () => props.active], ([, , on]) => {
   if (on) renderer?.markStylesDirty()
 })
 watch(

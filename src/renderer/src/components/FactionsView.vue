@@ -10,7 +10,7 @@
         <span class="fx-hint"
           >Drag people into rings · Drag rings to arrange · Click a person to manage</span
         >
-        <button class="btn btn-sm" @click="store.openForm()">＋ Person</button>
+        <button class="btn btn-sm" @click="store.openForm()">＋ {{ store.noun }}</button>
         <button
           v-if="visibleFactions.length > 1"
           class="btn btn-sm"

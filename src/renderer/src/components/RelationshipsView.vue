@@ -173,14 +173,18 @@
       <div v-if="editing && editing.id === 'new'" class="rv-editor rv-editor-new">
         <div class="rv-editor-label">New relationship</div>
         <div class="rv-editor-grid">
-          <div class="rv-field">
+          <div class="rv-field rv-field-picker">
             <label>Person A</label>
-            <select v-model="editing.person_a_id" @keydown.enter="saveEdit">
-              <option value="" disabled>Select person…</option>
-              <option v-for="p in personOptions" :key="p.id" :value="p.id">
-                {{ p.name }}{{ p.birth?.year ? ` (b. ${p.birth.year})` : '' }}
-              </option>
-            </select>
+            <button class="rv-pick-btn" type="button" @click="togglePicker('a')">
+              {{ pickedLabel(editing.person_a_id) }}
+            </button>
+            <PersonPicker
+              v-if="pickerSide === 'a'"
+              class="rv-picker-pop"
+              :exclude="[editing.person_b_id].filter(Boolean)"
+              @pick="onPickPerson"
+              @cancel="pickerSide = null"
+            />
           </div>
           <button class="rv-swap-btn" title="Swap A and B" @click="swapEditing">⇄</button>
           <div class="rv-field">
@@ -191,14 +195,18 @@
               <option value="adopted">Adopted (is adoptive parent of)</option>
             </select>
           </div>
-          <div class="rv-field">
+          <div class="rv-field rv-field-picker">
             <label>Person B</label>
-            <select v-model="editing.person_b_id" @keydown.enter="saveEdit">
-              <option value="" disabled>Select person…</option>
-              <option v-for="p in personOptions" :key="p.id" :value="p.id">
-                {{ p.name }}{{ p.birth?.year ? ` (b. ${p.birth.year})` : '' }}
-              </option>
-            </select>
+            <button class="rv-pick-btn" type="button" @click="togglePicker('b')">
+              {{ pickedLabel(editing.person_b_id) }}
+            </button>
+            <PersonPicker
+              v-if="pickerSide === 'b'"
+              class="rv-picker-pop"
+              :exclude="[editing.person_a_id].filter(Boolean)"
+              @pick="onPickPerson"
+              @cancel="pickerSide = null"
+            />
           </div>
           <div class="rv-field rv-field-sm">
             <label>{{ editing.type === 'spouse' ? 'Married (year)' : 'Since (year)' }}</label>
@@ -410,14 +418,18 @@
             <Transition name="rv-fade">
               <div v-if="editing?.id === row.rel.id" class="rv-editor" @click.stop>
                 <div class="rv-editor-grid">
-                  <div class="rv-field">
+                  <div class="rv-field rv-field-picker">
                     <label>Person A</label>
-                    <select v-model="editing.person_a_id" @keydown.enter="saveEdit">
-                      <option value="" disabled>Select person…</option>
-                      <option v-for="p in personOptions" :key="p.id" :value="p.id">
-                        {{ p.name }}{{ p.birth?.year ? ` (b. ${p.birth.year})` : '' }}
-                      </option>
-                    </select>
+                    <button class="rv-pick-btn" type="button" @click="togglePicker('a')">
+                      {{ pickedLabel(editing.person_a_id) }}
+                    </button>
+                    <PersonPicker
+                      v-if="pickerSide === 'a'"
+                      class="rv-picker-pop"
+                      :exclude="[editing.person_b_id].filter(Boolean)"
+                      @pick="onPickPerson"
+                      @cancel="pickerSide = null"
+                    />
                   </div>
                   <button class="rv-swap-btn" title="Swap A and B" @click="swapEditing">⇄</button>
                   <div class="rv-field">
@@ -428,14 +440,18 @@
                       <option value="adopted">Adopted (is adoptive parent of)</option>
                     </select>
                   </div>
-                  <div class="rv-field">
+                  <div class="rv-field rv-field-picker">
                     <label>Person B</label>
-                    <select v-model="editing.person_b_id" @keydown.enter="saveEdit">
-                      <option value="" disabled>Select person…</option>
-                      <option v-for="p in personOptions" :key="p.id" :value="p.id">
-                        {{ p.name }}{{ p.birth?.year ? ` (b. ${p.birth.year})` : '' }}
-                      </option>
-                    </select>
+                    <button class="rv-pick-btn" type="button" @click="togglePicker('b')">
+                      {{ pickedLabel(editing.person_b_id) }}
+                    </button>
+                    <PersonPicker
+                      v-if="pickerSide === 'b'"
+                      class="rv-picker-pop"
+                      :exclude="[editing.person_a_id].filter(Boolean)"
+                      @pick="onPickPerson"
+                      @cancel="pickerSide = null"
+                    />
                   </div>
                   <div class="rv-field rv-field-sm">
                     <label>{{
@@ -514,8 +530,29 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { api } from '../api'
 import { yearDate } from '../../../shared/calendarMath'
+import PersonPicker from './personForm/PersonPicker.vue'
 
 const store = useMainStore()
+
+// ── searchable person picking (replaces the old scroll-forever dropdowns) ────
+const pickerSide = ref(null) // 'a' | 'b' | null
+
+function togglePicker(side) {
+  pickerSide.value = pickerSide.value === side ? null : side
+}
+
+function pickedLabel(id) {
+  const p = id ? store.persons.find((x) => x.id === id) : null
+  if (!p) return 'Select person…'
+  return `${p.name || 'Unnamed'}${p.birth?.year ? ` (b. ${p.birth.year})` : ''}`
+}
+
+function onPickPerson(person) {
+  if (!editing.value || !pickerSide.value) return
+  if (pickerSide.value === 'a') editing.value.person_a_id = person.id
+  else editing.value.person_b_id = person.id
+  pickerSide.value = null
+}
 
 const PERSON_ICON_PATH =
   'M12 12.5c2.49 0 4.5-2.01 4.5-4.5S14.49 3.5 12 3.5 7.5 5.51 7.5 8s2.01 4.5 4.5 4.5zm0 2.25c-3 0-9 1.51-9 4.5V22h18v-2.75c0-2.99-6-4.5-9-4.5z'
@@ -598,12 +635,6 @@ const personById = computed(() => {
   })
   return m
 })
-const personOptions = computed(() =>
-  [...store.persons].sort((a, b) =>
-    (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
-  )
-)
-
 function meta(type) {
   const gs = store.graphSettings
   if (type === 'spouse') return { label: 'Spouse', color: gs.spouseColor }
@@ -867,6 +898,7 @@ function startEdit(rel) {
 function cancelEdit() {
   editing.value = null
   editError.value = ''
+  pickerSide.value = null
 }
 function swapEditing() {
   const e = editing.value
@@ -1415,6 +1447,40 @@ async function toggleStatus(row) {
 .rv-field-sm {
   max-width: 130px;
 }
+.rv-field-picker {
+  position: relative;
+}
+
+.rv-pick-btn {
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: border-color 0.15s;
+}
+
+.rv-pick-btn:hover {
+  border-color: var(--accent);
+}
+
+.rv-picker-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  min-width: 240px;
+  z-index: 40;
+}
+
 .rv-swap-btn {
   height: 34px;
   width: 34px;

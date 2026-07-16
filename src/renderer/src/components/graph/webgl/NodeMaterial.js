@@ -100,7 +100,7 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
 
       void main() {
         float d = length(vCorner);
-        float aa = fwidth(d) * 1.2 + 0.0008;
+        float aa = fwidth(d) * 1.5 + 0.0012;
 
         // ---- drop shadow (offset soft disc, behind everything) ----
         float ds = length(vCorner - uShadowOffset);
@@ -134,11 +134,15 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
           col = over(vec4(uGlowColor, sel * 0.95), col);
         }
 
-        // ---- glow (additive soft halo outside the circle) ----
+        // ---- glow (soft halo ring hugging the circle edge) ----
         if (vGlow > 0.001) {
           float halo = smoothstep(R * 1.5, R, d) * (1.0 - inside);
           col.rgb += uGlowColor * halo * vGlow * 0.6;
-          col.a = max(col.a, halo * vGlow * 0.5);
+          // Composite the halo's alpha OVER the existing alpha rather than max():
+          // max() of the fill's falling edge and the halo's rising edge dips at the
+          // crossover, punching a thin see-through band that reads as an aliased ring.
+          float glowA = halo * vGlow * 0.5;
+          col.a = col.a + glowA * (1.0 - col.a);
         }
 
         col.a *= vOpacity;

@@ -109,6 +109,11 @@ export default {
       title: '程式模式',
       desc: '控制顯示多少功能。簡易模式保持介面精簡；進階模式解鎖所有工具。'
     },
+    noun: {
+      title: '成員的稱呼',
+      desc: '此專案對條目的稱呼——人物、角色、船艦、家族……僅套用於此專案。',
+      placeholder: 'Person'
+    },
     close: '關閉'
   },
   help: {

@@ -1,6 +1,13 @@
 // Pure functions for link/node styling — no D3 or store dependency
 
-export function nodeColor(gender, gs) {
+import { lerpColorHex } from '../../../../shared/fields'
+
+/** Node fill. `t` is the trait system's gender_t (0..1 gradient position):
+ *  when present it lerps maleColor→femaleColor, so a slider/selection in the
+ *  gender slot colors the node anywhere along the gradient. The string labels
+ *  remain as the fallback for pre-trait data. */
+export function nodeColor(gender, gs, t) {
+  if (t != null && Number.isFinite(t)) return lerpColorHex(gs.maleColor, gs.femaleColor, t)
   if (gender === 'male') return gs.maleColor
   if (gender === 'female') return gs.femaleColor
   return gs.unknownColor

@@ -16,6 +16,9 @@
           @input="store.updateTag({ id: tag.id, color: $event.target.value })"
         />
         <span class="chip-label">{{ tag.icon ? tag.icon + ' ' : '' }}{{ tag.label }}</span>
+        <span v-if="tag.type" class="chip-type" :title="`Tag type: ${tag.type}`">{{
+          tag.type
+        }}</span>
         <button class="chip-remove" title="Remove tag" @click="removeTag(tag.id)">✕</button>
       </span>
     </div>
@@ -42,6 +45,17 @@
         placeholder="New tag label…"
         @keydown.enter="createAndAssign"
       />
+      <input
+        v-model="newType"
+        class="tag-new-input tag-type-input"
+        placeholder="type (optional)"
+        list="tag-type-suggestions"
+        title="Tags with the same type can be compared in the Groups view (e.g. 'family')"
+        @keydown.enter="createAndAssign"
+      />
+      <datalist id="tag-type-suggestions">
+        <option v-for="t in knownTypes" :key="t" :value="t" />
+      </datalist>
       <input v-model="newColor" type="color" class="tag-new-color" title="Tag color" />
       <button class="btn btn-ghost btn-sm" :disabled="!newLabel.trim()" @click="createAndAssign">
         ＋ Add
@@ -61,9 +75,12 @@ const props = defineProps({
 const store = useMainStore()
 const selectedTagId = ref('')
 const newLabel = ref('')
+const newType = ref('')
 const newColor = ref('#6c8ef5')
 
 const assignedTags = computed(() => store.tagsOf.get(props.entityId) || [])
+/** Types already used in this project, for the datalist suggestions. */
+const knownTypes = computed(() => [...new Set(store.tags.map((t) => t.type).filter(Boolean))])
 const availableTags = computed(() => {
   const assigned = new Set(assignedTags.value.map((t) => t.id))
   return store.tags.filter((t) => !assigned.has(t.id) && t.source !== 'derived')
@@ -78,10 +95,15 @@ async function assignSelected() {
 async function createAndAssign() {
   const label = newLabel.value.trim()
   if (!label) return
-  const res = await store.createTag({ label, color: newColor.value })
+  const res = await store.createTag({
+    label,
+    color: newColor.value,
+    type: newType.value.trim()
+  })
   if (res.success) {
     await store.addEntityTag(props.entityId, res.data.id)
     newLabel.value = ''
+    newType.value = ''
   }
 }
 
@@ -140,6 +162,21 @@ function removeTag(tagId) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.chip-type {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--t3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 5px;
+}
+
+.tag-type-input {
+  flex: 0 1 120px;
 }
 
 .chip-remove {

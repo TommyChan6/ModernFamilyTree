@@ -104,16 +104,119 @@ export interface DateValue {
   calendar: 'gregorian'
 }
 
+// ── Trait system (user-defined typed fields) ─────────────────────────────────
+// Every person property is a user-defined "trait": a project-scoped FieldDef
+// (what the trait is) plus per-person FieldValue rows (what it holds). Special
+// slots (name/gender/birth/death/highlight) tell the graph which traits drive
+// rendering. The legacy Person columns below survive as DERIVED SNAPSHOTS —
+// recomputed by dbCore on every trait write — so views keep reading
+// person.name / birth / death / gender untouched.
+
+export type FieldType =
+  | 'text' //           config: { multiline? }
+  | 'boolean'
+  | 'number' //         config: { min?, max?, step? }
+  | 'number_range' //   value { a, b } — uncertainty range
+  | 'select' //         config: { options: SelectOption[] }
+  | 'slider' //         config: { min, max, step, leftLabel?, rightLabel? }
+  | 'date' //           value: DateValue
+  | 'date_range' //     value { from, to } — uncertainty range
+  // Reserved for the custom-calendars feature (docs/design.md) — accepted by
+  // the birth/death slots but not creatable yet:
+  | 'custom_date'
+  | 'custom_date_range'
+
+export interface SelectOption {
+  id: string
+  label: string
+  /** Optional swatch — doubles as the highlight-ring color when slotted. */
+  color?: string
+}
+
+export interface FieldConfig {
+  multiline?: boolean
+  min?: number
+  max?: number
+  step?: number
+  /** Slider end labels (also name a boolean's two states in the gender slot). */
+  leftLabel?: string
+  rightLabel?: string
+  options?: SelectOption[]
+  /** Highlight-slot ring color ('' = theme accent). */
+  slotColor?: string
+}
+
+export type SlotName = 'name' | 'gender' | 'birth' | 'death' | 'highlight'
+
+/** When a trait applied ("captain 1910–1915"). Either side may be open. */
+export interface Timeframe {
+  from: DateValue | null
+  to: DateValue | null
+}
+
+/** A trait definition. Project-scoped; `locked` = template trait rendered on
+ *  every person's form. Slotted defs are always locked. */
+export interface FieldDef {
+  id: string
+  project_id: string
+  label: string
+  type: FieldType
+  config: FieldConfig
+  locked: boolean
+  /** Vertical order in the form (one project-wide ordering). */
+  order: number
+  /** Timeframe inputs enabled for this trait (Advanced mode). */
+  has_timeframe: boolean
+  /** Which slot this def occupies; null = plain list trait. */
+  slot: SlotName | null
+  /** Order inside the name slot (multi-trait names → word order). */
+  slot_order: number
+  /** Optional emoji shown before the label. */
+  icon: string
+  /** Unit suffix for numeric traits ("cm", "kg"). */
+  unit: string
+  /** System origin for seeded/migrated defs ('' = user-created). Lets the
+   *  legacy persons:create/update payload keep working as an adapter. */
+  sys: string
+  created_at: string
+  updated_at: string
+}
+
+/** One person's value for one trait. A row with value null means "attached
+ *  but empty" (keeps an unlocked trait on that person's form); no row at all
+ *  means the trait isn't set. */
+export interface FieldValue {
+  id: string
+  person_id: string
+  field_id: string
+  /** Shape depends on the def's FieldType — see coerceValue in fields.ts. */
+  value: unknown
+  /** Append this value to the node label after the name (per person). */
+  display_in_graph: boolean
+  timeframe: Timeframe | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Person {
   id: string
   project_id: string
+  // ↓ derived snapshots — recomputed from trait values by recomputeSnapshots();
+  //   kept so every view (graph/timeline/layout math) reads them unchanged.
   name: string
   birth: DateValue | null
   death: DateValue | null
+  /** Gender label ('male'/'female'/custom, 'unknown' when unset). */
   gender: string
   bio: string
   occupation: string
   location: string
+  /** name + every display_in_graph value ("Ellen Ripley · Lieutenant"). */
+  graph_label?: string
+  /** Gender as a 0..1 gradient position (null = unknown). */
+  gender_t?: number | null
+  /** Highlight-slot ring; color '' = theme accent. null = no ring. */
+  highlight?: { color: string } | null
   created_at: string
   updated_at: string
 }
@@ -193,6 +296,9 @@ export interface ImageRecord {
   /** Desktop: absolute path under userData/images. Web: a data: URL. */
   file_path: string
   is_primary: boolean
+  /** Named image slot: 'portrait' | 'fullbody' | 'background' | '' (extra).
+   *  The portrait doubles as the avatar (kept in sync with is_primary). */
+  role?: string
   /** Where the image came from: '' = user-picked photo; 'character' = a
    *  portrait rendered from a CharacterDoc (re-saving replaces it). */
   source?: string
@@ -249,6 +355,8 @@ export interface DB {
   projects: Record<string, Project>
   activeProjectId: string | null
   persons: Record<string, Person>
+  field_defs: Record<string, FieldDef>
+  field_values: Record<string, FieldValue>
   relationships: Record<string, Relationship>
   tags: Record<string, Tag>
   entity_tags: Record<string, EntityTag>

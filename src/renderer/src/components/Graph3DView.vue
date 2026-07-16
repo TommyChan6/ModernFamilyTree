@@ -16,8 +16,8 @@
       class="space3d-map"
       :class="{ 'space3d-map-hidden': store.cleanView }"
       :adapter="minimapAdapter"
-      :width="150"
-      :height="150"
+      :width="180"
+      :height="180"
     />
 
     <!-- Controls hints / tutorial card -->
@@ -262,9 +262,8 @@ const minimapAdapter = {
 function nodeVisual(n) {
   const g = gs()
   const selected = store.selectedPersonId === n.id
-  const fill = selected
-    ? d3.color(nodeColor(n.gender, g))?.brighter(0.4)?.toString() || nodeColor(n.gender, g)
-    : nodeColor(n.gender, g)
+  const baseFill = nodeColor(n.gender, g, n.gender_t)
+  const fill = selected ? d3.color(baseFill)?.brighter(0.4)?.toString() || baseFill : baseFill
   let opacityMul = 1
   const q = (props.searchQuery || '').toLowerCase().trim()
   if (q && !(n.name || '').toLowerCase().includes(q)) opacityMul *= 0.15

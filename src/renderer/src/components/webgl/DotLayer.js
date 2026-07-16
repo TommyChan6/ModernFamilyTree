@@ -126,7 +126,7 @@ function createDotMaterial() {
         float s = (0.5 + 0.5 * sin(uTime * 2.856)) * vPulse; // 2π / 2.2s cycle
         float r = vRadius * (1.0 + 0.35 * s);
         float d = length(vCorner);
-        float aa = fwidth(d) * 1.2 + 0.001;
+        float aa = fwidth(d) * 1.5 + 0.0012;
         float alpha = (1.0 - smoothstep(r - aa, r + aa, d)) * mix(1.0, mix(0.95, 0.45, s), vPulse);
         float a = alpha * vOpacity;
         if (a < 0.003) discard;

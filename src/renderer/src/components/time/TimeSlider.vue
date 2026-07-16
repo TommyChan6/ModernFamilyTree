@@ -17,15 +17,19 @@
     <div class="ts-readout" :title="active ? 'Time travel active' : 'Showing the present'">
       <div class="ts-readout-cap">{{ active ? 'YEAR' : 'NOW' }}</div>
       <div class="ts-readout-year">{{ readoutYear }}</div>
+      <div v-if="active && startYear != null" class="ts-readout-span">
+        from {{ Math.floor(startYear) }}
+      </div>
     </div>
 
-    <!-- Vertical track: past at the top, present at the bottom -->
+    <!-- Vertical track: past at the top, present at the bottom. Two nubs frame a
+         window of time — drag either; playback advances the end (lower) nub. -->
     <div class="ts-track-zone">
       <div class="ts-endcap">{{ range.minYear }}</div>
       <div
         ref="trackEl"
         class="ts-track"
-        title="Drag to travel through time"
+        title="Drag either handle to frame a span of time"
         @pointerdown="onTrackDown"
       >
         <div class="ts-rail"></div>
@@ -37,8 +41,23 @@
             :style="{ opacity: 0.12 + d * 0.88 }"
           ></div>
         </div>
-        <div class="ts-fill" :style="{ height: pct + '%' }"></div>
-        <div class="ts-thumb" :style="{ top: pct + '%' }">
+        <div
+          class="ts-fill"
+          :style="{ top: startPct + '%', height: Math.max(0, pct - startPct) + '%' }"
+        ></div>
+        <div
+          v-show="active"
+          class="ts-thumb ts-thumb-start"
+          :class="{ 'ts-thumb-grabbed': dragNub === 'start' }"
+          :style="{ top: startPct + '%' }"
+        >
+          <div class="ts-thumb-core"></div>
+        </div>
+        <div
+          class="ts-thumb ts-thumb-end"
+          :class="{ 'ts-thumb-grabbed': dragNub === 'end' }"
+          :style="{ top: pct + '%' }"
+        >
           <div class="ts-thumb-core"></div>
         </div>
       </div>
@@ -128,7 +147,7 @@ import { bucketizeEvents, eventsCrossed } from './timeMath'
 const store = useMainStore()
 const tt = useTimeTravel()
 // Destructured refs auto-unwrap in the template; methods stay on `tt`.
-const { year, playing, reversed, looping, speedIdx } = tt
+const { year, startYear, playing, reversed, looping, speedIdx } = tt
 const active = tt.active
 const rangeRef = tt.range
 
@@ -157,7 +176,8 @@ watch(visible, (isVisible) => {
 })
 
 const range = computed(() => rangeRef.value || { minYear: 0, maxYear: 1 })
-const pct = computed(() => tt.progress.value * 100)
+const pct = computed(() => tt.progress.value * 100) // end/playhead nub
+const startPct = computed(() => tt.startProgress.value * 100) // start nub
 const readoutYear = computed(() => (active.value ? Math.floor(year.value) : range.value.maxYear))
 const speedLabel = computed(() => TIME_SPEEDS[speedIdx.value].label)
 
@@ -168,25 +188,45 @@ const density = computed(() =>
 
 // ── Scrub the track ─────────────────────────────────────────────────────────
 const trackEl = ref(null)
+// Which nub the current drag is moving: 'start' (lower bound) or 'end' (playhead).
+const dragNub = ref(null)
 
-function yearAt(clientY) {
+function fractionAt(clientY) {
   const rect = trackEl.value.getBoundingClientRect()
-  const t = Math.min(1, Math.max(0, (clientY - rect.top) / Math.max(1, rect.height)))
+  return Math.min(1, Math.max(0, (clientY - rect.top) / Math.max(1, rect.height)))
+}
+function yearAt(clientY) {
   const r = range.value
-  return r.minYear + t * (r.maxYear - r.minYear)
+  return r.minYear + fractionAt(clientY) * (r.maxYear - r.minYear)
+}
+
+function applyDrag(clientY) {
+  const y = yearAt(clientY)
+  if (dragNub.value === 'start') tt.setStartYear(y)
+  else tt.setYear(y)
 }
 
 function onTrackDown(e) {
   if (e.button !== 0) return
   tt.pause()
-  tt.setYear(yearAt(e.clientY))
+  // While engaged, grab whichever nub sits nearest the click; from the resting
+  // (present) state a plain click just drops the playhead as before.
+  if (active.value) {
+    const f = fractionAt(e.clientY)
+    dragNub.value =
+      Math.abs(f - tt.startProgress.value) < Math.abs(f - tt.progress.value) ? 'start' : 'end'
+  } else {
+    dragNub.value = 'end'
+  }
+  applyDrag(e.clientY)
   window.addEventListener('pointermove', onTrackMove)
   window.addEventListener('pointerup', onTrackUp)
 }
 function onTrackMove(e) {
-  tt.setYear(yearAt(e.clientY))
+  applyDrag(e.clientY)
 }
 function onTrackUp() {
+  dragNub.value = null
   window.removeEventListener('pointermove', onTrackMove)
   window.removeEventListener('pointerup', onTrackUp)
 }
@@ -289,6 +329,13 @@ onBeforeUnmount(() => {
 .ts-on .ts-readout-year {
   color: var(--accent);
 }
+.ts-readout-span {
+  font-size: 8.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--t3);
+  margin-top: 1px;
+}
 .ts-playing .ts-readout-year {
   animation: ts-tick 1.1s ease-in-out infinite;
 }
@@ -369,6 +416,7 @@ onBeforeUnmount(() => {
   height: 18px;
   transform: translate(-50%, -50%);
   pointer-events: none;
+  z-index: 2;
 }
 .ts-thumb-core {
   position: absolute;
@@ -377,14 +425,32 @@ onBeforeUnmount(() => {
   background: var(--accent);
   border: 2px solid var(--t1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
-  transition: box-shadow 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.18s cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+/* The start nub is a hollow ring — reads as the opening edge of the span,
+   clearly distinct from the solid playhead that sweeps during playback. */
+.ts-thumb-start {
+  z-index: 1;
+}
+.ts-thumb-start .ts-thumb-core {
+  background: var(--surface);
+  border-color: var(--accent);
 }
 .ts-on .ts-thumb-core {
   box-shadow:
     0 0 0 3px rgba(108, 142, 245, 0.22),
     0 2px 10px rgba(0, 0, 0, 0.5);
 }
-.ts-playing .ts-thumb-core {
+/* Grabbed nub swells for tactile feedback */
+.ts-thumb-grabbed .ts-thumb-core {
+  transform: scale(1.3);
+  box-shadow:
+    0 0 0 5px rgba(108, 142, 245, 0.2),
+    0 3px 12px rgba(0, 0, 0, 0.55);
+}
+.ts-playing .ts-thumb-end .ts-thumb-core {
   animation: ts-pulse 1.1s ease-in-out infinite;
 }
 @keyframes ts-pulse {
