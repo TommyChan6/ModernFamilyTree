@@ -599,23 +599,40 @@ const graph3dRef = ref(null)
 const reloadTick = ref(0)
 const spaceWorking = computed(() => {
   void reloadTick.value
-  return workingOf(activeSceneId.value)
+  void activeScene.value?.type
+  return workingOf(activeSceneId.value, 'space')
 })
 
 // Live working copies of each scene's arrangement, mutated as the user drags
-// and persisted by Save Layout (Phase 5.4 turns this into autosave).
-// sceneId → { positions: {personId: {x,y}}, config: {...} }
+// and autosaved. A scene holds ONE arrangement PER layout type, so switching
+// type reveals that type's own layout without disturbing the others.
+//   sceneId → { [layoutType]: { positions: {personId:{x,y}}, config: {...} } }
 const working = new Map()
-function workingOf(sceneId) {
+// The per-scene layouts bag, seeded from the stored scene (new `layouts` map,
+// or the legacy flat positions/config folded into the scene's own type slot).
+function layoutsOf(sceneId) {
   if (!sceneId) return null
   if (!working.has(sceneId)) {
     const s = store.scenes.find((sc) => sc.id === sceneId)
-    working.set(sceneId, {
-      positions: JSON.parse(JSON.stringify(s?.positions || {})),
-      config: JSON.parse(JSON.stringify(s?.config || {}))
-    })
+    const bag = s?.layouts ? JSON.parse(JSON.stringify(s.layouts)) : {}
+    if (!s?.layouts && s) {
+      bag[s.type || 'organic'] = {
+        positions: JSON.parse(JSON.stringify(s.positions || {})),
+        config: JSON.parse(JSON.stringify(s.config || {}))
+      }
+    }
+    working.set(sceneId, bag)
   }
   return working.get(sceneId)
+}
+// The arrangement for one layout type (defaults to the scene's active type),
+// created empty on first touch so a fresh type computes its layout on entry.
+function workingOf(sceneId, type) {
+  const bag = layoutsOf(sceneId)
+  if (!bag) return null
+  const t = type || activeScene.value?.type || 'organic'
+  if (!bag[t]) bag[t] = { positions: {}, config: {} }
+  return bag[t]
 }
 
 // ── Shared mutable context ──────────────────────────────────────────────────
@@ -641,6 +658,38 @@ let hoverId = null // node currently hovered (for glow)
 let couplesHiSet = null // ids highlighted by the Marriage filter, or null
 
 const { cancelAnimation, animateToPositionsWithReset } = useGraphAnimation(ctx)
+
+// Each layout type gets a signature transition, so switching type reads as a
+// deliberate rearrangement rather than a jump:
+//   • Free    — a soft settle, nodes near the centre easing out first (bloom).
+//   • Organic — a quick relax before the force sim takes over.
+//   • Birth   — a top-down cascade down the year axis, like sediment falling.
+//   • Gens    — a springy top-to-bottom snap into generation rows.
+// Scene switches use the bloom so a whole new arrangement unfolds from the
+// middle outward.
+function centerOf(nodes) {
+  if (!nodes.length) return { x: 0, y: 0 }
+  const xs = nodes.map((n) => n.x),
+    ys = nodes.map((n) => n.y)
+  return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 }
+}
+function bloomStagger(spread = 260) {
+  const c = centerOf(ctx.nodesData)
+  return { stagger: spread, staggerBy: (n, t) => Math.hypot((t?.x ?? n.x) - c.x, (t?.y ?? n.y) - c.y) }
+}
+// Durations + stagger are kept so the whole transition (duration + stagger)
+// always finishes in under 0.5s.
+const MOTION = {
+  auto: () => ({ ease: d3.easeCubicOut, duration: 340 }),
+  custom: () => ({ ease: d3.easeCubicInOut, duration: 320, ...bloomStagger(140) }),
+  age: () => ({ ease: d3.easeCubicOut, duration: 300, stagger: 170, staggerBy: (n, t) => t?.y ?? n.y }),
+  generation: () => ({
+    ease: d3.easeBackOut.overshoot(1.4),
+    duration: 320,
+    stagger: 160,
+    staggerBy: (n, t) => t?.y ?? n.y
+  })
+}
 
 // ── Minimap (top-left) ──────────────────────────────────────────────────────
 // Reads the hot ctx directly and pans by driving the shared d3.zoom behaviour,
@@ -1094,30 +1143,17 @@ function switchScene(id) {
   enterActiveScene()
 }
 
-// New scene: keeps the current type and starts from the current positions
-// (the old "add state" behaviour).
+// New scene: a clean slate. Starts on Organic with empty layouts, so every
+// layout type computes fresh on first entry — a genuinely new arrangement of
+// the same people. (Duplicate is the "copy what I have" path.)
 async function addScene() {
   graph3dRef.value?.writeBack?.()
   if (ctx.nodesData.length) saveCurrentState()
-  const snap = {}
-  if (spaceActive.value) {
-    // The 3D view's working copy is the truth for a space scene.
-    const w = workingOf(activeSceneId.value)
-    Object.assign(snap, JSON.parse(JSON.stringify(w?.positions || {})))
-  } else {
-    ctx.nodesData.forEach((n) => {
-      snap[n.id] = { x: n.x, y: n.y }
-    })
-  }
-  const config = {}
-  if (currentMode.value === 'generation') {
-    config.genRowYValues = [...ctx.genRowYValues]
-    config.genRowSpacing = ctx.genRowSpacing
-  }
-  const res = await store.createScene('graph', `State ${graphScenes.value.length + 1}`, {
-    type: activeScene.value?.type || 'organic',
-    positions: snap,
-    config
+  const res = await store.createScene('graph', `Scene ${graphScenes.value.length + 1}`, {
+    type: 'organic',
+    layouts: {},
+    positions: {},
+    config: {}
   })
   if (res?.success) {
     store.setActiveScene('graph', res.data.id)
@@ -1147,11 +1183,22 @@ async function removeScene(scene) {
   if (wasActive) enterActiveScene()
 }
 
-/** Persist one scene's working arrangement through the data-access chain. */
+/** Persist one scene's working arrangement (every layout type) through the
+ *  data-access chain. The active type is also mirrored into the flat
+ *  positions/config so legacy readers, checkpoints and duplicates still see
+ *  the visible arrangement. */
 async function persistScene(sceneId) {
-  const w = working.get(sceneId)
-  if (!w || !store.scenes.some((s) => s.id === sceneId)) return
-  await store.saveScene({ id: sceneId, positions: w.positions, config: w.config })
+  const bag = working.get(sceneId)
+  const scene = store.scenes.find((s) => s.id === sceneId)
+  if (!bag || !scene) return
+  const type = scene.type || 'organic'
+  const active = bag[type] || { positions: {}, config: {} }
+  await store.saveScene({
+    id: sceneId,
+    layouts: JSON.parse(JSON.stringify(bag)),
+    positions: JSON.parse(JSON.stringify(active.positions || {})),
+    config: JSON.parse(JSON.stringify(active.config || {}))
+  })
 }
 
 // ── Ticked ──────────────────────────────────────────────────────────────────
@@ -1980,7 +2027,7 @@ function enterAutoMode() {
       })
       ctx.simulation.alpha(0.15).restart()
       reapplyDrag()
-    })
+    }, MOTION.auto())
   } else {
     ctx.nodesData.forEach((n) => {
       n.fx = null
@@ -2001,7 +2048,7 @@ function enterCustomMode() {
         n.fy = n.y
       })
       reapplyDrag()
-    })
+    }, MOTION.custom())
   } else {
     ctx.nodesData.forEach((n) => {
       n.fx = n.x
@@ -2033,7 +2080,7 @@ function enterAgeMode() {
       drawYearGuides(ctx, ageInfo.minYear, ageInfo.maxYear, ageInfo.padding, ageInfo.usableHeight)
       drawCurrentYearLine(ctx, ageInfo, store.currentDate?.year ?? null, false)
       reapplyDrag()
-    })
+    }, MOTION.age())
     return
   }
 
@@ -2087,7 +2134,7 @@ function enterAgeMode() {
     })
     snapshotMode()
     reapplyDrag()
-  })
+  }, MOTION.age())
 }
 
 // Re-position the Age-mode "current year" line (e.g. when the current year is set/changed/theme).
@@ -2128,7 +2175,7 @@ function enterGenerationMode() {
       })
       drawGenGuides(ctx, savedGenInfo)
       reapplyDrag()
-    })
+    }, MOTION.generation())
     return
   }
 
@@ -2168,7 +2215,7 @@ function enterGenerationMode() {
       })
       snapshotGenMode()
       reapplyDrag()
-    })
+    }, MOTION.generation())
   }
 }
 
@@ -2214,7 +2261,7 @@ function refreshLayout() {
       })
       snapshotMode('age')
       reapplyDrag()
-    })
+    }, MOTION.age())
   } else if (mode === 'generation') {
     removeGenPreview(ctx)
     ctx.genRowYValues = genInfo.genLabels.map((g) => g.y)
@@ -2227,7 +2274,7 @@ function refreshLayout() {
       })
       snapshotGenMode()
       reapplyDrag()
-    })
+    }, MOTION.generation())
   } else if (mode === 'auto') {
     animateToPositionsWithReset(genInfo.targets, () => {
       ctx.nodesData.forEach((n) => {
@@ -2238,7 +2285,7 @@ function refreshLayout() {
       })
       ctx.simulation.alpha(0.12).restart()
       reapplyDrag()
-    })
+    }, MOTION.auto())
   } else {
     animateToPositionsWithReset(genInfo.targets, () => {
       ctx.nodesData.forEach((n) => {
@@ -2247,7 +2294,7 @@ function refreshLayout() {
       })
       snapshotMode('custom')
       reapplyDrag()
-    })
+    }, MOTION.custom())
   }
 }
 
@@ -2343,7 +2390,7 @@ async function flushLayout() {
 // enter the saved active one (restored from settings by the store).
 async function initScenes() {
   if (!store.graphScenes.length) {
-    await store.ensureScene('graph', 'State 1', { type: 'organic' })
+    await store.ensureScene('graph', 'Scene 1', { type: 'organic', layouts: {} })
   }
   if (!activeSceneId.value || !graphScenes.value.some((s) => s.id === activeSceneId.value)) {
     store.setActiveScene('graph', graphScenes.value[0]?.id ?? null)

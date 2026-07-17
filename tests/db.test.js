@@ -917,6 +917,77 @@ describe('Scenes (groups)', () => {
       name: 'G'
     })
   })
+
+  it('a graph scene holds a per-type layouts map (one scene = all types)', () => {
+    initDB()
+    const { db } = getDB()
+    // Fresh graph scenes are born with an (empty) layouts map.
+    const scene = channelHandlers['scenes:create'](db, { view: 'graph', name: 'G' }, handlerEnv)
+    expect(scene.layouts).toEqual({})
+
+    const layouts = {
+      free: { positions: { p1: { x: 1, y: 1 } }, config: {} },
+      birth: { positions: { p1: { x: 5, y: 90 } }, config: {} }
+    }
+    channelHandlers['scenes:save'](db, { id: scene.id, type: 'birth', layouts }, handlerEnv)
+    expect(db.scenes[scene.id].layouts).toEqual(layouts)
+
+    // Duplicating deep-copies the whole layouts map.
+    const dup = channelHandlers['scenes:duplicate'](db, { id: scene.id }, handlerEnv)
+    expect(dup.scene.layouts).toEqual(layouts)
+    dup.scene.layouts.free.positions.p1.x = 99
+    expect(db.scenes[scene.id].layouts.free.positions.p1.x).toBe(1)
+  })
+})
+
+describe('Migration: flat graph scene → per-type layouts', () => {
+  it('wraps a legacy flat graph scene into layouts[type] and is idempotent', () => {
+    const dbDir = path.join(tmpDir, 'db')
+    fs.mkdirSync(dbDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dbDir, 'familytree.json'),
+      JSON.stringify({
+        projects: {
+          t1: { id: 't1', name: 'T', created_at: '2024-01-01', updated_at: '2024-01-01' }
+        },
+        activeProjectId: 't1',
+        persons: {},
+        relationships: {},
+        tags: {},
+        entity_tags: {},
+        scenes: {
+          s1: {
+            id: 's1',
+            project_id: 't1',
+            view: 'graph',
+            name: 'Flat',
+            type: 'birth',
+            config: { emphasis: 'maternal' },
+            positions: { p1: { x: 3, y: 7 } },
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01'
+          }
+        },
+        scene_tags: {},
+        images: {},
+        settings: {},
+        globalSettings: {}
+      })
+    )
+    initDB()
+    const { scenes } = getDB()
+    expect(scenes.s1.layouts).toEqual({
+      birth: { positions: { p1: { x: 3, y: 7 } }, config: { emphasis: 'maternal' } }
+    })
+
+    const before = JSON.parse(fs.readFileSync(path.join(tmpDir, 'db', 'familytree.json'), 'utf8'))
+    vi.resetModules()
+    return import('../src/main/db.js').then((mod2) => {
+      mod2.initDB()
+      const after = JSON.parse(fs.readFileSync(path.join(tmpDir, 'db', 'familytree.json'), 'utf8'))
+      expect(after.scenes.s1.layouts).toEqual(before.scenes.s1.layouts)
+    })
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1255,36 +1326,44 @@ describe('Migration: graphState setting → graph scenes', () => {
     )
   }
 
-  it('expands every per-mode state into a typed graph scene', () => {
+  it('merges the per-mode states by index into unified layout scenes', () => {
     writeDbWithGraphState()
     initDB()
     const { scenes, settings } = getDB()
 
     const graphScenes = Object.values(scenes).filter((s) => s.view === 'graph')
-    // 1 custom + 1 auto + 1 age + 2 generation = 5
-    expect(graphScenes).toHaveLength(5)
+    // State index 0 (all four modes) + state index 1 (generation only) = 2 scenes,
+    // NOT one scene per (mode × index). One scene holds every layout type.
+    expect(graphScenes).toHaveLength(2)
 
-    const byName = (name, type) => graphScenes.find((s) => s.name === name && s.type === type)
-    const reunion = byName('Reunion', 'free')
-    expect(reunion.positions).toEqual({ p1: { x: 100, y: 200 }, p2: { x: 150, y: 200 } })
-    expect(reunion.config).toEqual({})
-
-    const organic = graphScenes.find((s) => s.type === 'organic')
-    expect(organic.name).toBe('State 1')
-    expect(organic.positions).toEqual({}) // null snapshot → no positions yet
-
-    const birth = graphScenes.find((s) => s.type === 'birth')
-    expect(birth.positions.p2).toEqual({ x: 180, y: 400 })
-
-    const pedigree = byName('Pedigree', 'generations')
-    expect(pedigree.positions).toEqual({ p1: { x: 100, y: 100 }, p2: { x: 170, y: 250 } })
-    expect(pedigree.config).toEqual({
-      genRowYValues: [100, 250, 400],
+    // Index 0 — named from the first mode that had a name ('Reunion'), holding
+    // every layout type the old blob had a snapshot for at that index.
+    const reunion = graphScenes.find((s) => s.name === 'Reunion')
+    expect(reunion.type).toBe('generations') // the previously-active mode
+    expect(reunion.layouts.free.positions).toEqual({
+      p1: { x: 100, y: 200 },
+      p2: { x: 150, y: 200 }
+    })
+    expect(reunion.layouts.organic.positions).toEqual({}) // null snapshot → empty
+    expect(reunion.layouts.birth.positions.p2).toEqual({ x: 180, y: 400 })
+    expect(reunion.layouts.generations.positions).toEqual({ p1: { x: 1, y: 2 } })
+    expect(reunion.layouts.generations.config).toEqual({
+      genRowYValues: [100, 250],
       genRowSpacing: 150,
       emphasis: 'paternal'
     })
+    // The active type's arrangement is mirrored into the flat fields
+    expect(reunion.positions).toEqual({ p1: { x: 1, y: 2 } })
 
-    // The previously-active mode+state (generation, idx 1) is the active scene
+    // Index 1 — only generation had a state here, so only that layout exists.
+    const pedigree = graphScenes.find((s) => s.name === 'Pedigree')
+    expect(Object.keys(pedigree.layouts)).toEqual(['generations'])
+    expect(pedigree.layouts.generations.positions).toEqual({
+      p1: { x: 100, y: 100 },
+      p2: { x: 170, y: 250 }
+    })
+
+    // The previously-active state index (generation, idx 1) is the active scene
     expect(settings['t1:activeSceneId:graph']).toBe(pedigree.id)
     // The current-year override moved to its own setting
     expect(settings['t1:userCurrentYear']).toBe(1999)

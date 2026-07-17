@@ -199,9 +199,12 @@ node and link in a handful of instanced draw calls, with an on-demand frame loop
 nodes are mutated in place (`n.x/y/fx/fy`); `ticked()` just pokes the renderer.
 Layout math is kept in **pure functions** under `components/graph/` (`layoutAge.js`,
 `familyTreeLayout.ts`, `linkHelpers.js`, `graph3d/layout3D.js`) with no D3/Three or
-store dependency. Five layout types (free/organic/birth/generations/space); the type
-is a property of the active graph **Scene**, and each scene stores its own
-positions/config. The `space` type is **experimental**: the graph in 3D
+store dependency. Five layout types (free/organic/birth/generations/space); one graph
+**Scene** spans them all — `scene.layouts[type]` holds each type's own
+`{positions,config}` and `scene.type` names the active one, so switching type
+stays in the same scene and reveals that type's arrangement (flat
+`positions`/`config` mirror the active type for legacy readers). Each type
+animates in with its own signature motion (`useGraphAnimation` stagger opts). The `space` type is **experimental**: the graph in 3D
 (`Graph3DView.vue` + `components/graph/graph3d/`, d3-force-3d + OrbitControls),
 gated behind Advanced mode plus the topbar **🧪 Labs** toggle (`caps.space3d`);
 with the gate off it degrades to Free over the same positions. Arrangements

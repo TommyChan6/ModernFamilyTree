@@ -317,21 +317,40 @@ export interface SceneTag {
   updated_at: string
 }
 
+/** One layout type's arrangement within a graph scene: where each node sits
+ *  (plus `z` for the experimental 3D type) and that layout's own config
+ *  (generation rows, emphasis, 3D camera). */
+export interface SceneLayout {
+  positions: Record<string, unknown>
+  config: Record<string, unknown>
+}
+
 /** A saved arrangement of ONE view. Groups scenes replace the old
  *  "scenarios"; graph scenes replace the serialized graphState "states"
- *  (Phase 5). Directory/Relationships have no positions → no scenes. */
+ *  (Phase 5). Directory/Relationships have no positions → no scenes.
+ *
+ *  A **graph** scene is a single container that holds ALL layout types at
+ *  once: `layouts` maps each type (free/organic/birth/generations/space) to
+ *  its own arrangement, and `type` names the one currently on screen.
+ *  Switching type stays in the same scene and reveals that type's saved
+ *  arrangement. Groups/timeline scenes have one arrangement, kept in the flat
+ *  `positions`/`config` fields (and `layouts` stays undefined). */
 export interface Scene {
   id: string
   project_id: string
   /** Which view owns this scene: 'groups' | 'graph' | 'timeline'. */
   view: string
   name: string
-  /** Graph layout type (free/organic/birth/generations); null elsewhere. */
+  /** Graph: the layout type currently shown (free/organic/birth/generations/
+   *  space). null elsewhere. */
   type: string | null
-  /** View-specific settings (e.g. generation-row config). */
+  /** Flat, single-arrangement fields (groups/timeline scenes, and a mirror of
+   *  the active layout on graph scenes for legacy readers). */
   config: Record<string, unknown>
-  /** Per-entity position snapshots (graph/timeline scenes). */
   positions: Record<string, unknown>
+  /** Graph scenes only: per-layout-type arrangements, so one scene holds
+   *  Free, Organic, Birth, Generations (and Space) side by side. */
+  layouts?: Record<string, SceneLayout>
   created_at: string
   updated_at: string
 }

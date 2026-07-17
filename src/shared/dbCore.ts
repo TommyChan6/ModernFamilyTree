@@ -394,12 +394,32 @@ export function migrateGraphStateToScenes(db: any, env: Env): boolean {
       continue
     }
 
+    // The old graphState kept a snapshot PER MODE for each saved "state" index
+    // — i.e. state i already meant one arrangement that had a layout in every
+    // mode. Group by that index so each becomes ONE scene holding all layout
+    // types (the unified model), instead of one scene per (mode × index).
+    const modes = ['custom', 'auto', 'age', 'generation']
+    const stateCount = modes.reduce(
+      (max, mode) =>
+        Math.max(
+          max,
+          (state.modeStateNames?.[mode] || []).length,
+          (state.modeStateSnapshots?.[mode] || []).length
+        ),
+      0
+    )
+    const activeType = MODE_TO_TYPE[state.currentMode as string] || 'organic'
+    const now = env.nowStr()
     let activeSceneId: string | null = null
-    for (const mode of ['custom', 'auto', 'age', 'generation']) {
-      const names: string[] = state.modeStateNames?.[mode] || []
-      const snaps: unknown[] = state.modeStateSnapshots?.[mode] || []
-      const count = Math.max(names.length, snaps.length)
-      for (let i = 0; i < count; i++) {
+
+    for (let i = 0; i < stateCount; i++) {
+      const layouts: Record<string, { positions: Record<string, { x: number; y: number }>; config: Record<string, unknown> }> = {}
+      let sceneName = ''
+      for (const mode of modes) {
+        const snaps: unknown[] = state.modeStateSnapshots?.[mode] || []
+        const names: string[] = state.modeStateNames?.[mode] || []
+        if (names[i] && !sceneName) sceneName = names[i]
+        if (i >= snaps.length) continue
         const snap = (snaps[i] || {}) as Record<string, { x?: number; y?: number } | unknown>
         const positions: Record<string, { x: number; y: number }> = {}
         for (const [key, v] of Object.entries(snap)) {
@@ -419,25 +439,28 @@ export function migrateGraphStateToScenes(db: any, env: Env): boolean {
         }
         const emphasis = state.modeEmphasis?.[mode]
         if (emphasis && emphasis !== 'neutral') config.emphasis = emphasis
-
-        const id = env.uuid()
-        const now = env.nowStr()
-        const scene: Scene = {
-          id,
-          project_id: pid,
-          view: 'graph',
-          name: names[i] || `State ${i + 1}`,
-          type: MODE_TO_TYPE[mode],
-          config,
-          positions,
-          created_at: now,
-          updated_at: now
-        }
-        db.scenes[id] = scene
-        const activeIdx = state.modeActiveStateIdx?.[mode] ?? 0
-        if (mode === (state.currentMode || 'auto') && i === activeIdx) activeSceneId = id
-        changed = true
+        layouts[MODE_TO_TYPE[mode]] = { positions, config }
       }
+
+      const id = env.uuid()
+      const active = layouts[activeType] || Object.values(layouts)[0] || { positions: {}, config: {} }
+      const scene: Scene = {
+        id,
+        project_id: pid,
+        view: 'graph',
+        name: sceneName || `Scene ${i + 1}`,
+        type: activeType,
+        config: JSON.parse(JSON.stringify(active.config)),
+        positions: JSON.parse(JSON.stringify(active.positions)),
+        layouts,
+        created_at: now,
+        updated_at: now
+      }
+      db.scenes[id] = scene
+      // The formerly-active state index (of the active mode) stays active.
+      const activeIdx = state.modeActiveStateIdx?.[state.currentMode as string] ?? 0
+      if (i === activeIdx) activeSceneId = id
+      changed = true
     }
     if (activeSceneId) {
       db.settings[`${pid}:activeSceneId:graph`] = activeSceneId
@@ -448,6 +471,28 @@ export function migrateGraphStateToScenes(db: any, env: Env): boolean {
       changed = true
     }
     retireBlob()
+  }
+  return changed
+}
+
+// Graph scenes gained a per-type `layouts` map (one scene holds Free/Organic/
+// Birth/Generations/Space at once). Any graph scene still on the flat model
+// gets its current type's arrangement folded into layouts[type]. Idempotent:
+// scenes that already have `layouts` are left untouched.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function migrateSceneLayouts(db: any): boolean {
+  let changed = false
+  db.scenes = db.scenes || {}
+  for (const scene of Object.values(db.scenes) as Scene[]) {
+    if (scene.view !== 'graph' || scene.layouts) continue
+    const type = scene.type || 'organic'
+    scene.layouts = {
+      [type]: {
+        positions: JSON.parse(JSON.stringify(scene.positions || {})),
+        config: JSON.parse(JSON.stringify(scene.config || {}))
+      }
+    }
+    changed = true
   }
   return changed
 }
@@ -1451,6 +1496,9 @@ export const channelHandlers: Record<string, Handler> = {
       created_at: now,
       updated_at: now
     }
+    // Graph scenes carry a per-type arrangement map (one scene = all layouts).
+    if (data?.layouts) scene.layouts = data.layouts
+    else if ((data?.view || 'groups') === 'graph') scene.layouts = {}
     db.scenes[id] = scene
     return scene
   },
@@ -1480,6 +1528,7 @@ export const channelHandlers: Record<string, Handler> = {
       created_at: now,
       updated_at: now
     }
+    if (src.layouts) scene.layouts = JSON.parse(JSON.stringify(src.layouts))
     db.scenes[id] = scene
     const cloned: SceneTag[] = []
     for (const st of Object.values(db.scene_tags)) {
@@ -1500,6 +1549,7 @@ export const channelHandlers: Record<string, Handler> = {
     if (data.type !== undefined) scene.type = data.type
     if (data.config !== undefined) scene.config = data.config
     if (data.positions !== undefined) scene.positions = data.positions
+    if (data.layouts !== undefined) scene.layouts = data.layouts
     scene.updated_at = env.nowStr()
     return scene
   },

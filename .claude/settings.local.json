@@ -256,7 +256,15 @@
       "PowerShell(npx eslint --fix src/renderer/src/components/GraphCanvas.vue 2>&1)",
       "PowerShell(npx prettier --write src/renderer/src/components/RelationshipsView.vue src/renderer/src/components/GraphCanvas.vue 2>&1)",
       "PowerShell($sc = 'C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\ad591439-cf58-46f1-bc1d-6c11f2ddc0ef\\\\scratchpad'; node \"$sc\\\\featsmoke.mjs\" $sc)",
-      "PowerShell($sc = 'C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\ad591439-cf58-46f1-bc1d-6c11f2ddc0ef\\\\scratchpad'; node \"$sc\\\\pathsmoke.mjs\" $sc)"
+      "PowerShell($sc = 'C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\ad591439-cf58-46f1-bc1d-6c11f2ddc0ef\\\\scratchpad'; node \"$sc\\\\pathsmoke.mjs\" $sc)",
+      "PowerShell(npx vitest run tests/db.test.js 2>&1)",
+      "PowerShell(node -e \"try{require.resolve\\('playwright-core'\\);console.log\\('playwright-core OK'\\)}catch\\(e\\){console.log\\('no playwright-core'\\)}\"; node -e \"try{require.resolve\\('playwright'\\);console.log\\('playwright OK'\\)}catch\\(e\\){console.log\\('no playwright'\\)}\"; \\(Get-Command msedge -ErrorAction SilentlyContinue\\).Source)",
+      "PowerShell($paths=@\\(\"C:\\\\Program Files \\(x86\\)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\",\"C:\\\\Program Files\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\"\\); $paths | Where-Object {Test-Path $_})",
+      "PowerShell($env:BROWSER='none'; Start-Process -FilePath \"npm\" -ArgumentList \"run\",\"preview:web\",\"--\",\"--port\",\"4173\" -WindowStyle Hidden; Start-Sleep -Seconds 5; \\(Invoke-WebRequest -Uri http://localhost:4173 -UseBasicParsing -TimeoutSec 10\\).StatusCode)",
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\235a9c0c-c46c-473a-b3b6-68189c2ba2b1\\\\scratchpad\\\\smoke.mjs\" 2>&1)",
+      "PowerShell(node \".\\\\__smoke.mjs\" 2>&1)",
+      "PowerShell(node \".\\\\__inspect.mjs\" 2>&1)",
+      "PowerShell($env:BROWSER='none'; Start-Process -FilePath \"npm\" -ArgumentList \"run\",\"preview:web\",\"--\",\"--port\",\"4173\" -WindowStyle Hidden; Start-Sleep -Seconds 5; node \".\\\\__fit.mjs\" 2>&1)"
     ]
   }
 }

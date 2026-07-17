@@ -11,6 +11,7 @@ import {
   migrateScenariosToScenes,
   migrateFactionsToTags,
   migrateGraphStateToScenes,
+  migrateSceneLayouts,
   migrateFieldSystem,
   migrateRelationshipTypes
 } from '../shared/dbCore'
@@ -106,6 +107,11 @@ export function initDB() {
   // Migration: unpack the serialized graphState setting into graph scenes
   // (each per-mode "state" becomes a scene whose type is its former mode)
   if (migrateGraphStateToScenes(_db, { uuid: randomUUID, nowStr })) save()
+
+  // Migration: graph scenes gained a per-type `layouts` map (one scene now
+  // holds Free/Organic/Birth/Generations/Space at once) — wrap any scene still
+  // on the flat single-arrangement model.
+  if (migrateSceneLayouts(_db)) save()
 
   // Migration: convert an old single-container DB (no projects at all) to the
   // multi-project shape

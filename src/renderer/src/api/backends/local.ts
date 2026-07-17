@@ -10,6 +10,7 @@ import {
   migrateScenariosToScenes,
   migrateFactionsToTags,
   migrateGraphStateToScenes,
+  migrateSceneLayouts,
   migrateFieldSystem,
   migrateRelationshipTypes,
   nowStr
@@ -93,6 +94,7 @@ function getLocalDB(): Promise<DB> {
         const scenesMade = migrateScenariosToScenes(merged)
         const factionsDissolved = migrateFactionsToTags(merged, env)
         const graphScenesMade = migrateGraphStateToScenes(merged, env)
+        const sceneLayoutsMade = migrateSceneLayouts(merged)
         const fieldsAdopted = migrateFieldSystem(merged, env)
         const relTypesSeeded = migrateRelationshipTypes(merged, env)
         if (
@@ -101,6 +103,7 @@ function getLocalDB(): Promise<DB> {
           scenesMade ||
           factionsDissolved ||
           graphScenesMade ||
+          sceneLayoutsMade ||
           fieldsAdopted ||
           relTypesSeeded
         ) {

@@ -31,12 +31,18 @@ the hot path:
 
 ## Layout types
 
-Four layout **types**, picked from the bottom tool pill. The type is a property of
-the active **scene** — picking a different type retypes the scene and re-runs that
-type's layout math (the internal entry functions still use legacy ids, mapped from
-the scene type). Position changes animate via the
+Four layout **types**, picked from the bottom tool pill. A **scene** holds an
+arrangement for *every* type at once (`scene.layouts[type]`), and `scene.type`
+names the one on screen. Picking a different type stays in the same scene and
+reveals that type's own arrangement — computed fresh the first time, restored
+thereafter — so Free / Organic / Birth / Generations never clobber each other.
+(The internal entry functions still use legacy mode ids, mapped from the scene
+type.) Each type animates in with its own **signature motion** via the
 [`useGraphAnimation`](../src/renderer/src/components/graph/useGraphAnimation.js)
-composable.
+composable: Free settles from the centre outward (bloom), Organic relaxes into
+the force sim, Birth cascades top-down along the year axis, Generations snaps
+into rows with a springy overshoot. Motion is a staggered, per-node tween
+(`stagger` + `staggerBy` opts) so a layout resolves as a wave, not a jump.
 
 | Type | Scene `type` | Behavior |
 |------|--------------|----------|
@@ -88,11 +94,16 @@ are easy to reason about and test.
 
 The graph runs off `view:'graph'` **Scenes** — named, saved arrangements the user
 creates, renames, duplicates and deletes from the shared Scene tab strip
-([`SceneTabs.vue`](../src/renderer/src/components/SceneTabs.vue)). Each scene
-carries its layout `type`, a `positions` map (`{ [personId]: {x, y} }`) and a
-`config` (generation rows `genRowYValues`/`genRowSpacing`, Focus `emphasis`).
-`GraphCanvas` keeps a live **working copy** per scene and points the shared `ctx`
-at the active one.
+([`SceneTabs.vue`](../src/renderer/src/components/SceneTabs.vue)). A scene is a
+single container that spans all layout types: `scene.layouts` maps each type to
+its own `{ positions: { [personId]: {x, y} }, config }` (generation rows
+`genRowYValues`/`genRowSpacing`, Focus `emphasis`), and `scene.type` is the type
+currently shown. The flat `scene.positions`/`scene.config` mirror the active
+type's arrangement (legacy readers, checkpoints, duplicates). `GraphCanvas`
+keeps a live **working copy** — `sceneId → { [type]: {positions, config} }` — and
+points the shared `ctx` at the active scene's active-type slot. **New scene**
+(＋) is a clean slate (Organic, empty layouts → everything computes fresh);
+**Duplicate** (⧉) deep-copies every type's layout.
 
 Switching scene (or retyping the active one) is always the same guarded transition:
 
