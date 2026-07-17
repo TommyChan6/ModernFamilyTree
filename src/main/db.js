@@ -11,7 +11,8 @@ import {
   migrateScenariosToScenes,
   migrateFactionsToTags,
   migrateGraphStateToScenes,
-  migrateFieldSystem
+  migrateFieldSystem,
+  migrateRelationshipTypes
 } from '../shared/dbCore'
 
 // DB shape and the sample-family seed live in src/shared/dbCore.ts so the
@@ -55,6 +56,7 @@ export function initDB() {
   _db.field_defs = _db.field_defs || {}
   _db.field_values = _db.field_values || {}
   _db.relationships = _db.relationships || {}
+  _db.rel_type_defs = _db.rel_type_defs || {}
   _db.tags = _db.tags || {}
   _db.entity_tags = _db.entity_tags || {}
   _db.scenes = _db.scenes || {}
@@ -159,6 +161,10 @@ export function initDB() {
   // Runs last so every earlier migration path (single-container adoption,
   // tree rename, DateValues) is already in its final shape.
   if (migrateFieldSystem(_db, { uuid: randomUUID, nowStr })) save()
+
+  // Migration: fixed relationship types → the per-project registry (built-in
+  // defs; existing rows already use built-in keys, so nothing is rewritten).
+  if (migrateRelationshipTypes(_db, { uuid: randomUUID, nowStr })) save()
 }
 
 export function getDB() {

@@ -226,10 +226,57 @@ export interface Relationship {
   project_id: string
   person_a_id: string
   person_b_id: string
+  /** A RelationshipTypeDef key in this project ('parent_child', 'spouse', a
+   *  custom def's id, …). For directed defs, a→b follows role_a→role_b
+   *  (parent→child, mentor→student, likes→liked-by). */
   type: string
   status: string
   formed: DateValue | null
+  /** When the relationship ended (divorce, falling-out); null = ongoing. */
+  ended?: DateValue | null
+  /** Optional per-edge label shown instead of the type's ("estranged uncle"). */
+  label?: string | null
   created_at: string
+}
+
+// ── Relationship types (user-definable registry — src/shared/relTypes.ts) ────
+
+/** How the hierarchy math treats a type: 'vertical' = parent→child edge,
+ *  'horizontal' = couple edge, 'none' = ignored by generation/tree layouts
+ *  (still drawn, still pulls in force layouts per its weight). */
+export type SymmetryRole = 'vertical' | 'horizontal' | 'none'
+
+/** A relationship type. Project-scoped, like FieldDef. `builtin` defs are
+ *  seeded per project and can be tuned (label/weight/color/…) but never
+ *  deleted; custom defs are user-created (their `key` is their id). */
+export interface RelationshipTypeDef {
+  id: string
+  project_id: string
+  /** Stable slug Relationship.type points at. */
+  key: string
+  label: string
+  /** Structural weight −1..+1: +1 pure structural (strong layout spring),
+   *  0 pure affinity (decorative overlay, no force), negative = repulsion. */
+  weight: number
+  /** Directed a→b (arrowed) vs symmetric. */
+  directed: boolean
+  symmetryRole: SymmetryRole
+  /** End-role names of a directed edge ('Parent'/'Child'); '' when symmetric. */
+  role_a: string
+  role_b: string
+  /** Hex swatch; '' = the Style panel's per-type color (the legacy trio). */
+  color: string
+  /** Glyph shown in pickers and linked-relationship rows. */
+  glyph: string
+  /** Picker grouping band: 'family' | 'social' | 'power' | 'custom'. */
+  band: string
+  builtin: boolean
+  /** Selectable status values; the first is the default for new edges. */
+  statuses: string[]
+  /** Order within pickers (one project-wide ordering). */
+  order: number
+  created_at: string
+  updated_at: string
 }
 
 /** A labelled set of entities (a family, a house, "Villains", …). Identity
@@ -358,6 +405,7 @@ export interface DB {
   field_defs: Record<string, FieldDef>
   field_values: Record<string, FieldValue>
   relationships: Record<string, Relationship>
+  rel_type_defs: Record<string, RelationshipTypeDef>
   tags: Record<string, Tag>
   entity_tags: Record<string, EntityTag>
   scenes: Record<string, Scene>

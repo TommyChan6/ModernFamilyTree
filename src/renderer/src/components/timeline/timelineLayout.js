@@ -21,18 +21,24 @@ export function lifeEnd(p, refYear) {
 // Lane order comes from the same family-tree layout algorithm the Tree View
 // uses: couples sit in neighbouring lanes and children land near their parents,
 // so marriage/birth connectors stay short and cross as little as possible.
-export function computeLaneOrder(persons, relationships) {
-  return computeTreeOrder(persons, relationships)
+export function computeLaneOrder(persons, relationships, typeRoles) {
+  return computeTreeOrder(persons, relationships, typeRoles)
 }
 
-export function computeTimelineLayout(persons, relationships, refYear, laneOrder = null) {
+export function computeTimelineLayout(
+  persons,
+  relationships,
+  refYear,
+  laneOrder = null,
+  typeRoles = null
+) {
   const birthOf = (p) => toOrdinal(p.birth)
   const dated = persons.filter((p) => birthOf(p) != null)
 
   // Use the caller's (frozen) lane order when given; people missing from it —
   // e.g. added since the last "refresh layout" — append on the right in a
   // stable birth-date order.
-  const order = laneOrder || computeLaneOrder(persons, relationships)
+  const order = laneOrder || computeLaneOrder(persons, relationships, typeRoles)
   const orderIdx = new Map(order.map((id, i) => [id, i]))
   dated.sort((a, b) => {
     const ia = orderIdx.has(a.id) ? orderIdx.get(a.id) : Infinity

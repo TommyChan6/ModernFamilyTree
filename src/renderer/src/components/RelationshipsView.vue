@@ -55,6 +55,16 @@
         </button>
 
         <button
+          v-if="store.caps.customRelTypes"
+          class="rv-filter-btn"
+          :class="{ active: typesOpen }"
+          title="Manage relationship types"
+          @click="typesOpen = true"
+        >
+          ⚙ Types
+        </button>
+
+        <button
           class="btn btn-primary btn-sm"
           @click="editing?.id === 'new' ? cancelEdit() : startAdd()"
         >
@@ -62,6 +72,12 @@
         </button>
       </div>
     </div>
+
+    <Teleport to="body">
+      <Transition name="rv-fade">
+        <RelTypesPanel v-if="typesOpen" @close="typesOpen = false" />
+      </Transition>
+    </Teleport>
 
     <!-- Secondary facet panel: slides open beneath the toolbar -->
     <div class="rv-filters" :class="{ open: filtersOpen }">
@@ -190,9 +206,9 @@
           <div class="rv-field">
             <label>Relationship</label>
             <select v-model="editing.type">
-              <option value="parent_child">Is parent of</option>
-              <option value="spouse">Is spouse of</option>
-              <option value="adopted">Adopted (is adoptive parent of)</option>
+              <option v-for="d in store.relTypes" :key="d.key" :value="d.key">
+                {{ typeOptionLabel(d) }}
+              </option>
             </select>
           </div>
           <div class="rv-field rv-field-picker">
@@ -219,11 +235,12 @@
               @keydown.enter="saveEdit"
             />
           </div>
-          <div v-if="editing.type === 'spouse'" class="rv-field rv-field-sm">
+          <div v-if="statusesOf(editing.type).length > 1" class="rv-field rv-field-sm">
             <label>Status</label>
             <select v-model="editing.status">
-              <option value="active">Married</option>
-              <option value="divorced">Divorced</option>
+              <option v-for="s in statusesOf(editing.type)" :key="s" :value="s">
+                {{ statusLabel(editing.type, s) }}
+              </option>
             </select>
           </div>
         </div>
@@ -345,8 +362,9 @@
                     <span class="rv-dot rv-dot-right"></span>
                   </template>
                   <template v-else>
-                    <span class="rv-track" :class="{ dashed: row.rel.type === 'adopted' }"></span>
-                    <span class="rv-arrow"></span>
+                    <span class="rv-track" :class="{ dashed: isDashed(row.rel.type) }"></span>
+                    <span v-if="isDirected(row.rel.type)" class="rv-arrow"></span>
+                    <span v-else class="rv-dot rv-dot-right"></span>
                   </template>
                 </div>
               </div>
@@ -400,7 +418,7 @@
                   >⚠</span
                 >
                 <button
-                  v-if="row.rel.type !== 'spouse'"
+                  v-if="isDirected(row.rel.type)"
                   class="rv-action-btn"
                   title="Swap direction"
                   @click="swapRel(row)"
@@ -435,9 +453,9 @@
                   <div class="rv-field">
                     <label>Relationship</label>
                     <select v-model="editing.type">
-                      <option value="parent_child">Is parent of</option>
-                      <option value="spouse">Is spouse of</option>
-                      <option value="adopted">Adopted (is adoptive parent of)</option>
+                      <option v-for="d in store.relTypes" :key="d.key" :value="d.key">
+                        {{ typeOptionLabel(d) }}
+                      </option>
                     </select>
                   </div>
                   <div class="rv-field rv-field-picker">
@@ -466,11 +484,12 @@
                       @keydown.enter="saveEdit"
                     />
                   </div>
-                  <div v-if="editing.type === 'spouse'" class="rv-field rv-field-sm">
+                  <div v-if="statusesOf(editing.type).length > 1" class="rv-field rv-field-sm">
                     <label>Status</label>
                     <select v-model="editing.status">
-                      <option value="active">Married</option>
-                      <option value="divorced">Divorced</option>
+                      <option v-for="s in statusesOf(editing.type)" :key="s" :value="s">
+                        {{ statusLabel(editing.type, s) }}
+                      </option>
                     </select>
                   </div>
                 </div>
@@ -531,8 +550,10 @@ import { useMainStore } from '../store/index.js'
 import { api } from '../api'
 import { yearDate } from '../../../shared/calendarMath'
 import PersonPicker from './personForm/PersonPicker.vue'
+import RelTypesPanel from './RelTypesPanel.vue'
 
 const store = useMainStore()
+const typesOpen = ref(false)
 
 // ── searchable person picking (replaces the old scroll-forever dropdowns) ────
 const pickerSide = ref(null) // 'a' | 'b' | null
@@ -637,19 +658,48 @@ const personById = computed(() => {
 })
 function meta(type) {
   const gs = store.graphSettings
+  // The legacy trio keeps following the Style panel's colors.
   if (type === 'spouse') return { label: 'Spouse', color: gs.spouseColor }
   if (type === 'adopted') return { label: 'Adopted', color: gs.adoptedColor }
-  return { label: 'Parent of', color: gs.parentChildColor }
+  if (type === 'parent_child') return { label: 'Parent of', color: gs.parentChildColor }
+  const def = store.relTypeByKey.get(type)
+  return { label: def?.label || type, color: def?.color || gs.parentChildColor }
+}
+function defOf(type) {
+  return store.relTypeByKey.get(type)
+}
+function isDirected(type) {
+  const def = defOf(type)
+  return def ? def.directed : type !== 'spouse'
+}
+function isDashed(type) {
+  if (type === 'adopted') return true
+  const def = defOf(type)
+  return !!def && def.weight < 0.5 && type !== 'parent_child' && type !== 'spouse'
+}
+function statusesOf(type) {
+  return defOf(type)?.statuses || ['active']
+}
+function statusLabel(type, s) {
+  if (type === 'spouse' && s === 'active') return 'Married'
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
+}
+function typeOptionLabel(def) {
+  return def.directed ? `${def.role_a || 'A'} → ${def.role_b || 'B'}` : def.label
 }
 function connLabel(rel) {
+  if (rel.label) return rel.label // per-edge custom label wins
   if (rel.type === 'spouse') return rel.status === 'divorced' ? 'Divorced' : 'Married'
+  if (rel.type === 'parent_child') return 'Parent of'
   if (rel.type === 'adopted') return 'Adopted'
-  return 'Parent of'
+  return meta(rel.type).label
 }
 function roleLabel(type, side) {
   if (type === 'spouse') return 'Partner'
-  if (type === 'adopted') return side === 'a' ? 'Adoptive parent' : 'Adopted child'
-  return side === 'a' ? 'Parent' : 'Child'
+  const def = defOf(type)
+  if (!def) return side === 'a' ? 'Parent' : 'Child'
+  if (def.directed) return (side === 'a' ? def.role_a : def.role_b) || def.label
+  return def.label
 }
 
 // ── Consistency checks ──────────────────────────────────────────────────────
@@ -679,8 +729,20 @@ const issuesByRel = computed(() => {
     if (byPairType[pairKey(r) + '~' + r.type].length > 1)
       add(r.id, 'Duplicate — this pair already has this relationship')
     const pairRels = byPair[pairKey(r)]
-    if (pairRels.some((o) => o.type === 'spouse') && pairRels.some((o) => o.type !== 'spouse')) {
-      add(r.id, 'Conflict — this pair is linked as both spouses and parent/child')
+    // Couple + parent/child on the same pair is a conflict; couple + a social
+    // overlay (friends, rival, …) is fine.
+    const roleOfType = (t) =>
+      store.relTypeRoles.get(t) ||
+      (t === 'parent_child' || t === 'adopted'
+        ? 'vertical'
+        : t === 'spouse'
+          ? 'horizontal'
+          : 'none')
+    if (
+      pairRels.some((o) => roleOfType(o.type) === 'horizontal') &&
+      pairRels.some((o) => roleOfType(o.type) === 'vertical')
+    ) {
+      add(r.id, 'Conflict — this pair is linked as both partners and parent/child')
     }
     if (
       (r.type === 'parent_child' || r.type === 'adopted') &&
@@ -704,30 +766,23 @@ watch(issueCount, (n) => {
 })
 
 // ── Filter chips ────────────────────────────────────────────────────────────
+// One chip per registry type that's actually in use, in registry order.
 const chips = computed(() => {
   const rels = store.relationships
-  const count = (t) => rels.filter((r) => r.type === t).length
-  return [
-    { id: 'all', label: 'All', count: rels.length, color: 'var(--accent)' },
-    {
-      id: 'parent_child',
-      label: 'Parent',
-      count: count('parent_child'),
-      color: store.graphSettings.parentChildColor
-    },
-    {
-      id: 'spouse',
-      label: 'Spouse',
-      count: count('spouse'),
-      color: store.graphSettings.spouseColor
-    },
-    {
-      id: 'adopted',
-      label: 'Adopted',
-      count: count('adopted'),
-      color: store.graphSettings.adoptedColor
-    }
-  ]
+  const counts = new Map()
+  rels.forEach((r) => counts.set(r.type, (counts.get(r.type) || 0) + 1))
+  const list = [{ id: 'all', label: 'All', count: rels.length, color: 'var(--accent)' }]
+  for (const def of store.relTypes) {
+    const count = counts.get(def.key) || 0
+    if (!count) continue
+    list.push({
+      id: def.key,
+      label: def.key === 'parent_child' ? 'Parent' : def.label,
+      count,
+      color: meta(def.key).color
+    })
+  }
+  return list
 })
 
 // ── Rows (filter + sort) ────────────────────────────────────────────────────
@@ -906,6 +961,18 @@ function swapEditing() {
   ;[e.person_a_id, e.person_b_id] = [e.person_b_id, e.person_a_id]
 }
 
+// Switching the type resets the status to the new type's default when the
+// current one isn't valid for it.
+watch(
+  () => editing.value?.type,
+  (t) => {
+    const e = editing.value
+    if (!e || !t) return
+    const valid = statusesOf(t)
+    if (!valid.includes(e.status)) e.status = valid[0] || 'active'
+  }
+)
+
 const previewSentence = computed(() => {
   const e = editing.value
   if (!e) return ''
@@ -917,7 +984,13 @@ const previewSentence = computed(() => {
       : `${a} and ${b} are married`
   }
   if (e.type === 'adopted') return `${a} adopted ${b}`
-  return `${a} is a parent of ${b}`
+  if (e.type === 'parent_child') return `${a} is a parent of ${b}`
+  const def = defOf(e.type)
+  if (!def) return `${a} — ${b}`
+  if (def.directed) {
+    return `${a} is ${b}'s ${(def.role_a || def.label).toLowerCase()}`
+  }
+  return `${a} and ${b} are ${def.label.toLowerCase()}s`
 })
 
 async function saveEdit() {
@@ -943,12 +1016,13 @@ async function saveEdit() {
     return
   }
 
+  const validStatuses = statusesOf(e.type)
   const payload = {
     person_a_id: e.person_a_id,
     person_b_id: e.person_b_id,
     type: e.type,
     formed: yearDate(e.formed_year),
-    status: e.type === 'spouse' ? e.status : 'active'
+    status: validStatuses.includes(e.status) ? e.status : validStatuses[0] || 'active'
   }
   const res =
     e.id === 'new'
@@ -970,7 +1044,9 @@ async function removeRel(row) {
       ? 'marriage'
       : row.rel.type === 'adopted'
         ? 'adoption'
-        : 'parent–child'
+        : row.rel.type === 'parent_child'
+          ? 'parent–child'
+          : (meta(row.rel.type).label || 'this').toLowerCase()
   if (!confirm(`Delete the ${kind} relationship between ${aName} and ${bName}?`)) return
   if (editing.value?.id === row.rel.id) cancelEdit()
   await store.deleteRelationship(row.rel.id)

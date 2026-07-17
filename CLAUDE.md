@@ -145,9 +145,32 @@ labels come from `store.noun` (per-project setting; the data layer stays
 reactive proxies make Electron IPC throw "An object could not be cloned".
 Tests: `tests/fields.test.js`.
 
+**The relationship-type registry** (`src/shared/relTypes.ts` + the `relTypes:*`
+channels): every `Relationship.type` points at a project-scoped
+**RelationshipTypeDef** (like traits point at FieldDefs). Built-in defs
+(parent_child/adopted/spouse/sibling/partner/friends/likes/rival/mentor/
+subordinate) are seeded per project by `migrateRelationshipTypes` / the seed /
+`projects:create`; they can be tuned (label/weight/color/glyph/statuses) but
+never deleted; custom defs are user-created (key = their id; deleting one
+cascades its relationships). Two def fields drive ALL graph behavior — never
+match type literals in layout/render code: **`weight`** (−1..+1 structural↔
+affinity spectrum) is each link's spring strength in the 2D and 3D force
+simulations (0 = decorative overlay, negative = the `repelLinks` force pushes
+the pair apart), and **`symmetryRole`** ('vertical' | 'horizontal' | 'none')
+tells the hierarchy math (`familyTreeLayout.ts` — pure, takes an optional
+`typeRoles` map) which edges are parent→child vs couple vs invisible to the
+tree. `relationships:create/update` validate the type against the registry;
+rows also carry optional `label` (per-edge display text) and `ended`. The
+legacy trio keeps color '' → the Style panel's per-type colors. UI: PersonForm
+intent chips are generated from the registry (grouped by `band`; Simple mode =
+family band only, per `caps.relTypePicker`/`customRelTypes`), and
+`RelTypesPanel.vue` (Relationships view → ⚙ Types) edits defs — the weight
+slider needs `caps.tuneAffinity` (Advanced). Tests: `tests/relTypes.test.js`.
+
 **State** (`src/renderer/src/store/index.js`): a single Pinia store `main` is the
 source of truth for `persons`, `fieldDefs`/`fieldValues` (+ the
-`fieldDefById`/`fieldValuesOf` index Maps), `relationships`, `tags`/`entityTags`
+`fieldDefById`/`fieldValuesOf` index Maps), `relationships`, `relTypes` (+ the
+`relTypeByKey`/`relTypeRoles` index Maps), `tags`/`entityTags`
 (+ the `tagsOf`/`membersOf` index Maps), `scenes`/`sceneTags` (+ per-view
 `activeSceneIds`), `projects`, the `programMode` capability flags (`caps`), UI
 flags, and `graphSettings`.
@@ -222,7 +245,10 @@ integrity) — update it when
 changing `db.js`, `src/shared/dbCore.ts`, or the data shape. `tests/auth.test.js`
 covers accounts (hashing, sessions, lockout, per-user scoping, quotas, the request
 envelope) — it dials PBKDF2 down via `__setPbkdf2IterationsForTesting`; update it
-with `src/shared/auth.ts` or the `auth:*` channels. `tests/setup.js` (wired in
+with `src/shared/auth.ts` or the `auth:*` channels. `tests/relTypes.test.js`
+covers the relationship-type registry (seeding, migration, channel validation,
+builtin protection, custom-delete cascade) — update it with
+`src/shared/relTypes.ts` or the `relTypes:*`/`relationships:*` channels. `tests/setup.js` (wired in
 `vitest.config.js`) backfills `globalThis.crypto` for Node 18 workers.
 `tests/graphMath.test.js`,
 `tests/viewMath.test.js` and `tests/calendarMath.test.js` cover the pure view/date

@@ -196,6 +196,15 @@ const relationshipChips = computed(() => {
         role = 'Adoptive Parent'
         colorClass = 'chip-amber'
       }
+    } else {
+      // Registry types (friends, likes, custom…): the OTHER person's role.
+      const def = store.relTypeByKey.get(r.type)
+      if (def?.directed) {
+        role = (r.person_a_id === pid ? def.role_b : def.role_a) || def.label
+      } else {
+        role = r.label || def?.label || r.type
+      }
+      colorClass = 'chip-blue'
     }
 
     chips.push({ id: r.id, role, name: other.name, otherId, colorClass })
@@ -450,6 +459,11 @@ async function handleDelete() {
 .chip-amber {
   background: rgba(245, 166, 35, 0.15);
   color: #f5a623;
+}
+
+.chip-blue {
+  background: rgba(108, 142, 245, 0.15);
+  color: #6c8ef5;
 }
 
 .chip-role {

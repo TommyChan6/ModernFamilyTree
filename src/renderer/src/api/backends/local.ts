@@ -11,6 +11,7 @@ import {
   migrateFactionsToTags,
   migrateGraphStateToScenes,
   migrateFieldSystem,
+  migrateRelationshipTypes,
   nowStr
 } from '../../../../shared/dbCore'
 import { PUBLIC_CHANNELS, resolveSession, unwrapRequest } from '../../../../shared/auth'
@@ -93,13 +94,15 @@ function getLocalDB(): Promise<DB> {
         const factionsDissolved = migrateFactionsToTags(merged, env)
         const graphScenesMade = migrateGraphStateToScenes(merged, env)
         const fieldsAdopted = migrateFieldSystem(merged, env)
+        const relTypesSeeded = migrateRelationshipTypes(merged, env)
         if (
           renamed ||
           datesWrapped ||
           scenesMade ||
           factionsDissolved ||
           graphScenesMade ||
-          fieldsAdopted
+          fieldsAdopted ||
+          relTypesSeeded
         ) {
           void persist(merged)
         }

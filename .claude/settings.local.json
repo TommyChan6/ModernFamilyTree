@@ -243,7 +243,15 @@
       "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\60e61358-7a8c-4d25-9b96-336be7be8491\\\\scratchpad\\\\drive.mjs\")",
       "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\60e61358-7a8c-4d25-9b96-336be7be8491\\\\scratchpad\\\\drive2.mjs\")",
       "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\60e61358-7a8c-4d25-9b96-336be7be8491\\\\scratchpad\\\\driveWeb.mjs\")",
-      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\60e61358-7a8c-4d25-9b96-336be7be8491\\\\scratchpad\\\\drive3.mjs\")"
+      "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\60e61358-7a8c-4d25-9b96-336be7be8491\\\\scratchpad\\\\drive3.mjs\")",
+      "PowerShell($f = 'src\\\\renderer\\\\src\\\\components\\\\GraphCanvas.vue'; \\(Get-Content $f -Raw\\) -replace [regex]::Escape\\('computeGenLayout\\(ctx.nodesData, store.relationships, width, height\\)'\\), 'computeGenLayout\\(ctx.nodesData, store.relationships, width, height, store.relTypeRoles\\)' | Set-Content $f -Encoding utf8 -NoNewline)",
+      "PowerShell(git diff --stat src/renderer/src/components/GraphCanvas.vue; $b = [System.IO.File]::ReadAllBytes\\('src\\\\renderer\\\\src\\\\components\\\\GraphCanvas.vue'\\)[0..2]; \"$\\($b -join ','\\)\")",
+      "PowerShell(git checkout -- src/renderer/src/components/GraphCanvas.vue)",
+      "PowerShell(npx prettier --write src/renderer/src/components/Graph3DView.vue src/renderer/src/components/GraphCanvas.vue src/renderer/src/components/PersonForm.vue src/renderer/src/components/RelationshipsView.vue src/renderer/src/components/RelTypesPanel.vue src/renderer/src/components/timeline/timelineLayout.js)",
+      "PowerShell($sc = 'C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\ad591439-cf58-46f1-bc1d-6c11f2ddc0ef\\\\scratchpad'; node \"$sc\\\\websmoke.mjs\" $sc)",
+      "PowerShell(npx prettier --write src/renderer/src/components/ViewHeader.vue src/renderer/src/components/CanvasToggles.vue src/renderer/src/components/GraphCanvas.vue src/renderer/src/components/TimelineView.vue src/renderer/src/components/FactionsView.vue src/renderer/src/components/character/CharacterView.vue src/renderer/src/styles/global.css 2>&1)",
+      "PowerShell(npm run preview:web 2>&1)",
+      "PowerShell($sc = 'C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\ad591439-cf58-46f1-bc1d-6c11f2ddc0ef\\\\scratchpad'; node \"$sc\\\\uismoke.mjs\" $sc)"
     ]
   }
 }

@@ -307,7 +307,8 @@ const statsMap = computed(() => {
   store.relationships.forEach((r) => {
     if (m[r.person_a_id]) {
       m[r.person_a_id].kin++
-      if (r.type === 'parent_child' || r.type === 'adopted') m[r.person_a_id].children++
+      // Children = vertical edges where this person is the parent side.
+      if (store.relTypeRoles.get(r.type) === 'vertical') m[r.person_a_id].children++
     }
     if (m[r.person_b_id]) m[r.person_b_id].kin++
   })

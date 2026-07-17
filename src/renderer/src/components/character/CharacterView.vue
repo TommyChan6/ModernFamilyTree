@@ -1,213 +1,228 @@
 <template>
-  <div class="cv-root" :class="{ 'cv-solo': !draft }">
-    <!-- Wardrobe rail: slot categories; selecting one drives grid + glow -->
-    <aside v-if="draft" class="cv-wardrobe">
-      <button
-        v-for="slot in pack.slots"
-        :key="slot.id"
-        class="cv-slot-btn"
-        :class="{ active: selectedSlot === slot.id }"
-        :title="t('character.slots.' + slot.id)"
-        @click="selectedSlot = slot.id"
-      >
-        <span class="cv-slot-icon">{{ slot.icon }}</span>
-      </button>
-    </aside>
-
-    <!-- Stage column -->
-    <div class="cv-center">
-      <header class="cv-topstrip">
-        <label class="cv-field">
-          <span class="cv-field-label">{{ t('character.person') }}</span>
-          <select v-model="personId" class="cv-select">
-            <option v-for="p in store.persons" :key="p.id" :value="p.id">{{ p.name }}</option>
-          </select>
-        </label>
-        <label class="cv-field">
-          <span class="cv-field-label">{{ t('character.style') }}</span>
-          <select class="cv-select" :value="pack.id" disabled>
-            <option :value="pack.id">{{ pack.name }}</option>
-          </select>
-        </label>
-        <input
-          v-if="draft"
-          class="cv-label-input"
-          :value="draft.label"
-          :placeholder="t('character.labelPh')"
-          @input="liveEdit((d) => (d.label = $event.target.value))"
-          @blur="endEdit"
-        />
-        <span class="cv-labs-tag">🧪 {{ t('character.experimental') }}</span>
-      </header>
-
-      <!-- The stage (or the empty states) -->
-      <div class="cv-stage-area">
-        <template v-if="!store.persons.length">
-          <div class="cv-empty">
-            <div class="cv-empty-mark">🎭</div>
-            <p>{{ t('character.noPersons') }}</p>
-          </div>
-        </template>
-        <template v-else-if="!draft">
-          <div class="cv-empty">
-            <div class="cv-empty-mark">🎭</div>
-            <p class="cv-empty-title">{{ t('character.emptyTitle', { name: personName }) }}</p>
-            <p class="cv-empty-hint">{{ t('character.emptyHint') }}</p>
-            <button class="btn btn-primary" @click="addLook">✨ {{ t('character.create') }}</button>
-          </div>
-        </template>
-        <CharacterStage
-          v-else
-          ref="stageRef"
-          :doc="draft"
-          :pack="pack"
-          :selected-slot="selectedSlot"
-          @select-slot="selectedSlot = $event"
-        />
-      </div>
-
-      <!-- Portraits filmstrip: this person's looks -->
-      <div v-if="personId && store.persons.length" class="cv-filmstrip">
+  <div class="cv-view">
+    <ViewHeader
+      icon="🎭"
+      title="Character"
+      :count="store.persons.length ? personDocs.length : null"
+      :hint="`🧪 ${t('character.experimental')}`"
+    />
+    <div class="cv-root" :class="{ 'cv-solo': !draft }">
+      <!-- Wardrobe rail: slot categories; selecting one drives grid + glow -->
+      <aside v-if="draft" class="cv-wardrobe">
         <button
-          v-for="doc in personDocs"
-          :key="doc.id"
-          class="cv-look"
-          :class="{ active: doc.id === activeDocId }"
-          @click="activeDocId = doc.id"
+          v-for="slot in pack.slots"
+          :key="slot.id"
+          class="cv-slot-btn"
+          :class="{ active: selectedSlot === slot.id }"
+          :title="t('character.slots.' + slot.id)"
+          @click="selectedSlot = slot.id"
         >
-          <img class="cv-look-thumb" :src="thumbOf(doc)" alt="" />
-          <span class="cv-look-name">{{ doc.label }}</span>
-          <span v-if="doc.is_portrait" class="cv-look-star" :title="t('character.portraitBadge')"
-            >★</span
-          >
-          <span v-if="ageLabel(doc)" class="cv-look-age">{{ ageLabel(doc) }}</span>
+          <span class="cv-slot-icon">{{ slot.icon }}</span>
         </button>
-        <button class="cv-look cv-look-add" :title="t('character.addLook')" @click="addLook">
-          ＋
-        </button>
-      </div>
+      </aside>
 
-      <!-- Bottom tool pill -->
-      <div v-if="draft" class="cv-pill">
-        <button class="cv-pill-btn" :title="t('character.randomize')" @click="randomize">🎲</button>
-        <button class="cv-pill-btn" :title="t('character.mirror')" @click="mirror">⇄</button>
-        <div class="cv-pill-sep"></div>
-        <button
-          class="cv-pill-btn"
-          :disabled="!undoStack.length"
-          :title="t('character.undo')"
-          @click="undo"
-        >
-          ↩
-        </button>
-        <button
-          class="cv-pill-btn"
-          :disabled="!redoStack.length"
-          :title="t('character.redo')"
-          @click="redo"
-        >
-          ↪
-        </button>
-        <div class="cv-pill-sep"></div>
-        <button class="cv-pill-btn" :title="t('character.zoomIn')" @click="stageRef?.zoomBy(1.2)">
-          ⊕
-        </button>
-        <button
-          class="cv-pill-btn"
-          :title="t('character.zoomOut')"
-          @click="stageRef?.zoomBy(1 / 1.2)"
-        >
-          ⊖
-        </button>
-        <div class="cv-pill-sep"></div>
-        <button class="cv-pill-btn cv-pill-primary" :disabled="portraitBusy" @click="setAsPortrait">
-          {{ portraitDone ? '✓ ' : '🖼 ' }}{{ t('character.setPortrait') }}
-        </button>
-      </div>
-    </div>
-
-    <!-- Inspector: parts, colors, sliders for the selected slot -->
-    <aside v-if="draft" class="cv-inspector">
-      <section class="cv-section">
-        <h4 class="cv-section-title">
-          {{ slotDef?.icon }} {{ t('character.slots.' + selectedSlot) }}
-        </h4>
-        <PartGrid :doc="draft" :pack="pack" :slot-id="selectedSlot" @pick="pickPart" />
-        <label class="cv-slider-row">
-          <span>{{ t('character.size') }}</span>
+      <!-- Stage column -->
+      <div class="cv-center">
+        <header class="cv-topstrip">
+          <label class="cv-field">
+            <span class="cv-field-label">{{ t('character.person') }}</span>
+            <select v-model="personId" class="cv-select">
+              <option v-for="p in store.persons" :key="p.id" :value="p.id">{{ p.name }}</option>
+            </select>
+          </label>
+          <label class="cv-field">
+            <span class="cv-field-label">{{ t('character.style') }}</span>
+            <select class="cv-select" :value="pack.id" disabled>
+              <option :value="pack.id">{{ pack.name }}</option>
+            </select>
+          </label>
           <input
-            type="range"
-            min="0.7"
-            max="1.4"
-            step="0.02"
-            :value="currentSlotState.scale"
-            @input="liveEdit((d) => setSlotScale(d, Number($event.target.value)))"
-            @change="endEdit"
+            v-if="draft"
+            class="cv-label-input"
+            :value="draft.label"
+            :placeholder="t('character.labelPh')"
+            @input="liveEdit((d) => (d.label = $event.target.value))"
+            @blur="endEdit"
           />
-        </label>
-      </section>
+        </header>
 
-      <section class="cv-section">
-        <h4 class="cv-section-title">🎨 {{ t('character.colors') }}</h4>
-        <div class="cv-palette">
-          <label v-for="ch in pack.paletteChannels" :key="ch" class="cv-swatch">
+        <!-- The stage (or the empty states) -->
+        <div class="cv-stage-area">
+          <template v-if="!store.persons.length">
+            <div class="cv-empty">
+              <div class="cv-empty-mark">🎭</div>
+              <p>{{ t('character.noPersons') }}</p>
+            </div>
+          </template>
+          <template v-else-if="!draft">
+            <div class="cv-empty">
+              <div class="cv-empty-mark">🎭</div>
+              <p class="cv-empty-title">{{ t('character.emptyTitle', { name: personName }) }}</p>
+              <p class="cv-empty-hint">{{ t('character.emptyHint') }}</p>
+              <button class="btn btn-primary" @click="addLook">
+                ✨ {{ t('character.create') }}
+              </button>
+            </div>
+          </template>
+          <CharacterStage
+            v-else
+            ref="stageRef"
+            :doc="draft"
+            :pack="pack"
+            :selected-slot="selectedSlot"
+            @select-slot="selectedSlot = $event"
+          />
+        </div>
+
+        <!-- Portraits filmstrip: this person's looks -->
+        <div v-if="personId && store.persons.length" class="cv-filmstrip">
+          <button
+            v-for="doc in personDocs"
+            :key="doc.id"
+            class="cv-look"
+            :class="{ active: doc.id === activeDocId }"
+            @click="activeDocId = doc.id"
+          >
+            <img class="cv-look-thumb" :src="thumbOf(doc)" alt="" />
+            <span class="cv-look-name">{{ doc.label }}</span>
+            <span v-if="doc.is_portrait" class="cv-look-star" :title="t('character.portraitBadge')"
+              >★</span
+            >
+            <span v-if="ageLabel(doc)" class="cv-look-age">{{ ageLabel(doc) }}</span>
+          </button>
+          <button class="cv-look cv-look-add" :title="t('character.addLook')" @click="addLook">
+            ＋
+          </button>
+        </div>
+
+        <!-- Bottom tool pill -->
+        <div v-if="draft" class="cv-pill">
+          <button class="cv-pill-btn" :title="t('character.randomize')" @click="randomize">
+            🎲
+          </button>
+          <button class="cv-pill-btn" :title="t('character.mirror')" @click="mirror">⇄</button>
+          <div class="cv-pill-sep"></div>
+          <button
+            class="cv-pill-btn"
+            :disabled="!undoStack.length"
+            :title="t('character.undo')"
+            @click="undo"
+          >
+            ↩
+          </button>
+          <button
+            class="cv-pill-btn"
+            :disabled="!redoStack.length"
+            :title="t('character.redo')"
+            @click="redo"
+          >
+            ↪
+          </button>
+          <div class="cv-pill-sep"></div>
+          <button class="cv-pill-btn" :title="t('character.zoomIn')" @click="stageRef?.zoomBy(1.2)">
+            ⊕
+          </button>
+          <button
+            class="cv-pill-btn"
+            :title="t('character.zoomOut')"
+            @click="stageRef?.zoomBy(1 / 1.2)"
+          >
+            ⊖
+          </button>
+          <div class="cv-pill-sep"></div>
+          <button
+            class="cv-pill-btn cv-pill-primary"
+            :disabled="portraitBusy"
+            @click="setAsPortrait"
+          >
+            {{ portraitDone ? '✓ ' : '🖼 ' }}{{ t('character.setPortrait') }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Inspector: parts, colors, sliders for the selected slot -->
+      <aside v-if="draft" class="cv-inspector">
+        <section class="cv-section">
+          <h4 class="cv-section-title">
+            {{ slotDef?.icon }} {{ t('character.slots.' + selectedSlot) }}
+          </h4>
+          <PartGrid :doc="draft" :pack="pack" :slot-id="selectedSlot" @pick="pickPart" />
+          <label class="cv-slider-row">
+            <span>{{ t('character.size') }}</span>
             <input
-              type="color"
-              :value="draft.palette[ch] || '#8f87a3'"
-              @input="liveEdit((d) => (d.palette[ch] = $event.target.value))"
+              type="range"
+              min="0.7"
+              max="1.4"
+              step="0.02"
+              :value="currentSlotState.scale"
+              @input="liveEdit((d) => setSlotScale(d, Number($event.target.value)))"
               @change="endEdit"
             />
-            <span>{{ t('character.palette.' + ch) }}</span>
           </label>
-        </div>
-      </section>
+        </section>
 
-      <section class="cv-section">
-        <h4 class="cv-section-title">🧍 {{ t('character.body') }}</h4>
-        <label v-for="m in ['height', 'build', 'headSize']" :key="m" class="cv-slider-row">
-          <span>{{ t('character.' + m) }}</span>
-          <input
-            type="range"
-            min="-1"
-            max="1"
-            step="0.05"
-            :value="draft.morph[m]"
-            @input="liveEdit((d) => (d.morph[m] = Number($event.target.value)))"
-            @change="endEdit"
-          />
-        </label>
-      </section>
+        <section class="cv-section">
+          <h4 class="cv-section-title">🎨 {{ t('character.colors') }}</h4>
+          <div class="cv-palette">
+            <label v-for="ch in pack.paletteChannels" :key="ch" class="cv-swatch">
+              <input
+                type="color"
+                :value="draft.palette[ch] || '#8f87a3'"
+                @input="liveEdit((d) => (d.palette[ch] = $event.target.value))"
+                @change="endEdit"
+              />
+              <span>{{ t('character.palette.' + ch) }}</span>
+            </label>
+          </div>
+        </section>
 
-      <section class="cv-section">
-        <h4 class="cv-section-title">⏳ {{ t('character.ages') }}</h4>
-        <p class="cv-hint">{{ t('character.ageHint') }}</p>
-        <div class="cv-ages">
-          <input
-            type="number"
-            min="0"
-            class="cv-age-input"
-            :placeholder="t('character.ageFrom')"
-            :value="draft.age_from ?? ''"
-            @input="liveEdit((d) => (d.age_from = toAge($event.target.value)))"
-            @change="endEdit"
-          />
-          <span class="cv-age-dash">–</span>
-          <input
-            type="number"
-            min="0"
-            class="cv-age-input"
-            :placeholder="t('character.ageTo')"
-            :value="draft.age_to ?? ''"
-            @input="liveEdit((d) => (d.age_to = toAge($event.target.value)))"
-            @change="endEdit"
-          />
-        </div>
-      </section>
+        <section class="cv-section">
+          <h4 class="cv-section-title">🧍 {{ t('character.body') }}</h4>
+          <label v-for="m in ['height', 'build', 'headSize']" :key="m" class="cv-slider-row">
+            <span>{{ t('character.' + m) }}</span>
+            <input
+              type="range"
+              min="-1"
+              max="1"
+              step="0.05"
+              :value="draft.morph[m]"
+              @input="liveEdit((d) => (d.morph[m] = Number($event.target.value)))"
+              @change="endEdit"
+            />
+          </label>
+        </section>
 
-      <button class="btn btn-danger btn-sm cv-delete" @click="deleteLook">
-        {{ t('character.deleteLook') }}
-      </button>
-    </aside>
+        <section class="cv-section">
+          <h4 class="cv-section-title">⏳ {{ t('character.ages') }}</h4>
+          <p class="cv-hint">{{ t('character.ageHint') }}</p>
+          <div class="cv-ages">
+            <input
+              type="number"
+              min="0"
+              class="cv-age-input"
+              :placeholder="t('character.ageFrom')"
+              :value="draft.age_from ?? ''"
+              @input="liveEdit((d) => (d.age_from = toAge($event.target.value)))"
+              @change="endEdit"
+            />
+            <span class="cv-age-dash">–</span>
+            <input
+              type="number"
+              min="0"
+              class="cv-age-input"
+              :placeholder="t('character.ageTo')"
+              :value="draft.age_to ?? ''"
+              @input="liveEdit((d) => (d.age_to = toAge($event.target.value)))"
+              @change="endEdit"
+            />
+          </div>
+        </section>
+
+        <button class="btn btn-danger btn-sm cv-delete" @click="deleteLook">
+          {{ t('character.deleteLook') }}
+        </button>
+      </aside>
+    </div>
   </div>
 </template>
 
@@ -218,6 +233,7 @@ import { useI18n } from '../../i18n'
 import { api } from '../../api'
 import CharacterStage from './CharacterStage.vue'
 import PartGrid from './PartGrid.vue'
+import ViewHeader from '../ViewHeader.vue'
 import { stylePacks } from './styles/cartoon'
 import { defaultParts, defaultPalette, randomizeDoc, slotOf, slotState } from './characterModel'
 import { rasterize, portraitRegion } from './render/SpriteCompositor2D'
@@ -499,13 +515,21 @@ function snapshotKey() {
 </script>
 
 <style scoped>
-.cv-root {
+.cv-view {
   position: absolute;
   inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  z-index: 2;
+}
+.cv-root {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
   display: grid;
   grid-template-columns: 56px 1fr 268px;
   background: var(--bg);
-  z-index: 2;
 }
 
 /* Before the first look exists both asides are hidden — collapse to one track

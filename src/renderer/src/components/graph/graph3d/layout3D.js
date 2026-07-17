@@ -73,8 +73,8 @@ export function to2DPosition(p, pivot) {
  * assignment (parents above children, spouses on one row). Returns
  * { levelOf: {id: row}, rowCount } with rows 0..rowCount-1, 0 = oldest.
  */
-export function generationLevels(nodes, relationships) {
-  const { yMap } = computeGenLayout(nodes, relationships, 2000, 1000)
+export function generationLevels(nodes, relationships, typeRoles) {
+  const { yMap } = computeGenLayout(nodes, relationships, 2000, 1000, typeRoles)
   const ys = [...new Set(Object.values(yMap))].sort((a, b) => a - b)
   const rowIndex = new Map(ys.map((y, i) => [y, i]))
   const levelOf = {}
@@ -87,8 +87,8 @@ export function generationLevels(nodes, relationships) {
  * horizontal layers, oldest on top, centred on y=0.
  * Returns { yOf: {id: y}, layers: [{ row, y, label }] }.
  */
-export function layeredTargets(nodes, relationships, spacing = 170) {
-  const { levelOf, rowCount } = generationLevels(nodes, relationships)
+export function layeredTargets(nodes, relationships, spacing = 170, typeRoles) {
+  const { levelOf, rowCount } = generationLevels(nodes, relationships, typeRoles)
   const yFor = (row) => ((rowCount - 1) / 2 - row) * spacing
   const yOf = {}
   for (const n of nodes) yOf[n.id] = yFor(levelOf[n.id] ?? 0)

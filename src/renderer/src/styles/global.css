@@ -294,3 +294,70 @@ select {
 .gap-md {
   gap: 16px;
 }
+
+/* ── Canvas panes (shared by graph/timeline/groups right-side overlays) ────── */
+/* A glassy floating card that springs in from the right with a soft blur-focus,
+   used for Focus / Legend / Relationships panes so every view's overlays feel
+   like one family. Rows inside can stagger via `--i` (see .cp-stagger). */
+.canvas-pane {
+  background: var(--glass-strong);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  animation: canvas-pane-in 0.46s cubic-bezier(0.22, 1.15, 0.36, 1) backwards;
+}
+@keyframes canvas-pane-in {
+  from {
+    opacity: 0;
+    transform: translateX(26px) scale(0.95);
+    filter: blur(7px);
+  }
+}
+
+/* The vertical stack the panes live in, anchored to the canvas's top-right. */
+.canvas-pane-stack {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100% - 28px);
+  overflow: visible;
+  pointer-events: none;
+}
+.canvas-pane-stack > * {
+  pointer-events: auto;
+}
+
+/* Staggered row entrance — set inline style `--i` per row (0,1,2,…). */
+.cp-stagger {
+  animation: cp-row-in 0.44s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(0.1s + var(--i, 0) * 0.045s);
+}
+@keyframes cp-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+
+/* Panes slide/scale out to the right when Clean view sweeps overlays away. */
+.canvas-pane-stack.clean-hidden {
+  transform: translateX(calc(100% + 30px));
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-pane,
+  .cp-stagger {
+    animation: none;
+  }
+}

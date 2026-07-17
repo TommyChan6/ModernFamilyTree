@@ -194,3 +194,68 @@ describe('computeTreeOrder', () => {
     }
   })
 })
+
+describe('computeGenLayout — registry symmetry roles', () => {
+  const edge = (type, a, b) => ({ id: `${type}:${a}:${b}`, type, person_a_id: a, person_b_id: b })
+
+  it('ignores unknown types entirely without a roles map (legacy fallback)', () => {
+    const { persons, rels } = nuclear()
+    const base = computeGenLayout(persons, rels, W, H)
+    const withSocial = computeGenLayout(
+      persons,
+      [...rels, edge('friends', 'dad', 'kid1'), edge('rival', 'mom', 'kid2')],
+      W,
+      H
+    )
+    expect(withSocial.targets).toEqual(base.targets)
+  })
+
+  it("a 'none'-role edge never merges rows or couples people", () => {
+    const { persons, rels } = nuclear()
+    const roles = new Map([['friends', 'none']])
+    const { targets } = computeGenLayout(
+      persons,
+      [...rels, edge('friends', 'dad', 'kid1')],
+      W,
+      H,
+      roles
+    )
+    // Friendship across generations must not pull kid1 onto the parents' row
+    expect(targets.kid1.y).toBeGreaterThan(targets.dad.y)
+  })
+
+  it("a 'horizontal'-role type (partner) couples people like spouse does", () => {
+    const persons = [
+      person('g', 'male', 1930),
+      person('kid', 'female', 1955),
+      person('beau', 'male', 1953)
+    ]
+    const rels = [child('g', 'kid'), edge('partner', 'kid', 'beau')]
+    const roles = new Map([
+      ['partner', 'horizontal'],
+      ['parent_child', 'vertical']
+    ])
+    const { targets } = computeGenLayout(persons, rels, W, H, roles)
+    expect(targets.beau.y).toBe(targets.kid.y)
+    expect(Math.abs(targets.beau.x - targets.kid.x)).toBe(SPOUSE_GAP)
+  })
+
+  it("a custom 'vertical'-role type stacks generations like parent_child", () => {
+    const persons = [person('boss', 'male', 1940), person('minion', 'male', 1970)]
+    const rels = [edge('custom-hierarchy', 'boss', 'minion')]
+    const roles = new Map([['custom-hierarchy', 'vertical']])
+    const { targets, genLabels } = computeGenLayout(persons, rels, W, H, roles)
+    expect(genLabels).toHaveLength(2)
+    expect(targets.minion.y).toBeGreaterThan(targets.boss.y)
+  })
+
+  it('computeTreeOrder accepts the roles map', () => {
+    const { persons, rels } = nuclear()
+    const roles = new Map([
+      ['parent_child', 'vertical'],
+      ['adopted', 'vertical'],
+      ['spouse', 'horizontal']
+    ])
+    expect(computeTreeOrder(persons, rels, roles)).toEqual(computeTreeOrder(persons, rels))
+  })
+})

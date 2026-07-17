@@ -26,6 +26,7 @@ import type {
   ProjectOverview,
   PublicUser,
   Relationship,
+  RelationshipTypeDef,
   Scene,
   SceneTag,
   Session,
@@ -49,6 +50,15 @@ import {
 } from './fields'
 
 export { migrateFieldSystem } from './fields'
+import {
+  clampWeight,
+  coerceSymmetryRole,
+  ensureProjectRelTypes,
+  relTypeByKey,
+  relTypesForProject
+} from './relTypes'
+
+export { migrateRelationshipTypes } from './relTypes'
 import {
   SESSION_DAYS,
   addDays,
@@ -112,6 +122,7 @@ export const EMPTY_DB = (): DB => ({
   field_defs: {},
   field_values: {},
   relationships: {},
+  rel_type_defs: {},
   tags: {},
   entity_tags: {},
   scenes: {},
@@ -556,6 +567,8 @@ export function seedSampleData(db: DB, projectId: string, env: Env): void {
   // gender/birth/death slots + occupation/location/bio) and the sample
   // persons' columns adopted as trait values.
   ensureProjectFields(db, projectId, env)
+  // …and on the relationship-type registry (built-in defs).
+  ensureProjectRelTypes(db, projectId, env)
 }
 
 /** Fresh, seeded database for a first run (used by the browser-local backend). */
@@ -867,8 +880,10 @@ export const channelHandlers: Record<string, Handler> = {
       updated_at: now
     }
     db.projects[id] = project
-    // Even an empty project starts on the trait system (locked default defs).
+    // Even an empty project starts on the trait system (locked default defs)
+    // and the relationship-type registry (built-in defs).
     ensureProjectFields(db, id, env)
+    ensureProjectRelTypes(db, id, env)
     return project
   },
 
@@ -902,6 +917,9 @@ export const channelHandlers: Record<string, Handler> = {
     }
     for (const [rid, r] of Object.entries(db.relationships)) {
       if (r.project_id === pid) delete db.relationships[rid]
+    }
+    for (const [rtid, rt] of Object.entries(db.rel_type_defs || {})) {
+      if (rt.project_id === pid) delete db.rel_type_defs[rtid]
     }
     for (const [tid, t] of Object.entries(db.tags)) {
       if (t.project_id === pid) {
@@ -1217,15 +1235,20 @@ export const channelHandlers: Record<string, Handler> = {
   },
 
   'relationships:create'(db, data, env) {
+    const pid = db.activeProjectId as string
+    const def = relTypeByKey(db, pid, data.type)
+    if (!def) throw new Error(`Unknown relationship type: ${data.type}`)
     const id = env.uuid()
     const rel: Relationship = {
       id,
-      project_id: db.activeProjectId as string,
+      project_id: pid,
       person_a_id: data.person_a_id,
       person_b_id: data.person_b_id,
       type: data.type,
-      status: data.status || 'active',
+      status: data.status || def.statuses[0] || 'active',
       formed: data.formed ?? null,
+      ended: data.ended ?? null,
+      label: data.label ?? null,
       created_at: env.nowStr()
     }
     db.relationships[id] = rel
@@ -1235,9 +1258,16 @@ export const channelHandlers: Record<string, Handler> = {
   'relationships:update'(db, data) {
     const existing = db.relationships[data.id]
     if (!existing) throw new Error('Relationship not found')
+    if (data.type !== undefined) {
+      if (!relTypeByKey(db, existing.project_id, data.type)) {
+        throw new Error(`Unknown relationship type: ${data.type}`)
+      }
+      existing.type = data.type
+    }
     if (data.status !== undefined) existing.status = data.status
     if (data.formed !== undefined) existing.formed = data.formed
-    if (data.type !== undefined) existing.type = data.type
+    if (data.ended !== undefined) existing.ended = data.ended
+    if (data.label !== undefined) existing.label = data.label
     if (data.person_a_id !== undefined) existing.person_a_id = data.person_a_id
     if (data.person_b_id !== undefined) existing.person_b_id = data.person_b_id
     return existing
@@ -1246,6 +1276,81 @@ export const channelHandlers: Record<string, Handler> = {
   'relationships:delete'(db, data) {
     delete db.relationships[data.id]
     return { id: data.id }
+  },
+
+  // ── relationship types (the registry — src/shared/relTypes.ts) ─────────────
+  'relTypes:getAll'(db) {
+    return relTypesForProject(db, db.activeProjectId as string)
+  },
+
+  'relTypes:create'(db, data, env) {
+    const pid = db.activeProjectId as string
+    const id = env.uuid()
+    const now = env.nowStr()
+    const defs = relTypesForProject(db, pid)
+    const def: RelationshipTypeDef = {
+      id,
+      project_id: pid,
+      key: id, // custom defs: the id doubles as the type slug
+      label: String(data?.label ?? '').trim() || 'New type',
+      weight: clampWeight(data?.weight ?? 0),
+      directed: !!data?.directed,
+      symmetryRole: coerceSymmetryRole(data?.symmetryRole),
+      role_a: String(data?.role_a ?? ''),
+      role_b: String(data?.role_b ?? ''),
+      color: String(data?.color || '#8a93a6'),
+      glyph: String(data?.glyph || '◆'),
+      band: 'custom',
+      builtin: false,
+      statuses:
+        Array.isArray(data?.statuses) && data.statuses.length
+          ? data.statuses.map(String)
+          : ['active', 'ended'],
+      order: defs.length ? Math.max(...defs.map((d) => d.order)) + 1 : 0,
+      created_at: now,
+      updated_at: now
+    }
+    db.rel_type_defs[id] = def
+    return def
+  },
+
+  'relTypes:update'(db, data, env) {
+    const def = db.rel_type_defs[data.id]
+    if (!def) throw new Error('Relationship type not found')
+    if (data.label !== undefined) def.label = String(data.label).trim() || def.label
+    if (data.weight !== undefined) def.weight = clampWeight(data.weight)
+    if (data.color !== undefined) def.color = String(data.color)
+    if (data.glyph !== undefined) def.glyph = String(data.glyph)
+    if (Array.isArray(data.statuses) && data.statuses.length) {
+      def.statuses = data.statuses.map(String)
+    }
+    // Direction and hierarchy role define what existing edges MEAN — only
+    // custom defs may change them (a builtin flip would corrupt the tree math).
+    if (!def.builtin) {
+      if (data.directed !== undefined) def.directed = !!data.directed
+      if (data.symmetryRole !== undefined) def.symmetryRole = coerceSymmetryRole(data.symmetryRole)
+      if (data.role_a !== undefined) def.role_a = String(data.role_a)
+      if (data.role_b !== undefined) def.role_b = String(data.role_b)
+    }
+    def.updated_at = env.nowStr()
+    return def
+  },
+
+  // Deleting a custom type removes its relationships with it (like a tag
+  // delete cascades its joins). Built-ins can be tuned but never deleted.
+  'relTypes:delete'(db, data) {
+    const def = db.rel_type_defs[data.id]
+    if (!def) throw new Error('Relationship type not found')
+    if (def.builtin) throw new Error('Built-in relationship types cannot be deleted')
+    const removed: string[] = []
+    for (const [rid, r] of Object.entries(db.relationships)) {
+      if (r.project_id === def.project_id && r.type === def.key) {
+        delete db.relationships[rid]
+        removed.push(rid)
+      }
+    }
+    delete db.rel_type_defs[data.id]
+    return { id: data.id, removedRelationships: removed }
   },
 
   // ── tags ───────────────────────────────────────────────────────────────────
@@ -1720,6 +1825,9 @@ export const WRITE_CHANNELS = new Set([
   'relationships:create',
   'relationships:update',
   'relationships:delete',
+  'relTypes:create',
+  'relTypes:update',
+  'relTypes:delete',
   'tags:create',
   'tags:update',
   'tags:delete',

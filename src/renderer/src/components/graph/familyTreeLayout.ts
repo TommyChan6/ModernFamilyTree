@@ -16,7 +16,7 @@
 // Everything is deterministic (stable sorts, id tie-breaks) and O(sweeps · (N + E)
 // + N log N per row sort), so a few thousand people stay well under a frame.
 
-import type { DateValue } from '../../../../shared/types'
+import type { DateValue, SymmetryRole } from '../../../../shared/types'
 import { toOrdinal } from '../../../../shared/calendarMath'
 
 export const NODE_GAP = 90 // min horizontal gap between neighbouring blocks
@@ -38,6 +38,18 @@ export interface LayoutRelationship {
   person_a_id: string
   person_b_id: string
 }
+
+/** rel.type → how the hierarchy treats it (a RelationshipTypeDef's
+ *  symmetryRole). Optional everywhere: without it, the legacy trio behaves as
+ *  it always did and any other type is ignored by the tree math. */
+export type TypeRoles = ReadonlyMap<string, SymmetryRole>
+
+const legacyRoleOf = (type: string): SymmetryRole =>
+  type === 'parent_child' || type === 'adopted'
+    ? 'vertical'
+    : type === 'spouse'
+      ? 'horizontal'
+      : 'none'
 
 export interface GenLayoutResult {
   targets: Record<string, { x: number; y: number }>
@@ -67,12 +79,16 @@ export function computeGenLayout(
   nodesData: readonly LayoutPerson[],
   relationships: readonly LayoutRelationship[],
   width: number,
-  height: number
+  height: number,
+  typeRoles?: TypeRoles
 ): GenLayoutResult {
   const byId = new Map<string, LayoutPerson>()
   for (const p of nodesData) byId.set(p.id, p)
 
   // ── Adjacency (edges to unknown ids are ignored) ──────────────────────────
+  // Which edges are hierarchy edges comes from the type registry's
+  // symmetryRole: 'vertical' = parent(a)→child(b), 'horizontal' = couple,
+  // 'none' = social overlay the tree math never sees.
   const parentsOf = new Map<string, string[]>()
   const childrenOf = new Map<string, string[]>()
   const spousesOf = new Map<string, string[]>()
@@ -80,10 +96,11 @@ export function computeGenLayout(
     const a = r.person_a_id
     const b = r.person_b_id
     if (a === b || !byId.has(a) || !byId.has(b)) continue
-    if (r.type === 'parent_child' || r.type === 'adopted') {
+    const role = typeRoles?.get(r.type) ?? legacyRoleOf(r.type)
+    if (role === 'vertical') {
       pushUnique(parentsOf, b, a)
       pushUnique(childrenOf, a, b)
-    } else if (r.type === 'spouse') {
+    } else if (role === 'horizontal') {
       pushUnique(spousesOf, a, b)
       pushUnique(spousesOf, b, a)
     }
@@ -409,9 +426,10 @@ export function computeGenLayout(
 // Left→right reading order of the layout — the Timeline uses this for lane order.
 export function computeTreeOrder(
   persons: readonly LayoutPerson[],
-  relationships: readonly LayoutRelationship[]
+  relationships: readonly LayoutRelationship[],
+  typeRoles?: TypeRoles
 ): string[] {
-  const { targets } = computeGenLayout(persons, relationships, 2000, 1000)
+  const { targets } = computeGenLayout(persons, relationships, 2000, 1000, typeRoles)
   return [...persons]
     .sort((a, b) => {
       const ta = targets[a.id]

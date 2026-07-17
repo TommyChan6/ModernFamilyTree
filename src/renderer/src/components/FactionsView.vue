@@ -20,6 +20,13 @@
           ✨ Arrange
         </button>
         <button class="btn btn-primary btn-sm" @click="handleCreateFaction">＋ New Group</button>
+        <CanvasToggles
+          show-focus
+          :focus="focusOpen"
+          :legend="legendOpen"
+          @update:focus="focusOpen = $event"
+          @update:legend="legendOpen = $event"
+        />
       </div>
     </div>
 
@@ -62,10 +69,21 @@
       </div>
 
       <!-- Minimap (top-left) -->
-      <MiniMap v-if="visibleFactions.length" ref="minimapRef" :adapter="minimapAdapter" />
+      <MiniMap
+        v-if="visibleFactions.length"
+        ref="minimapRef"
+        :class="{ 'fx-cv-hide': store.cleanView }"
+        :adapter="minimapAdapter"
+      />
 
       <!-- Zoom controls -->
-      <div v-if="activeFactions.length" class="fx-controls" @pointerdown.stop @click.stop>
+      <div
+        v-if="activeFactions.length"
+        class="fx-controls"
+        :class="{ 'fx-cv-hide': store.cleanView }"
+        @pointerdown.stop
+        @click.stop
+      >
         <button class="fx-ctrl-btn" title="Zoom in" @click="zoomBy(1.3333)">＋</button>
         <button class="fx-ctrl-btn" title="Zoom out" @click="zoomBy(0.75)">－</button>
         <div class="fx-ctrl-sep"></div>
@@ -74,38 +92,87 @@
         <span class="fx-zoom-label">{{ Math.round(k * 100) }}%</span>
       </div>
 
-      <!-- Faction manager panel -->
+      <!-- Right-docked overlay panes: Focus + Groups (shared toggle cluster) -->
       <div
         v-if="activeFactions.length"
-        class="fx-manager"
-        @pointerdown.stop
-        @wheel.stop
-        @click.stop
+        class="canvas-pane-stack fx-pane-stack"
+        :class="{ 'clean-hidden': store.cleanView }"
       >
-        <div class="fx-panel-title">Groups</div>
-        <div
-          v-for="f in activeFactions"
-          :key="f.id"
-          class="fx-mrow"
-          :class="{ off: f.visible === false }"
-          @mouseenter="hoverFactionId = f.visible === false ? null : f.id"
-          @mouseleave="hoverFactionId = null"
-        >
-          <span class="fx-mdot" :style="{ background: f.color }"></span>
-          <span class="fx-mname" :title="f.name">{{ f.name }}</span>
-          <span class="fx-mcount">{{ (f.member_ids || []).length }}</span>
-          <button
-            class="fx-mbtn"
-            :title="f.visible === false ? 'Show group' : 'Hide group'"
-            @click="toggleVisible(f)"
+        <Transition name="pane">
+          <div
+            v-if="focusOpen"
+            class="canvas-pane fx-focus-pane"
+            @pointerdown.stop
+            @wheel.stop
+            @click.stop
           >
-            {{ f.visible === false ? '◌' : '👁' }}
-          </button>
-          <button class="fx-mbtn" title="Edit group" @click="openFactionEdit(f.id, $event)">
-            ✎
-          </button>
-        </div>
-        <div v-if="sharedCount" class="fx-mfoot">{{ sharedCount }} in multiple groups</div>
+            <div class="fx-panel-title">Focus</div>
+            <div class="fx-focus-row">
+              <span class="fx-focus-label">Gender</span>
+              <div class="fx-focus-chips">
+                <button
+                  v-for="o in genderFocusOpts"
+                  :key="o.id"
+                  class="fx-focus-chip"
+                  :class="{ on: focusGender === o.id }"
+                  @click="focusGender = o.id"
+                >
+                  {{ o.label }}
+                </button>
+              </div>
+            </div>
+            <div class="fx-focus-row" :class="{ 'fx-focus-off': !store.currentDate }">
+              <span class="fx-focus-label">Life</span>
+              <div class="fx-focus-chips">
+                <button
+                  v-for="o in lifeFocusOpts"
+                  :key="o.id"
+                  class="fx-focus-chip"
+                  :class="{ on: focusLife === o.id }"
+                  :disabled="o.id !== 'all' && !store.currentDate"
+                  @click="focusLife = o.id"
+                >
+                  {{ o.label }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Transition>
+
+        <Transition name="pane">
+          <div
+            v-if="legendOpen"
+            class="canvas-pane fx-manager"
+            @pointerdown.stop
+            @wheel.stop
+            @click.stop
+          >
+            <div class="fx-panel-title">Groups</div>
+            <div
+              v-for="f in activeFactions"
+              :key="f.id"
+              class="fx-mrow"
+              :class="{ off: f.visible === false }"
+              @mouseenter="hoverFactionId = f.visible === false ? null : f.id"
+              @mouseleave="hoverFactionId = null"
+            >
+              <span class="fx-mdot" :style="{ background: f.color }"></span>
+              <span class="fx-mname" :title="f.name">{{ f.name }}</span>
+              <span class="fx-mcount">{{ (f.member_ids || []).length }}</span>
+              <button
+                class="fx-mbtn"
+                :title="f.visible === false ? 'Show group' : 'Hide group'"
+                @click="toggleVisible(f)"
+              >
+                {{ f.visible === false ? '◌' : '👁' }}
+              </button>
+              <button class="fx-mbtn" title="Edit group" @click="openFactionEdit(f.id, $event)">
+                ✎
+              </button>
+            </div>
+            <div v-if="sharedCount" class="fx-mfoot">{{ sharedCount }} in multiple groups</div>
+          </div>
+        </Transition>
       </div>
 
       <!-- Unassigned tray -->
@@ -277,6 +344,7 @@ import { FactionsRenderer } from './factions/webgl/FactionsRenderer.js'
 import { withAlpha } from './webgl/overlayUtils.js'
 import SceneTabs from './SceneTabs.vue'
 import MiniMap from './MiniMap.vue'
+import CanvasToggles from './CanvasToggles.vue'
 
 const store = useMainStore()
 
@@ -660,6 +728,44 @@ function personDimmed(id, factionIds) {
   }
   if (hoverFactionId.value) {
     return !factionIds.includes(hoverFactionId.value)
+  }
+  if (focusActive.value) return focusDimmed(id)
+  return false
+}
+
+// ── Focus pane (shared header toggle cluster): dim non-matching people ──────
+const focusOpen = ref(false)
+const legendOpen = ref(true)
+const focusGender = ref('all') // 'all' | 'male' | 'female' | 'unknown'
+const focusLife = ref('all') // 'all' | 'living' | 'deceased'
+const genderFocusOpts = [
+  { id: 'all', label: 'All' },
+  { id: 'male', label: '♂' },
+  { id: 'female', label: '♀' },
+  { id: 'unknown', label: '?' }
+]
+const lifeFocusOpts = [
+  { id: 'all', label: 'All' },
+  { id: 'living', label: 'Living' },
+  { id: 'deceased', label: 'Remembered' }
+]
+const focusActive = computed(() => focusGender.value !== 'all' || focusLife.value !== 'all')
+const focusPersonById = computed(() => {
+  const m = new Map()
+  store.persons.forEach((p) => m.set(p.id, p))
+  return m
+})
+function focusDimmed(id) {
+  const p = focusPersonById.value.get(id)
+  if (!p) return false
+  if (focusGender.value !== 'all') {
+    const g = p.gender === 'male' || p.gender === 'female' ? p.gender : 'unknown'
+    if (g !== focusGender.value) return true
+  }
+  if (focusLife.value !== 'all') {
+    const dead = !!(p.death?.year && store.currentDate && p.death.year <= store.currentDate.year)
+    if (focusLife.value === 'deceased' && !dead) return true
+    if (focusLife.value === 'living' && dead) return true
   }
   return false
 }
@@ -1417,8 +1523,18 @@ onMounted(() => {
 })
 
 // Appearance-only state → re-sync style targets (the renderer tweens toward them).
-watch([hoverPersonId, hoverFactionId, hoverPillId, dropTargetId, dragNode, ghost], () =>
-  renderer?.markStylesDirty()
+watch(
+  [
+    hoverPersonId,
+    hoverFactionId,
+    hoverPillId,
+    dropTargetId,
+    dragNode,
+    ghost,
+    focusGender,
+    focusLife
+  ],
+  () => renderer?.markStylesDirty()
 )
 // Meta changes (memberships, colours, renames) also change arc counts → full rebuild.
 watch(nodeMeta, () => {
@@ -1592,27 +1708,83 @@ onBeforeUnmount(() => {
   margin: 3px 2px;
 }
 
-/* ── Manager panel ───────────────────────────────────────── */
+/* Clean view fades the floating overlays away (the header cluster stays). */
+.fx-cv-hide {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.fx-pane-stack {
+  cursor: default;
+}
+
+/* ── Manager panel (now inside .canvas-pane-stack — chrome from global) ───── */
 .fx-manager {
-  position: absolute;
-  top: 14px;
-  right: 16px;
-  z-index: 5;
-  background: var(--glass-soft);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-  border-radius: 12px;
   padding: 12px 12px 10px;
-  box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 190px;
   max-width: 250px;
-  max-height: 45%;
+  max-height: 46vh;
   overflow-y: auto;
-  cursor: default;
+}
+
+/* ── Focus pane ──────────────────────────────────────────── */
+.fx-focus-pane {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 210px;
+}
+.fx-focus-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fx-focus-row.fx-focus-off {
+  opacity: 0.55;
+}
+.fx-focus-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t2);
+  min-width: 46px;
+}
+.fx-focus-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.fx-focus-chip {
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease,
+    transform 0.16s cubic-bezier(0.34, 1.5, 0.5, 1);
+}
+.fx-focus-chip:hover:not(:disabled) {
+  color: var(--t1);
+  transform: translateY(-1px);
+}
+.fx-focus-chip.on {
+  background: var(--adim);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  color: var(--accent);
+}
+.fx-focus-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .fx-panel-title {
   font-size: 10px;

@@ -79,13 +79,23 @@ export function isMaternal(d, persons) {
   return parent && parent.gender === 'female'
 }
 
-export function getLinkStroke(d, emph, gs, persons) {
+/** Statuses that mean "this relationship is over" — the edge renders faded
+ *  and short-dashed whatever its type. */
+export const ENDED_STATUSES = new Set(['divorced', 'ended', 'estranged', 'resolved'])
+
+// Every helper takes the edge's RelationshipTypeDef as an optional trailing
+// param (callers look it up via store.relTypeByKey). Without one — old call
+// sites, tests — the legacy trio behaves exactly as before.
+
+export function getLinkStroke(d, emph, gs, persons, def) {
   if (emph === 'paternal' && isPaternal(d, persons))
     return d.type === 'adopted' ? '#7bb8f0' : '#4a90d9'
   if (emph === 'maternal' && isMaternal(d, persons))
     return d.type === 'adopted' ? '#eda0c4' : '#d94a8a'
   if (d.type === 'spouse') return gs.spouseColor
   if (d.type === 'adopted') return gs.adoptedColor
+  // Registry types carry their own swatch ('' = legacy trio → Style panel).
+  if (def?.color) return def.color
   return gs.parentChildColor
 }
 
@@ -102,14 +112,14 @@ export function getLinkWidth(d, emph, gs, persons) {
 }
 
 export function getLinkEmphOpacity(d, emph, gs, persons) {
-  const base = d.status === 'divorced' ? gs.linkOpacity * 0.5 : gs.linkOpacity
+  const base = ENDED_STATUSES.has(d.status) ? gs.linkOpacity * 0.5 : gs.linkOpacity
   if (emph === 'neutral') return base
   if (emph === 'paternal' && isPaternal(d, persons)) return Math.min(1, base * 1.3)
   if (emph === 'maternal' && isMaternal(d, persons)) return Math.min(1, base * 1.3)
   return base
 }
 
-export function getLinkMarker(d, emph, persons) {
+export function getLinkMarker(d, emph, persons, def) {
   if (d.type === 'parent_child' || d.type === 'adopted') {
     if (emph === 'paternal' && isPaternal(d, persons))
       return d.type === 'adopted' ? 'url(#arr-pat-ad)' : 'url(#arr-pat)'
@@ -117,12 +127,19 @@ export function getLinkMarker(d, emph, persons) {
       return d.type === 'adopted' ? 'url(#arr-mat-ad)' : 'url(#arr-mat)'
     return d.type === 'adopted' ? 'url(#arr-a)' : 'url(#arr)'
   }
+  // Any other directed registry type (likes, mentor, subordinate, custom…)
+  // gets the plain arrowhead; callers color it from the def.
+  if (def?.directed) return 'url(#arr)'
   return null
 }
 
-export function getDashArray(d) {
-  if (d.status === 'divorced') return '3,3'
+export function getDashArray(d, def) {
+  if (ENDED_STATUSES.has(d.status)) return '3,3'
   if (d.type === 'spouse') return '6,4'
   if (d.type === 'adopted') return '4,3'
+  // Affinity-side registry types read as overlays: soft dash under weight 0.5,
+  // sparse dots for repulsion edges (rivals).
+  if (def && def.weight < 0) return '2,5'
+  if (def && def.weight < 0.5) return '5,4'
   return null
 }

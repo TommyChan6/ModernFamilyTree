@@ -13,9 +13,18 @@
         >
       </div>
 
-      <span class="tl-hint"
-        >Drag to pan · Scroll to zoom · Ctrl: time only · Shift: width only</span
-      >
+      <div class="tl-actions">
+        <span class="tl-hint"
+          >Drag to pan · Scroll to zoom · Ctrl: time only · Shift: width only</span
+        >
+        <CanvasToggles
+          show-focus
+          :focus="focusOpen"
+          :legend="legendOpen"
+          @update:focus="focusOpen = $event"
+          @update:legend="legendOpen = $event"
+        />
+      </div>
     </div>
 
     <!-- Stage: three stacked canvases (grid · WebGL world · gutter/labels) -->
@@ -53,6 +62,7 @@
         v-if="placedCount"
         ref="minimapRef"
         class="tl-minimap"
+        :class="{ 'tl-cv-hide': store.cleanView }"
         :adapter="minimapAdapter"
         :width="158"
         :height="180"
@@ -60,14 +70,27 @@
       />
 
       <!-- Floating search (matches the tree view) -->
-      <div v-if="placedCount" class="tl-search" @pointerdown.stop @click.stop @wheel.stop>
+      <div
+        v-if="placedCount"
+        class="tl-search"
+        :class="{ 'tl-cv-hide': store.cleanView }"
+        @pointerdown.stop
+        @click.stop
+        @wheel.stop
+      >
         <span class="tl-search-icon">🔍</span>
         <input v-model="searchQuery" placeholder="Search family members…" />
         <button v-if="searchQuery" class="tl-search-clear" @click="searchQuery = ''">✕</button>
       </div>
 
       <!-- Zoom controls (matches the tree view's control bar) -->
-      <div v-if="placedCount" class="tl-controls" @pointerdown.stop @click.stop>
+      <div
+        v-if="placedCount"
+        class="tl-controls"
+        :class="{ 'tl-cv-hide': store.cleanView }"
+        @pointerdown.stop
+        @click.stop
+      >
         <button class="tl-ctrl-btn" title="Zoom in" @click="zoomBy(1.3333)">＋</button>
         <button class="tl-ctrl-btn" title="Zoom out" @click="zoomBy(0.75)">－</button>
         <div class="tl-ctrl-sep"></div>
@@ -84,38 +107,91 @@
         <span class="tl-zoom-label">{{ zoomLabel }}</span>
       </div>
 
-      <!-- Legend panel (matches the tree view) -->
-      <div v-if="placedCount" class="tl-legend-panel" @pointerdown.stop @wheel.stop>
-        <div class="tl-panel-title">Legend</div>
-        <div class="tl-leg-section">
-          <div class="tl-leg-label">People</div>
-          <div class="tl-leg-row">
-            <span class="tl-leg-dot" :style="{ background: colors.male }"></span>Male
+      <!-- Right-docked overlay panes: Focus + Legend (shared toggle cluster) -->
+      <div
+        v-if="placedCount"
+        class="canvas-pane-stack tl-pane-stack"
+        :class="{ 'clean-hidden': store.cleanView }"
+      >
+        <Transition name="pane">
+          <div
+            v-if="focusOpen"
+            class="canvas-pane tl-focus-pane"
+            @pointerdown.stop
+            @wheel.stop
+            @click.stop
+          >
+            <div class="tl-panel-title">Focus</div>
+            <div class="tl-focus-row">
+              <span class="tl-focus-label">Gender</span>
+              <div class="tl-focus-chips">
+                <button
+                  v-for="o in genderFocusOpts"
+                  :key="o.id"
+                  class="tl-focus-chip"
+                  :class="{ on: focusGender === o.id }"
+                  @click="focusGender = o.id"
+                >
+                  {{ o.label }}
+                </button>
+              </div>
+            </div>
+            <div class="tl-focus-row" :class="{ 'tl-focus-off': !store.currentDate }">
+              <span class="tl-focus-label">Life</span>
+              <div class="tl-focus-chips">
+                <button
+                  v-for="o in lifeFocusOpts"
+                  :key="o.id"
+                  class="tl-focus-chip"
+                  :class="{ on: focusLife === o.id }"
+                  :disabled="o.id !== 'all' && !store.currentDate"
+                  :title="o.id !== 'all' && !store.currentDate ? 'Set the current year first' : ''"
+                  @click="focusLife = o.id"
+                >
+                  {{ o.label }}
+                </button>
+              </div>
+            </div>
           </div>
-          <div class="tl-leg-row">
-            <span class="tl-leg-dot" :style="{ background: colors.female }"></span>Female
+        </Transition>
+
+        <Transition name="pane">
+          <div v-if="legendOpen" class="canvas-pane tl-legend-panel" @pointerdown.stop @wheel.stop>
+            <div class="tl-panel-title">Legend</div>
+            <div class="tl-leg-section">
+              <div class="tl-leg-label">People</div>
+              <div class="tl-leg-row">
+                <span class="tl-leg-dot" :style="{ background: colors.male }"></span>Male
+              </div>
+              <div class="tl-leg-row">
+                <span class="tl-leg-dot" :style="{ background: colors.female }"></span>Female
+              </div>
+            </div>
+            <div class="tl-leg-section">
+              <div class="tl-leg-label">Lines</div>
+              <div class="tl-leg-row">
+                <span class="tl-leg-line" :style="{ background: colors.spouse }"></span>Marriage
+              </div>
+              <div class="tl-leg-row">
+                <span
+                  class="tl-leg-line tl-leg-dashed"
+                  :style="{ borderColor: colors.spouse }"
+                ></span
+                >Divorced
+              </div>
+              <div class="tl-leg-row">
+                <span class="tl-leg-line" :style="{ background: colors.parentChild }"></span>Birth
+              </div>
+              <div class="tl-leg-row">
+                <span
+                  class="tl-leg-line tl-leg-dashed"
+                  :style="{ borderColor: colors.parentChild }"
+                ></span
+                >Adopted
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="tl-leg-section">
-          <div class="tl-leg-label">Lines</div>
-          <div class="tl-leg-row">
-            <span class="tl-leg-line" :style="{ background: colors.spouse }"></span>Marriage
-          </div>
-          <div class="tl-leg-row">
-            <span class="tl-leg-line tl-leg-dashed" :style="{ borderColor: colors.spouse }"></span
-            >Divorced
-          </div>
-          <div class="tl-leg-row">
-            <span class="tl-leg-line" :style="{ background: colors.parentChild }"></span>Birth
-          </div>
-          <div class="tl-leg-row">
-            <span
-              class="tl-leg-line tl-leg-dashed"
-              :style="{ borderColor: colors.parentChild }"
-            ></span
-            >Adopted
-          </div>
-        </div>
+        </Transition>
       </div>
 
       <!-- Marriage year edit popup -->
@@ -189,6 +265,7 @@ import { useTimeTravel } from './time/useTimeTravel'
 import { withAlpha } from './webgl/overlayUtils.js'
 import SceneTabs from './SceneTabs.vue'
 import MiniMap from './MiniMap.vue'
+import CanvasToggles from './CanvasToggles.vue'
 
 const store = useMainStore()
 const tt = useTimeTravel()
@@ -269,14 +346,55 @@ const searchSet = computed(() => {
   return s
 })
 
+// ── Overlay panes (shared header toggle cluster) ────────────────────────────
+const focusOpen = ref(false)
+const legendOpen = ref(true)
+// Focus emphasis: dim the people who don't match. Applied through the same
+// dimming path the renderer already tweens (no renderer changes needed).
+const focusGender = ref('all') // 'all' | 'male' | 'female' | 'unknown'
+const focusLife = ref('all') // 'all' | 'living' | 'deceased'
+const genderFocusOpts = [
+  { id: 'all', label: 'All' },
+  { id: 'male', label: '♂' },
+  { id: 'female', label: '♀' },
+  { id: 'unknown', label: '?' }
+]
+const lifeFocusOpts = [
+  { id: 'all', label: 'All' },
+  { id: 'living', label: 'Living' },
+  { id: 'deceased', label: 'Remembered' }
+]
+const focusActive = computed(() => focusGender.value !== 'all' || focusLife.value !== 'all')
+const personById = computed(() => {
+  const m = new Map()
+  store.persons.forEach((p) => m.set(p.id, p))
+  return m
+})
+function focusDimmed(id) {
+  const p = personById.value.get(id)
+  if (!p) return false
+  if (focusGender.value !== 'all') {
+    const g = p.gender === 'male' || p.gender === 'female' ? p.gender : 'unknown'
+    if (g !== focusGender.value) return true
+  }
+  if (focusLife.value !== 'all') {
+    const dead = !!(p.death?.year && store.currentDate && p.death.year <= store.currentDate.year)
+    if (focusLife.value === 'deceased' && !dead) return true
+    if (focusLife.value === 'living' && dead) return true
+  }
+  return false
+}
+
 function isDimmed(id) {
   if (hoverId.value) return !relatedSet.value.has(id)
   if (searchOn.value) return !searchSet.value.has(id)
+  if (focusActive.value) return focusDimmed(id)
   return false
 }
 function connDimmed(ids) {
   if (hoverId.value) return !ids.includes(hoverId.value)
   if (searchOn.value) return !ids.some((id) => searchSet.value.has(id))
+  if (focusActive.value) return ids.every((id) => focusDimmed(id))
   return false
 }
 
@@ -318,7 +436,7 @@ watch(
   () => store.persons,
   () => {
     if (store.persons.length && !laneOrder.value)
-      laneOrder.value = computeLaneOrder(store.persons, store.relationships)
+      laneOrder.value = computeLaneOrder(store.persons, store.relationships, store.relTypeRoles)
   },
   { immediate: true, deep: true }
 )
@@ -326,7 +444,7 @@ watch(
 const refreshSpinning = ref(false)
 let refreshSpinTimer = 0
 function refreshLayout() {
-  laneOrder.value = computeLaneOrder(store.persons, store.relationships)
+  laneOrder.value = computeLaneOrder(store.persons, store.relationships, store.relTypeRoles)
   refreshSpinning.value = true
   if (refreshSpinTimer) clearTimeout(refreshSpinTimer)
   refreshSpinTimer = setTimeout(() => {
@@ -797,7 +915,9 @@ watch(layout, (L) => {
     syncCamera()
   })
 })
-watch([hoverId, searchSet, () => store.selectedPersonId, colors], () => renderer?.markStylesDirty())
+watch([hoverId, searchSet, () => store.selectedPersonId, colors, focusGender, focusLife], () =>
+  renderer?.markStylesDirty()
+)
 // Time travel: re-sync per scrub/playback step while on screen; switching back
 // in re-syncs too (the view stays mounted, hidden, and time may have moved).
 watch([() => tt.year.value, () => tt.startYear.value, () => props.active], ([, , on]) => {
@@ -875,10 +995,23 @@ onBeforeUnmount(() => {
   cursor: help;
 }
 
+.tl-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 .tl-hint {
   font-size: 11px;
   color: var(--t3);
   font-weight: 500;
+}
+
+/* Clean view fades the floating overlays away (the header cluster stays so it
+   can be toggled back). */
+.tl-cv-hide {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
 }
 
 /* ── Stage ───────────────────────────────────────────────── */
@@ -1041,26 +1174,74 @@ onBeforeUnmount(() => {
   }
 }
 
-/* ── Legend panel (tree-view style) ──────────────────────── */
+/* Legend/Focus now live in .canvas-pane-stack (glass chrome + spring-in from
+   global.css); these classes only carry inner layout. */
+.tl-pane-stack {
+  cursor: default;
+}
 .tl-legend-panel {
-  position: absolute;
-  bottom: 18px;
-  right: 16px;
-  z-index: 5;
-  background: var(--glass-soft);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-  border-radius: 12px;
   padding: 12px 16px;
   font-size: 11px;
   color: var(--t2);
-  box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-width: 140px;
-  cursor: default;
+  min-width: 150px;
+}
+.tl-focus-pane {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 210px;
+}
+.tl-focus-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tl-focus-row.tl-focus-off {
+  opacity: 0.55;
+}
+.tl-focus-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t2);
+  min-width: 46px;
+}
+.tl-focus-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.tl-focus-chip {
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease,
+    transform 0.16s cubic-bezier(0.34, 1.5, 0.5, 1);
+}
+.tl-focus-chip:hover:not(:disabled) {
+  color: var(--t1);
+  transform: translateY(-1px);
+}
+.tl-focus-chip.on {
+  background: var(--adim);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  color: var(--accent);
+}
+.tl-focus-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .tl-panel-title {
   font-size: 10px;

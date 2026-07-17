@@ -92,20 +92,23 @@
                   <div class="pf-rel-top">
                     <span class="pf-rel-type">{{ rel.roleLabel }}</span>
                     <span class="pf-rel-name">{{ rel.otherName }}</span>
-                    <span v-if="rel.status === 'divorced'" class="pf-rel-divorced">Divorced</span>
+                    <span v-if="rel.status && rel.status !== 'active'" class="pf-rel-divorced">
+                      {{ statusLabel(rel.relType, rel.status) }}
+                    </span>
                     <button class="pf-rel-x" type="button" @click="removeExistingRel(rel.id)">
                       ✕
                     </button>
                   </div>
                   <div class="pf-rel-fields">
-                    <label v-if="rel.relType === 'spouse'" class="pf-rel-field">
+                    <label v-if="statusesOf(rel.relType).length > 1" class="pf-rel-field">
                       <span>Status</span>
                       <select
                         :value="rel.status"
                         @change="updateExistingRelStatus(rel.id, $event.target.value)"
                       >
-                        <option value="active">Married</option>
-                        <option value="divorced">Divorced</option>
+                        <option v-for="s in statusesOf(rel.relType)" :key="s" :value="s">
+                          {{ statusLabel(rel.relType, s) }}
+                        </option>
                       </select>
                     </label>
                     <label class="pf-rel-field">
@@ -128,7 +131,7 @@
                   class="pf-rel-card pf-rel-new"
                 >
                   <div class="pf-rel-top">
-                    <span class="pf-rel-type">{{ relTypeLabel(link.relType) }}</span>
+                    <span class="pf-rel-type">{{ link.roleLabel }}</span>
                     <span class="pf-rel-name">{{ personName(link.personId) }}</span>
                     <span class="pf-rel-pending">new</span>
                     <button class="pf-rel-x" type="button" @click="pendingLinks.splice(idx, 1)">
@@ -136,33 +139,37 @@
                     </button>
                   </div>
                   <div class="pf-rel-fields">
-                    <label v-if="link.relType === 'spouse_of'" class="pf-rel-field">
+                    <label v-if="statusesOf(link.defKey).length > 1" class="pf-rel-field">
                       <span>Status</span>
-                      <select v-model="link.divorced">
-                        <option :value="false">Married</option>
-                        <option :value="true">Divorced</option>
+                      <select v-model="link.status">
+                        <option v-for="s in statusesOf(link.defKey)" :key="s" :value="s">
+                          {{ statusLabel(link.defKey, s) }}
+                        </option>
                       </select>
                     </label>
                     <label class="pf-rel-field">
-                      <span>{{ link.relType === 'spouse_of' ? 'Married' : 'Since' }}</span>
+                      <span>{{ link.defKey === 'spouse' ? 'Married' : 'Since' }}</span>
                       <input v-model.number="link.formedDate" type="number" placeholder="Year" />
                     </label>
                   </div>
                 </div>
               </TransitionGroup>
 
-              <!-- intent buttons -->
-              <div class="pf-intents">
-                <button
-                  v-for="intent in INTENTS"
-                  :key="intent.relType"
-                  type="button"
-                  class="pf-intent"
-                  :class="{ active: pickerFor === intent.relType }"
-                  @click="pickerFor = pickerFor === intent.relType ? null : intent.relType"
-                >
-                  <span class="pf-intent-glyph">{{ intent.glyph }}</span> {{ intent.label }}
-                </button>
+              <!-- intent buttons, grouped by band (Family / Social / Power / Custom) -->
+              <div v-for="band in intentBands" :key="band.id" class="pf-intent-band">
+                <div v-if="intentBands.length > 1" class="pf-band-label">{{ band.label }}</div>
+                <div class="pf-intents">
+                  <button
+                    v-for="intent in band.intents"
+                    :key="intent.id"
+                    type="button"
+                    class="pf-intent"
+                    :class="{ active: pickerFor === intent.id }"
+                    @click="pickerFor = pickerFor === intent.id ? null : intent.id"
+                  >
+                    <span class="pf-intent-glyph">{{ intent.glyph }}</span> {{ intent.label }}
+                  </button>
+                </div>
               </div>
               <Transition name="fl">
                 <PersonPicker
@@ -303,17 +310,59 @@ import TagChipsEditor from './TagChipsEditor.vue'
 
 const store = useMainStore()
 
-const INTENTS = [
-  { relType: 'child_of', label: 'Parent', glyph: '↑', hint: 'Who is a parent of this person?' },
-  { relType: 'parent_of', label: 'Child', glyph: '↓', hint: 'Who is a child of this person?' },
-  { relType: 'spouse_of', label: 'Spouse', glyph: '⚭', hint: 'Who is their spouse?' },
-  {
-    relType: 'adopted_by',
-    label: 'Adoptive parent',
-    glyph: '☂',
-    hint: 'Who adopted this person?'
+// Intent chips are generated from the relationship-type registry. A directed
+// def yields one chip per side — the chip names the person you PICK ("Parent"
+// = pick their parent, "Crush" = pick their crush); a symmetric def yields
+// one. Simple mode only offers the family band.
+const BAND_LABELS = { family: 'Family', social: 'Social', power: 'Power', custom: 'Custom' }
+const intentBands = computed(() => {
+  const defs = store.caps.relTypePicker
+    ? store.relTypes
+    : store.relTypes.filter((d) => d.band === 'family')
+  const bands = []
+  const bandOf = new Map()
+  for (const def of defs) {
+    const intents = []
+    if (def.directed) {
+      const mk = (dir, pickedRole) => ({
+        id: `${def.key}:${dir}`,
+        defKey: def.key,
+        dir, // which side the PICKED person takes: role_a or role_b
+        glyph: def.glyph,
+        label: pickedRole || def.label,
+        hint: `Who is this person's ${(pickedRole || def.label).toLowerCase()}?`
+      })
+      intents.push(mk('a', def.role_a), mk('b', def.role_b))
+    } else {
+      intents.push({
+        id: `${def.key}:sym`,
+        defKey: def.key,
+        dir: 'sym',
+        glyph: def.glyph,
+        label: def.label,
+        hint: `${def.label}: pick the other person`
+      })
+    }
+    const band = BAND_LABELS[def.band] ? def.band : 'custom'
+    if (!bandOf.has(band)) {
+      const entry = { id: band, label: BAND_LABELS[band], intents: [] }
+      bandOf.set(band, entry)
+      bands.push(entry)
+    }
+    bandOf.get(band).intents.push(...intents)
   }
-]
+  return bands
+})
+const allIntents = computed(() => intentBands.value.flatMap((b) => b.intents))
+
+/** Selectable statuses of a type (single-status types render no dropdown). */
+function statusesOf(defKey) {
+  return store.relTypeByKey.get(defKey)?.statuses || ['active']
+}
+function statusLabel(defKey, s) {
+  if (defKey === 'spouse' && s === 'active') return 'Married'
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
+}
 
 const IMAGE_SLOTS = [
   { role: 'portrait', glyph: '☺', label: 'Portrait', hint: 'Head & shoulders — the avatar' },
@@ -608,7 +657,7 @@ function removeFromPerson(fieldId) {
 
 // ── relationships ─────────────────────────────────────────────────────────────
 const pickerPlaceholder = computed(() => {
-  const intent = INTENTS.find((i) => i.relType === pickerFor.value)
+  const intent = allIntents.value.find((i) => i.id === pickerFor.value)
   return intent ? intent.hint : 'Type a name…'
 })
 
@@ -622,25 +671,18 @@ const excludedPersonIds = computed(() => {
 
 let linkKey = 0
 function addLink(person) {
+  const intent = allIntents.value.find((i) => i.id === pickerFor.value)
+  if (!intent) return
   pendingLinks.value.push({
     key: `l${linkKey++}`,
     personId: person.id,
-    relType: pickerFor.value,
-    formedDate: '',
-    divorced: false
+    defKey: intent.defKey,
+    dir: intent.dir,
+    roleLabel: intent.label,
+    status: statusesOf(intent.defKey)[0] || 'active',
+    formedDate: ''
   })
   pickerFor.value = null
-}
-
-function relTypeLabel(relType) {
-  return (
-    {
-      child_of: 'Child of',
-      parent_of: 'Parent of',
-      spouse_of: 'Spouse of',
-      adopted_by: 'Adopted by'
-    }[relType] || relType
-  )
 }
 
 function personName(pid) {
@@ -654,12 +696,16 @@ function buildExistingRels(personId) {
     const otherId = r.person_a_id === personId ? r.person_b_id : r.person_a_id
     const other = store.persons.find((p) => p.id === otherId)
     if (!other) return
-    let roleLabel = ''
-    if (r.type === 'spouse') roleLabel = 'Spouse of'
-    else if (r.type === 'parent_child')
-      roleLabel = r.person_a_id === personId ? 'Parent of' : 'Child of'
-    else if (r.type === 'adopted')
-      roleLabel = r.person_a_id === personId ? 'Adoptive parent of' : 'Adopted by'
+    // This person's role in the pair ("Parent of", "Crush of", "Friend of").
+    const def = store.relTypeByKey.get(r.type)
+    let roleLabel
+    if (r.label)
+      roleLabel = r.label // per-edge custom label wins
+    else if (!def) roleLabel = r.type
+    else if (def.directed) {
+      const mine = r.person_a_id === personId ? def.role_a : def.role_b
+      roleLabel = mine ? `${mine} of` : def.label
+    } else roleLabel = `${def.label} of`
     rels.push({
       id: r.id,
       otherId,
@@ -693,29 +739,15 @@ async function updateExistingRelDate(relId, val) {
 
 async function createPendingLinks(selfId) {
   for (const link of pendingLinks.value) {
-    let person_a_id, person_b_id, type
-    if (link.relType === 'child_of') {
-      person_a_id = link.personId
-      person_b_id = selfId
-      type = 'parent_child'
-    } else if (link.relType === 'parent_of') {
-      person_a_id = selfId
-      person_b_id = link.personId
-      type = 'parent_child'
-    } else if (link.relType === 'spouse_of') {
-      person_a_id = selfId
-      person_b_id = link.personId
-      type = 'spouse'
-    } else {
-      person_a_id = link.personId
-      person_b_id = selfId
-      type = 'adopted'
-    }
+    // dir 'a' = the picked person takes role_a (parent/mentor/admirer…);
+    // 'b'/'sym' = this person does.
+    const person_a_id = link.dir === 'a' ? link.personId : selfId
+    const person_b_id = link.dir === 'a' ? selfId : link.personId
     await store.createRelationship({
       person_a_id,
       person_b_id,
-      type,
-      status: link.divorced ? 'divorced' : 'active',
+      type: link.defKey,
+      status: link.status || 'active',
       formed: yearDate(link.formedDate)
     })
   }
@@ -1264,6 +1296,17 @@ function scrollToSection(id) {
   outline: none;
 }
 
+.pf-intent-band {
+  margin-bottom: 10px;
+}
+.pf-band-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t3);
+  margin-bottom: 5px;
+}
 .pf-intents {
   display: flex;
   gap: 7px;

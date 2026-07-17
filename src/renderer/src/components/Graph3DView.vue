@@ -283,10 +283,11 @@ function nodeVisual(n) {
 function linkVisual(d) {
   const g = gs()
   const persons = store.persons
-  const colorHex = getLinkStroke(d, 'neutral', g, persons)
+  const def = store.relTypeByKey.get(d.type)
+  const colorHex = getLinkStroke(d, 'neutral', g, persons, def)
   const width = getLinkWidth(d, 'neutral', g, persons)
   const opacity = getLinkEmphOpacity(d, 'neutral', g, persons)
-  const dashStr = getDashArray(d)
+  const dashStr = getDashArray(d, def)
   let dashLen = 0,
     dashGap = 0
   if (dashStr) {
@@ -294,14 +295,18 @@ function linkVisual(d) {
     dashLen = p[0]
     dashGap = p[1]
   }
-  const marker = getLinkMarker(d, 'neutral', persons)
+  const marker = getLinkMarker(d, 'neutral', persons, def)
   return {
     colorHex,
     width,
     opacity,
     dashLen,
     dashGap,
-    arrowColor: marker ? (d.type === 'adopted' ? g.adoptedColor : g.parentChildColor) : null,
+    arrowColor: marker
+      ? d.type === 'adopted'
+        ? g.adoptedColor
+        : def?.color || g.parentChildColor
+      : null,
     arrowSize: 9
   }
 }
@@ -315,6 +320,65 @@ function ageOf(p) {
 }
 
 // ── Simulation ───────────────────────────────────────────────────────────────
+// Same structural-weight wiring as the 2D graph: spring strength scales with
+// the type's weight (+1 skeleton … 0 overlay), negatives repel instead.
+function linkWeightOf(d) {
+  return store.relTypeByKey.get(d.type)?.weight ?? 0
+}
+
+/** (Re)apply per-link distance/strength — d3 caches them at initialize time. */
+function applyLinkForceParams() {
+  const link = sim?.force('link')
+  if (!link) return
+  link
+    .distance((d) => {
+      const w = Math.max(0, Math.min(1, linkWeightOf(d)))
+      return gs().linkDistance * (1 + (1 - w) * 0.6)
+    })
+    .strength((d) => 0.35 * Math.max(0, linkWeightOf(d)))
+}
+
+/** Soft pairwise repulsion for negative-weight edges (3D twin of the 2D one). */
+function repelLinksForce() {
+  let links = []
+  const R = 520
+  const force = (alpha) => {
+    for (const l of links) {
+      const w = linkWeightOf(l)
+      if (w >= 0) continue
+      const s = l.source
+      const t = l.target
+      if (typeof s !== 'object' || typeof t !== 'object') continue
+      let dx = t.x - s.x
+      let dy = t.y - s.y
+      let dz = (t.z || 0) - (s.z || 0)
+      let dist = Math.hypot(dx, dy, dz)
+      if (dist < 1) {
+        dx = 1
+        dy = 0
+        dz = 0
+        dist = 1
+      }
+      if (dist >= R) continue
+      const k = -w * alpha * 30 * (1 - dist / R)
+      const fx = (dx / dist) * k
+      const fy = (dy / dist) * k
+      const fz = (dz / dist) * k
+      t.vx += fx
+      t.vy += fy
+      t.vz += fz
+      s.vx -= fx
+      s.vy -= fy
+      s.vz -= fz
+    }
+  }
+  force.links = (l) => {
+    links = l
+    return force
+  }
+  return force
+}
+
 function buildSim() {
   const g = gs()
   sim = forceSimulation([], 3)
@@ -325,6 +389,7 @@ function buildSim() {
         .distance(g.linkDistance)
         .strength(0.35)
     )
+    .force('repelLinks', repelLinksForce())
     .force(
       'charge',
       forceManyBody()
@@ -341,6 +406,7 @@ function buildSim() {
     .on('end', () => {
       if (layeredOn.value) syncLayerDiscs()
     })
+  applyLinkForceParams()
 }
 
 /** Reconcile nodes3d/links3d with the store (keeps live node objects warm). */
@@ -373,6 +439,7 @@ function syncData() {
   if (drag && !next.includes(drag.node)) drag = null
   sim.nodes(nodes3d)
   sim.force('link').links(links3d)
+  sim.force('repelLinks')?.links(links3d)
   renderer?.setData(nodes3d, links3d)
   minimapRef.value?.redraw()
   if (nodes3d.length) sim.alpha(hadNew ? 0.25 : 0.08).restart()
@@ -439,7 +506,12 @@ function cancelLayerTween() {
 
 function syncLayerDiscs() {
   if (!nodes3d.length) return
-  const { layers } = layeredTargets(nodes3d, store.relationships, layerSpacing())
+  const { layers } = layeredTargets(
+    nodes3d,
+    store.relationships,
+    layerSpacing(),
+    store.relTypeRoles
+  )
   let cx = 0,
     cz = 0
   nodes3d.forEach((n) => {
@@ -460,7 +532,7 @@ function syncLayerDiscs() {
 function applyLayers(immediate = false) {
   cancelLayerTween()
   if (!nodes3d.length) return
-  const { yOf } = layeredTargets(nodes3d, store.relationships, layerSpacing())
+  const { yOf } = layeredTargets(nodes3d, store.relationships, layerSpacing(), store.relTypeRoles)
   if (immediate) {
     nodes3d.forEach((n) => {
       n.y = yOf[n.id] ?? 0
@@ -804,10 +876,22 @@ watch(
   () => {
     if (!sim || !renderer) return
     const g = gs()
-    sim.force('link').distance(g.linkDistance)
+    applyLinkForceParams()
     sim.force('charge').strength(g.chargeStrength * 1.05)
     sim.force('collide').radius(g.nodeRadius + 24)
     if (nodes3d.length) sim.alpha(0.15).restart()
+    renderer.markAllDirty()
+    renderer.requestRedraw()
+  },
+  { deep: true }
+)
+// Registry tuning (a type's weight/color) re-parameterizes the springs.
+watch(
+  () => store.relTypes,
+  () => {
+    if (!sim || !renderer) return
+    applyLinkForceParams()
+    if (nodes3d.length) sim.alpha(0.2).restart()
     renderer.markAllDirty()
     renderer.requestRedraw()
   },

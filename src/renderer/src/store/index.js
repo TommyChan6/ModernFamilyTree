@@ -23,6 +23,7 @@ export const useMainStore = defineStore('main', () => {
   const fieldDefs = ref([]) // trait definitions (FieldDef[]), ordered by `order`
   const fieldValues = ref([]) // per-person trait values (FieldValue[])
   const relationships = ref([])
+  const relTypes = ref([]) // RelationshipTypeDef[], ordered by `order`
   const tags = ref([])
   const entityTags = ref([]) // the entity↔tag membership join rows
   const scenes = ref([]) // every saved Scene of the project, all views
@@ -139,6 +140,12 @@ export const useMainStore = defineStore('main', () => {
     }
     return m
   })
+  // Relationship-type lookup: relTypeByKey.get(rel.type) → RelationshipTypeDef.
+  // Layout/render code reads def.weight and def.symmetryRole through this —
+  // never type literals.
+  const relTypeByKey = computed(() => new Map(relTypes.value.map((d) => [d.key, d])))
+  // rel.type → symmetryRole, the shape the pure layout modules take.
+  const relTypeRoles = computed(() => new Map(relTypes.value.map((d) => [d.key, d.symmetryRole])))
   // Trait lookups: fieldDefById.get(id) → FieldDef;
   // fieldValuesOf.get(personId) → Map(fieldId → FieldValue)
   const fieldDefById = computed(() => new Map(fieldDefs.value.map((d) => [d.id, d])))
@@ -200,6 +207,12 @@ export const useMainStore = defineStore('main', () => {
       /** 'none' | 'basic' (no physics sliders) | 'full' */
       style: m === 'simple' ? 'none' : m === 'standard' ? 'basic' : 'full',
       tags: m !== 'simple',
+      /** Non-family relationship types in pickers (Simple = family band only). */
+      relTypePicker: m !== 'simple',
+      /** Creating/editing/deleting custom relationship types. */
+      customRelTypes: m !== 'simple',
+      /** Tuning a type's structural↔affinity weight (the physics of it). */
+      tuneAffinity: m === 'advanced',
       /** The Labs toggle itself is an Advanced-mode affordance… */
       labs: m === 'advanced',
       /** Extra Time Travel transport (speed / reverse / event skip / loop);
@@ -483,6 +496,7 @@ export const useMainStore = defineStore('main', () => {
       personsRes,
       fieldsRes,
       relsRes,
+      relTypesRes,
       tagsRes,
       entityTagsRes,
       scenesRes,
@@ -493,6 +507,7 @@ export const useMainStore = defineStore('main', () => {
       api.invoke('persons:getAll'),
       api.invoke('fields:list'),
       api.invoke('relationships:getAll'),
+      api.invoke('relTypes:getAll'),
       api.invoke('tags:getAll'),
       api.invoke('entity_tags:getAll'),
       api.invoke('scenes:getAll'),
@@ -506,6 +521,7 @@ export const useMainStore = defineStore('main', () => {
       fieldValues.value = fieldsRes.data.values
     }
     if (relsRes.success) relationships.value = relsRes.data
+    if (relTypesRes.success) relTypes.value = relTypesRes.data
     if (tagsRes.success) tags.value = tagsRes.data
     if (entityTagsRes.success) entityTags.value = entityTagsRes.data
     if (scenesRes.success) scenes.value = scenesRes.data
@@ -706,6 +722,33 @@ export const useMainStore = defineStore('main', () => {
   async function deleteRelationship(id) {
     const res = await api.invoke('relationships:delete', { id })
     if (res.success) relationships.value = relationships.value.filter((r) => r.id !== id)
+    return res
+  }
+
+  // ── Relationship-type actions (the registry) ───────────────────────────────
+  async function createRelType(data) {
+    const res = await api.invoke('relTypes:create', data)
+    if (res.success) relTypes.value.push(res.data)
+    return res
+  }
+
+  async function updateRelType(patch) {
+    const res = await api.invoke('relTypes:update', patch)
+    if (res.success) {
+      const idx = relTypes.value.findIndex((d) => d.id === patch.id)
+      if (idx !== -1) relTypes.value[idx] = res.data
+    }
+    return res
+  }
+
+  /** Deleting a custom type also removes its relationships (server cascade). */
+  async function deleteRelType(id) {
+    const res = await api.invoke('relTypes:delete', { id })
+    if (res.success) {
+      const removed = new Set(res.data.removedRelationships || [])
+      relTypes.value = relTypes.value.filter((d) => d.id !== id)
+      relationships.value = relationships.value.filter((r) => !removed.has(r.id))
+    }
     return res
   }
 
@@ -1094,6 +1137,9 @@ export const useMainStore = defineStore('main', () => {
     fieldDefById,
     fieldValuesOf,
     relationships,
+    relTypes,
+    relTypeByKey,
+    relTypeRoles,
     tags,
     entityTags,
     scenes,
@@ -1160,6 +1206,9 @@ export const useMainStore = defineStore('main', () => {
     createRelationship,
     updateRelationship,
     deleteRelationship,
+    createRelType,
+    updateRelType,
+    deleteRelType,
     createTag,
     updateTag,
     deleteTag,
