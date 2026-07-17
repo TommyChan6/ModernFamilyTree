@@ -120,8 +120,32 @@
                         @change="updateExistingRelDate(rel.id, $event.target.value)"
                       />
                     </label>
+                    <label v-if="statusesOf(rel.relType).length > 1" class="pf-rel-field">
+                      <span>Ended</span>
+                      <input
+                        type="number"
+                        :value="rel.endedDate"
+                        placeholder="—"
+                        @change="updateExistingRelEnded(rel.id, $event.target.value)"
+                      />
+                    </label>
                   </div>
                 </div>
+              </div>
+
+              <!-- Derived siblings: computed from shared parents, no rows stored -->
+              <div v-if="store.editingPerson && derivedSibNames.length" class="pf-sibs">
+                <span class="pf-sibs-label">Siblings</span>
+                <span
+                  v-for="(s, i) in derivedSibNames"
+                  :key="s.id"
+                  class="pf-sib-chip"
+                  :style="{ '--i': i }"
+                  title="Derived from a shared parent — no separate relationship needed"
+                >
+                  ⇄ {{ s.name }}
+                </span>
+                <span class="pf-sibs-hint">via shared parents</span>
               </div>
 
               <TransitionGroup v-if="pendingLinks.length" name="fl" tag="div" class="pf-rels">
@@ -307,6 +331,7 @@ import FieldRow from './personForm/FieldRow.vue'
 import AddFieldBar from './personForm/AddFieldBar.vue'
 import PersonPicker from './personForm/PersonPicker.vue'
 import TagChipsEditor from './TagChipsEditor.vue'
+import { derivedSiblings } from './graph/graphInsights.js'
 
 const store = useMainStore()
 
@@ -713,11 +738,26 @@ function buildExistingRels(personId) {
       roleLabel,
       relType: r.type,
       status: r.status || 'active',
-      formedDate: r.formed?.year || null
+      formedDate: r.formed?.year || null,
+      endedDate: r.ended?.year || null
     })
   })
   return rels
 }
+
+// Derived siblinghood (shared parents) for the person being edited — shown as
+// read-only chips; explicit sibling rows stay for half/step exceptions.
+const derivedSibNames = computed(() => {
+  const pid = store.editingPerson?.id
+  if (!pid) return []
+  const sibs = derivedSiblings(
+    store.relationships,
+    store.relTypeRoles.size ? (t) => store.relTypeRoles.get(t) || 'none' : undefined
+  )
+  return [...(sibs.get(pid) || [])]
+    .map((id) => ({ id, name: store.persons.find((p) => p.id === id)?.name || 'Unnamed' }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+})
 
 async function removeExistingRel(relId) {
   await store.deleteRelationship(relId)
@@ -735,6 +775,13 @@ async function updateExistingRelDate(relId, val) {
   await store.updateRelationship({ id: relId, formed: yearDate(formedDate) })
   const rel = existingRels.value.find((r) => r.id === relId)
   if (rel) rel.formedDate = formedDate
+}
+
+async function updateExistingRelEnded(relId, val) {
+  const endedDate = val ? +val : null
+  await store.updateRelationship({ id: relId, ended: yearDate(endedDate) })
+  const rel = existingRels.value.find((r) => r.id === relId)
+  if (rel) rel.endedDate = endedDate
 }
 
 async function createPendingLinks(selfId) {
@@ -1294,6 +1341,47 @@ function scrollToSection(id) {
   background: var(--surface);
   color: var(--t1);
   outline: none;
+}
+
+/* Derived siblings: read-only chips that ripple in */
+.pf-sibs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.pf-sibs-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+.pf-sib-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, #58b5bc 40%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, #58b5bc 12%, transparent);
+  color: var(--t1);
+  font-size: 11.5px;
+  font-weight: 600;
+  animation: pf-sib-in 0.4s cubic-bezier(0.3, 1.5, 0.4, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 0.06s);
+}
+@keyframes pf-sib-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+.pf-sibs-hint {
+  font-size: 10px;
+  color: var(--t3);
+  font-style: italic;
 }
 
 .pf-intent-band {

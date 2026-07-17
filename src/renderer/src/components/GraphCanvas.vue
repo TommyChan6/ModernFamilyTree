@@ -167,6 +167,51 @@
           </div>
         </div>
       </Transition>
+
+      <!-- Connection trace: armed hint / the traced chain / no-connection notice -->
+      <Transition name="pathcard">
+        <div v-if="pathAnchor && !pathInfo" key="armed" class="path-card path-armed">
+          <span class="path-armed-beacon"></span>
+          <span class="path-armed-name">{{ personName(pathAnchor) }}</span>
+          <span class="path-armed-hint">shift-click another person to trace the connection</span>
+          <button class="path-close" title="Cancel (Esc)" @click="clearPath">✕</button>
+        </div>
+        <div v-else-if="pathInfo && pathInfo.none" key="none" class="path-card path-none">
+          <span class="path-none-icon">🛰</span>
+          <span>
+            No connection between <b>{{ personName(pathInfo.fromId) }}</b> and
+            <b>{{ personName(pathInfo.toId) }}</b>
+          </span>
+          <button class="path-close" title="Dismiss (Esc)" @click="clearPath">✕</button>
+        </div>
+        <div v-else-if="pathActive" key="path" class="path-card">
+          <div class="path-title">
+            <span class="path-title-icon">🧭</span>
+            Connection
+            <span class="path-count">
+              {{ pathHops.length - 1 }} hop{{ pathHops.length > 2 ? 's' : '' }}
+            </span>
+          </div>
+          <div class="path-chain">
+            <template v-for="(hop, i) in pathHops" :key="hop.id">
+              <div v-if="hop.via" class="path-via" :style="{ '--i': i * 2 - 1 }">
+                <span class="path-via-label">{{ hop.via.glyph }} {{ hop.via.text }}</span>
+                <span class="path-via-line"></span>
+              </div>
+              <button
+                class="path-person"
+                :style="{ '--i': i * 2, '--pc': hop.color }"
+                :title="'View ' + hop.name"
+                @click="store.selectPerson(hop.id)"
+              >
+                <span class="path-person-dot"></span>
+                {{ hop.name }}
+              </button>
+            </template>
+          </div>
+          <button class="path-close" title="Clear (Esc)" @click="clearPath">✕</button>
+        </div>
+      </Transition>
       <!-- Right-docked overlay panes: Focus, Relationships, Legend. They stack and
          spring in from the header toggle cluster; Clean view sweeps them away. -->
       <div class="canvas-pane-stack" :class="{ 'clean-hidden': store.cleanView }">
@@ -254,6 +299,32 @@
                 </button>
               </div>
             </div>
+            <div class="highlight-divider"></div>
+            <!-- Orbit rings: keep N hops around the selected person lit -->
+            <div
+              class="highlight-row"
+              :class="{ 'highlight-disabled': !store.selectedPersonId }"
+              :title="!store.selectedPersonId ? 'Select a person first' : ''"
+            >
+              <div class="highlight-label">Orbit</div>
+              <div class="orbit-opts">
+                <button
+                  v-for="d in [0, 1, 2, 3]"
+                  :key="d"
+                  class="orbit-opt"
+                  :class="{ on: egoDepth === d, rings: d > 0 }"
+                  :disabled="!store.selectedPersonId && d > 0"
+                  :title="d === 0 ? 'Off' : `${d} hop${d > 1 ? 's' : ''} around the selection`"
+                  @click="egoDepth = d"
+                >
+                  <template v-if="d === 0">Off</template>
+                  <template v-else>
+                    <span v-for="r in d" :key="r" class="orbit-ring" :style="{ '--r': r }"></span>
+                    <span class="orbit-num">{{ d }}</span>
+                  </template>
+                </button>
+              </div>
+            </div>
           </div>
         </Transition>
 
@@ -284,9 +355,79 @@
                 </span>
               </button>
             </div>
+            <!-- Romance intel: mutual sparks, longing, triangles & rivalries -->
+            <div v-if="hasRomance" class="rtl-romance">
+              <div class="rtl-romance-title">Romance</div>
+              <div
+                v-for="(m, i) in romance.mutual"
+                :key="'m' + i"
+                class="rtl-rom-row cp-stagger"
+                :style="{ '--i': i }"
+              >
+                <span class="rtl-rom-icon rom-beat">💞</span>
+                <span class="rtl-rom-text">
+                  <b>{{ personName(m.a) }}</b> ⇆ <b>{{ personName(m.b) }}</b>
+                </span>
+              </div>
+              <div
+                v-for="(u, i) in romance.unrequited"
+                :key="'u' + i"
+                class="rtl-rom-row cp-stagger"
+                :style="{ '--i': romance.mutual.length + i }"
+              >
+                <span class="rtl-rom-icon rom-drift">💘</span>
+                <span class="rtl-rom-text">
+                  <b>{{ personName(u.from) }}</b> pines for <b>{{ personName(u.to) }}</b>
+                </span>
+              </div>
+              <div
+                v-for="(t, i) in romance.triangles"
+                :key="'t' + i"
+                class="rtl-rom-row rtl-rom-triangle cp-stagger"
+                :style="{ '--i': romance.mutual.length + romance.unrequited.length + i }"
+              >
+                <span class="rtl-rom-icon rom-spin">🔺</span>
+                <span class="rtl-rom-text">
+                  {{ t.map((id) => personName(id)).join(' → ') }} → …
+                </span>
+              </div>
+              <div
+                v-for="(rv, i) in romance.rivals"
+                :key="'r' + i"
+                class="rtl-rom-row cp-stagger"
+                :style="{
+                  '--i':
+                    romance.mutual.length + romance.unrequited.length + romance.triangles.length + i
+                }"
+              >
+                <span class="rtl-rom-icon rom-clash">⚔</span>
+                <span class="rtl-rom-text">
+                  {{ rv.admirers.map((id) => personName(id)).join(' & ') }} vie for
+                  <b>{{ personName(rv.crush) }}</b>
+                </span>
+              </div>
+            </div>
+
+            <!-- Social gravity: pull friend/crush clusters together (organic layout) -->
+            <div class="rtl-gravity" :title="'Boosts social-edge springs in the Organic layout'">
+              <span class="rtl-gravity-icon" :class="{ pulling: socialPull > 1 }">🪐</span>
+              <span class="rtl-gravity-label">Social gravity</span>
+              <input
+                v-model.number="socialPull"
+                class="rtl-gravity-slider"
+                type="range"
+                min="1"
+                max="4"
+                step="0.5"
+              />
+              <span class="rtl-gravity-val">×{{ socialPull.toFixed(1) }}</span>
+            </div>
+
             <div class="rtl-hint">
               {{
-                soloType ? '✦ Isolating one type — click again to reset' : 'Click a type to isolate'
+                soloType
+                  ? '✦ Isolating one type — click again to reset'
+                  : 'Click a type to isolate · Shift-click two people to trace their connection'
               }}
             </div>
           </div>
@@ -354,6 +495,12 @@ import {
 import { computeAgeYPositions } from './graph/layoutAge.js'
 import { computeGenLayout } from './graph/familyTreeLayout'
 import {
+  shortestPath,
+  egoDistances,
+  mutualLikesKeys,
+  romanceInsights
+} from './graph/graphInsights.js'
+import {
   drawYearGuides,
   drawGenGuides,
   removeGuides,
@@ -389,6 +536,10 @@ const focusOpen = ref(false) // Highlights pane (from the header toggle cluster)
 const legendOpen = ref(true) // Legend pane toggle
 const relTypesOpen = ref(false) // Relationships pane toggle
 const soloType = ref(null) // when set, only this relationship type stays lit
+const pathAnchor = ref(null) // first shift-clicked person (armed, waiting for the second)
+const pathInfo = ref(null) // { ids, rels } | { none, fromId, toId } — the traced connection
+const egoDepth = ref(0) // Orbit rings: 0 = off, 1..3 = hops kept lit around the selection
+const socialPull = ref(1) // Social gravity ×1..×4 — boosts affinity-edge springs (organic)
 
 const modes = [
   { id: 'custom', label: '✋ Free', title: 'Free — nodes stay where you put them' },
@@ -631,6 +782,101 @@ function toggleSolo(key) {
 }
 watch(soloType, () => markLinkStyles())
 
+// ── Connection trace (shift-click two people) ───────────────────────────────
+// First shift-click arms an anchor; the second runs a BFS over EVERY edge type
+// and lights the shortest chain — nodes stay lit, path links become flowing
+// marching-ants, everything else recedes. Esc or ✕ clears.
+const pathIdSet = computed(() => new Set(pathInfo.value?.ids || []))
+const pathRelIdSet = computed(() => new Set((pathInfo.value?.rels || []).map((r) => r.id)))
+const pathActive = computed(() => !!pathInfo.value && !pathInfo.value.none)
+
+function handlePathClick(node) {
+  store.relPopup = null
+  if (!pathAnchor.value || pathInfo.value) {
+    // (Re)arm on this person.
+    pathInfo.value = null
+    pathAnchor.value = node.id
+  } else if (pathAnchor.value === node.id) {
+    pathAnchor.value = null // disarm
+  } else {
+    const res = shortestPath(pathAnchor.value, node.id, store.relationships)
+    pathInfo.value = res || { none: true, fromId: pathAnchor.value, toId: node.id }
+    pathAnchor.value = null
+  }
+}
+
+function clearPath() {
+  pathInfo.value = null
+  pathAnchor.value = null
+}
+
+function personName(id) {
+  return store.persons.find((p) => p.id === id)?.name || 'Unnamed'
+}
+function personColor(id) {
+  const p = store.persons.find((x) => x.id === id)
+  return p ? nodeColor(p.gender, store.graphSettings, p.gender_t) : 'var(--accent)'
+}
+
+/** The traced chain as displayable hops: person chips + the joining role label. */
+const pathHops = computed(() => {
+  const info = pathInfo.value
+  if (!info || info.none) return []
+  return info.ids.map((id, i) => {
+    let via = null
+    if (i > 0) {
+      const r = info.rels[i - 1]
+      const def = store.relTypeByKey.get(r.type)
+      if (r.label) via = { text: r.label, glyph: def?.glyph || '·' }
+      else if (!def) via = { text: r.type, glyph: '·' }
+      else if (def.directed) {
+        // rels[i-1] joins ids[i-1] → ids[i]; name the PREVIOUS person's role.
+        const prevIsA = r.person_a_id === info.ids[i - 1]
+        via = { text: `${prevIsA ? def.role_a : def.role_b} of`, glyph: def.glyph }
+      } else via = { text: def.label, glyph: def.glyph }
+    }
+    return { id, name: personName(id), color: personColor(id), via }
+  })
+})
+
+// Members vanished (person/relationship deleted) → the trace no longer holds.
+watch(
+  () => store.relationships.length + ':' + store.persons.length,
+  () => {
+    if (pathInfo.value || pathAnchor.value) clearPath()
+  }
+)
+watch([pathInfo, pathAnchor], () => {
+  markNodeStyles()
+  markLinkStyles()
+})
+
+// ── Orbit rings (ego view) ──────────────────────────────────────────────────
+// With a person selected, everyone fades by hop distance beyond the chosen
+// ring count. Recomputed only while active.
+const egoMap = computed(() => {
+  if (!egoDepth.value || !store.selectedPersonId) return null
+  return egoDistances(store.selectedPersonId, store.relationships)
+})
+watch([egoDepth, egoMap], () => {
+  markNodeStyles()
+  markLinkStyles()
+})
+
+// ── Romance intel (likes edges) ─────────────────────────────────────────────
+const mutualLikes = computed(() => mutualLikesKeys(store.relationships))
+const romance = computed(() => romanceInsights(store.relationships))
+const hasRomance = computed(() => {
+  const r = romance.value
+  return r.mutual.length + r.unrequited.length + r.triangles.length + r.rivals.length > 0
+})
+
+// Social gravity: re-parameterize the springs live as the slider moves.
+watch(socialPull, () => {
+  applyLinkForceParams()
+  if (currentMode.value === 'auto') ctx.simulation?.alpha(0.4).restart()
+})
+
 function applyGenderHighlight() {
   markNodeStyles()
 }
@@ -749,8 +995,11 @@ const relPopupPersonB = computed(() => {
 const relPopupFormedLabel = computed(() => {
   if (!store.relPopup) return ''
   const r = store.relPopup.rel
-  if (r.formed?.year)
-    return r.type === 'spouse' ? `Married: ${r.formed.year}` : `Since: ${r.formed.year}`
+  if (r.formed?.year) {
+    const from = r.type === 'spouse' ? `Married: ${r.formed.year}` : `Since: ${r.formed.year}`
+    return r.ended?.year ? `${from} — ${r.ended.year}` : from
+  }
+  if (r.ended?.year) return `Ended: ${r.ended.year}`
   if (r.type === 'parent_child') {
     const child = store.persons.find((x) => x.id === r.person_b_id)
     if (child?.birth?.year) return `Born: ${child.birth.year}`
@@ -987,6 +1236,36 @@ function nodeVisual(n) {
   const q = searchQuery.value.toLowerCase().trim()
   if (q && !(n.name || '').toLowerCase().includes(q)) opacityMul *= 0.2
 
+  // Connection trace: the chain stays lit (endpoints swell), the rest recede.
+  let pathGlow = false
+  if (pathActive.value) {
+    if (pathIdSet.value.has(n.id)) {
+      const ids = pathInfo.value.ids
+      if (n.id === ids[0] || n.id === ids[ids.length - 1]) {
+        radiusMul = Math.max(radiusMul, 1.2)
+        pathGlow = true
+      }
+    } else {
+      opacityMul *= 0.1
+    }
+  } else if (egoMap.value) {
+    // Orbit rings: fade with hop distance beyond the chosen ring count.
+    const dist = egoMap.value.get(n.id)
+    if (dist === 0) {
+      radiusMul = Math.max(radiusMul, 1.18)
+      pathGlow = true
+    } else if (dist == null || dist > egoDepth.value) {
+      opacityMul *= 0.07
+    } else {
+      opacityMul *= Math.max(0.45, 1 - dist * 0.16)
+    }
+  }
+  // Armed trace anchor: a beacon while waiting for the second shift-click.
+  if (pathAnchor.value === n.id && !pathInfo.value) {
+    pathGlow = true
+    radiusMul = Math.max(radiusMul, 1.2)
+  }
+
   const tY = tt.gateYear.value
   const tStart = tt.gateStartYear.value
   let timeGlow = false
@@ -1011,7 +1290,7 @@ function nodeVisual(n) {
     borderA: selected ? 0.95 : hl ? 0.92 : 0.18,
     opacity: gs.nodeOpacity * opacityMul,
     selected,
-    glow: selected || timeGlow || (hoverId === n.id && gs.glowOnHover) ? 1 : 0,
+    glow: selected || timeGlow || pathGlow || (hoverId === n.id && gs.glowOnHover) ? 1 : 0,
     imageUrl: n.primary_image ? getImageUrl(n.primary_image) : null
   }
 }
@@ -1067,10 +1346,15 @@ function linkVisual(d) {
 
   const tY = tt.gateYear.value
   let timeHidden = false
+  let timeDissolved = false
   if (tY !== Infinity) {
     if (linkTimeHidden(d)) {
       opacity = 0
       timeHidden = true // arrowheads don't fade with opacity — shrink them away too
+    } else if (d._tEnd != null && tY > d._tEnd) {
+      // The bond ended before the scrubbed year: a faint dashed ghost of it.
+      opacity *= 0.16
+      timeDissolved = true
     } else if (d._tAppear != null && tY - d._tAppear < FRESH_YEARS) {
       // Just formed/born: a brief width + opacity surge as time flows past
       width *= 1.6
@@ -1086,10 +1370,58 @@ function linkVisual(d) {
     dashLen = p[0]
     dashGap = p[1]
   }
+  if (timeDissolved) {
+    dashLen = 3
+    dashGap = 4
+  }
 
   // Solo lens (Relationships pane): the chosen type stays lit, the rest fade.
   if (soloType.value && d.type !== soloType.value) {
     opacity *= 0.07
+  }
+
+  // Orbit rings: links out past the lit rings recede with their people.
+  if (!pathActive.value && egoMap.value) {
+    const da = egoMap.value.get(d.person_a_id)
+    const db = egoMap.value.get(d.person_b_id)
+    const dmax = da == null || db == null ? Infinity : Math.max(da, db)
+    if (dmax > egoDepth.value) opacity *= 0.05
+  }
+
+  // ── Ambient life ──────────────────────────────────────────────────────────
+  // flow drifts the dash pattern along the curve (LinkMaterial's uTime);
+  // fadeTo ramps opacity toward the target — the "longing gradient".
+  let flow = 0
+  let fadeTo = 1
+  if (d.type === 'likes') {
+    const mutual = mutualLikes.value.has([d.person_a_id, d.person_b_id].sort().join('~'))
+    if (mutual) {
+      flow = 16 // requited: both arcs shimmer toward each other
+      opacity = Math.min(1, opacity * 1.25)
+    } else {
+      fadeTo = 0.15 // dissolves as it reaches the crush
+      flow = 26 // dashes drift toward them — animated longing
+    }
+  } else if (def && def.weight < 0) {
+    flow = -22 // rivalry: tension marching back toward the aggressor
+  }
+  // The solo lens brings its isolated type to life.
+  if (soloType.value === d.type && dashLen > 0 && !flow) flow = 24
+
+  // Connection trace: the chain becomes flowing marching-ants; everything
+  // off-path recedes. Applied last — the trace always wins.
+  if (pathActive.value) {
+    if (pathRelIdSet.value.has(d.id)) {
+      opacity = Math.min(1, gs.linkOpacity * 1.9)
+      width = Math.max(width * 1.6, 3.2)
+      dashLen = 7
+      dashGap = 5
+      flow = 34
+      fadeTo = 1
+    } else {
+      opacity *= 0.05
+      flow = 0
+    }
   }
 
   const marker = getLinkMarker(d, emph, persons, def)
@@ -1100,6 +1432,8 @@ function linkVisual(d) {
     opacity,
     dashLen,
     dashGap,
+    flow,
+    fadeTo,
     arrowColor: marker ? markerColor(marker, gs, def) : null,
     arrowSize: timeHidden ? 0 : isPatMat ? 14 : 9
   }
@@ -1206,13 +1540,20 @@ function applyLinkForceParams() {
   if (!ctx.simulation) return
   const link = ctx.simulation.force('link')
   if (!link) return
+  // Social gravity (Relationships pane): boosts affinity-band springs so
+  // friend/crush clusters visibly pull together, capped below family bonds.
+  const effWeight = (d) => {
+    const w = linkWeightOf(d)
+    if (w <= 0 || w >= 0.5) return w
+    return Math.min(0.85, w * socialPull.value)
+  }
   link
     .distance((d) => {
       // Weaker bonds sit a little longer, up to 1.6× for pure-affinity edges.
-      const w = Math.max(0, Math.min(1, linkWeightOf(d)))
+      const w = Math.max(0, Math.min(1, effWeight(d)))
       return store.graphSettings.linkDistance * (1 + (1 - w) * 0.6)
     })
-    .strength((d) => 0.4 * Math.max(0, linkWeightOf(d)))
+    .strength((d) => 0.4 * Math.max(0, effWeight(d)))
 }
 
 /** Soft pairwise repulsion for negative-weight edges: pushes the two endpoints
@@ -1299,7 +1640,10 @@ function updateGraph() {
       ...r,
       source: r.person_a_id,
       target: r.person_b_id,
-      _tAppear: appear
+      _tAppear: appear,
+      // When the bond ended (divorce, falling-out): time travel past this year
+      // fades the edge to a dashed ghost instead of hiding it.
+      _tEnd: toOrdinal(r.ended)
     }
   })
   // Drop stale interaction refs to nodes that no longer exist.
@@ -1414,6 +1758,12 @@ function onPointerDown(e) {
   if (e.button !== 0) return
   const w = clientToWorld(e.clientX, e.clientY)
   const node = pickVisibleNode(w.x, w.y)
+  // Shift-click = connection trace (arm an anchor / trace to the second person)
+  // — intercepted before dragging so the node never budges.
+  if (e.shiftKey && node) {
+    handlePathClick(node)
+    return
+  }
   if (node && !store.lockNodes) {
     drag = { node, moved: false, downX: e.clientX, downY: e.clientY }
     grab = { dx: w.x - node.x, dy: w.y - node.y }
@@ -2032,11 +2382,18 @@ defineExpose({ flushLayout, reloadScenes, exportImage })
 
 let scenesInitialized = false
 
+// Esc dismisses the connection trace (armed or drawn).
+function onGlobalKeydown(e) {
+  if (e.key === 'Escape' && (pathInfo.value || pathAnchor.value)) clearPath()
+}
+
 onMounted(() => {
   initGraph()
   updateGraph()
+  window.addEventListener('keydown', onGlobalKeydown)
 })
 onUnmounted(() => {
+  window.removeEventListener('keydown', onGlobalKeydown)
   ctx.simulation?.stop()
   ctx.resizeObserver?.disconnect()
   cancelAnimation()
@@ -2615,6 +2972,480 @@ watch(
   padding-top: 4px;
   border-top: 1px solid var(--border);
   text-align: center;
+}
+
+/* ── Romance intel ─────────────────────────────────────────────────────── */
+.rtl-romance {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+.rtl-romance-title {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--pink);
+}
+.rtl-rom-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--t2);
+  line-height: 1.35;
+}
+.rtl-rom-row b {
+  color: var(--t1);
+  font-weight: 600;
+}
+.rtl-rom-icon {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+/* Each romance glyph gets its own idle life */
+.rom-beat {
+  animation: rom-beat 1.6s ease-in-out infinite;
+}
+@keyframes rom-beat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  12% {
+    transform: scale(1.3);
+  }
+  24% {
+    transform: scale(1);
+  }
+  36% {
+    transform: scale(1.22);
+  }
+  48% {
+    transform: scale(1);
+  }
+}
+.rom-drift {
+  animation: rom-drift 3.2s ease-in-out infinite;
+}
+@keyframes rom-drift {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(4px);
+    opacity: 0.55;
+  }
+}
+.rom-spin {
+  animation: rom-spin 5s linear infinite;
+}
+@keyframes rom-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+.rom-clash {
+  animation: rom-clash 2.2s ease-in-out infinite;
+}
+@keyframes rom-clash {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  8% {
+    transform: rotate(-14deg);
+  }
+  16% {
+    transform: rotate(12deg);
+  }
+  24% {
+    transform: rotate(0deg);
+  }
+}
+
+/* ── Social gravity ────────────────────────────────────────────────────── */
+.rtl-gravity {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.rtl-gravity-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+.rtl-gravity-icon.pulling {
+  animation: gravity-wobble 2.4s ease-in-out infinite;
+}
+@keyframes gravity-wobble {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.2) rotate(20deg);
+  }
+}
+.rtl-gravity-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--t2);
+  white-space: nowrap;
+}
+.rtl-gravity-slider {
+  flex: 1;
+  min-width: 0;
+  height: 18px;
+  accent-color: var(--accent);
+  background: transparent;
+  border: none;
+  padding: 0;
+  box-shadow: none;
+}
+.rtl-gravity-val {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent);
+  width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Orbit rings control (Focus pane) ─────────────────────────────────── */
+.orbit-opts {
+  display: flex;
+  gap: 5px;
+  flex: 1;
+}
+.orbit-opt {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--elevated);
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background 0.18s ease,
+    transform 0.2s cubic-bezier(0.34, 1.55, 0.5, 1);
+}
+.orbit-opt:hover:not(:disabled) {
+  transform: translateY(-1px);
+  color: var(--t1);
+}
+.orbit-opt:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.orbit-opt.on {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: var(--adim);
+  color: var(--accent);
+}
+.orbit-num {
+  position: relative;
+  z-index: 2;
+}
+/* Concentric rings that ripple outward while that depth is active */
+.orbit-ring {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: calc(var(--r) * 11px);
+  height: calc(var(--r) * 11px);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 50%;
+  opacity: 0.4;
+  pointer-events: none;
+}
+.orbit-opt.on .orbit-ring {
+  animation: orbit-ripple 2.2s ease-out infinite;
+  animation-delay: calc(var(--r) * 0.25s);
+}
+@keyframes orbit-ripple {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+/* ── Connection trace card ─────────────────────────────────────────────── */
+.path-card {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(860px, calc(100% - 48px));
+  padding: 11px 40px 11px 16px;
+  border-radius: 16px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(16px) saturate(1.25);
+  -webkit-backdrop-filter: blur(16px) saturate(1.25);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  box-shadow:
+    var(--shadow),
+    0 0 34px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.path-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--t3);
+  white-space: nowrap;
+}
+.path-title-icon {
+  font-size: 14px;
+  animation: compass-wander 5s ease-in-out infinite;
+}
+@keyframes compass-wander {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  30% {
+    transform: rotate(-22deg);
+  }
+  65% {
+    transform: rotate(16deg);
+  }
+}
+.path-count {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--adim);
+  padding: 1px 7px;
+  border-radius: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.path-chain {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.path-person {
+  --pc: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px 4px 6px;
+  border: 1px solid color-mix(in srgb, var(--pc) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pc) 12%, transparent);
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  animation: path-pop 0.5s cubic-bezier(0.3, 1.6, 0.4, 1) backwards;
+  animation-delay: calc(var(--i) * 0.09s);
+  transition:
+    transform 0.18s cubic-bezier(0.34, 1.55, 0.5, 1),
+    box-shadow 0.18s ease;
+}
+.path-person:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--pc) 35%, transparent);
+}
+@keyframes path-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4) translateY(8px);
+  }
+}
+.path-person-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--pc);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--pc) 60%, transparent);
+  flex-shrink: 0;
+}
+.path-via {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  animation: path-pop 0.5s cubic-bezier(0.3, 1.6, 0.4, 1) backwards;
+  animation-delay: calc(var(--i) * 0.09s);
+}
+.path-via-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--t3);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+/* The connector itself: an energy line whose gradient streams start→end */
+.path-via-line {
+  width: 34px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 15%, transparent),
+    var(--accent),
+    color-mix(in srgb, var(--accent) 15%, transparent)
+  );
+  background-size: 200% 100%;
+  animation: path-stream 1.1s linear infinite;
+}
+@keyframes path-stream {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.path-close {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  border: none;
+  background: transparent;
+  color: var(--t3);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 3px 5px;
+  border-radius: 6px;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.path-close:hover {
+  color: var(--t1);
+  background: var(--hover);
+}
+
+/* Armed state: a pulsing beacon while waiting for the second person */
+.path-armed {
+  padding-right: 40px;
+}
+.path-armed-beacon {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  animation: beacon 1.4s ease-out infinite;
+}
+@keyframes beacon {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 65%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 12px transparent;
+  }
+}
+.path-armed-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--t1);
+  white-space: nowrap;
+}
+.path-armed-hint {
+  font-size: 11.5px;
+  color: var(--t2);
+}
+.path-none {
+  font-size: 12px;
+  color: var(--t2);
+  padding-right: 40px;
+}
+.path-none b {
+  color: var(--t1);
+}
+.path-none-icon {
+  font-size: 15px;
+  animation: satellite-drift 4s ease-in-out infinite;
+}
+@keyframes satellite-drift {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-3px) rotate(14deg);
+  }
+}
+
+/* Card enter/leave: rises with a blur-focus, sinks away on clear */
+.pathcard-enter-active {
+  transition:
+    opacity 0.34s ease,
+    transform 0.42s cubic-bezier(0.22, 1.3, 0.36, 1),
+    filter 0.34s ease;
+}
+.pathcard-leave-active {
+  transition:
+    opacity 0.22s ease,
+    transform 0.26s ease,
+    filter 0.22s ease;
+}
+.pathcard-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(18px) scale(0.92);
+  filter: blur(6px);
+}
+.pathcard-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(10px) scale(0.95);
+  filter: blur(4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rom-beat,
+  .rom-drift,
+  .rom-spin,
+  .rom-clash,
+  .rtl-gravity-icon.pulling,
+  .orbit-opt.on .orbit-ring,
+  .path-title-icon,
+  .path-via-line,
+  .path-armed-beacon,
+  .path-none-icon {
+    animation: none;
+  }
 }
 
 .highlights-title {

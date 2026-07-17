@@ -79,6 +79,12 @@ export class WebGLGraphRenderer {
     glCanvas.addEventListener('webglcontextlost', this._onContextLost, false)
     glCanvas.addEventListener('webglcontextrestored', this._onContextRestored, false)
     this._glCanvas = glCanvas
+
+    // Ambient flow pauses with the tab; restart the loop when it comes back.
+    this._onVisibility = () => {
+      if (document.visibilityState === 'visible' && this._hasFlow) this.requestRedraw()
+    }
+    document.addEventListener('visibilitychange', this._onVisibility)
   }
 
   resize(w, h) {
@@ -212,10 +218,12 @@ export class WebGLGraphRenderer {
       visual = this.hooks.linkVisual
     this._linkCacheById.clear()
     const seen = new Set()
+    this._hasFlow = false // any flowing dash keeps the ambient loop alive
     for (const d of links) {
       const v = visual(d)
       v.colorRGB = rgb(v.colorHex)
       v.arrowRGB = v.arrowColor ? rgb(v.arrowColor) : null
+      if (v.flow) this._hasFlow = true
       this._linkCacheById.set(d.id, v)
       seen.add(d.id)
       let a = this._linkAnim.get(d.id)
@@ -283,7 +291,9 @@ export class WebGLGraphRenderer {
       dashGap: v.dashGap,
       width: a.w,
       arrowColorRGB: v.arrowRGB,
-      arrowSize: a.ar
+      arrowSize: a.ar,
+      flow: v.flow || 0,
+      fadeTo: v.fadeTo
     }
   }
 
@@ -340,11 +350,21 @@ export class WebGLGraphRenderer {
     )
     this.world.matrixWorldNeedsUpdate = true
 
+    // Ambient dash flow: advance the shared clock; keep the loop alive while
+    // any link is flowing (and the tab visible) — otherwise idle at 0% as before.
+    this.linkLayer.material.uniforms.uTime.value = ts / 1000
+
     this.renderer.render(this.scene, this.camera)
     this.overlay.draw(this.hooks.overlayOpts())
 
-    // Keep the loop alive frame-to-frame only while a tween is still settling.
-    if (this._nodeTweening || this._linkTweening) this.requestRedraw()
+    // Keep the loop alive frame-to-frame while a tween is settling or dashes flow.
+    if (
+      this._nodeTweening ||
+      this._linkTweening ||
+      (this._hasFlow && document.visibilityState === 'visible')
+    ) {
+      this.requestRedraw()
+    }
   }
 
   // ── Image export ────────────────────────────────────────────────────────────
@@ -438,6 +458,7 @@ export class WebGLGraphRenderer {
 
   dispose() {
     this.disposed = true
+    document.removeEventListener('visibilitychange', this._onVisibility)
     this._glCanvas?.removeEventListener('webglcontextlost', this._onContextLost)
     this._glCanvas?.removeEventListener('webglcontextrestored', this._onContextRestored)
     this.atlas.dispose()

@@ -2,6 +2,8 @@ import * as THREE from 'three'
 
 // Ribbon material for all link curves. Dashes are computed from world-unit arc length so
 // they scale with zoom exactly like SVG stroke-dasharray did inside the zoomed group.
+// aFlow (world units/sec, signed) drifts the dash pattern along the curve against uTime —
+// the ambient "dash flow" that makes tension/longing edges feel alive. 0 = static.
 export function createLinkMaterial() {
   return new THREE.ShaderMaterial({
     glslVersion: THREE.GLSL3,
@@ -9,31 +11,37 @@ export function createLinkMaterial() {
     depthTest: false,
     depthWrite: false,
     side: THREE.DoubleSide,
+    uniforms: { uTime: { value: 0 } },
     vertexShader: /* glsl */ `
       in vec3 aColor;
       in float aArc;
       in vec2 aDash;     // (dashLen, gapLen) in world units; dashLen<=0 => solid
       in float aOpacity;
+      in float aFlow;    // dash drift speed (world units/sec, signed); 0 = static
       out vec3 vColor;
       out float vArc;
       out vec2 vDash;
       out float vOpacity;
+      out float vFlow;
       void main() {
-        vColor = aColor; vArc = aArc; vDash = aDash; vOpacity = aOpacity;
+        vColor = aColor; vArc = aArc; vDash = aDash; vOpacity = aOpacity; vFlow = aFlow;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
     fragmentShader: /* glsl */ `
       precision highp float;
+      uniform float uTime;
       in vec3 vColor;
       in float vArc;
       in vec2 vDash;
       in float vOpacity;
+      in float vFlow;
       out vec4 fragColor;
       void main() {
         if (vDash.x > 0.0) {
           float period = vDash.x + vDash.y;
-          if (mod(vArc, period) > vDash.x) discard;
+          float arc = vArc - vFlow * uTime;
+          if (mod(mod(arc, period) + period, period) > vDash.x) discard;
         }
         fragColor = vec4(vColor, vOpacity);
       }

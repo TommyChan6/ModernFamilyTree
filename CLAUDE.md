@@ -166,6 +166,19 @@ intent chips are generated from the registry (grouped by `band`; Simple mode =
 family band only, per `caps.relTypePicker`/`customRelTypes`), and
 `RelTypesPanel.vue` (Relationships view → ⚙ Types) edits defs — the weight
 slider needs `caps.tuneAffinity` (Advanced). Tests: `tests/relTypes.test.js`.
+Graph-side insight math (BFS `shortestPath`/`egoDistances`, `derivedSiblings`
+from shared vertical-edge parents, `romanceInsights` over directed likes) is
+pure in `components/graph/graphInsights.js` (tests:
+`tests/graphInsights.test.js`) and drives the graph's connection trace
+(shift-click two people → flowing marching-ants chain + hop card), the Focus
+pane's Orbit rings, the Relationships pane's Romance section + Social gravity,
+redundant-sibling issue flags, and read-only sibling chips (PersonModal /
+PersonForm). Siblinghood is derived — explicit `sibling` rows are for
+half/step exceptions. `Relationship.ended` is editable (RelationshipsView +
+PersonForm), and time travel fades ended bonds to dashed ghosts (`_tEnd`).
+The link shader supports per-link dash **flow** (`aFlow` vs `uTime` — the
+renderer keeps a live rAF loop only while any link flows) and per-vertex
+opacity gradients (`fadeTo`, one-way likes).
 
 **State** (`src/renderer/src/store/index.js`): a single Pinia store `main` is the
 source of truth for `persons`, `fieldDefs`/`fieldValues` (+ the

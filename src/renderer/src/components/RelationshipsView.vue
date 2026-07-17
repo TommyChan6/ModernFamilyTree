@@ -236,6 +236,17 @@
             />
           </div>
           <div v-if="statusesOf(editing.type).length > 1" class="rv-field rv-field-sm">
+            <label>Ended (year)</label>
+            <input
+              v-model="editing.ended_year"
+              type="number"
+              placeholder="—"
+              min="1"
+              max="2200"
+              @keydown.enter="saveEdit"
+            />
+          </div>
+          <div v-if="statusesOf(editing.type).length > 1" class="rv-field rv-field-sm">
             <label>Status</label>
             <select v-model="editing.status">
               <option v-for="s in statusesOf(editing.type)" :key="s" :value="s">
@@ -485,6 +496,17 @@
                     />
                   </div>
                   <div v-if="statusesOf(editing.type).length > 1" class="rv-field rv-field-sm">
+                    <label>Ended (year)</label>
+                    <input
+                      v-model="editing.ended_year"
+                      type="number"
+                      placeholder="—"
+                      min="1"
+                      max="2200"
+                      @keydown.enter="saveEdit"
+                    />
+                  </div>
+                  <div v-if="statusesOf(editing.type).length > 1" class="rv-field rv-field-sm">
                     <label>Status</label>
                     <select v-model="editing.status">
                       <option v-for="s in statusesOf(editing.type)" :key="s" :value="s">
@@ -551,6 +573,7 @@ import { api } from '../api'
 import { yearDate } from '../../../shared/calendarMath'
 import PersonPicker from './personForm/PersonPicker.vue'
 import RelTypesPanel from './RelTypesPanel.vue'
+import { derivedSiblings } from './graph/graphInsights.js'
 
 const store = useMainStore()
 const typesOpen = ref(false)
@@ -755,9 +778,26 @@ const issuesByRel = computed(() => {
     if (r.type === 'parent_child' && parentCount[r.person_b_id] > 2) {
       add(r.id, `${b?.name || 'This child'} has more than two biological parents`)
     }
+    // Siblinghood is derived from shared parents — an explicit row on top of
+    // that is redundant (explicit rows are for half/step cases the tree can't see).
+    if (
+      r.type === 'sibling' &&
+      derivedSibs.value.get(r.person_a_id)?.has(r.person_b_id) &&
+      r.person_a_id !== r.person_b_id
+    ) {
+      add(r.id, 'Redundant — these two are already siblings via a shared parent')
+    }
   })
   return out
 })
+
+// Derived siblinghood (shared vertical-edge parent) — feeds the redundancy check.
+const derivedSibs = computed(() =>
+  derivedSiblings(
+    store.relationships,
+    store.relTypeRoles.size ? (t) => store.relTypeRoles.get(t) || 'none' : undefined
+  )
+)
 const issueCount = computed(() => Object.keys(issuesByRel.value).length)
 
 // If the user is on the Issues filter and the last issue gets fixed, fall back to All
@@ -936,6 +976,7 @@ function startAdd() {
     person_b_id: '',
     type: 'parent_child',
     formed_year: '',
+    ended_year: '',
     status: 'active'
   }
 }
@@ -947,6 +988,7 @@ function startEdit(rel) {
     person_b_id: rel.person_b_id,
     type: rel.type,
     formed_year: rel.formed?.year || '',
+    ended_year: rel.ended?.year || '',
     status: rel.status || 'active'
   }
 }
@@ -1022,6 +1064,7 @@ async function saveEdit() {
     person_b_id: e.person_b_id,
     type: e.type,
     formed: yearDate(e.formed_year),
+    ended: yearDate(e.ended_year),
     status: validStatuses.includes(e.status) ? e.status : validStatuses[0] || 'active'
   }
   const res =
@@ -1493,7 +1536,7 @@ async function toggleStatus(row) {
 }
 .rv-editor-grid {
   display: grid;
-  grid-template-columns: 1fr auto 1fr 1fr 110px auto;
+  grid-template-columns: 1fr auto 1fr 1fr 92px 92px auto;
   gap: 10px;
   align-items: end;
 }

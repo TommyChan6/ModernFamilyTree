@@ -121,6 +121,7 @@
 import { ref, watch, computed } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { api } from '../api'
+import { derivedSiblings } from './graph/graphInsights.js'
 
 const store = useMainStore()
 const images = ref([])
@@ -209,6 +210,22 @@ const relationshipChips = computed(() => {
 
     chips.push({ id: r.id, role, name: other.name, otherId, colorClass })
   })
+
+  // Derived siblings (shared parents) — appended unless an explicit sibling
+  // row to the same person already produced a chip.
+  const explicit = new Set(chips.map((c) => c.otherId + '~' + c.role))
+  const sibs = derivedSiblings(
+    store.relationships,
+    store.relTypeRoles.size ? (t) => store.relTypeRoles.get(t) || 'none' : undefined
+  )
+  for (const otherId of sibs.get(pid) || []) {
+    const other = store.persons.find((p) => p.id === otherId)
+    if (!other) continue
+    const role =
+      other.gender === 'male' ? 'Brother' : other.gender === 'female' ? 'Sister' : 'Sibling'
+    if (explicit.has(otherId + '~' + role)) continue
+    chips.push({ id: 'sib:' + otherId, role, name: other.name, otherId, colorClass: 'chip-teal' })
+  }
 
   return chips
 })
@@ -464,6 +481,11 @@ async function handleDelete() {
 .chip-blue {
   background: rgba(108, 142, 245, 0.15);
   color: #6c8ef5;
+}
+
+.chip-teal {
+  background: rgba(88, 181, 188, 0.15);
+  color: #58b5bc;
 }
 
 .chip-role {

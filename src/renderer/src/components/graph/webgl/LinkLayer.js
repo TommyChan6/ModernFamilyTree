@@ -49,6 +49,7 @@ export class LinkLayer {
     this.arc = mk('aArc', 1)
     this.dash = mk('aDash', 2)
     this.opacity = mk('aOpacity', 1)
+    this.flow = mk('aFlow', 1)
     const index = new Uint32Array(capacity * IPL)
     for (let j = 0; j < capacity; j++) {
       const base = j * VPL,
@@ -170,7 +171,9 @@ export class LinkLayer {
   }
 
   // On style change: per-link colour / opacity / dash pattern (same value on all its verts).
-  // `visual(d)` returns { color:[r,g,b], opacity, dashLen, dashGap } (already tweened).
+  // `visual(d)` returns { color:[r,g,b], opacity, dashLen, dashGap, flow?, fadeTo? }
+  // (already tweened). `fadeTo` (0..1) ramps opacity along the curve toward the target —
+  // the "longing gradient" on one-way likes; `flow` drifts the dashes (see LinkMaterial).
   updateStyles(links, visual) {
     if (!this._a.aColor || !links.length) return
     for (let j = 0; j < links.length; j++) {
@@ -180,20 +183,26 @@ export class LinkLayer {
       const op = vis.opacity
       const dl = vis.dashLen || 0,
         gl = vis.dashGap || 0
+      const flow = vis.flow || 0
+      const fadeTo = vis.fadeTo == null ? 1 : vis.fadeTo
       const base = j * VPL
       for (let v = 0; v < VPL; v++) {
         const vi = base + v
+        // v>>1 = curve sample index (two ribbon verts per sample, source→target).
+        const t = v >> 1
         this.color[vi * 3] = col[0]
         this.color[vi * 3 + 1] = col[1]
         this.color[vi * 3 + 2] = col[2]
-        this.opacity[vi] = op
+        this.opacity[vi] = fadeTo === 1 ? op : op * (1 - (1 - fadeTo) * (t / SEG))
         this.dash[vi * 2] = dl
         this.dash[vi * 2 + 1] = gl
+        this.flow[vi] = flow
       }
     }
     this._a.aColor.needsUpdate = true
     this._a.aOpacity.needsUpdate = true
     this._a.aDash.needsUpdate = true
+    this._a.aFlow.needsUpdate = true
   }
 
   dispose() {
