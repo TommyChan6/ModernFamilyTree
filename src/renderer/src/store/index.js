@@ -614,8 +614,9 @@ export const useMainStore = defineStore('main', () => {
         (r) => r.person_a_id !== id && r.person_b_id !== id
       )
       entityTags.value = entityTags.value.filter((row) => row.entity_id !== id)
+      selectedPersonIds.value = selectedPersonIds.value.filter((x) => x !== id)
       if (selectedPersonId.value === id) {
-        selectedPersonId.value = null
+        selectedPersonId.value = selectedPersonIds.value.at(-1) ?? null
         modalOpen.value = false
       }
     }

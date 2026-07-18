@@ -157,17 +157,23 @@
           @remove="removeScene"
         />
       </div>
-      <Transition name="relpop">
-        <div v-if="store.relPopup" class="rel-popup" :style="relPopupStyle" @click.stop>
-          <button class="rel-popup-close" @click="store.relPopup = null">✕</button>
-          <div class="rel-popup-type">{{ relPopupTypeLabel }}</div>
-          <div class="rel-popup-people">{{ relPopupPersonA }} — {{ relPopupPersonB }}</div>
-          <div v-if="relPopupFormedLabel" class="rel-popup-date">{{ relPopupFormedLabel }}</div>
-          <div v-if="relPopupStatus" class="rel-popup-status" :class="relPopupStatus">
-            {{ relPopupStatus }}
-          </div>
-        </div>
-      </Transition>
+      <!-- Action pane (lower-left, clear of the time slider): contextual verbs
+         for whatever is selected — a person, a pair, a crowd, or a bond. -->
+      <GraphActionPane
+        :mode3d="spaceActive"
+        :can-pin="currentMode === 'auto' && !spaceActive"
+        :pinned="selPinned"
+        :style-size="selStyle.size"
+        :style-color="selStyle.color"
+        :solo-type="soloType"
+        @focus-person="focusOnPerson"
+        @trace="traceFrom"
+        @trace-pair="tracePair"
+        @toggle-pin="togglePinSelected"
+        @set-size="(v) => setSelectedStyle({ size: v })"
+        @set-color="(c) => setSelectedStyle({ color: c })"
+        @solo="toggleSolo"
+      />
 
       <!-- Connection trace: armed hint / the traced chain / no-connection notice -->
       <Transition name="pathcard">
@@ -521,6 +527,7 @@ import { screenToWorld, nodesExtent, fitExtent } from './graph/webgl/coords.js'
 import { viewRectXYK } from './webgl/minimapMath'
 import { withAlpha } from './webgl/overlayUtils.js'
 import SceneTabs from './SceneTabs.vue'
+import GraphActionPane from './graph/GraphActionPane.vue'
 import Graph3DView from './Graph3DView.vue'
 import MiniMap from './MiniMap.vue'
 import ViewHeader from './ViewHeader.vue'
@@ -676,14 +683,22 @@ function centerOf(nodes) {
 }
 function bloomStagger(spread = 260) {
   const c = centerOf(ctx.nodesData)
-  return { stagger: spread, staggerBy: (n, t) => Math.hypot((t?.x ?? n.x) - c.x, (t?.y ?? n.y) - c.y) }
+  return {
+    stagger: spread,
+    staggerBy: (n, t) => Math.hypot((t?.x ?? n.x) - c.x, (t?.y ?? n.y) - c.y)
+  }
 }
 // Durations + stagger are kept so the whole transition (duration + stagger)
 // always finishes in under 0.5s.
 const MOTION = {
   auto: () => ({ ease: d3.easeCubicOut, duration: 340 }),
   custom: () => ({ ease: d3.easeCubicInOut, duration: 320, ...bloomStagger(140) }),
-  age: () => ({ ease: d3.easeCubicOut, duration: 300, stagger: 170, staggerBy: (n, t) => t?.y ?? n.y }),
+  age: () => ({
+    ease: d3.easeCubicOut,
+    duration: 300,
+    stagger: 170,
+    staggerBy: (n, t) => t?.y ?? n.y
+  }),
   generation: () => ({
     ease: d3.easeBackOut.overshoot(1.4),
     duration: 320,
@@ -889,11 +904,14 @@ const pathHops = computed(() => {
   })
 })
 
-// Members vanished (person/relationship deleted) → the trace no longer holds.
+// Members vanished (person/relationship deleted) → the trace no longer holds,
+// and a selected bond that no longer exists must leave the action pane.
 watch(
   () => store.relationships.length + ':' + store.persons.length,
   () => {
     if (pathInfo.value || pathAnchor.value) clearPath()
+    const selRel = store.relPopup?.rel
+    if (selRel && !store.relationships.some((r) => r.id === selRel.id)) store.relPopup = null
   }
 )
 watch([pathInfo, pathAnchor], () => {
@@ -1022,44 +1040,111 @@ function applyDeceasedHighlight() {
   markNodeStyles()
 }
 
-// ── Popup computeds ─────────────────────────────────────────────────────────
-const relPopupStyle = computed(() => {
-  if (!store.relPopup) return {}
-  return { left: store.relPopup.x + 'px', top: store.relPopup.y + 'px' }
-})
-const relPopupTypeLabel = computed(() => {
-  if (!store.relPopup) return ''
-  const r = store.relPopup.rel
-  if (r.label) return r.label // per-edge custom label wins
-  if (r.type === 'spouse') return r.status === 'divorced' ? 'Divorced' : 'Married'
-  return store.relTypeByKey.get(r.type)?.label || r.type
-})
-const relPopupPersonA = computed(() => {
-  if (!store.relPopup) return ''
-  return store.persons.find((x) => x.id === store.relPopup.rel.person_a_id)?.name || '?'
-})
-const relPopupPersonB = computed(() => {
-  if (!store.relPopup) return ''
-  return store.persons.find((x) => x.id === store.relPopup.rel.person_b_id)?.name || '?'
-})
-const relPopupFormedLabel = computed(() => {
-  if (!store.relPopup) return ''
-  const r = store.relPopup.rel
-  if (r.formed?.year) {
-    const from = r.type === 'spouse' ? `Married: ${r.formed.year}` : `Since: ${r.formed.year}`
-    return r.ended?.year ? `${from} — ${r.ended.year}` : from
+// ── Action pane support (selection verbs + per-node style overrides) ────────
+// Per-node visual overrides ({ size?, color? } by person id) live in the active
+// scene's layouts bag under a `styles` key, so they persist through the normal
+// scenes:save autosave and follow duplicates/checkpoints like positions do.
+// `activeStyles` is the live (non-reactive) object nodeVisual() reads; `uiTick`
+// lets the pane's computeds see mutations to it (and to node pins).
+let activeStyles = {}
+const uiTick = ref(0)
+
+function refreshActiveStyles() {
+  const bag = layoutsOf(activeSceneId.value)
+  if (bag) {
+    if (!bag.styles) bag.styles = {}
+    activeStyles = bag.styles
+  } else {
+    activeStyles = {}
   }
-  if (r.ended?.year) return `Ended: ${r.ended.year}`
-  if (r.type === 'parent_child') {
-    const child = store.persons.find((x) => x.id === r.person_b_id)
-    if (child?.birth?.year) return `Born: ${child.birth.year}`
+  uiTick.value++
+}
+
+/** Apply a style patch ({size} and/or {color}; 1 / null clear back to default)
+ *  to every selected person, restyle, and autosave the scene. */
+function setSelectedStyle(patch) {
+  const bag = layoutsOf(activeSceneId.value)
+  if (!bag || !store.selectedPersonIds.length) return
+  if (!bag.styles) bag.styles = {}
+  activeStyles = bag.styles
+  for (const id of store.selectedPersonIds) {
+    const next = { ...(activeStyles[id] || {}) }
+    if ('size' in patch) {
+      if (!patch.size || patch.size === 1) delete next.size
+      else next.size = patch.size
+    }
+    if ('color' in patch) {
+      if (!patch.color) delete next.color
+      else next.color = patch.color
+    }
+    if (Object.keys(next).length) activeStyles[id] = next
+    else delete activeStyles[id]
   }
-  return ''
+  uiTick.value++
+  markNodeStyles()
+  schedulePersist(activeSceneId.value)
+}
+
+// The pane's chips reflect the primary (last-touched) selected person.
+const selStyle = computed(() => {
+  void uiTick.value
+  const ids = store.selectedPersonIds
+  const ov = ids.length ? activeStyles[ids[ids.length - 1]] : null
+  return { size: ov?.size ?? 1, color: ov?.color ?? null }
 })
-const relPopupStatus = computed(() => {
-  const s = store.relPopup?.rel?.status
-  return s && s !== 'active' ? s : ''
+
+const selPinned = computed(() => {
+  void uiTick.value
+  const id = store.selectedPersonId
+  if (!id) return false
+  const n = ctx.nodesData.find((x) => x.id === id)
+  return !!n && n.fx != null
 })
+
+function togglePinSelected() {
+  const id = store.selectedPersonId
+  const n = id && ctx.nodesData.find((x) => x.id === id)
+  if (!n) return
+  if (n.fx != null) {
+    n.fx = null
+    n.fy = null
+    if (currentMode.value === 'auto') ctx.simulation?.alpha(0.15).restart()
+  } else {
+    n.fx = n.x
+    n.fy = n.y
+  }
+  uiTick.value++
+}
+
+/** Glide the camera to a person (kept at ≥1.1× so the arrival feels close). */
+function focusOnPerson(id) {
+  const n = ctx.nodesData.find((x) => x.id === id)
+  const el = ctx.containerRef
+  if (!n || !el || !ctx.zoomBehavior) return
+  const k = Math.max(ctx.transform.k, 1.1)
+  const sx = ctx.transform.sx ?? 1,
+    sy = ctx.transform.sy ?? 1
+  const t = d3.zoomIdentity
+    .translate(el.clientWidth / 2 - n.x * sx * k, el.clientHeight / 2 - n.y * sy * k)
+    .scale(k)
+  ctx.zoomSelection
+    ?.transition()
+    .duration(520)
+    .ease(d3.easeCubicInOut)
+    .call(ctx.zoomBehavior.transform, t)
+}
+
+/** Arm the connection trace from this person (pane's Trace button). */
+function traceFrom(id) {
+  pathInfo.value = null
+  pathAnchor.value = id
+}
+
+/** Trace the chain between the two selected people directly. */
+function tracePair([a, b]) {
+  pathAnchor.value = null
+  pathInfo.value = shortestPath(a, b, store.relationships) || { none: true, fromId: a, toId: b }
+}
 
 // ── Snapshot helpers ────────────────────────────────────────────────────────
 // Snapshot the live node positions (and generation rows / emphasis) into the
@@ -1118,6 +1203,7 @@ function enterActiveScene() {
   const w = workingOf(activeSceneId.value)
   ctx.activeSnapshot = w && Object.keys(w.positions).length ? w.positions : null
   activeEmphasis.value = w?.config?.emphasis || 'neutral'
+  refreshActiveStyles() // point nodeVisual at this scene's per-node overrides
   removeGuides(ctx)
   const mode = currentMode.value
   if (mode === 'space') {
@@ -1256,7 +1342,9 @@ function linkTimeHidden(d) {
 function nodeVisual(n) {
   const gs = store.graphSettings
   const selected = store.selectedPersonId === n.id || store.selectedPersonIds.includes(n.id)
-  const baseFill = nodeColor(n.gender, gs, n.gender_t)
+  // Per-node overrides from the action pane (scene-scoped): custom fill + size.
+  const ov = activeStyles[n.id]
+  const baseFill = ov?.color || nodeColor(n.gender, gs, n.gender_t)
   const fill = selected ? d3.color(baseFill)?.brighter(0.4)?.toString() || baseFill : baseFill
 
   let opacityMul = 1,
@@ -1331,7 +1419,7 @@ function nodeVisual(n) {
   // Highlight-slot ring: a colored border (selection still wins).
   const hl = n.highlight ? n.highlight.color || '#f5a623' : null
   return {
-    radius: gs.nodeRadius * radiusMul,
+    radius: gs.nodeRadius * radiusMul * (ov?.size ?? 1),
     fill,
     border: selected ? '#6c8ef5' : hl || '#ffffff',
     borderPx: selected ? 3 : hl ? 2.6 : 1.5,
@@ -1541,6 +1629,8 @@ function initGraph() {
     })
   ctx.zoomSelection = d3.select(overlayEl.value)
   ctx.zoomSelection.call(ctx.zoomBehavior)
+  // Double-click opens the profile card (see onDblClick) — not a d3 zoom step.
+  ctx.zoomSelection.on('dblclick.zoom', null)
   overlayEl.value.addEventListener('wheel', onStretchWheel, { passive: false })
   installPointerHandlers()
 
@@ -1813,6 +1903,7 @@ function installPointerHandlers() {
   const el = overlayEl.value
   el.addEventListener('pointerdown', onPointerDown)
   el.addEventListener('pointermove', onHoverMove)
+  el.addEventListener('dblclick', onDblClick)
   window.addEventListener('pointermove', onPointerMove)
   window.addEventListener('pointerup', onPointerUp)
 }
@@ -1821,6 +1912,7 @@ function removePointerHandlers() {
   if (el) {
     el.removeEventListener('pointerdown', onPointerDown)
     el.removeEventListener('pointermove', onHoverMove)
+    el.removeEventListener('dblclick', onDblClick)
     el.removeEventListener('wheel', onStretchWheel)
   }
   window.removeEventListener('pointermove', onPointerMove)
@@ -1829,6 +1921,13 @@ function removePointerHandlers() {
 
 function onPointerDown(e) {
   if (e.button !== 0) return
+  // Modifier-clicks are graph gestures, never text-selection gestures — without
+  // this a shift-click extends whatever DOM selection exists and floods the
+  // whole app with highlighted text.
+  if (e.shiftKey || e.ctrlKey || e.metaKey) {
+    e.preventDefault()
+    window.getSelection?.()?.removeAllRanges?.()
+  }
   const w = clientToWorld(e.clientX, e.clientY)
   const node = pickVisibleNode(w.x, w.y)
   // Ctrl/Cmd-click = connection trace (arm an anchor / trace to the second person)
@@ -1904,7 +2003,7 @@ function onPointerMove(e) {
   }
 }
 
-function onPointerUp(_e) {
+function onPointerUp(e) {
   if (drag) {
     const d = drag.node,
       m = currentMode.value
@@ -1926,40 +2025,49 @@ function onPointerUp(_e) {
       cleanupEmptyGenRows(ctx, snapshotGenMode, ticked)
     }
     ctx.renderer.invalidatePicker()
-    // A press that never moved is a plain click → select the person.
+    // A press that never moved is a plain click → select the person (the
+    // action pane appears; Details / double-click opens the profile card).
     if (!drag.moved) {
       store.relPopup = null
-      store.selectPerson(d.id)
+      store.selectPerson(d.id, { modal: false })
     }
     drag = null
     return
   }
-  // Click (press with no meaningful movement) → select node / open rel popup / deselect.
+  // Click (press with no meaningful movement) → select node / select line / deselect.
   if (pending && !pending.moved) {
     const w = clientToWorld(pending.downX, pending.downY)
     const node = pickVisibleNode(w.x, w.y)
     if (node) {
       if (!store.lockNodes) {
         store.relPopup = null
-        store.selectPerson(node.id)
+        store.selectPerson(node.id, { modal: false })
       }
     } else {
       let link = store.lockLines ? null : ctx.renderer?.pickLink(w.x, w.y, store.graphSettings)
       if (link && linkTimeHidden(link)) link = null
       if (link) {
-        const rect = ctx.containerRef.getBoundingClientRect()
-        store.relPopup = {
-          rel: link,
-          x: pending.downX - rect.left,
-          y: pending.downY - rect.top - 10
-        }
-      } else {
-        store.selectPerson(null)
+        store.selectPerson(null, { modal: false })
+        store.relPopup = { rel: link }
+      } else if (!e.shiftKey) {
+        // A missed shift-click keeps the multi-selection — the user is mid-way
+        // through building it, and a stray click shouldn't wipe it.
+        store.selectPerson(null, { modal: false })
         store.relPopup = null
       }
     }
   }
   pending = null
+}
+
+// Double-click a person → the full profile card (single click just selects).
+function onDblClick(e) {
+  const w = clientToWorld(e.clientX, e.clientY)
+  const node = pickVisibleNode(w.x, w.y)
+  if (node && !store.lockNodes) {
+    store.relPopup = null
+    store.selectPerson(node.id)
+  }
 }
 
 // ── Drag-to-place from the Directory tab ────────────────────────────────────
@@ -2055,16 +2163,20 @@ function enterAutoMode() {
   ctx.simulation.stop()
   removeCurrentYearLine(ctx)
   if (hasSnapshot()) {
-    animateToPositionsWithReset(ctx.activeSnapshot, () => {
-      ctx.nodesData.forEach((n) => {
-        n.fx = null
-        n.fy = null
-        n.vx = 0
-        n.vy = 0
-      })
-      ctx.simulation.alpha(0.15).restart()
-      reapplyDrag()
-    }, MOTION.auto())
+    animateToPositionsWithReset(
+      ctx.activeSnapshot,
+      () => {
+        ctx.nodesData.forEach((n) => {
+          n.fx = null
+          n.fy = null
+          n.vx = 0
+          n.vy = 0
+        })
+        ctx.simulation.alpha(0.15).restart()
+        reapplyDrag()
+      },
+      MOTION.auto()
+    )
   } else {
     ctx.nodesData.forEach((n) => {
       n.fx = null
@@ -2079,13 +2191,17 @@ function enterCustomMode() {
   ctx.simulation.stop()
   removeCurrentYearLine(ctx)
   if (hasSnapshot()) {
-    animateToPositionsWithReset(ctx.activeSnapshot, () => {
-      ctx.nodesData.forEach((n) => {
-        n.fx = n.x
-        n.fy = n.y
-      })
-      reapplyDrag()
-    }, MOTION.custom())
+    animateToPositionsWithReset(
+      ctx.activeSnapshot,
+      () => {
+        ctx.nodesData.forEach((n) => {
+          n.fx = n.x
+          n.fy = n.y
+        })
+        reapplyDrag()
+      },
+      MOTION.custom()
+    )
   } else {
     ctx.nodesData.forEach((n) => {
       n.fx = n.x
@@ -2109,15 +2225,19 @@ function enterAgeMode() {
     ctx.nodesData.forEach((n) => {
       targets[n.id] = { x: snap[n.id]?.x ?? n.x, y: ageInfo.yMap[n.id] }
     })
-    animateToPositionsWithReset(targets, () => {
-      ctx.nodesData.forEach((n) => {
-        n.fx = n.x
-        n.fy = ageInfo.yMap[n.id]
-      })
-      drawYearGuides(ctx, ageInfo.minYear, ageInfo.maxYear, ageInfo.padding, ageInfo.usableHeight)
-      drawCurrentYearLine(ctx, ageInfo, store.currentDate?.year ?? null, false)
-      reapplyDrag()
-    }, MOTION.age())
+    animateToPositionsWithReset(
+      targets,
+      () => {
+        ctx.nodesData.forEach((n) => {
+          n.fx = n.x
+          n.fy = ageInfo.yMap[n.id]
+        })
+        drawYearGuides(ctx, ageInfo.minYear, ageInfo.maxYear, ageInfo.padding, ageInfo.usableHeight)
+        drawCurrentYearLine(ctx, ageInfo, store.currentDate?.year ?? null, false)
+        reapplyDrag()
+      },
+      MOTION.age()
+    )
     return
   }
 
@@ -2164,14 +2284,18 @@ function enterAgeMode() {
 
   drawYearGuides(ctx, ageInfo.minYear, ageInfo.maxYear, ageInfo.padding, ageInfo.usableHeight)
   drawCurrentYearLine(ctx, ageInfo, store.currentDate?.year ?? null, false)
-  animateToPositionsWithReset(targets, () => {
-    ctx.nodesData.forEach((n) => {
-      n.fx = n.x
-      n.fy = ageInfo.yMap[n.id]
-    })
-    snapshotMode()
-    reapplyDrag()
-  }, MOTION.age())
+  animateToPositionsWithReset(
+    targets,
+    () => {
+      ctx.nodesData.forEach((n) => {
+        n.fx = n.x
+        n.fy = ageInfo.yMap[n.id]
+      })
+      snapshotMode()
+      reapplyDrag()
+    },
+    MOTION.age()
+  )
 }
 
 // Re-position the Age-mode "current year" line (e.g. when the current year is set/changed/theme).
@@ -2205,14 +2329,18 @@ function enterGenerationMode() {
     const savedGenInfo = {
       genLabels: ctx.genRowYValues.map((y, i) => ({ label: `Gen ${i + 1}`, y }))
     }
-    animateToPositionsWithReset(targets, () => {
-      ctx.nodesData.forEach((n) => {
-        n.fx = n.x
-        n.fy = n.y
-      })
-      drawGenGuides(ctx, savedGenInfo)
-      reapplyDrag()
-    }, MOTION.generation())
+    animateToPositionsWithReset(
+      targets,
+      () => {
+        ctx.nodesData.forEach((n) => {
+          n.fx = n.x
+          n.fy = n.y
+        })
+        drawGenGuides(ctx, savedGenInfo)
+        reapplyDrag()
+      },
+      MOTION.generation()
+    )
     return
   }
 
@@ -2245,14 +2373,18 @@ function enterGenerationMode() {
     snapshotGenMode()
     reapplyDrag()
   } else {
-    animateToPositionsWithReset(genInfo.targets, () => {
-      ctx.nodesData.forEach((n) => {
-        n.fx = n.x
-        n.fy = genInfo.targets[n.id]?.y ?? n.y
-      })
-      snapshotGenMode()
-      reapplyDrag()
-    }, MOTION.generation())
+    animateToPositionsWithReset(
+      genInfo.targets,
+      () => {
+        ctx.nodesData.forEach((n) => {
+          n.fx = n.x
+          n.fy = genInfo.targets[n.id]?.y ?? n.y
+        })
+        snapshotGenMode()
+        reapplyDrag()
+      },
+      MOTION.generation()
+    )
   }
 }
 
@@ -2291,47 +2423,63 @@ function refreshLayout() {
     ctx.nodesData.forEach((n) => {
       targets[n.id] = { x: genInfo.targets[n.id]?.x ?? n.x, y: ageInfo.yMap[n.id] }
     })
-    animateToPositionsWithReset(targets, () => {
-      ctx.nodesData.forEach((n) => {
-        n.fx = n.x
-        n.fy = ageInfo.yMap[n.id]
-      })
-      snapshotMode('age')
-      reapplyDrag()
-    }, MOTION.age())
+    animateToPositionsWithReset(
+      targets,
+      () => {
+        ctx.nodesData.forEach((n) => {
+          n.fx = n.x
+          n.fy = ageInfo.yMap[n.id]
+        })
+        snapshotMode('age')
+        reapplyDrag()
+      },
+      MOTION.age()
+    )
   } else if (mode === 'generation') {
     removeGenPreview(ctx)
     ctx.genRowYValues = genInfo.genLabels.map((g) => g.y)
     ctx.genRowSpacing = genInfo.rowHeight || 140
     drawGenGuides(ctx, genInfo)
-    animateToPositionsWithReset(genInfo.targets, () => {
-      ctx.nodesData.forEach((n) => {
-        n.fx = n.x
-        n.fy = n.y
-      })
-      snapshotGenMode()
-      reapplyDrag()
-    }, MOTION.generation())
+    animateToPositionsWithReset(
+      genInfo.targets,
+      () => {
+        ctx.nodesData.forEach((n) => {
+          n.fx = n.x
+          n.fy = n.y
+        })
+        snapshotGenMode()
+        reapplyDrag()
+      },
+      MOTION.generation()
+    )
   } else if (mode === 'auto') {
-    animateToPositionsWithReset(genInfo.targets, () => {
-      ctx.nodesData.forEach((n) => {
-        n.fx = null
-        n.fy = null
-        n.vx = 0
-        n.vy = 0
-      })
-      ctx.simulation.alpha(0.12).restart()
-      reapplyDrag()
-    }, MOTION.auto())
+    animateToPositionsWithReset(
+      genInfo.targets,
+      () => {
+        ctx.nodesData.forEach((n) => {
+          n.fx = null
+          n.fy = null
+          n.vx = 0
+          n.vy = 0
+        })
+        ctx.simulation.alpha(0.12).restart()
+        reapplyDrag()
+      },
+      MOTION.auto()
+    )
   } else {
-    animateToPositionsWithReset(genInfo.targets, () => {
-      ctx.nodesData.forEach((n) => {
-        n.fx = n.x
-        n.fy = n.y
-      })
-      snapshotMode('custom')
-      reapplyDrag()
-    }, MOTION.custom())
+    animateToPositionsWithReset(
+      genInfo.targets,
+      () => {
+        ctx.nodesData.forEach((n) => {
+          n.fx = n.x
+          n.fy = n.y
+        })
+        snapshotMode('custom')
+        reapplyDrag()
+      },
+      MOTION.custom()
+    )
   }
 }
 
@@ -2466,9 +2614,14 @@ defineExpose({ flushLayout, reloadScenes, exportImage })
 
 let scenesInitialized = false
 
-// Esc dismisses the connection trace (armed or drawn).
+// Esc peels back one layer at a time: trace → selected bond → selected people.
+// Overlays (modal/form) own Esc while they're up.
 function onGlobalKeydown(e) {
-  if (e.key === 'Escape' && (pathInfo.value || pathAnchor.value)) clearPath()
+  if (e.key !== 'Escape') return
+  if (store.modalOpen || store.formOpen) return
+  if (pathInfo.value || pathAnchor.value) clearPath()
+  else if (store.relPopup) store.relPopup = null
+  else if (store.selectedPersonIds.length) store.selectPerson(null, { modal: false })
 }
 
 onMounted(() => {
@@ -2606,6 +2759,15 @@ watch(
   min-height: 0;
   background: var(--bg);
   overflow: hidden;
+  /* Canvas gestures (shift-click multi-select, ctrl-click trace) must never
+     start or extend a DOM text selection. Text fields opt back in below. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.graph-area input,
+.graph-area textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 .graph-gl {
   position: absolute;
@@ -2799,85 +2961,6 @@ watch(
   background: rgba(239, 83, 80, 0.15);
   color: #ef5350;
 }
-.rel-popup {
-  position: absolute;
-  z-index: 20;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px 18px;
-  min-width: 180px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-  transform: translateX(-50%) translateY(-100%);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.rel-popup-close {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
-  border: none;
-  background: transparent;
-  color: var(--t3);
-  font-size: 11px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.rel-popup-close:hover {
-  background: var(--hover);
-  color: var(--t1);
-}
-.rel-popup-type {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--accent);
-}
-.rel-popup-people {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--t1);
-}
-.rel-popup-date {
-  font-size: 12px;
-  color: var(--t2);
-}
-.rel-popup-status.divorced {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #ef5350;
-  background: rgba(239, 83, 80, 0.12);
-  padding: 2px 8px;
-  border-radius: 6px;
-  align-self: flex-start;
-}
-.relpop-enter-active {
-  transition:
-    opacity 0.18s ease,
-    transform 0.22s cubic-bezier(0.34, 1.3, 0.64, 1);
-}
-.relpop-leave-active {
-  transition:
-    opacity 0.12s ease,
-    transform 0.12s ease;
-}
-.relpop-enter-from {
-  opacity: 0;
-  transform: translateX(-50%) translateY(-90%) scale(0.92);
-}
-.relpop-leave-to {
-  opacity: 0;
-  transform: translateX(-50%) translateY(-100%) scale(0.95);
-}
-
 /* Scene tab strip inside the floating bottom bar: restyle the shared banner
    component into the old states-bar pill */
 .graph-scene-tabs {

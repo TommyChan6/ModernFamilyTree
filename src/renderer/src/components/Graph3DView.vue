@@ -690,10 +690,11 @@ function onPointerUp() {
     const node = drag.node
     sim.alphaTarget(0)
     if (!drag.moved) {
-      // A press without movement is a click → select.
+      // A press without movement is a click → select (the action pane appears;
+      // its Details button opens the profile card).
       if (!store.lockNodes) {
         store.relPopup = null
-        store.selectPerson(node.id)
+        store.selectPerson(node.id, { modal: false })
       }
     }
     node.fx = null
@@ -733,7 +734,7 @@ function onDblClick(e) {
   const node = renderer.pickNode(p.x, p.y, gs().nodeRadius)
   if (node) {
     renderer.flyToNode(node, gs().nodeRadius)
-    if (!store.lockNodes) store.selectPerson(node.id)
+    if (!store.lockNodes) store.selectPerson(node.id, { modal: false })
   }
 }
 

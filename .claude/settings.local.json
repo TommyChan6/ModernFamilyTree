@@ -272,7 +272,12 @@
       "PowerShell($running = Get-Process | Where-Object { $_.ProcessName -match 'electron|family-tree' }; if \\($running\\) { Write-Output \"APP RUNNING - abort\" } else { Write-Output \"app closed - safe\" })",
       "Bash(git stash *)",
       "Bash(git checkout *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(ls \"c:/Users/tommy/OneDrive/Desktop/newFamilyTree/.claude/skills\" 2>/dev/null; ls \"c:/Users/tommy/OneDrive/Desktop/newFamilyTree/.claude\" 2>/dev/null; ls \"C:/Users/tommy/.claude/projects/c--Users-tommy-OneDrive-Desktop-newFamilyTree/memory\")",
+      "Read(//c/Users/tommy/.claude/projects/c--Users-tommy-OneDrive-Desktop-newFamilyTree/memory/**)",
+      "Bash(node debug-shift.mjs)",
+      "Bash(node rel-shot.mjs)",
+      "Bash(taskkill //F //IM node.exe //FI \"WINDOWTITLE ne *\")"
     ]
   }
 }
