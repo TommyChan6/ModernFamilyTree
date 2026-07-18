@@ -269,7 +269,9 @@
       "PowerShell($p = Join-Path $env:APPDATA 'family-tree\\\\db\\\\familytree.json'; if \\(Test-Path $p\\) { Write-Output \"FOUND: $p\"; \\(Get-Item $p\\).Length } else { Write-Output \"NOT at family-tree; searching APPDATA...\"; Get-ChildItem -Path $env:APPDATA -Recurse -Filter 'familytree.json' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName })",
       "PowerShell(Get-Process | Where-Object { $_.ProcessName -match 'electron|family' } | Select-Object ProcessName, Id)",
       "WebFetch(domain:en.wikipedia.org)",
-      "PowerShell($running = Get-Process | Where-Object { $_.ProcessName -match 'electron|family-tree' }; if \\($running\\) { Write-Output \"APP RUNNING - abort\" } else { Write-Output \"app closed - safe\" })"
+      "PowerShell($running = Get-Process | Where-Object { $_.ProcessName -match 'electron|family-tree' }; if \\($running\\) { Write-Output \"APP RUNNING - abort\" } else { Write-Output \"app closed - safe\" })",
+      "Bash(git stash *)",
+      "Bash(git checkout *)"
     ]
   }
 }

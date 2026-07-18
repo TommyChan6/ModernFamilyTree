@@ -640,19 +640,42 @@ function onPointerUp() {
 }
 
 // Scroll = zoom (map-app style; panning is drag-only):
-//   plain scroll → uniform zoom, Ctrl → vertical (time) only, Shift → horizontal (lanes) only
+//   plain scroll → uniform zoom, hold Z → vertical (time) only, X → horizontal
+//   (lanes) only. The axis keys are ignored while a text field is focused.
+const stretchKeys = new Set() // 'x' (horizontal) and/or 'z' (vertical) held
+function isTypingTarget(el) {
+  if (!el) return false
+  const tag = el.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable === true
+}
+function onStretchKeyDown(e) {
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
+  if (isTypingTarget(e.target) || isTypingTarget(document.activeElement)) return
+  const k = e.key.toLowerCase()
+  if (k === 'x' || k === 'z') stretchKeys.add(k)
+}
+function onStretchKeyUp(e) {
+  const k = e.key.toLowerCase()
+  if (k === 'x' || k === 'z') stretchKeys.delete(k)
+}
+function clearStretchKeys() {
+  stretchKeys.clear()
+}
 function onWheel(e) {
   if (!stageEl.value) return
   cancelTween()
   const rect = stageEl.value.getBoundingClientRect()
   const mx = e.clientX - rect.left
   const my = e.clientY - rect.top
-  // Shift+wheel reports its delta on deltaX in Chromium
   const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX
   const factor = Math.exp(-delta * 0.0022)
 
-  const vertical = !e.shiftKey
-  const horizontal = !e.ctrlKey && !e.metaKey
+  // Hold X → horizontal only, Z → vertical only; neither → uniform (both).
+  const armed = !isTypingTarget(document.activeElement) && stretchKeys.size > 0
+  const onlyX = armed && stretchKeys.has('x') && !stretchKeys.has('z')
+  const onlyZ = armed && stretchKeys.has('z') && !stretchKeys.has('x')
+  const vertical = !onlyX
+  const horizontal = !onlyZ
 
   const oldPx = pxPerYear.value,
     oldLs = laneScale.value
@@ -885,6 +908,10 @@ onMounted(() => {
   })
   if (stageEl.value) ro.observe(stageEl.value)
 
+  window.addEventListener('keydown', onStretchKeyDown)
+  window.addEventListener('keyup', onStretchKeyUp)
+  window.addEventListener('blur', clearStretchKeys)
+
   // Coming back into view: fit once (first reveal), otherwise keep the user's
   // pan/zoom and just re-sync to the current stage size.
   watch(
@@ -934,6 +961,9 @@ onBeforeUnmount(() => {
   if (refreshSpinTimer) clearTimeout(refreshSpinTimer)
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerup', onPointerUp)
+  window.removeEventListener('keydown', onStretchKeyDown)
+  window.removeEventListener('keyup', onStretchKeyUp)
+  window.removeEventListener('blur', clearStretchKeys)
   renderer?.dispose()
   renderer = null
 })

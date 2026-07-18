@@ -43,6 +43,7 @@
         v-if="!spaceActive && store.persons.length"
         ref="minimapRef"
         :adapter="minimapAdapter"
+        class="graph-minimap"
         :class="{ 'clean-hide-left': store.cleanView }"
       />
       <div class="bottom-bars" :class="{ 'clean-hide-down': store.cleanView }">
@@ -1729,9 +1730,9 @@ function pickVisibleNode(wx, wy) {
 }
 
 function zoomFilter(event) {
-  // Plain wheel → d3 uniform zoom. Shift/Ctrl/Cmd wheel is directional stretch,
+  // Plain wheel → d3 uniform zoom. Holding X / Z arms directional stretch,
   // handled by onStretchWheel instead, so keep d3 out of it.
-  if (event.type === 'wheel') return !event.ctrlKey && !event.shiftKey && !event.metaKey
+  if (event.type === 'wheel') return !stretchArmed()
   if (event.button != null && event.button !== 0) return false
   const w = clientToWorld(event.clientX, event.clientY)
   const hit = pickVisibleNode(w.x, w.y)
@@ -1739,24 +1740,49 @@ function zoomFilter(event) {
   return true
 }
 
-// Directional zoom: Shift+wheel stretches the layout horizontally, Ctrl/Cmd+wheel
-// vertically (mirrors the Timeline's axis-lock feel). The stretch lives on the
-// camera transform as sx/sy and is baked into positions by the renderer, so nodes
-// stay perfectly round and link strokes keep a uniform width. The point under the
-// cursor is held fixed on the stretched axis; we push the anchored pan back through
-// d3 so its internal transform stays in sync with ours.
+// ── Directional (per-axis) stretch-zoom ──────────────────────────────────────
+// Hold X and scroll to stretch the layout horizontally, Z to stretch it
+// vertically. The stretch lives on the camera transform as sx/sy and is baked
+// into positions by the renderer, so nodes stay perfectly round and link strokes
+// keep a uniform width. The point under the cursor is held fixed on the stretched
+// axis; we push the anchored pan back through d3 so its internal transform stays
+// in sync with ours. The keys are ignored while a text field is focused, so
+// typing "x"/"z" never arms a zoom.
+const stretchKeys = new Set() // 'x' (horizontal) and/or 'z' (vertical) held
+const stretchArmed = () => stretchKeys.size > 0
+
+function isTypingTarget(el) {
+  if (!el) return false
+  const tag = el.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable === true
+}
+function onStretchKeyDown(e) {
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
+  if (isTypingTarget(e.target) || isTypingTarget(document.activeElement)) return
+  const k = e.key.toLowerCase()
+  if (k === 'x' || k === 'z') stretchKeys.add(k)
+}
+function onStretchKeyUp(e) {
+  const k = e.key.toLowerCase()
+  if (k === 'x' || k === 'z') stretchKeys.delete(k)
+}
+function clearStretchKeys() {
+  stretchKeys.clear()
+}
+
 const STRETCH_MIN = 0.25
 const STRETCH_MAX = 4
 function onStretchWheel(e) {
-  const horiz = e.shiftKey
-  const vert = e.ctrlKey || e.metaKey
+  // A focused text field disables directional zoom entirely.
+  if (isTypingTarget(document.activeElement)) return
+  const horiz = stretchKeys.has('x')
+  const vert = stretchKeys.has('z')
   if (!horiz && !vert) return // plain wheel → let d3 do uniform zoom
   if (spaceActive.value) return // 3D space owns its own camera
   e.preventDefault()
   const rect = overlayEl.value.getBoundingClientRect()
   const mx = e.clientX - rect.left
   const my = e.clientY - rect.top
-  // Shift+wheel reports its delta on deltaX in Chromium; fall back to it.
   const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX
   const factor = Math.exp(-delta * 0.0022)
   const t = ctx.transform
@@ -2449,9 +2475,15 @@ onMounted(() => {
   initGraph()
   updateGraph()
   window.addEventListener('keydown', onGlobalKeydown)
+  window.addEventListener('keydown', onStretchKeyDown)
+  window.addEventListener('keyup', onStretchKeyUp)
+  window.addEventListener('blur', clearStretchKeys)
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', onGlobalKeydown)
+  window.removeEventListener('keydown', onStretchKeyDown)
+  window.removeEventListener('keyup', onStretchKeyUp)
+  window.removeEventListener('blur', clearStretchKeys)
   ctx.simulation?.stop()
   ctx.resizeObserver?.disconnect()
   cancelAnimation()
@@ -2874,6 +2906,13 @@ watch(
   transform: translateX(calc(100% + 30px));
   opacity: 0;
   pointer-events: none;
+}
+
+/* Shift the graph minimap right so the full-height time slider clears its
+   inner (left) edge — the slider hugs the far-left rail, the minimap sits
+   just past it. */
+.mini-map.graph-minimap {
+  left: 84px;
 }
 
 /* Compound selector so it outweighs the MiniMap's own base styles */

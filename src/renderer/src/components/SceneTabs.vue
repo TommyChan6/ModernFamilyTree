@@ -175,20 +175,40 @@ defineExpose({ startRename })
 .st-chip.active .st-badge {
   color: var(--accent);
 }
+/* The delete affordance stays mounted and animates open on chip hover — it
+   springs out from nothing rather than snapping in. `max-width` + a negative
+   margin (to absorb the flex gap while collapsed) keep the chip from jumping. */
 .st-x {
-  display: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 13px;
   line-height: 1;
   color: var(--t3);
   border-radius: 4px;
-  padding: 0 2px;
-  transition: color 0.12s;
+  max-width: 0;
+  margin-left: -7px;
+  opacity: 0;
+  transform: scale(0.5);
+  overflow: hidden;
+  pointer-events: none;
+  transition:
+    max-width 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    margin-left 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.18s ease,
+    transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1),
+    color 0.12s ease;
 }
 .st-chip:hover .st-x {
-  display: inline;
+  max-width: 18px;
+  margin-left: 0;
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
 }
 .st-x:hover {
   color: #ef5350;
+  transform: scale(1.18);
 }
 .st-rename {
   width: 110px;

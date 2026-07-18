@@ -271,8 +271,8 @@ onBeforeUnmount(() => {
 .time-slider {
   position: absolute;
   left: 14px;
-  top: 186px;
-  bottom: 118px;
+  top: 14px;
+  bottom: 14px;
   width: 58px;
   z-index: 6;
   display: flex;
@@ -299,6 +299,7 @@ onBeforeUnmount(() => {
 .time-slider.ts-timeline {
   left: 76px;
   top: 226px;
+  bottom: 118px;
 }
 /* Clean view slides the panel off with the rest of the chrome */
 .time-slider.ts-clean {
