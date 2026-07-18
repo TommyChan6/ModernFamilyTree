@@ -33,6 +33,7 @@ export const useMainStore = defineStore('main', () => {
   const activeSceneIds = ref({ groups: null, graph: null, timeline: null })
   const draggingPersonId = ref(null) // person being dragged from the member list
   const selectedPersonId = ref(null)
+  const selectedPersonIds = ref([]) // multi-selection set (graph canvas shift-click)
   const inspectorTab = ref('directory') // right dock tab: 'inspector' | 'directory'
   const modalOpen = ref(false)
   const formOpen = ref(false)
@@ -1001,9 +1002,20 @@ export const useMainStore = defineStore('main', () => {
     return res
   }
 
-  function selectPerson(id) {
+  function selectPerson(id, { modal = true } = {}) {
     selectedPersonId.value = id
-    modalOpen.value = !!id
+    selectedPersonIds.value = id ? [id] : []
+    if (modal) modalOpen.value = !!id
+  }
+
+  // Shift-click on the graph canvas: add/remove a person from the multi-selection
+  // without opening the detail modal. The primary selection tracks the last touch.
+  function toggleSelectPerson(id) {
+    if (!id) return
+    const cur = selectedPersonIds.value
+    const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]
+    selectedPersonIds.value = next
+    selectedPersonId.value = next.length ? next[next.length - 1] : null
   }
 
   function openForm(person = null) {
@@ -1149,6 +1161,7 @@ export const useMainStore = defineStore('main', () => {
     activeSceneIds,
     draggingPersonId,
     selectedPersonId,
+    selectedPersonIds,
     inspectorTab,
     modalOpen,
     formOpen,
@@ -1236,6 +1249,7 @@ export const useMainStore = defineStore('main', () => {
     deleteCharacter,
     setCharacterPortrait,
     selectPerson,
+    toggleSelectPerson,
     openForm,
     closeModal,
     closeForm,

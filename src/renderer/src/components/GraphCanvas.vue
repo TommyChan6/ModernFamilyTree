@@ -173,7 +173,7 @@
         <div v-if="pathAnchor && !pathInfo" key="armed" class="path-card path-armed">
           <span class="path-armed-beacon"></span>
           <span class="path-armed-name">{{ personName(pathAnchor) }}</span>
-          <span class="path-armed-hint">shift-click another person to trace the connection</span>
+          <span class="path-armed-hint">ctrl-click another person to trace the connection</span>
           <button class="path-close" title="Cancel (Esc)" @click="clearPath">✕</button>
         </div>
         <div v-else-if="pathInfo && pathInfo.none" key="none" class="path-card path-none">
@@ -427,7 +427,7 @@
               {{
                 soloType
                   ? '✦ Isolating one type — click again to reset'
-                  : 'Click a type to isolate · Shift-click two people to trace their connection'
+                  : 'Click a type to isolate · Ctrl-click two people to trace their connection'
               }}
             </div>
           </div>
@@ -536,7 +536,7 @@ const focusOpen = ref(false) // Highlights pane (from the header toggle cluster)
 const legendOpen = ref(true) // Legend pane toggle
 const relTypesOpen = ref(false) // Relationships pane toggle
 const soloType = ref(null) // when set, only this relationship type stays lit
-const pathAnchor = ref(null) // first shift-clicked person (armed, waiting for the second)
+const pathAnchor = ref(null) // first ctrl-clicked person (armed, waiting for the second)
 const pathInfo = ref(null) // { ids, rels } | { none, fromId, toId } — the traced connection
 const egoDepth = ref(0) // Orbit rings: 0 = off, 1..3 = hops kept lit around the selection
 const socialPull = ref(1) // Social gravity ×1..×4 — boosts affinity-edge springs (organic)
@@ -831,8 +831,8 @@ function toggleSolo(key) {
 }
 watch(soloType, () => markLinkStyles())
 
-// ── Connection trace (shift-click two people) ───────────────────────────────
-// First shift-click arms an anchor; the second runs a BFS over EVERY edge type
+// ── Connection trace (ctrl-click two people) ────────────────────────────────
+// First ctrl-click arms an anchor; the second runs a BFS over EVERY edge type
 // and lights the shortest chain — nodes stay lit, path links become flowing
 // marching-ants, everything else recedes. Esc or ✕ clears.
 const pathIdSet = computed(() => new Set(pathInfo.value?.ids || []))
@@ -1254,7 +1254,7 @@ function linkTimeHidden(d) {
 // panel filters, but as plain values consumed by the WebGL layers each redraw.
 function nodeVisual(n) {
   const gs = store.graphSettings
-  const selected = store.selectedPersonId === n.id
+  const selected = store.selectedPersonId === n.id || store.selectedPersonIds.includes(n.id)
   const baseFill = nodeColor(n.gender, gs, n.gender_t)
   const fill = selected ? d3.color(baseFill)?.brighter(0.4)?.toString() || baseFill : baseFill
 
@@ -1307,7 +1307,7 @@ function nodeVisual(n) {
       opacityMul *= Math.max(0.45, 1 - dist * 0.16)
     }
   }
-  // Armed trace anchor: a beacon while waiting for the second shift-click.
+  // Armed trace anchor: a beacon while waiting for the second ctrl-click.
   if (pathAnchor.value === n.id && !pathInfo.value) {
     pathGlow = true
     radiusMul = Math.max(radiusMul, 1.2)
@@ -1805,10 +1805,16 @@ function onPointerDown(e) {
   if (e.button !== 0) return
   const w = clientToWorld(e.clientX, e.clientY)
   const node = pickVisibleNode(w.x, w.y)
-  // Shift-click = connection trace (arm an anchor / trace to the second person)
+  // Ctrl/Cmd-click = connection trace (arm an anchor / trace to the second person)
   // — intercepted before dragging so the node never budges.
-  if (e.shiftKey && node) {
+  if ((e.ctrlKey || e.metaKey) && node) {
     handlePathClick(node)
+    return
+  }
+  // Shift-click = toggle this person in the multi-selection (no drag, no modal).
+  if (e.shiftKey && node) {
+    store.relPopup = null
+    store.toggleSelectPerson(node.id)
     return
   }
   if (node && !store.lockNodes) {
@@ -1894,6 +1900,11 @@ function onPointerUp(_e) {
       cleanupEmptyGenRows(ctx, snapshotGenMode, ticked)
     }
     ctx.renderer.invalidatePicker()
+    // A press that never moved is a plain click → select the person.
+    if (!drag.moved) {
+      store.relPopup = null
+      store.selectPerson(d.id)
+    }
     drag = null
     return
   }
@@ -2471,6 +2482,10 @@ watch(
 )
 watch(
   () => store.selectedPersonId,
+  () => markNodeStyles()
+)
+watch(
+  () => store.selectedPersonIds,
   () => markNodeStyles()
 )
 // Time travel: re-sync styles per scrub/playback step, but only while this view

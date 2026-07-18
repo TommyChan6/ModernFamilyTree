@@ -110,6 +110,7 @@ export function createNode3DMaterial({ atlasTexture }) {
         vec3 bodyRGB = vFill;
         if (uHasAtlas == 1 && vAvatar >= 0.0) {
           vec2 uv = vCorner * (0.5 / R) + 0.5;
+          uv.y = 1.0 - uv.y; // atlas rows are top-first; screen-top maps to v=1, so flip
           vec4 tex = texture(uAtlas, vec3(uv, vAvatar));
           if (vAvatar >= 0.5) {
             bodyRGB = tex.rgb;

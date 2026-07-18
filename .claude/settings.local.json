@@ -264,7 +264,12 @@
       "PowerShell(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\235a9c0c-c46c-473a-b3b6-68189c2ba2b1\\\\scratchpad\\\\smoke.mjs\" 2>&1)",
       "PowerShell(node \".\\\\__smoke.mjs\" 2>&1)",
       "PowerShell(node \".\\\\__inspect.mjs\" 2>&1)",
-      "PowerShell($env:BROWSER='none'; Start-Process -FilePath \"npm\" -ArgumentList \"run\",\"preview:web\",\"--\",\"--port\",\"4173\" -WindowStyle Hidden; Start-Sleep -Seconds 5; node \".\\\\__fit.mjs\" 2>&1)"
+      "PowerShell($env:BROWSER='none'; Start-Process -FilePath \"npm\" -ArgumentList \"run\",\"preview:web\",\"--\",\"--port\",\"4173\" -WindowStyle Hidden; Start-Sleep -Seconds 5; node \".\\\\__fit.mjs\" 2>&1)",
+      "WebSearch",
+      "PowerShell($p = Join-Path $env:APPDATA 'family-tree\\\\db\\\\familytree.json'; if \\(Test-Path $p\\) { Write-Output \"FOUND: $p\"; \\(Get-Item $p\\).Length } else { Write-Output \"NOT at family-tree; searching APPDATA...\"; Get-ChildItem -Path $env:APPDATA -Recurse -Filter 'familytree.json' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName })",
+      "PowerShell(Get-Process | Where-Object { $_.ProcessName -match 'electron|family' } | Select-Object ProcessName, Id)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "PowerShell($running = Get-Process | Where-Object { $_.ProcessName -match 'electron|family-tree' }; if \\($running\\) { Write-Output \"APP RUNNING - abort\" } else { Write-Output \"app closed - safe\" })"
     ]
   }
 }

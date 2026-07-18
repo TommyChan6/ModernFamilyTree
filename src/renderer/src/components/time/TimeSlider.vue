@@ -271,7 +271,7 @@ onBeforeUnmount(() => {
 .time-slider {
   position: absolute;
   left: 14px;
-  top: 168px;
+  top: 186px;
   bottom: 118px;
   width: 58px;
   z-index: 6;
