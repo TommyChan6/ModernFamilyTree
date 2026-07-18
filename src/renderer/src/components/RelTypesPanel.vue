@@ -44,6 +44,23 @@
             </button>
             <span v-else class="rtp-builtin" title="Built-in — tunable, not deletable">●</span>
           </div>
+          <div class="rtp-row-gen">
+            <span class="rtp-w-label" title="How the generations layout treats this type's edges">
+              Generations
+            </span>
+            <div class="rtp-seg">
+              <button
+                v-for="opt in GEN_ROLES"
+                :key="opt.role"
+                class="rtp-seg-btn"
+                :class="{ 'is-on': def.symmetryRole === opt.role }"
+                :title="opt.hint"
+                @click="patch(def, { symmetryRole: opt.role })"
+              >
+                {{ opt.glyph }} {{ opt.label }}
+              </button>
+            </div>
+          </div>
           <div v-if="store.caps.tuneAffinity" class="rtp-row-weight">
             <span class="rtp-w-label">Repel</span>
             <input
@@ -80,6 +97,23 @@
             ＋ Add type
           </button>
         </div>
+        <div class="rtp-row-gen rtp-new-gen">
+          <span class="rtp-w-label" title="How the generations layout treats this type's edges">
+            Generations
+          </span>
+          <div class="rtp-seg">
+            <button
+              v-for="opt in GEN_ROLES"
+              :key="opt.role"
+              class="rtp-seg-btn"
+              :class="{ 'is-on': draft.symmetryRole === opt.role }"
+              :title="opt.hint"
+              @click="draft.symmetryRole = opt.role"
+            >
+              {{ opt.glyph }} {{ opt.label }}
+            </button>
+          </div>
+        </div>
         <div v-if="store.caps.tuneAffinity" class="rtp-row-weight rtp-new-weight">
           <span class="rtp-w-label">Repel</span>
           <input
@@ -104,6 +138,29 @@ import { useMainStore } from '../store/index.js'
 
 defineEmits(['close'])
 const store = useMainStore()
+
+// The generational role a type plays in the generations layout. Maps 1:1 to
+// RelationshipTypeDef.symmetryRole — the field the pure tree math reads.
+const GEN_ROLES = [
+  {
+    role: 'vertical',
+    glyph: '↓',
+    label: 'Generational',
+    hint: 'Parent → child — the child sits one generation below.'
+  },
+  {
+    role: 'horizontal',
+    glyph: '⚭',
+    label: 'Same generation',
+    hint: 'A couple — both partners share a row, side by side.'
+  },
+  {
+    role: 'none',
+    glyph: '—',
+    label: 'Non-generational',
+    hint: 'Ignored by the generations layout (still drawn and pulls in force layouts).'
+  }
+]
 
 // The legacy trio has color '' (the Style panel drives it) — show the Style
 // panel's current color in the swatch; picking a color moves the type onto
@@ -145,7 +202,8 @@ const draft = reactive({
   directed: false,
   role_a: '',
   role_b: '',
-  weight: 0
+  weight: 0,
+  symmetryRole: 'none'
 })
 
 async function create() {
@@ -157,7 +215,8 @@ async function create() {
     directed: draft.directed,
     role_a: draft.directed ? draft.role_a : '',
     role_b: draft.directed ? draft.role_b : '',
-    weight: draft.weight
+    weight: draft.weight,
+    symmetryRole: draft.symmetryRole
   })
   if (res.success) {
     draft.label = ''
@@ -165,6 +224,7 @@ async function create() {
     draft.role_b = ''
     draft.weight = 0
     draft.directed = false
+    draft.symmetryRole = 'none'
   }
 }
 </script>
@@ -309,6 +369,42 @@ async function create() {
   margin-top: 6px;
   padding-left: 30px;
 }
+.rtp-row-gen {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding-left: 30px;
+}
+.rtp-seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.rtp-seg-btn {
+  border: none;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: var(--t2);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rtp-seg-btn:first-child {
+  border-left: none;
+}
+.rtp-seg-btn:hover {
+  background: var(--hover);
+  color: var(--t1);
+}
+.rtp-seg-btn.is-on {
+  background: var(--accent);
+  color: #fff;
+}
 .rtp-w-label {
   font-size: 9.5px;
   font-weight: 700;
@@ -377,6 +473,10 @@ async function create() {
   cursor: pointer;
 }
 .rtp-new-weight {
+  padding-left: 0;
+  margin-top: 10px;
+}
+.rtp-new-gen {
   padding-left: 0;
   margin-top: 10px;
 }

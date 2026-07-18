@@ -133,19 +133,29 @@ describe('relTypes channels', () => {
     expect(updated.color).toBe('#123456')
   })
 
-  it('relTypes:update refuses direction/role changes on builtins but allows them on customs', () => {
+  it('relTypes:update refuses direction/role changes on builtins but allows the generational role', () => {
     initDB()
     const { db } = getDB()
     const pc = channelHandlers['relTypes:getAll'](db, {}, handlerEnv).find(
       (d) => d.key === 'parent_child'
     )
+    // directed + role names stay locked on builtins; the generational role is
+    // user-tunable on any type (it just tells the layout how to read the edge).
     const after = channelHandlers['relTypes:update'](
       db,
-      { id: pc.id, directed: false, symmetryRole: 'none' },
+      { id: pc.id, directed: false, symmetryRole: 'none', role_a: 'X' },
       handlerEnv
     )
     expect(after.directed).toBe(true)
-    expect(after.symmetryRole).toBe('vertical')
+    expect(after.role_a).toBe('Parent')
+    expect(after.symmetryRole).toBe('none')
+    // …and it can be set back.
+    const restored = channelHandlers['relTypes:update'](
+      db,
+      { id: pc.id, symmetryRole: 'vertical' },
+      handlerEnv
+    )
+    expect(restored.symmetryRole).toBe('vertical')
 
     const custom = channelHandlers['relTypes:create'](db, { label: 'Liege' }, handlerEnv)
     const flipped = channelHandlers['relTypes:update'](

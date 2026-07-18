@@ -1369,11 +1369,16 @@ export const channelHandlers: Record<string, Handler> = {
     if (Array.isArray(data.statuses) && data.statuses.length) {
       def.statuses = data.statuses.map(String)
     }
-    // Direction and hierarchy role define what existing edges MEAN — only
-    // custom defs may change them (a builtin flip would corrupt the tree math).
+    // The generational (hierarchy) role is user-tunable on ANY type, including
+    // builtins — it's how the generations layout is told to treat this type's
+    // edges (vertical = parent→child, horizontal = same-generation couple,
+    // none = ignored by the tree math). Changing it reinterprets existing edges,
+    // which is the intended effect.
+    if (data.symmetryRole !== undefined) def.symmetryRole = coerceSymmetryRole(data.symmetryRole)
+    // Direction and role names define what a directed edge MEANS — only custom
+    // defs may change them (flipping a builtin's direction would corrupt a→b).
     if (!def.builtin) {
       if (data.directed !== undefined) def.directed = !!data.directed
-      if (data.symmetryRole !== undefined) def.symmetryRole = coerceSymmetryRole(data.symmetryRole)
       if (data.role_a !== undefined) def.role_a = String(data.role_a)
       if (data.role_b !== undefined) def.role_b = String(data.role_b)
     }

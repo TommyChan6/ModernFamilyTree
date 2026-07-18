@@ -271,7 +271,8 @@
       "WebFetch(domain:en.wikipedia.org)",
       "PowerShell($running = Get-Process | Where-Object { $_.ProcessName -match 'electron|family-tree' }; if \\($running\\) { Write-Output \"APP RUNNING - abort\" } else { Write-Output \"app closed - safe\" })",
       "Bash(git stash *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(npx tsc *)"
     ]
   }
 }
