@@ -16,6 +16,7 @@
     <div
       ref="containerEl"
       class="graph-area"
+      :class="{ 'wheel-editing': editMode }"
       @dragover.prevent="onDirectoryDragOver"
       @drop.prevent="onDirectoryDrop"
     >
@@ -188,6 +189,100 @@
         @set-size="(v) => setSelectedStyle({ size: v })"
         @set-color="(c) => setSelectedStyle({ color: c })"
         @solo="toggleSolo"
+      />
+
+      <!-- ── Action wheel (hold Tab): flick toward an edit mode ─────────────
+         The wheel layer owns the pointer while it's up; releasing Tab (or
+         clicking a sector) commits, the dead zone / Esc cancels. -->
+      <Transition name="wheelfade">
+        <ActionWheel
+          v-if="wheelOpen"
+          :slots="wheelSlots"
+          :x="wheelPos.x"
+          :y="wheelPos.y"
+          :active-id="editMode?.id || null"
+          @update:highlight="wheelHighlight = $event"
+          @pick="commitWheel($event)"
+          @cancel="cancelWheel"
+        />
+      </Transition>
+      <!-- selection burst: a ring blooming out from where the wheel just was -->
+      <div
+        v-if="wheelBurst"
+        :key="wheelBurst.key"
+        class="wheel-burst"
+        :style="{ left: wheelBurst.x + 'px', top: wheelBurst.y + 'px', '--mc': wheelBurst.color }"
+      ></div>
+
+      <!-- Link mode's ghost bond: anchor → cursor, marching until click two -->
+      <svg v-if="ghostLink" class="ghost-layer">
+        <line
+          class="ghost-line"
+          :x1="ghostLink.x1"
+          :y1="ghostLink.y1"
+          :x2="ghostLink.x2"
+          :y2="ghostLink.y2"
+          :style="{ stroke: ghostLink.color }"
+        />
+        <circle
+          class="ghost-dot"
+          :cx="ghostLink.x1"
+          :cy="ghostLink.y1"
+          r="5"
+          :style="{ fill: ghostLink.color }"
+        />
+      </svg>
+
+      <!-- Add mode's christening bubble: name the person you just placed -->
+      <div
+        v-if="nameBubble"
+        class="name-bubble"
+        :style="{ left: nameBubble.x + 'px', top: nameBubble.y + 'px' }"
+      >
+        <input
+          ref="nameInputEl"
+          v-model="nameBubble.value"
+          class="name-bubble-input"
+          :placeholder="`Name this ${store.noun.toLowerCase()}…`"
+          @keydown.enter.prevent="commitNameBubble(true)"
+          @keydown.esc.stop.prevent="commitNameBubble(false)"
+        />
+      </div>
+
+      <!-- Mode HUD: which edit mode is live, its next step, and the exits -->
+      <Transition name="whud">
+        <div
+          v-if="editMode"
+          class="wheel-hud"
+          :style="{ '--mc': editMode.color || 'var(--accent)' }"
+        >
+          <span class="wheel-hud-badge">
+            <span class="wheel-hud-ring"></span>
+            <span class="wheel-hud-ic">{{ editMode.icon }}</span>
+          </span>
+          <div class="wheel-hud-text">
+            <div class="wheel-hud-label">{{ editMode.label }}</div>
+            <div class="wheel-hud-hint">{{ hudHint }}</div>
+          </div>
+          <button class="wheel-hud-btn" title="Customize the wheel" @click="openWheelConfig()">
+            ⚙
+          </button>
+          <button class="wheel-hud-btn" title="Exit edit mode (Esc)" @click="exitEditMode">
+            ✕
+          </button>
+        </div>
+      </Transition>
+      <Transition name="wflash">
+        <div v-if="wheelFlash" :key="wheelFlash.key" class="wheel-flash">
+          <span class="wheel-flash-ic">{{ wheelFlash.icon }}</span
+          >{{ wheelFlash.text }}
+        </div>
+      </Transition>
+
+      <WheelConfigModal
+        :open="wheelConfigOpen"
+        :initial-slot="wheelConfigSlot"
+        @close="wheelConfigOpen = false"
       />
 
       <!-- Connection trace: armed hint / the traced chain / no-connection notice -->
@@ -543,6 +638,9 @@ import { viewRectXYK } from './webgl/minimapMath'
 import { withAlpha } from './webgl/overlayUtils.js'
 import SceneTabs from './SceneTabs.vue'
 import GraphActionPane from './graph/GraphActionPane.vue'
+import ActionWheel from './graph/ActionWheel.vue'
+import WheelConfigModal from './graph/WheelConfigModal.vue'
+import { resolveWheelSlots } from './graph/wheelModes.js'
 import Graph3DView from './Graph3DView.vue'
 import MiniMap from './MiniMap.vue'
 import ViewHeader from './ViewHeader.vue'
@@ -927,6 +1025,11 @@ watch(
     if (pathInfo.value || pathAnchor.value) clearPath()
     const selRel = store.relPopup?.rel
     if (selRel && !store.relationships.some((r) => r.id === selRel.id)) store.relPopup = null
+    // Wheel-mode anchors must not outlive their targets either.
+    if (linkAnchorId.value && !store.persons.some((p) => p.id === linkAnchorId.value)) {
+      linkAnchorId.value = null
+    }
+    if (deleteArm.value) deleteArm.value = null
   }
 )
 watch([pathInfo, pathAnchor], () => {
@@ -1176,6 +1279,391 @@ function traceFrom(id) {
 function tracePair([a, b]) {
   pathAnchor.value = null
   pathInfo.value = shortestPath(a, b, store.relationships) || { none: true, fromId: a, toId: b }
+}
+
+// ── Action wheel (hold Tab) ─────────────────────────────────────────────────
+// Holding Tab blooms a radial menu of edit modes under the cursor; flick
+// toward one and release to enter it. An active mode routes plain clicks to
+// its verb (delete, link, paint…) until Esc / a quick Tab tap exits. Slots are
+// user-configurable (WheelConfigModal → store.wheelSlots, per project).
+const wheelOpen = ref(false)
+const wheelPos = ref({ x: 0, y: 0 })
+const wheelHighlight = ref(null)
+const wheelConfigOpen = ref(false)
+const wheelConfigSlot = ref(null) // direction preselected in the editor
+const editMode = ref(null) // the active resolved slot, or null
+const linkAnchorId = ref(null) // link mode: first of the two consecutive clicks
+const deleteArm = ref(null) // delete mode: { id, isRel } awaiting the confirm click
+const ghostMouse = ref(null) // link mode: cursor (container px) for the ghost line
+const nameBubble = ref(null) // add mode: { id, x, y, value } inline christening input
+const nameInputEl = ref(null)
+const wheelFlash = ref(null) // transient toast: { icon, text, key }
+const wheelBurst = ref(null) // commit ring burst: { x, y, color, key }
+let wheelFlashTimer = null
+let deleteArmTimer = null
+let wheelBurstTimer = null
+let wheelDownAt = 0
+let lastMouse = null // last hover point in container px — where the wheel opens
+
+const wheelEnv = computed(() => ({
+  relTypeByKey: store.relTypeByKey,
+  tagById: new Map(store.tags.map((t) => [t.id, t])),
+  graphSettings: store.graphSettings,
+  caps: store.caps,
+  noun: store.noun
+}))
+const wheelSlots = computed(() => resolveWheelSlots(store.wheelSlots, wheelEnv.value))
+
+const hudHint = computed(() => {
+  const m = editMode.value
+  if (!m) return ''
+  if (m.kind === 'link' && linkAnchorId.value)
+    return `Now click who ${personName(linkAnchorId.value)} bonds with`
+  if (m.kind === 'delete' && deleteArm.value) return 'Click it again to confirm'
+  if (m.kind === 'pin' && currentMode.value !== 'auto')
+    return 'Pinning matters in the Organic layout'
+  return m.hint
+})
+
+function onWheelKeyDown(e) {
+  if (store.activeView !== 'graph') return
+  if (wheelOpen.value && (e.key === 'c' || e.key === 'C')) {
+    e.preventDefault()
+    cancelWheel()
+    openWheelConfig()
+    return
+  }
+  if (e.key !== 'Tab') return
+  if (store.modalOpen || store.formOpen || wheelConfigOpen.value || nameBubble.value) return
+  if (spaceActive.value) return // the 3D stage owns its own controls (for now)
+  // Full-screen overlays (landing page, auth, curtain, profile) own the stage —
+  // the graph is merely mounted beneath them.
+  if (!store.authUser || store.curtain.active || store.userPageOpen) return
+  if (document.querySelector('.home')) return
+  if (isTypingTarget(e.target) || isTypingTarget(document.activeElement)) return
+  e.preventDefault() // Tab must not cycle focus while it drives the wheel
+  if (e.repeat || wheelOpen.value) return
+  wheelDownAt = performance.now()
+  openWheel()
+}
+
+function onWheelKeyUp(e) {
+  if (e.key !== 'Tab' || !wheelOpen.value) return
+  e.preventDefault()
+  commitWheel(wheelHighlight.value)
+}
+
+function openWheel() {
+  const el = containerEl.value
+  if (!el) return
+  const { width, height } = el.getBoundingClientRect()
+  const mx = 150,
+    mTop = 168,
+    mBot = 168
+  const px = lastMouse?.x ?? width / 2
+  const py = lastMouse?.y ?? height / 2
+  wheelPos.value = {
+    x: Math.min(Math.max(px, mx), Math.max(mx, width - mx)),
+    y: Math.min(Math.max(py, mTop), Math.max(mTop, height - mBot))
+  }
+  wheelHighlight.value = null
+  wheelOpen.value = true
+}
+
+function cancelWheel() {
+  wheelOpen.value = false
+  wheelHighlight.value = null
+}
+
+function commitWheel(idx) {
+  const quickTap = performance.now() - wheelDownAt < 230
+  const pos = { ...wheelPos.value }
+  cancelWheel()
+  if (idx == null) {
+    // A quick empty tap toggles back out of the active mode.
+    if (quickTap && editMode.value) exitEditMode()
+    return
+  }
+  const s = wheelSlots.value[idx]
+  if (!s) return
+  if (s.empty) {
+    openWheelConfig(idx) // an empty slot IS the invitation to fill it
+    return
+  }
+  if (s.disabled) {
+    showWheelFlash('🔒', s.disabledHint || 'Not available right now')
+    return
+  }
+  spawnWheelBurst(pos, s.color)
+  activateEditMode(s)
+}
+
+function activateEditMode(s) {
+  if (editMode.value?.id === s.id) {
+    exitEditMode() // picking the running mode again turns it off
+    return
+  }
+  editMode.value = s
+  linkAnchorId.value = null
+  deleteArm.value = null
+  ghostMouse.value = null
+  markNodeStyles()
+  markLinkStyles()
+}
+
+function exitEditMode() {
+  editMode.value = null
+  linkAnchorId.value = null
+  deleteArm.value = null
+  ghostMouse.value = null
+  markNodeStyles()
+  markLinkStyles()
+}
+
+function openWheelConfig(slotIdx = null) {
+  wheelConfigSlot.value = slotIdx
+  wheelConfigOpen.value = true
+}
+
+function showWheelFlash(icon, text) {
+  wheelFlash.value = { icon, text, key: Date.now() }
+  if (wheelFlashTimer) clearTimeout(wheelFlashTimer)
+  wheelFlashTimer = setTimeout(() => {
+    wheelFlash.value = null
+    wheelFlashTimer = null
+  }, 1700)
+}
+
+function spawnWheelBurst(pos, color) {
+  wheelBurst.value = { x: pos.x, y: pos.y, color: color || '#6c8ef5', key: Date.now() }
+  if (wheelBurstTimer) clearTimeout(wheelBurstTimer)
+  wheelBurstTimer = setTimeout(() => {
+    wheelBurst.value = null
+    wheelBurstTimer = null
+  }, 620)
+}
+
+// The ghost bond: anchor node → cursor, while link mode waits for click two.
+const ghostLink = computed(() => {
+  const m = editMode.value
+  if (!m || m.kind !== 'link' || !linkAnchorId.value || !ghostMouse.value) return null
+  const n = ctx.nodesData.find((x) => x.id === linkAnchorId.value)
+  if (!n) return null
+  const s = worldToScreen(n.x, n.y, ctx.transform)
+  return { x1: s.x, y1: s.y, x2: ghostMouse.value.x, y2: ghostMouse.value.y, color: m.color }
+})
+
+/** Route a plain click to the active edit mode's verb. `w` is world coords. */
+function handleModeClick(w, node) {
+  const m = editMode.value
+  if (!m) return
+  if (m.kind === 'add') {
+    if (node) showWheelFlash('✚', 'Click an empty spot')
+    else addPersonAt(w)
+    return
+  }
+  if (node) {
+    if (m.kind === 'delete') armOrDelete({ id: node.id, isRel: false })
+    else if (m.kind === 'link') linkClick(node)
+    else if (m.kind === 'pin') pinClick(node)
+    else if (m.kind === 'paint') paintClick(node, m)
+    else if (m.kind === 'tag') tagClick(node, m)
+    else showWheelFlash(m.icon, 'Click a bond, not a node')
+    return
+  }
+  // Empty canvas: the bond-targeting modes pick the line under the cursor.
+  let link = ctx.renderer?.pickLink(w.x, w.y, store.graphSettings)
+  if (link && linkTimeHidden(link)) link = null
+  if (link && m.kind === 'delete') return armOrDelete({ id: link.id, isRel: true })
+  if (link && m.kind === 'end') return endBondClick(link)
+  if (link && m.kind === 'swap') return swapBondClick(link)
+  // Clicked nothing: release any half-done gesture.
+  if (linkAnchorId.value || deleteArm.value) {
+    linkAnchorId.value = null
+    deleteArm.value = null
+    markNodeStyles()
+    markLinkStyles()
+  }
+}
+
+// Delete mode: first click arms (red pulse), the second within a beat commits.
+function armOrDelete(target) {
+  const cur = deleteArm.value
+  if (deleteArmTimer) clearTimeout(deleteArmTimer)
+  if (cur && cur.id === target.id) {
+    deleteArm.value = null
+    doWheelDelete(target)
+    return
+  }
+  deleteArm.value = target
+  deleteArmTimer = setTimeout(() => {
+    deleteArm.value = null
+    markNodeStyles()
+    markLinkStyles()
+  }, 2600)
+  markNodeStyles()
+  markLinkStyles()
+}
+
+async function doWheelDelete(target) {
+  if (target.isRel) {
+    const res = await store.deleteRelationship(target.id)
+    if (res?.success) showWheelFlash('🗑', 'Bond deleted')
+  } else {
+    const name = personName(target.id)
+    const res = await store.deletePerson(target.id)
+    if (res?.success) showWheelFlash('🗑', `${name} deleted`)
+  }
+  markNodeStyles()
+  markLinkStyles()
+}
+
+// Link mode: consecutive clicks bond people; the second click becomes the next
+// anchor so chains (parent → child → grandchild) flow without re-arming.
+async function linkClick(node) {
+  const m = editMode.value
+  if (!store.relTypeByKey.has(m.slot.type)) {
+    showWheelFlash('⚠️', 'That bond type no longer exists')
+    exitEditMode()
+    return
+  }
+  if (!linkAnchorId.value) {
+    linkAnchorId.value = node.id
+    markNodeStyles()
+    return
+  }
+  if (linkAnchorId.value === node.id) {
+    linkAnchorId.value = null
+    markNodeStyles()
+    return
+  }
+  const a = linkAnchorId.value
+  const b = node.id
+  const dup = store.relationships.some(
+    (r) =>
+      r.type === m.slot.type &&
+      ((r.person_a_id === a && r.person_b_id === b) || (r.person_a_id === b && r.person_b_id === a))
+  )
+  if (dup) {
+    showWheelFlash(m.icon, 'Already linked')
+  } else {
+    const res = await store.createRelationship({
+      person_a_id: a,
+      person_b_id: b,
+      type: m.slot.type
+    })
+    if (res?.success) showWheelFlash('✨', `Linked — ${m.label}`)
+  }
+  linkAnchorId.value = b
+  markNodeStyles()
+  markLinkStyles()
+}
+
+function pinClick(node) {
+  if (node.fx != null) {
+    node.fx = null
+    node.fy = null
+    if (currentMode.value === 'auto') ctx.simulation?.alpha(0.15).restart()
+    showWheelFlash('📌', `${node.name || 'Node'} released`)
+  } else {
+    node.fx = node.x
+    node.fy = node.y
+    showWheelFlash('📌', `${node.name || 'Node'} pinned`)
+  }
+  uiTick.value++
+}
+
+// Paint mode: tint the node (same color again wipes it back to auto).
+function paintClick(node, m) {
+  const bag = layoutsOf(activeSceneId.value)
+  if (!bag) return
+  if (!bag.styles) bag.styles = {}
+  activeStyles = bag.styles
+  const next = { ...(activeStyles[node.id] || {}) }
+  if (next.color === m.slot.color) delete next.color
+  else next.color = m.slot.color
+  if (Object.keys(next).length) activeStyles[node.id] = next
+  else delete activeStyles[node.id]
+  uiTick.value++
+  markNodeStyles()
+  schedulePersist(activeSceneId.value)
+}
+
+async function tagClick(node, m) {
+  const tagId = m.slot.tagId
+  const has = (store.tagsOf.get(node.id) || []).some((t) => t.id === tagId)
+  const res = has
+    ? await store.removeEntityTag(node.id, tagId)
+    : await store.addEntityTag(node.id, tagId)
+  if (res?.success) showWheelFlash(m.icon, `${has ? '−' : '+'} ${m.label}`)
+}
+
+async function endBondClick(link) {
+  if (link.ended?.year) {
+    showWheelFlash('⌛', 'Already ended')
+    return
+  }
+  const year = store.currentDate?.year
+  if (!year) {
+    showWheelFlash('⌛', 'Set a current year first')
+    return
+  }
+  const res = await store.updateRelationship({ id: link.id, ended: { year } })
+  if (res?.success) showWheelFlash('⌛', `Ended ${year}`)
+}
+
+async function swapBondClick(link) {
+  const def = store.relTypeByKey.get(link.type)
+  if (!def?.directed) {
+    showWheelFlash('⇄', 'That bond has no direction')
+    return
+  }
+  const res = await store.updateRelationship({
+    id: link.id,
+    person_a_id: link.person_b_id,
+    person_b_id: link.person_a_id
+  })
+  if (res?.success) showWheelFlash('⇄', 'Direction flipped')
+}
+
+// Add mode: drop a new person where the click landed, then christen them via
+// the inline bubble (Enter saves, Esc keeps the placeholder name).
+async function addPersonAt(w) {
+  const res = await store.createPerson({ name: `New ${store.noun}` })
+  if (!res?.success) return
+  await nextTick() // let the persons watcher run updateGraph() first
+  const node = ctx.nodesData.find((n) => n.id === res.data.id)
+  const m = currentMode.value
+  if (node) {
+    node.x = w.x
+    node.fx = w.x
+    if (m !== 'age') node.y = w.y
+    if (m === 'auto') {
+      // Organic: seed the position and let the simulation settle around it
+      node.fx = null
+      node.fy = null
+      node.vx = 0
+      node.vy = 0
+      ctx.simulation.alpha(0.1).restart()
+    } else if (m !== 'age') {
+      node.fy = w.y
+    }
+    ticked()
+    ctx.renderer?.invalidatePicker()
+    saveCurrentState()
+  }
+  const s = worldToScreen(node ? node.x : w.x, node ? node.y : w.y, ctx.transform)
+  nameBubble.value = { id: res.data.id, x: s.x, y: s.y, value: '' }
+  await nextTick()
+  nameInputEl.value?.focus()
+}
+
+async function commitNameBubble(save) {
+  const nb = nameBubble.value
+  if (!nb) return
+  nameBubble.value = null
+  const name = (nb.value || '').trim()
+  if (save && name) await store.updatePerson({ id: nb.id, name })
 }
 
 // ── Snapshot helpers ────────────────────────────────────────────────────────
@@ -1449,6 +1937,18 @@ function nodeVisual(n) {
     }
   }
 
+  // Action-wheel arming: the delete-confirm pulse / the link-mode anchor beacon.
+  let wheelRing = null
+  if (deleteArm.value && !deleteArm.value.isRel && deleteArm.value.id === n.id) {
+    wheelRing = '#ef5350'
+    pathGlow = true
+    radiusMul = Math.max(radiusMul, 1.18)
+  } else if (linkAnchorId.value === n.id && editMode.value?.kind === 'link') {
+    wheelRing = editMode.value.color
+    pathGlow = true
+    radiusMul = Math.max(radiusMul, 1.12)
+  }
+
   // Highlight-slot ring: a colored border (selection still wins).
   const hl = n.highlight ? n.highlight.color || '#f5a623' : null
   return {
@@ -1456,9 +1956,9 @@ function nodeVisual(n) {
     fill,
     // A crisp white rim for selection; the accent halo/ring rides just outside it
     // (drawn in the shader) so the blue reads as focus without a doubled rim.
-    border: selected ? '#ffffff' : hl || '#ffffff',
-    borderPx: selected ? 2.4 : hl ? 2.6 : 1.5,
-    borderA: selected ? 1 : hl ? 0.92 : 0.18,
+    border: selected ? '#ffffff' : wheelRing || hl || '#ffffff',
+    borderPx: selected ? 2.4 : wheelRing ? 2.8 : hl ? 2.6 : 1.5,
+    borderA: selected ? 1 : wheelRing ? 1 : hl ? 0.92 : 0.18,
     opacity: gs.nodeOpacity * opacityMul,
     selected,
     glow: selected || timeGlow || pathGlow || (hoverId === n.id && gs.glowOnHover) ? 1 : 0,
@@ -1484,7 +1984,7 @@ function linkVisual(d) {
     emph = emphVisual(),
     persons = store.persons
   const def = store.relTypeByKey.get(d.type)
-  const colorHex = getLinkStroke(d, emph, gs, persons, def)
+  let colorHex = getLinkStroke(d, emph, gs, persons, def)
   let width = getLinkWidth(d, emph, gs, persons)
   let opacity = getLinkEmphOpacity(d, emph, gs, persons)
 
@@ -1629,6 +2129,18 @@ function linkVisual(d) {
       opacity *= 0.05
       flow = 0
     }
+  }
+
+  // Delete mode's armed bond: a red marching warning until the confirming click.
+  if (deleteArm.value?.isRel && deleteArm.value.id === d.id) {
+    colorHex = '#ef5350'
+    opacity = 1
+    width = Math.max(width, 3.2)
+    dashLen = 5
+    dashGap = 4
+    flow = 30
+    fadeTo = 1
+    halo = 1
   }
 
   const marker = getLinkMarker(d, emph, persons, def)
@@ -2109,6 +2621,8 @@ function removePointerHandlers() {
 
 function onPointerDown(e) {
   if (e.button !== 0) return
+  // A pending christening commits with whatever was typed — the click moves on.
+  if (nameBubble.value) commitNameBubble(true)
   // Modifier-clicks are graph gestures, never text-selection gestures — without
   // this a shift-click extends whatever DOM selection exists and floods the
   // whole app with highlighted text.
@@ -2133,6 +2647,12 @@ function onPointerDown(e) {
   // Shift-drag on empty canvas = marquee select (box or lasso, per the toolbar).
   if (e.shiftKey && !node && !spaceActive.value) {
     startMarquee(e)
+    return
+  }
+  // An active action-wheel mode routes plain clicks to its verb — no drag,
+  // no selection. Modifier gestures (trace, multi-select) keep working above.
+  if (editMode.value && !spaceActive.value) {
+    handleModeClick(w, node)
     return
   }
   if (node && !store.lockNodes) {
@@ -2275,6 +2795,7 @@ function onPointerUp(e) {
 
 // Double-click a person → the full profile card (single click just selects).
 function onDblClick(e) {
+  if (editMode.value) return // mode clicks are deliberate — never pop the card
   const w = clientToWorld(e.clientX, e.clientY)
   const node = pickVisibleNode(w.x, w.y)
   if (node && !store.lockNodes) {
@@ -2317,6 +2838,8 @@ function onDirectoryDrop(e) {
 
 // Hover glow (only meaningful when not dragging).
 function onHoverMove(e) {
+  lastMouse = containerXY(e) // remembered so the action wheel opens under the cursor
+  if (editMode.value?.kind === 'link' && linkAnchorId.value) ghostMouse.value = lastMouse
   if (drag) return
   const w = clientToWorld(e.clientX, e.clientY)
   const node = pickVisibleNode(w.x, w.y)
@@ -2827,12 +3350,25 @@ defineExpose({ flushLayout, reloadScenes, exportImage })
 
 let scenesInitialized = false
 
-// Esc peels back one layer at a time: trace → selected bond → selected people.
-// Overlays (modal/form) own Esc while they're up.
+// Esc peels back one layer at a time: wheel layers → trace → selected bond →
+// selected people. Overlays (modal/form) own Esc while they're up.
 function onGlobalKeydown(e) {
   if (e.key !== 'Escape') return
   if (store.modalOpen || store.formOpen) return
-  if (marqueeRaw) {
+  if (wheelConfigOpen.value) {
+    wheelConfigOpen.value = false
+  } else if (wheelOpen.value) {
+    cancelWheel()
+  } else if (nameBubble.value) {
+    commitNameBubble(false)
+  } else if (linkAnchorId.value || deleteArm.value) {
+    linkAnchorId.value = null
+    deleteArm.value = null
+    markNodeStyles()
+    markLinkStyles()
+  } else if (editMode.value) {
+    exitEditMode()
+  } else if (marqueeRaw) {
     marqueeRaw = null
     marquee.value = null
   } else if (pathInfo.value || pathAnchor.value) clearPath()
@@ -2847,13 +3383,22 @@ onMounted(() => {
   window.addEventListener('keydown', onGlobalKeydown)
   window.addEventListener('keydown', onStretchKeyDown)
   window.addEventListener('keyup', onStretchKeyUp)
+  window.addEventListener('keydown', onWheelKeyDown)
+  window.addEventListener('keyup', onWheelKeyUp)
   window.addEventListener('blur', clearStretchKeys)
+  window.addEventListener('blur', cancelWheel)
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', onGlobalKeydown)
   window.removeEventListener('keydown', onStretchKeyDown)
   window.removeEventListener('keyup', onStretchKeyUp)
+  window.removeEventListener('keydown', onWheelKeyDown)
+  window.removeEventListener('keyup', onWheelKeyUp)
   window.removeEventListener('blur', clearStretchKeys)
+  window.removeEventListener('blur', cancelWheel)
+  if (wheelFlashTimer) clearTimeout(wheelFlashTimer)
+  if (deleteArmTimer) clearTimeout(deleteArmTimer)
+  if (wheelBurstTimer) clearTimeout(wheelBurstTimer)
   ctx.simulation?.stop()
   ctx.resizeObserver?.disconnect()
   cancelAnimation()
@@ -2897,10 +3442,7 @@ watch(
   }
 )
 // A clicked / marquee-selected bond lights up the line itself.
-watch(
-  [() => store.relPopup, () => store.selectedRelationshipIds],
-  () => markLinkStyles()
-)
+watch([() => store.relPopup, () => store.selectedRelationshipIds], () => markLinkStyles())
 // Time travel: re-sync styles per scrub/playback step, but only while this view
 // is actually on screen (it stays mounted, hidden, behind the other views);
 // watching activeView too re-syncs on the way back in if time moved meanwhile.
@@ -4039,5 +4581,301 @@ watch(
 .seg-option.seg-active {
   color: var(--t1);
   font-weight: 700;
+}
+
+/* ── Action wheel & edit modes ─────────────────────────────────────────────── */
+.graph-area.wheel-editing .graph-overlay {
+  cursor: crosshair;
+}
+
+.wheelfade-leave-active {
+  transition: opacity 0.16s ease;
+}
+.wheelfade-leave-to {
+  opacity: 0;
+}
+
+/* Commit burst: a mode-colored ring blooming out of the wheel's last position. */
+.wheel-burst {
+  --mc: var(--accent);
+  position: absolute;
+  z-index: 19;
+  width: 250px;
+  height: 250px;
+  margin: -125px 0 0 -125px;
+  border-radius: 50%;
+  border: 2px solid var(--mc);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--mc) 45%, transparent);
+  pointer-events: none;
+  animation: wheel-burst 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes wheel-burst {
+  from {
+    transform: scale(0.28);
+    opacity: 0.95;
+  }
+  to {
+    transform: scale(1.05);
+    opacity: 0;
+  }
+}
+
+/* Link mode's ghost bond: a marching dashed line from the anchor to the cursor. */
+.ghost-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 6;
+  pointer-events: none;
+  overflow: visible;
+}
+.ghost-line {
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 8 7;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 6px currentColor);
+  animation: ghost-march 0.5s linear infinite;
+}
+@keyframes ghost-march {
+  to {
+    stroke-dashoffset: -15;
+  }
+}
+.ghost-dot {
+  animation: ghost-pulse 1.1s ease-in-out infinite;
+}
+@keyframes ghost-pulse {
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Add mode's christening bubble. */
+.name-bubble {
+  position: absolute;
+  z-index: 21;
+  transform: translate(-50%, calc(-100% - 34px));
+  background: var(--glass-strong);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 12px;
+  padding: 6px 8px;
+  box-shadow: var(--shadow);
+  animation: name-bubble-in 0.32s cubic-bezier(0.34, 1.4, 0.5, 1) backwards;
+}
+/* A little tail pointing at the newborn node. */
+.name-bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 9px;
+  height: 9px;
+  transform: translateX(-50%) rotate(45deg);
+  background: inherit;
+  border-right: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+@keyframes name-bubble-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 22px)) scale(0.85);
+  }
+}
+.name-bubble-input {
+  width: 168px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.name-bubble-input::placeholder {
+  color: var(--t3);
+  font-weight: 500;
+}
+
+/* Mode HUD: the floating chip naming the live edit mode. */
+.wheel-hud {
+  --mc: var(--accent);
+  position: absolute;
+  left: 50%;
+  bottom: 86px;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px 7px 8px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid color-mix(in srgb, var(--mc) 35%, var(--border));
+  border-radius: 999px;
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.26),
+    0 0 18px color-mix(in srgb, var(--mc) 16%, transparent);
+}
+.wheel-hud-badge {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--mc) 16%, transparent);
+  flex-shrink: 0;
+}
+.wheel-hud-ic {
+  font-size: 14px;
+  line-height: 1;
+}
+/* A comet orbiting the badge — "this mode is live". */
+.wheel-hud-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0 68%,
+    color-mix(in srgb, var(--mc) 90%, transparent) 90%,
+    transparent 100%
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 2.5px),
+    #000 calc(100% - 2px)
+  );
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+  animation: hud-orbit 2.4s linear infinite;
+}
+@keyframes hud-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.wheel-hud-text {
+  min-width: 0;
+  padding-right: 2px;
+}
+.wheel-hud-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--t1);
+  white-space: nowrap;
+}
+.wheel-hud-hint {
+  font-size: 10px;
+  color: var(--t3);
+  white-space: nowrap;
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wheel-hud-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--t3);
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    transform 0.18s cubic-bezier(0.34, 1.5, 0.5, 1);
+}
+.wheel-hud-btn:hover {
+  background: var(--hover);
+  color: var(--t1);
+  transform: scale(1.08);
+}
+.whud-enter-active {
+  transition:
+    opacity 0.24s ease,
+    transform 0.38s cubic-bezier(0.22, 1.3, 0.36, 1),
+    filter 0.24s ease;
+}
+.whud-leave-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.2s ease,
+    filter 0.18s ease;
+}
+.whud-enter-from,
+.whud-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(18px) scale(0.9);
+  filter: blur(6px);
+}
+
+/* Feedback toast riding above the HUD. */
+.wheel-flash {
+  position: absolute;
+  left: 50%;
+  bottom: 136px;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t1);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.wheel-flash-ic {
+  font-size: 12px;
+}
+.wflash-enter-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.3s cubic-bezier(0.34, 1.5, 0.5, 1);
+}
+.wflash-leave-active {
+  transition:
+    opacity 0.24s ease,
+    transform 0.24s ease;
+}
+.wflash-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(10px) scale(0.85);
+}
+.wflash-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-8px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wheel-burst,
+  .ghost-line,
+  .ghost-dot,
+  .name-bubble,
+  .wheel-hud-ring {
+    animation: none;
+  }
 }
 </style>

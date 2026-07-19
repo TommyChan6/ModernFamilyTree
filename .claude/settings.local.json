@@ -285,7 +285,12 @@
       "Bash(node __TRACKED_VAR__/drive2.mjs)",
       "Bash(node __TRACKED_VAR__/drive3.mjs)",
       "Bash(node __TRACKED_VAR__/drive4.mjs)",
-      "Bash(node __TRACKED_VAR__/drive5.mjs)"
+      "Bash(node __TRACKED_VAR__/drive5.mjs)",
+      "Bash(node -e \"console.log\\(!!require\\('playwright-core/package.json'\\).version\\)\")",
+      "Bash(SHOT_DIR=\"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/7abf2c02-9e7d-4b24-926a-ed848d3b55f5/scratchpad\" node \"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/7abf2c02-9e7d-4b24-926a-ed848d3b55f5/scratchpad/verify-wheel.mjs\")",
+      "Bash(node -e \"console.log\\(require.resolve\\('playwright-core'\\)\\)\")",
+      "Bash(SHOT_DIR=\"\" node \"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/7abf2c02-9e7d-4b24-926a-ed848d3b55f5/scratchpad/verify-wheel.mjs\")",
+      "Bash(SHOT_DIR=\"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/7abf2c02-9e7d-4b24-926a-ed848d3b55f5/scratchpad\" node \"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/7abf2c02-9e7d-4b24-926a-ed848d3b55f5/scratchpad/shot-light.mjs\")"
     ]
   }
 }

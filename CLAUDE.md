@@ -207,7 +207,10 @@ stays in the same scene and reveals that type's arrangement (flat
 animates in with its own signature motion (`useGraphAnimation` stagger opts). The `space` type is **experimental**: the graph in 3D
 (`Graph3DView.vue` + `components/graph/graph3d/`, d3-force-3d + OrbitControls),
 gated behind Advanced mode plus the topbar **🧪 Labs** toggle (`caps.space3d`);
-with the gate off it degrades to Free over the same positions. Arrangements
+with the gate off it degrades to Free over the same positions. Holding **Tab** opens a radial
+**action wheel** of edit modes (delete, add, link-as-type, tag, paint, pin…) —
+catalog in `components/graph/wheelModes.js`, slots configurable per project via
+`WheelConfigModal.vue` (persisted as the `wheelSlots` setting). Arrangements
 autosave through `scenes:save`; a manual checkpoint (`checkpoint:save`/`revert`,
 Ctrl+S / Project ▾ menu) plus `hasUnsavedChanges` drive the close-confirmation
 prompt (wired from main via `window.__hasUnsavedChanges` / `window.__saveCheckpoint`

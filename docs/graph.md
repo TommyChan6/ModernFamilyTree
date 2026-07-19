@@ -152,6 +152,31 @@ only — they never mutate data.
 | Marriage | Default / Married / Divorced / Single |
 | Deceased | Default / Deceased / Living — **requires** a Present date (Project ▾ menu) |
 
+## Action wheel (edit modes)
+
+Holding **Tab** over the canvas blooms a radial menu of eight directional slots under
+the cursor ([`ActionWheel.vue`](../src/renderer/src/components/graph/ActionWheel.vue));
+flick toward a slot and release to enter that **edit mode**. While a mode is live a
+HUD chip names it at the bottom of the canvas and plain clicks route to its verb
+instead of selecting (`handleModeClick` in `GraphCanvas.vue`); modifier gestures
+(shift multi-select, ctrl trace) keep working. Esc or a quick Tab tap exits.
+
+Mode kinds live in the pure catalog
+[`wheelModes.js`](../src/renderer/src/components/graph/wheelModes.js): `add` (click
+empty canvas → new person + inline name bubble), `delete` (click a node/bond, click
+again within a beat to confirm — the target pulses red while armed), `link` (click
+two people consecutively to create a relationship of the slot's type — a ghost
+dashed line follows the cursor, and the second person becomes the next anchor so
+chains flow), `tag` / `paint` (click people to toggle a tag / a node color), `pin`,
+`end` (click a bond → sets `ended` to the current year) and `swap` (flip a directed
+bond). Slots are user-configurable per project in
+[`WheelConfigModal.vue`](../src/renderer/src/components/graph/WheelConfigModal.vue)
+(press **C** while the wheel is open, the ⚙ on the HUD chip, or release onto an
+empty slot); the layout persists as the `wheelSlots` setting via
+`store.setWheelSlots`. Gating follows `caps` (family-band link types only in Simple
+mode, tags/paint need Standard). The wheel component is generic — the timeline and
+groups views can adopt it later with their own catalogs.
+
 ## Nodes
 
 Each node is a circular avatar: the person's primary photo clipped to a circle, or a

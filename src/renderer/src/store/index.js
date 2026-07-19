@@ -88,6 +88,9 @@ export const useMainStore = defineStore('main', () => {
   const labsEnabled = ref(false)
   // Whether the Space (3D) controls hints were already shown once.
   const spaceHintSeen = ref(false)
+  // The graph's Tab-hold action wheel: the user's 8 slot descriptors, or null
+  // for the built-in defaults (see components/graph/wheelModes.js). Per project.
+  const wheelSlots = ref(null)
 
   // Graph visual settings
   const graphSettings = ref({
@@ -566,6 +569,13 @@ export const useMainStore = defineStore('main', () => {
       checkpoint.value = saved.checkpoint ? JSON.parse(saved.checkpoint) : null
     } catch {
       checkpoint.value = null
+    }
+    // Restore the action wheel's custom slots (null / garbage → defaults)
+    try {
+      const ws = saved.wheelSlots ? JSON.parse(saved.wheelSlots) : null
+      wheelSlots.value = Array.isArray(ws) ? ws : null
+    } catch {
+      wheelSlots.value = null
     }
   }
 
@@ -1137,6 +1147,12 @@ export const useMainStore = defineStore('main', () => {
     api.invoke('settings:set', { key: 'noun', value: noun.value })
   }
 
+  /** Save the action wheel's slot layout (null reverts to the defaults). */
+  function setWheelSlots(slots) {
+    wheelSlots.value = slots ? JSON.parse(JSON.stringify(slots)) : null
+    api.invoke('settings:set', { key: 'wheelSlots', value: JSON.stringify(wheelSlots.value) })
+  }
+
   function updateGraphSetting(key, value) {
     graphSettings.value[key] = value
     api.invoke('settings:set', { key: `graph_${key}`, value: JSON.stringify(value) })
@@ -1248,6 +1264,8 @@ export const useMainStore = defineStore('main', () => {
     setLabsEnabled,
     spaceHintSeen,
     markSpaceHintSeen,
+    wheelSlots,
+    setWheelSlots,
     // computed
     selectedPerson,
     personCount,
