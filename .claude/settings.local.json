@@ -290,7 +290,14 @@
       "Bash(SHOT_DIR=\"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/7abf2c02-9e7d-4b24-926a-ed848d3b55f5/scratchpad\" node \"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/7abf2c02-9e7d-4b24-926a-ed848d3b55f5/scratchpad/verify-wheel.mjs\")",
       "Bash(node -e \"console.log\\(require.resolve\\('playwright-core'\\)\\)\")",
       "Bash(SHOT_DIR=\"\" node \"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/7abf2c02-9e7d-4b24-926a-ed848d3b55f5/scratchpad/verify-wheel.mjs\")",
-      "Bash(SHOT_DIR=\"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/7abf2c02-9e7d-4b24-926a-ed848d3b55f5/scratchpad\" node \"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/7abf2c02-9e7d-4b24-926a-ed848d3b55f5/scratchpad/shot-light.mjs\")"
+      "Bash(SHOT_DIR=\"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/7abf2c02-9e7d-4b24-926a-ed848d3b55f5/scratchpad\" node \"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/7abf2c02-9e7d-4b24-926a-ed848d3b55f5/scratchpad/shot-light.mjs\")",
+      "Bash(perl -i -pe \"s/\\\\Q>{{ ch === ' ' ? '\\\\E\\\\x{a0}\\\\Q' : ch }}<\\\\E/>{{ ch }}</\" src/renderer/src/components/PersonModal.vue)",
+      "Bash(perl -i -pe 'BEGIN{binmode\\(STDIN\\);binmode\\(STDOUT\\)} s/>\\\\{\\\\{ ch === .+? \\\\}\\\\}</>{{ ch }}</ if $. == 81' src/renderer/src/components/PersonModal.vue)",
+      "Bash(perl -i -pe \"s/\\\\\\(ch === ' ' \\\\? '\\\\x{c2}\\\\x{a0}' : ch\\\\\\)/\\(ch === ' ' ? '\\\\\\\\\\\\\\\\u00A0' : ch\\)/ if \\\\$. == 440\" src/renderer/src/components/PersonModal.vue)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(Object.keys\\(p.devDependencies||{}\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(OUT=. node --experimental-vm-modules -e \"process.env.NODE_PATH='c:/Users/tommy/OneDrive/Desktop/newFamilyTree/node_modules'; require\\('module'\\).Module._initPaths\\(\\); import\\('./shot-profile.mjs'\\).catch\\(e=>{console.error\\(e\\);process.exit\\(1\\)}\\)\")",
+      "Bash(cp \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\62049b0a-e776-46f4-ac67-c8b71b01c583\\\\scratchpad\\\\shot-profile.mjs\" .claude-shot.mjs)",
+      "Bash(OUT=\"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/62049b0a-e776-46f4-ac67-c8b71b01c583/scratchpad\" node .claude-shot.mjs)"
     ]
   }
 }
