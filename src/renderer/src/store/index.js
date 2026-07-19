@@ -95,6 +95,10 @@ export const useMainStore = defineStore('main', () => {
   // Per-project setting; the picker lives in the Directory toolbar.
   const cardStyle = ref('classic')
   const CARD_STYLES = ['classic', 'poster', 'holo', 'neon', 'arcana']
+  // Directory viewing mode: the classic virtualized grid, or one of the 3D
+  // stage layouts (carousel ring / coverflow / hand fan / swipe deck).
+  const viewMode = ref('grid')
+  const VIEW_MODES = ['grid', 'wheel', 'flow', 'fan', 'deck']
 
   // Graph visual settings
   const graphSettings = ref({
@@ -583,6 +587,8 @@ export const useMainStore = defineStore('main', () => {
     }
     // Restore the directory card style (unknown/stale values → classic)
     cardStyle.value = CARD_STYLES.includes(saved.cardStyle) ? saved.cardStyle : 'classic'
+    // Restore the directory viewing mode (unknown/stale values → grid)
+    viewMode.value = VIEW_MODES.includes(saved.directoryViewMode) ? saved.directoryViewMode : 'grid'
   }
 
   // ── Save model: checkpoint + revert ────────────────────────────────────────
@@ -1160,6 +1166,13 @@ export const useMainStore = defineStore('main', () => {
     api.invoke('settings:set', { key: 'cardStyle', value: id })
   }
 
+  /** Switch the Directory's viewing mode and remember it for this project. */
+  function setViewMode(id) {
+    if (!VIEW_MODES.includes(id) || id === viewMode.value) return
+    viewMode.value = id
+    api.invoke('settings:set', { key: 'directoryViewMode', value: id })
+  }
+
   /** Save the action wheel's slot layout (null reverts to the defaults). */
   function setWheelSlots(slots) {
     wheelSlots.value = slots ? JSON.parse(JSON.stringify(slots)) : null
@@ -1281,6 +1294,8 @@ export const useMainStore = defineStore('main', () => {
     setWheelSlots,
     cardStyle,
     setCardStyle,
+    viewMode,
+    setViewMode,
     // computed
     selectedPerson,
     personCount,

@@ -8,6 +8,7 @@
       </div>
 
       <div class="pv-controls">
+        <ViewModeSwitch />
         <CardStylePicker />
 
         <div class="pv-search">
@@ -155,8 +156,10 @@
     <!-- Scrollable grid. Native vertical scroll (smooth, real scrollbar) plus
          grab-and-drag navigation; only the rows near the viewport exist in the
          DOM, and the whole visible block is positioned by a single translateY —
-         no per-card transforms. -->
+         no per-card transforms. Kept mounted (v-show) while a stage mode is
+         active so its ResizeObserver + scroll state survive mode switches. -->
     <div
+      v-show="store.viewMode === 'grid'"
       ref="scrollEl"
       class="pv-scroll"
       :class="{ dragging }"
@@ -196,6 +199,16 @@
         </div>
       </div>
     </div>
+
+    <!-- 3D stage modes (carousel / flow / hand / deck) — windowed rendering,
+         shared drag/momentum physics; see people/CardStage.vue. -->
+    <CardStage
+      v-if="store.viewMode !== 'grid'"
+      :mode="store.viewMode"
+      :persons="displayed"
+      :stats-of="stats"
+      :ref-year="refYear"
+    />
   </div>
 </template>
 
@@ -204,6 +217,8 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useMainStore } from '../store/index.js'
 import PersonCard from './people/PersonCard.vue'
 import CardStylePicker from './people/CardStylePicker.vue'
+import ViewModeSwitch from './people/ViewModeSwitch.vue'
+import CardStage from './people/CardStage.vue'
 import { useVirtualGrid } from './people/useVirtualGrid.js'
 import { useDragScroll } from './people/useDragScroll.js'
 import { ageOf, CARD_W, CARD_H, GAP, PAD } from './people/peopleLayout.js'
