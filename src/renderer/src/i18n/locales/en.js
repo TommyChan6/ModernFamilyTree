@@ -14,7 +14,25 @@ export default {
     lightMode: 'Light mode',
     darkMode: 'Dark mode',
     newProject: 'New project',
-    closeProject: 'Close project'
+    closeProject: 'Close project',
+    undo: 'Undo the last data edit',
+    redo: 'Redo the undone edit'
+  },
+  history: {
+    undid: 'Undid {what}',
+    redid: 'Redid {what}',
+    kind: {
+      persons: 'a person edit',
+      relationships: 'a relationship edit',
+      fields: 'a trait edit',
+      relTypes: 'a relationship-type edit',
+      tags: 'a tag edit',
+      entity_tags: 'a tag change',
+      scene_tags: 'a group change',
+      images: 'a photo change',
+      characters: 'a character edit',
+      generic: 'a change'
+    }
   },
   mode: {
     simple: 'Simple',

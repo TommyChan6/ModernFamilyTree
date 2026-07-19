@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { api } from '../api'
+import { api, onUndoableMutation } from '../api'
 import { setSessionToken, clearSessionToken, getSessionToken } from '../api/session'
 import { latestDataYear } from './currentYear.js'
 import { locale, setLocale, isSupportedLocale } from '../i18n'
@@ -591,6 +591,92 @@ export const useMainStore = defineStore('main', () => {
     cardStyle.value = CARD_STYLES.includes(saved.cardStyle) ? saved.cardStyle : 'classic'
     // Restore the directory viewing mode (unknown/stale values → grid)
     viewMode.value = VIEW_MODES.includes(saved.directoryViewMode) ? saved.directoryViewMode : 'grid'
+    // Undo stacks are per project — pick up this project's state
+    refreshHistoryStatus()
+  }
+
+  // ── Undo / redo (data edits — see src/shared/history.ts) ──────────────────
+  // The shared core snapshots every undoable data channel; these actions drive
+  // the topbar buttons. Status is kept optimistically in sync (any successful
+  // undoable mutation means "can undo, can't redo") and authoritatively after
+  // undo/redo/load, so no extra round-trip rides on normal edits.
+  const historyStatus = ref({
+    canUndo: false,
+    canRedo: false,
+    undoChannel: null,
+    redoChannel: null
+  })
+  onUndoableMutation((channel) => {
+    historyStatus.value = { canUndo: true, canRedo: false, undoChannel: channel, redoChannel: null }
+  })
+
+  async function refreshHistoryStatus() {
+    const res = await api.invoke('history:status')
+    if (res.success) historyStatus.value = res.data
+  }
+
+  /** Re-fetch every data slice a history restore can touch (arrangement state
+   *  — scenes, settings — is outside the undo scope) and drop selections that
+   *  no longer resolve. */
+  async function reloadAfterHistory() {
+    const [
+      personsRes,
+      fieldsRes,
+      relsRes,
+      relTypesRes,
+      tagsRes,
+      entityTagsRes,
+      sceneTagsRes,
+      charactersRes
+    ] = await Promise.all([
+      api.invoke('persons:getAll'),
+      api.invoke('fields:list'),
+      api.invoke('relationships:getAll'),
+      api.invoke('relTypes:getAll'),
+      api.invoke('tags:getAll'),
+      api.invoke('entity_tags:getAll'),
+      api.invoke('scene_tags:getAll'),
+      api.invoke('characters:getAll')
+    ])
+    if (personsRes.success) persons.value = personsRes.data
+    if (fieldsRes.success) {
+      fieldDefs.value = fieldsRes.data.defs
+      fieldValues.value = fieldsRes.data.values
+    }
+    if (relsRes.success) relationships.value = relsRes.data
+    if (relTypesRes.success) relTypes.value = relTypesRes.data
+    if (tagsRes.success) tags.value = tagsRes.data
+    if (entityTagsRes.success) entityTags.value = entityTagsRes.data
+    if (sceneTagsRes.success) sceneTags.value = sceneTagsRes.data
+    if (charactersRes.success) characters.value = charactersRes.data
+    const alive = new Set(persons.value.map((p) => p.id))
+    selectedPersonIds.value = selectedPersonIds.value.filter((id) => alive.has(id))
+    if (selectedPersonId.value && !alive.has(selectedPersonId.value)) {
+      selectedPersonId.value = selectedPersonIds.value.at(-1) ?? null
+      modalOpen.value = false
+    }
+    const relAlive = new Set(relationships.value.map((r) => r.id))
+    selectedRelationshipIds.value = selectedRelationshipIds.value.filter((id) => relAlive.has(id))
+    if (relPopup.value && !relAlive.has(relPopup.value.id)) relPopup.value = null
+    refreshUsage()
+  }
+
+  /** Undo/redo one data edit. Resolves to the reverted/replayed channel name
+   *  (for the toast label) or null when there was nothing to do. */
+  async function undo() {
+    const res = await api.invoke('history:undo')
+    if (!res.success) return null
+    historyStatus.value = res.data.status
+    await reloadAfterHistory()
+    return res.data.channel
+  }
+
+  async function redo() {
+    const res = await api.invoke('history:redo')
+    if (!res.success) return null
+    historyStatus.value = res.data.status
+    await reloadAfterHistory()
+    return res.data.channel
   }
 
   // ── Save model: checkpoint + revert ────────────────────────────────────────
@@ -1369,6 +1455,10 @@ export const useMainStore = defineStore('main', () => {
     resetGraphSettings,
     hasUnsavedChanges,
     saveCheckpoint,
-    revertToCheckpoint
+    revertToCheckpoint,
+    historyStatus,
+    refreshHistoryStatus,
+    undo,
+    redo
   }
 })

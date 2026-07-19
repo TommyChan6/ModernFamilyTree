@@ -14,7 +14,25 @@ export default {
     lightMode: '淺色模式',
     darkMode: '深色模式',
     newProject: '新增專案',
-    closeProject: '關閉專案'
+    closeProject: '關閉專案',
+    undo: '復原上一次資料編輯',
+    redo: '取消復原'
+  },
+  history: {
+    undid: '已復原{what}',
+    redid: '已重做{what}',
+    kind: {
+      persons: '人物編輯',
+      relationships: '關係編輯',
+      fields: '特徵編輯',
+      relTypes: '關係類型編輯',
+      tags: '標籤編輯',
+      entity_tags: '標籤變更',
+      scene_tags: '群組變更',
+      images: '照片變更',
+      characters: '角色編輯',
+      generic: '一次變更'
+    }
   },
   mode: {
     simple: '簡易',

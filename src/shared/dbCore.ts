@@ -59,6 +59,9 @@ import {
 } from './relTypes'
 
 export { migrateRelationshipTypes } from './relTypes'
+import { UNDOABLE_CHANNELS, historyHandlers, withHistory } from './history'
+
+export { UNDOABLE_CHANNELS } from './history'
 import {
   SESSION_DAYS,
   addDays,
@@ -413,7 +416,10 @@ export function migrateGraphStateToScenes(db: any, env: Env): boolean {
     let activeSceneId: string | null = null
 
     for (let i = 0; i < stateCount; i++) {
-      const layouts: Record<string, { positions: Record<string, { x: number; y: number }>; config: Record<string, unknown> }> = {}
+      const layouts: Record<
+        string,
+        { positions: Record<string, { x: number; y: number }>; config: Record<string, unknown> }
+      > = {}
       let sceneName = ''
       for (const mode of modes) {
         const snaps: unknown[] = state.modeStateSnapshots?.[mode] || []
@@ -443,7 +449,8 @@ export function migrateGraphStateToScenes(db: any, env: Env): boolean {
       }
 
       const id = env.uuid()
-      const active = layouts[activeType] || Object.values(layouts)[0] || { positions: {}, config: {} }
+      const active = layouts[activeType] ||
+        Object.values(layouts)[0] || { positions: {}, config: {} }
       const scene: Scene = {
         id,
         project_id: pid,
@@ -1852,6 +1859,16 @@ export const channelHandlers: Record<string, Handler> = {
   }
 }
 
+// ── Undo/redo (src/shared/history.ts) ────────────────────────────────────────
+// Register the history:* channels and wrap every undoable data channel so it
+// captures a before-snapshot as it runs. Applied here — not in the shells —
+// so desktop, web and the tests all get identical history behavior.
+Object.assign(channelHandlers, historyHandlers)
+for (const channel of UNDOABLE_CHANNELS) {
+  const raw = channelHandlers[channel]
+  if (raw) channelHandlers[channel] = withHistory(channel, raw)
+}
+
 /** Channels that mutate the DB — the shell persists after handling one. */
 export const WRITE_CHANNELS = new Set([
   'auth:register',
@@ -1899,6 +1916,8 @@ export const WRITE_CHANNELS = new Set([
   'scene_tags:remove',
   'checkpoint:save',
   'checkpoint:revert',
+  'history:undo',
+  'history:redo',
   'images:add',
   'images:setRole',
   'images:setPrimary',

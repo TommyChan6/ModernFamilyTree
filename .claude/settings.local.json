@@ -299,7 +299,8 @@
       "Bash(cp \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\62049b0a-e776-46f4-ac67-c8b71b01c583\\\\scratchpad\\\\shot-profile.mjs\" .claude-shot.mjs)",
       "Bash(OUT=\"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/62049b0a-e776-46f4-ac67-c8b71b01c583/scratchpad\" node .claude-shot.mjs)",
       "Bash(cp \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\62049b0a-e776-46f4-ac67-c8b71b01c583\\\\scratchpad\\\\shot-cards.mjs\" .claude-shot.mjs)",
-      "Bash(cp \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\62049b0a-e776-46f4-ac67-c8b71b01c583\\\\scratchpad\\\\shot-modes.mjs\" .claude-shot.mjs)"
+      "Bash(cp \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\62049b0a-e776-46f4-ac67-c8b71b01c583\\\\scratchpad\\\\shot-modes.mjs\" .claude-shot.mjs)",
+      "Bash(node \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\36ec2c4a-aa73-4f0e-a113-9ff3bdef509d\\\\scratchpad\\\\drive-undo.mjs\")"
     ]
   }
 }

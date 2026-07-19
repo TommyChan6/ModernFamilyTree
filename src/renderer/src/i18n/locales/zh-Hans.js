@@ -14,7 +14,25 @@ export default {
     lightMode: '浅色模式',
     darkMode: '深色模式',
     newProject: '新建项目',
-    closeProject: '关闭项目'
+    closeProject: '关闭项目',
+    undo: '撤销上一次数据编辑',
+    redo: '重做已撤销的编辑'
+  },
+  history: {
+    undid: '已撤销{what}',
+    redid: '已重做{what}',
+    kind: {
+      persons: '人物编辑',
+      relationships: '关系编辑',
+      fields: '特征编辑',
+      relTypes: '关系类型编辑',
+      tags: '标签编辑',
+      entity_tags: '标签变更',
+      scene_tags: '分组变更',
+      images: '照片变更',
+      characters: '角色编辑',
+      generic: '一次变更'
+    }
   },
   mode: {
     simple: '简易',

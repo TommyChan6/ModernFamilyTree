@@ -45,6 +45,58 @@
         @export="handleExport"
         @import="handleImport"
       />
+      <div class="history-ctrl">
+        <button
+          class="history-btn"
+          :class="{ 'kick-undo': undoKick }"
+          :disabled="historyBusy || !store.historyStatus.canUndo"
+          :title="t('topbar.undo') + ' (Ctrl+Z)'"
+          @click="doUndo"
+          @animationend="undoKick = false"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9 14 4 9l5-5" />
+            <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+          </svg>
+        </button>
+        <button
+          class="history-btn"
+          :class="{ 'kick-redo': redoKick }"
+          :disabled="historyBusy || !store.historyStatus.canRedo"
+          :title="t('topbar.redo') + ' (Ctrl+X)'"
+          @click="doRedo"
+          @animationend="redoKick = false"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="m15 14 5-5-5-5" />
+            <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" />
+          </svg>
+        </button>
+        <Transition name="history-toast">
+          <div v-if="historyToast" :key="historyToast.key" class="history-toast">
+            <span class="history-toast-glyph">{{ historyToast.verb === 'undid' ? '↺' : '↻' }}</span>
+            {{ historyToast.text }}
+          </div>
+        </Transition>
+      </div>
       <div class="topbar-spacer"></div>
       <button
         class="btn btn-ghost btn-sm"
@@ -283,10 +335,95 @@ async function handleRevert(skipConfirm = false) {
   if (res.success) await graphRef.value?.reloadScenes?.()
 }
 
+// ── Undo / redo (topbar buttons + Ctrl+Z / Ctrl+X) ──────────────────────────
+const historyBusy = ref(false)
+const undoKick = ref(false)
+const redoKick = ref(false)
+const historyToast = ref(null)
+let historyToastTimer = 0
+let historyToastKey = 0
+
+const HISTORY_KINDS = new Set([
+  'persons',
+  'relationships',
+  'fields',
+  'relTypes',
+  'tags',
+  'entity_tags',
+  'scene_tags',
+  'images',
+  'characters'
+])
+
+function showHistoryToast(verb, channel) {
+  const domain = String(channel || '').split(':')[0]
+  const what = t(`history.kind.${HISTORY_KINDS.has(domain) ? domain : 'generic'}`)
+  clearTimeout(historyToastTimer)
+  historyToast.value = { key: ++historyToastKey, verb, text: t(`history.${verb}`, { what }) }
+  historyToastTimer = setTimeout(() => (historyToast.value = null), 1700)
+}
+
+async function doUndo() {
+  if (historyBusy.value || !store.historyStatus.canUndo) return
+  historyBusy.value = true
+  undoKick.value = true
+  try {
+    const channel = await store.undo()
+    if (channel) showHistoryToast('undid', channel)
+  } finally {
+    historyBusy.value = false
+  }
+}
+
+async function doRedo() {
+  if (historyBusy.value || !store.historyStatus.canRedo) return
+  historyBusy.value = true
+  redoKick.value = true
+  try {
+    const channel = await store.redo()
+    if (channel) showHistoryToast('redid', channel)
+  } finally {
+    historyBusy.value = false
+  }
+}
+
+// Undo/redo hotkeys never fire from editable fields (text inputs keep their
+// native Ctrl+Z / Ctrl+X), nor over the auth/home/curtain overlays or while
+// the person form holds an unsaved working copy.
+function isEditableTarget(e) {
+  const el = e.target
+  return (
+    !!el &&
+    (el.tagName === 'INPUT' ||
+      el.tagName === 'TEXTAREA' ||
+      el.tagName === 'SELECT' ||
+      el.isContentEditable)
+  )
+}
+
+function historyHotkeysBlocked() {
+  return (
+    !store.authUser ||
+    store.curtain.active ||
+    store.userPageOpen ||
+    homeOpen.value ||
+    authOpen.value ||
+    store.formOpen
+  )
+}
+
 function onKeydown(e) {
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 's') {
+  if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return
+  const key = e.key.toLowerCase()
+  if (key === 's') {
     e.preventDefault()
     handleSave()
+    return
+  }
+  if ((key === 'z' || key === 'x') && !isEditableTarget(e) && !historyHotkeysBlocked()) {
+    e.preventDefault()
+    if (key === 'z') doUndo()
+    else doRedo()
   }
 }
 
@@ -670,6 +807,165 @@ onUnmounted(() => {
 
 .topbar-spacer {
   flex: 0;
+}
+
+/* ── Undo / redo (beside the Project menu) ────────────────────────────────── */
+.history-ctrl {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.history-btn {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--t2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    opacity 0.3s ease,
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.history-btn:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--t1);
+  transform: translateY(-1px);
+}
+
+.history-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.9);
+}
+
+.history-btn:disabled {
+  opacity: 0.28;
+  cursor: default;
+}
+
+.history-btn svg {
+  display: block;
+}
+
+/* Click feedback: the arrow sweeps a full turn (its own direction) with a
+   springy overshoot, over an accent ripple that blooms out of the button. */
+.history-btn.kick-undo svg {
+  animation: history-spin-ccw 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.history-btn.kick-redo svg {
+  animation: history-spin-cw 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes history-spin-ccw {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  45% {
+    transform: rotate(-290deg) scale(1.25);
+  }
+  100% {
+    transform: rotate(-360deg) scale(1);
+  }
+}
+
+@keyframes history-spin-cw {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  45% {
+    transform: rotate(290deg) scale(1.25);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+.history-btn::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 40%, transparent) 0%,
+    transparent 70%
+  );
+  opacity: 0;
+  pointer-events: none;
+}
+
+.history-btn.kick-undo::after,
+.history-btn.kick-redo::after {
+  animation: history-ripple 0.5s ease-out;
+}
+
+@keyframes history-ripple {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.3);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+
+/* The "Undid …" pill that drops out from under the buttons */
+.history-toast {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  color: var(--t1);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 999px;
+  white-space: nowrap;
+  z-index: 70;
+  pointer-events: none;
+}
+
+.history-toast-glyph {
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.history-toast-enter-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.history-toast-leave-active {
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+.history-toast-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-8px) scale(0.85);
+}
+
+.history-toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(5px) scale(0.95);
 }
 
 .mode-picker-wrap {

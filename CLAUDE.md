@@ -99,6 +99,17 @@ persists after any channel in `WRITE_CHANNELS` before returning. Writes tag new
 records with the active `project_id`; reads filter by it. Handlers may be async
 (the auth ones are) — both shells `await` them.
 
+**Undo/redo** (`src/shared/history.ts` + the `history:*` channels): dbCore wraps
+every channel in `UNDOABLE_CHANNELS` (data edits: persons/fields/relationships/
+relTypes/tags/entity_tags/scene_tags add-remove/images/characters — NOT scenes or
+settings, which the checkpoint owns) with a before-snapshot of the active
+project's rows; `history:undo`/`redo` swap the live rows against the top snapshot
+(per-project stacks, in-memory only, cap 50). A throwing handler rolls back to
+its snapshot, so writes are atomic. Image-file deletion is deferred + GC'd so
+undoing a delete keeps photos. The store's `undo()`/`redo()` reload the data
+slices and `historyStatus` drives the topbar buttons (Ctrl+Z / Ctrl+X; the api
+seam's `onUndoableMutation` keeps status fresh). Tests: `tests/history.test.js`.
+
 **Accounts & auth** (`src/shared/auth.ts` + the `auth:*` channels in `dbCore.ts`):
 the app is username/password gated, built website-shaped so the hosted backend can
 adopt it wholesale. Passwords are PBKDF2-SHA256 (Web Crypto, 600k iterations,
