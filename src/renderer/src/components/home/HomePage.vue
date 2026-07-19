@@ -1,7 +1,10 @@
 <template>
-  <div ref="pageRef" class="home" @scroll.passive="onScroll">
+  <div ref="pageRef" class="home" @scroll.passive="onScroll" @mousemove.passive="onAuraMove">
+    <!-- Soft light that trails the cursor across the whole page -->
+    <div ref="auraRef" class="cursor-aura" aria-hidden="true"></div>
+
     <!-- ── Nav ─────────────────────────────────────────────────────────── -->
-    <header class="nav" :class="{ scrolled }">
+    <header class="nav" :class="{ scrolled }" :style="{ '--progress': scrollProgress }">
       <button class="nav-logo" type="button" @click="scrollTo('top')">
         <span class="nav-logo-mark">🌳</span>
         <span class="nav-logo-name">Family Tree</span>
@@ -35,9 +38,15 @@
     </header>
 
     <!-- ── Hero ────────────────────────────────────────────────────────── -->
-    <section ref="heroRef" class="hero">
+    <section ref="heroRef" class="hero" @click="onHeroClick">
+      <div class="hero-aurora" aria-hidden="true">
+        <div class="aurora-blob blob-a"></div>
+        <div class="aurora-blob blob-b"></div>
+        <div class="aurora-blob blob-c"></div>
+      </div>
       <canvas ref="heroCanvas" class="hero-canvas"></canvas>
       <div class="hero-vignette"></div>
+      <div class="hero-grain" aria-hidden="true"></div>
 
       <div class="hero-content" :style="heroParallax">
         <p class="hero-eyebrow">✦ &nbsp;EVERY FAMILY IS A UNIVERSE&nbsp; ✦</p>
@@ -80,6 +89,10 @@
       <button class="hero-scroll-cue" type="button" title="Scroll" @click="scrollTo('features')">
         <span class="cue-mouse"><span class="cue-wheel"></span></span>
       </button>
+
+      <Transition name="hint">
+        <span v-if="!skyClicked" class="hero-hint">✨ psst — click the sky</span>
+      </Transition>
     </section>
 
     <!-- ── Features ────────────────────────────────────────────────────── -->
@@ -175,6 +188,9 @@
           <div class="about-orbit orbit-2"><span class="orbit-dot pink"></span></div>
           <div class="about-orbit orbit-3"><span class="orbit-dot green"></span></div>
           <div class="about-core">🌳</div>
+          <span class="emblem-twinkle tw-1">✦</span>
+          <span class="emblem-twinkle tw-2">✦</span>
+          <span class="emblem-twinkle tw-3">✦</span>
         </div>
         <div class="about-text">
           <p class="kicker">About the maker</p>
@@ -196,6 +212,12 @@
 
     <!-- ── Final CTA ───────────────────────────────────────────────────── -->
     <section class="final" data-reveal>
+      <div class="final-sky" aria-hidden="true">
+        <span class="shoot shoot-1"></span>
+        <span class="shoot shoot-2"></span>
+        <span class="shoot shoot-3"></span>
+      </div>
+      <div class="final-border" aria-hidden="true"></div>
       <div class="final-inner">
         <h2>{{ isAuthed ? 'Your family is waiting.' : "Begin your family's story." }}</h2>
         <p>
@@ -242,7 +264,8 @@
         </div>
       </div>
       <div class="footer-bottom">
-        © {{ new Date().getFullYear() }} Family Tree · Made with ♥ and zero venture capital
+        © {{ new Date().getFullYear() }} Family Tree · Made with
+        <span class="heartbeat">♥</span> and zero venture capital
       </div>
     </footer>
 
@@ -390,19 +413,39 @@ function openLegal(tab) {
   legalOpen.value = true
 }
 
-// ── Scroll: nav state, hero parallax, section navigation ────────────────────
+// ── Scroll: nav state, progress bar, hero parallax, section navigation ──────
 const scrolled = ref(false)
 const heroShift = ref(0)
+const scrollProgress = ref(0)
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 let scrollRaf = 0
 function onScroll() {
   cancelAnimationFrame(scrollRaf)
   scrollRaf = requestAnimationFrame(() => {
-    const top = pageRef.value?.scrollTop ?? 0
+    const el = pageRef.value
+    const top = el?.scrollTop ?? 0
     scrolled.value = top > 24
     heroShift.value = reducedMotion ? 0 : Math.min(top, 900)
+    scrollProgress.value = el
+      ? Math.min(1, top / Math.max(1, el.scrollHeight - el.clientHeight))
+      : 0
   })
+}
+
+// ── Cursor aura: a soft light that trails the pointer over the page ─────────
+// Direct DOM writes (no reactivity) — mousemove fires far too often for that.
+const auraRef = ref(null)
+function onAuraMove(e) {
+  if (reducedMotion || !auraRef.value) return
+  auraRef.value.style.transform = `translate3d(${e.clientX - 300}px, ${e.clientY - 300}px, 0)`
+  auraRef.value.style.opacity = '1'
+}
+
+// ── Sky-click hint (the constellation spawns fireworks on click) ────────────
+const skyClicked = ref(false)
+function onHeroClick(e) {
+  if (e.target === heroCanvas.value || e.target === heroRef.value) skyClicked.value = true
 }
 
 const heroParallax = computed(() => ({
@@ -525,6 +568,28 @@ onUnmounted(() => {
   scroll-behavior: smooth;
 }
 
+/* ══ Cursor aura ══════════════════════════════════════════════════════════ */
+.cursor-aura {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 7%, transparent),
+    transparent 62%
+  );
+  transform: translate3d(-100vw, -100vh, 0);
+  transition:
+    transform 0.22s ease-out,
+    opacity 0.6s ease;
+}
+
 /* ══ Scroll reveals ═══════════════════════════════════════════════════════ */
 [data-reveal] {
   opacity: 0;
@@ -565,6 +630,20 @@ onUnmounted(() => {
   padding-bottom: 9px;
 }
 
+/* reading-progress ribbon along the nav's top edge */
+.nav::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2.5px;
+  background: linear-gradient(90deg, var(--accent), var(--pink), var(--amber));
+  transform: scaleX(var(--progress, 0));
+  transform-origin: left;
+  pointer-events: none;
+}
+
 .nav-logo {
   display: inline-flex;
   align-items: center;
@@ -585,6 +664,14 @@ onUnmounted(() => {
   border-radius: 11px;
   background: linear-gradient(135deg, var(--adim), rgba(108, 142, 245, 0.32));
   border: 1px solid rgba(108, 142, 245, 0.35);
+  transition:
+    transform 0.35s cubic-bezier(0.34, 1.6, 0.64, 1),
+    box-shadow 0.3s ease;
+}
+
+.nav-logo:hover .nav-logo-mark {
+  transform: rotate(-10deg) scale(1.1);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .nav-logo-name {
@@ -692,6 +779,122 @@ onUnmounted(() => {
   height: 100%;
 }
 
+/* Aurora: huge blurred color pools drifting behind the constellation */
+.hero-aurora {
+  position: absolute;
+  inset: -12%;
+  pointer-events: none;
+  filter: blur(70px) saturate(1.25);
+  opacity: 0.55;
+}
+
+.aurora-blob {
+  position: absolute;
+  width: 55vmax;
+  height: 55vmax;
+  border-radius: 50%;
+}
+
+.aurora-blob.blob-a {
+  top: -22%;
+  left: -14%;
+  background: radial-gradient(
+    circle at 35% 35%,
+    color-mix(in srgb, var(--accent) 26%, transparent),
+    transparent 62%
+  );
+  animation: aurora-a 26s ease-in-out infinite alternate;
+}
+
+.aurora-blob.blob-b {
+  bottom: -26%;
+  right: -16%;
+  background: radial-gradient(
+    circle at 60% 45%,
+    color-mix(in srgb, var(--pink) 18%, transparent),
+    transparent 62%
+  );
+  animation: aurora-b 32s ease-in-out infinite alternate;
+}
+
+.aurora-blob.blob-c {
+  top: 18%;
+  left: 42%;
+  width: 40vmax;
+  height: 40vmax;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--green) 13%, transparent),
+    transparent 64%
+  );
+  animation: aurora-c 40s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-a {
+  to {
+    transform: translate(9vmax, 7vmax) rotate(28deg) scale(1.15);
+  }
+}
+
+@keyframes aurora-b {
+  to {
+    transform: translate(-8vmax, -6vmax) rotate(-22deg) scale(1.2);
+  }
+}
+
+@keyframes aurora-c {
+  to {
+    transform: translate(-10vmax, 5vmax) scale(1.3);
+  }
+}
+
+/* Film grain — a whisper of texture so the sky doesn't band */
+.hero-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Invitation to play with the constellation */
+.hero-hint {
+  position: absolute;
+  right: clamp(16px, 4vw, 44px);
+  bottom: 28px;
+  z-index: 1;
+  padding: 8px 15px;
+  border-radius: 999px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--glass-strong);
+  backdrop-filter: blur(8px);
+  color: var(--t2);
+  font-size: 11.5px;
+  font-weight: 600;
+  pointer-events: none;
+  animation:
+    fade-drop 1s ease 2.6s both,
+    hint-bob 3.4s ease-in-out 3.6s infinite;
+}
+
+@keyframes hint-bob {
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.hint-leave-active {
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
+}
+
+.hint-leave-to {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
 .hero-vignette {
   position: absolute;
   inset: 0;
@@ -738,6 +941,7 @@ onUnmounted(() => {
   margin-right: 0.24em;
   opacity: 0;
   transform: translateY(26px) rotate(2deg);
+  filter: blur(7px);
   animation: word-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
@@ -745,6 +949,7 @@ onUnmounted(() => {
   to {
     opacity: 1;
     transform: none;
+    filter: blur(0);
   }
 }
 
@@ -788,6 +993,7 @@ onUnmounted(() => {
 }
 
 .cta-primary {
+  position: relative;
   border: none;
   border-radius: 14px;
   padding: 15px 30px;
@@ -803,6 +1009,51 @@ onUnmounted(() => {
     box-shadow 0.3s ease,
     filter 0.2s ease,
     transform 0.25s ease;
+}
+
+/* sonar ring pulsing off the button edge */
+.cta-primary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  animation: cta-pulse 2.6s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes cta-pulse {
+  to {
+    box-shadow: 0 0 0 15px transparent;
+  }
+}
+
+/* recurring shine sweep across the face */
+.cta-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 42%,
+    rgba(255, 255, 255, 0.32) 50%,
+    transparent 58%
+  );
+  background-size: 300% 100%;
+  background-position: 200% 0;
+  animation: cta-sheen 3.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes cta-sheen {
+  0% {
+    background-position: 200% 0;
+  }
+  55%,
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 .cta-primary:hover {
@@ -955,6 +1206,48 @@ onUnmounted(() => {
   padding: clamp(60px, 9vw, 110px) clamp(18px, 4vw, 44px);
 }
 
+/* Faint drifting nebulae parked behind each section, one hue per stop */
+#features::before,
+#views::before,
+#explore::before {
+  content: '';
+  position: absolute;
+  width: 46vmax;
+  height: 46vmax;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.12;
+  pointer-events: none;
+  z-index: -1;
+  animation: nebula-drift 30s ease-in-out infinite alternate;
+}
+
+#features::before {
+  top: -10%;
+  left: -20vmax;
+  background: radial-gradient(circle, var(--accent), transparent 60%);
+}
+
+#views::before {
+  top: 0;
+  right: -22vmax;
+  background: radial-gradient(circle, var(--pink), transparent 60%);
+  animation-delay: -10s;
+}
+
+#explore::before {
+  bottom: -10%;
+  left: -18vmax;
+  background: radial-gradient(circle, var(--green), transparent 60%);
+  animation-delay: -20s;
+}
+
+@keyframes nebula-drift {
+  to {
+    transform: translate(6vmax, -4vmax) scale(1.18);
+  }
+}
+
 .section-head {
   text-align: center;
   max-width: 640px;
@@ -1041,6 +1334,50 @@ onUnmounted(() => {
   opacity: 1;
 }
 
+/* a comet of light orbiting the card's border while hovered */
+@property --hspin {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.feature::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--hspin),
+    transparent 0deg 40deg,
+    var(--accent) 90deg,
+    var(--pink) 130deg,
+    transparent 180deg 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  animation: hspin-turn 3.2s linear infinite;
+  pointer-events: none;
+}
+
+.feature:hover::after {
+  opacity: 1;
+}
+
+@keyframes hspin-turn {
+  to {
+    --hspin: 360deg;
+  }
+}
+
 .feature-icon {
   width: 46px;
   height: 46px;
@@ -1089,8 +1426,56 @@ onUnmounted(() => {
 }
 
 .stat-block {
+  position: relative;
   text-align: center;
   min-width: 150px;
+}
+
+/* soft light breathing behind each number */
+.stat-block::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 32%;
+  width: 130px;
+  height: 130px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 15%, transparent),
+    transparent 65%
+  );
+  animation: stat-breathe 4.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.stat-block:nth-child(2)::before {
+  animation-delay: -1s;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--pink) 13%, transparent),
+    transparent 65%
+  );
+}
+
+.stat-block:nth-child(3)::before {
+  animation-delay: -2s;
+}
+
+.stat-block:nth-child(4)::before {
+  animation-delay: -3s;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--amber) 13%, transparent),
+    transparent 65%
+  );
+}
+
+@keyframes stat-breathe {
+  50% {
+    transform: translate(-50%, -50%) scale(1.3);
+    opacity: 0.55;
+  }
 }
 
 .stat-num {
@@ -1139,6 +1524,11 @@ onUnmounted(() => {
   overflow: hidden;
   mask-image: linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
   padding: 7px 0;
+  transform: rotate(-0.8deg);
+}
+
+.marquee.marquee-reverse {
+  transform: rotate(0.8deg);
 }
 
 .marquee-track {
@@ -1297,6 +1687,46 @@ onUnmounted(() => {
   box-shadow: 0 0 12px var(--green);
 }
 
+.emblem-twinkle {
+  position: absolute;
+  font-size: 12px;
+  color: var(--amber);
+  animation: twinkle 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.emblem-twinkle.tw-1 {
+  top: 4px;
+  right: 20px;
+}
+
+.emblem-twinkle.tw-2 {
+  bottom: 14px;
+  left: 2px;
+  color: var(--pink);
+  animation-delay: 0.9s;
+}
+
+.emblem-twinkle.tw-3 {
+  top: 42%;
+  right: -8px;
+  color: var(--accent);
+  font-size: 9px;
+  animation-delay: 1.7s;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(0.6) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15) rotate(45deg);
+  }
+}
+
 .about-text h2 {
   font-size: clamp(20px, 2.6vw, 27px);
   line-height: 1.3;
@@ -1395,6 +1825,114 @@ onUnmounted(() => {
 @keyframes final-drift-b {
   to {
     transform: translate(-7vmax, -5vmax) scale(1.12);
+  }
+}
+
+/* Starfield + shooting stars behind the final call to action */
+.final-sky {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, color-mix(in srgb, var(--t1) 55%, transparent) 1px, transparent 1.6px),
+    radial-gradient(circle, color-mix(in srgb, var(--t1) 35%, transparent) 1px, transparent 1.5px);
+  background-size:
+    190px 170px,
+    120px 140px;
+  background-position:
+    12px 24px,
+    64px 88px;
+  opacity: 0.4;
+  animation: final-twinkle 5s ease-in-out infinite;
+}
+
+@keyframes final-twinkle {
+  50% {
+    opacity: 0.22;
+  }
+}
+
+.shoot {
+  position: absolute;
+  width: 120px;
+  height: 1.5px;
+  left: -8%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--t1));
+  opacity: 0;
+  animation: shoot-across 8s linear infinite;
+}
+
+.shoot-1 {
+  top: 16%;
+}
+
+.shoot-2 {
+  top: 42%;
+  animation-delay: 3.2s;
+  animation-duration: 10s;
+}
+
+.shoot-3 {
+  top: 68%;
+  animation-delay: 5.8s;
+  animation-duration: 12s;
+}
+
+@keyframes shoot-across {
+  0% {
+    transform: rotate(16deg) translateX(0);
+    opacity: 0;
+  }
+  3% {
+    opacity: 0.8;
+  }
+  13% {
+    transform: rotate(16deg) translateX(76vw);
+    opacity: 0;
+  }
+  100% {
+    transform: rotate(16deg) translateX(76vw);
+    opacity: 0;
+  }
+}
+
+/* slowly revolving gradient border around the whole card */
+@property --fspin {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.final-border {
+  position: absolute;
+  inset: 0;
+  border-radius: 30px;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--fspin),
+    color-mix(in srgb, var(--accent) 70%, transparent),
+    color-mix(in srgb, var(--pink) 50%, transparent),
+    color-mix(in srgb, var(--amber) 40%, transparent),
+    color-mix(in srgb, var(--accent) 70%, transparent)
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: fspin-turn 10s linear infinite;
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 2;
+}
+
+@keyframes fspin-turn {
+  to {
+    --fspin: 360deg;
   }
 }
 
@@ -1502,6 +2040,29 @@ onUnmounted(() => {
   color: var(--t3);
 }
 
+.heartbeat {
+  display: inline-block;
+  color: var(--pink);
+  animation: heart-thump 1.7s ease-in-out infinite;
+}
+
+@keyframes heart-thump {
+  0%,
+  50%,
+  100% {
+    transform: scale(1);
+  }
+  12% {
+    transform: scale(1.3);
+  }
+  24% {
+    transform: scale(1);
+  }
+  36% {
+    transform: scale(1.22);
+  }
+}
+
 /* ══ Motion safety ════════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
   .home {
@@ -1526,8 +2087,28 @@ onUnmounted(() => {
   .about-orbit,
   .about-core,
   .final::before,
-  .final::after {
+  .final::after,
+  .aurora-blob,
+  .hero-hint,
+  .cta-primary::before,
+  .cta-primary::after,
+  .feature::after,
+  .stat-block::before,
+  #features::before,
+  #views::before,
+  #explore::before,
+  .emblem-twinkle,
+  .final-sky,
+  .shoot,
+  .final-border,
+  .heartbeat {
     animation: none;
+  }
+  .cursor-aura {
+    display: none;
+  }
+  .hero-hint {
+    opacity: 1;
   }
 }
 </style>

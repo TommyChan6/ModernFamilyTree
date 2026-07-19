@@ -79,6 +79,25 @@ interface Meteor {
   life: number
 }
 
+// Click fireworks: the visitor can tap the sky to burst a handful of sparks
+// (ballistic, faded by age) and leave a permanent little star behind.
+interface Spark {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  t0: number
+  life: number
+  colorIdx: number
+  r: number
+}
+
+interface BurstRing {
+  x: number
+  y: number
+  t0: number
+}
+
 export interface HeroConstellationHandle {
   /** Re-read the CSS design tokens (call when the theme changes). */
   refreshPalette(): void
@@ -317,6 +336,8 @@ export function createHeroConstellation(canvas: HTMLCanvasElement): HeroConstell
   const pulses: Pulse[] = []
   const ripples: Ripple[] = []
   const meteors: Meteor[] = []
+  const sparks: Spark[] = []
+  const burstRings: BurstRing[] = []
 
   let w = 0
   let h = 0
@@ -526,6 +547,29 @@ export function createHeroConstellation(canvas: HTMLCanvasElement): HeroConstell
       }
     }
 
+    // Click fireworks — ballistic sparks plus an expanding ring.
+    for (const s of sparks) {
+      const age = time - s.t0
+      const k = age / s.life
+      if (k < 0 || k > 1) continue
+      const fade = 1 - k
+      const x = s.x + s.vx * age
+      const y = s.y + s.vy * age + 60 * age * age
+      const size = s.r * (0.7 + 0.6 * fade) * 2
+      ctx.globalAlpha = fade
+      ctx.drawImage(sprites[s.colorIdx], x - size / 2, y - size / 2, size, size)
+    }
+    ctx.globalAlpha = 1
+    for (const ring of burstRings) {
+      const k = (time - ring.t0) / 1.1
+      if (k < 0 || k > 1) continue
+      ctx.strokeStyle = rgba(palette.accent, 0.55 * (1 - k))
+      ctx.lineWidth = 1.6
+      ctx.beginPath()
+      ctx.arc(ring.x, ring.y, 3 + k * 48, 0, TAU)
+      ctx.stroke()
+    }
+
     // Meteors — rare streaks across the far background.
     for (const m of meteors) {
       const s = (time - m.t0) / m.life
@@ -642,9 +686,48 @@ export function createHeroConstellation(canvas: HTMLCanvasElement): HeroConstell
     pyTarget = 0
   }
 
+  function spawnBurst(cx: number, cy: number): void {
+    burstRings.push({ x: cx, y: cy, t0: t })
+    const count = 14 + Math.floor(Math.random() * 6)
+    for (let i = 0; i < count; i++) {
+      const ang = Math.random() * TAU
+      const speed = 30 + Math.random() * 130
+      sparks.push({
+        x: cx,
+        y: cy,
+        vx: Math.cos(ang) * speed,
+        vy: Math.sin(ang) * speed - 24,
+        t0: t,
+        life: 0.7 + Math.random() * 0.9,
+        colorIdx: Math.floor(Math.random() * 4),
+        r: 5 + Math.random() * 9
+      })
+    }
+    while (sparks.length > 90) sparks.shift()
+    while (burstRings.length > 8) burstRings.shift()
+    // Every click leaves a permanent little star behind — the visitor's mark.
+    dust.push({
+      u: cx / Math.max(1, w),
+      v: cy / Math.max(1, h),
+      r: 1 + Math.random(),
+      layer: 2,
+      tw: Math.random() * TAU
+    })
+    if (dust.length > 220) dust.splice(0, dust.length - 220)
+  }
+
+  function onClick(e: MouseEvent): void {
+    // Only bare-sky clicks — buttons and links inside the hero keep their job.
+    if (e.target !== canvas && e.target !== host) return
+    const rect = canvas.getBoundingClientRect()
+    spawnBurst(e.clientX - rect.left, e.clientY - rect.top)
+    if (reducedMotion) drawFrame()
+  }
+
   const host = canvas.parentElement ?? canvas
   host.addEventListener('mousemove', onPointerMove)
   host.addEventListener('mouseleave', onPointerLeave)
+  host.addEventListener('click', onClick)
 
   const resizeObserver = new ResizeObserver(() => resize())
   resizeObserver.observe(host)
@@ -685,6 +768,7 @@ export function createHeroConstellation(canvas: HTMLCanvasElement): HeroConstell
       document.removeEventListener('visibilitychange', onVisibility)
       host.removeEventListener('mousemove', onPointerMove)
       host.removeEventListener('mouseleave', onPointerLeave)
+      host.removeEventListener('click', onClick)
     }
   }
 }

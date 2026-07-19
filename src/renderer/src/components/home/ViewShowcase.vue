@@ -19,50 +19,54 @@
     </div>
 
     <!-- The stage: one family, morphing between five layouts -->
-    <div class="stage-frame">
-      <div class="stage-tilt" :class="{ tilted: active === 'space' }">
-        <div class="stage-spin" :class="{ spinning: active === 'space' }">
-          <!-- Group zone discs (groups view only) -->
-          <div
-            v-for="(g, gi) in GROUPS"
-            :key="'g' + gi"
-            class="disc"
-            :class="'disc-' + gi"
-            :style="discStyle(g)"
-          >
-            <span class="disc-label">{{ g.label }}</span>
-          </div>
+    <div class="stage-frame" @mousemove="stageTilt" @mouseleave="stageLeave">
+      <div class="stage-stars" aria-hidden="true"></div>
+      <span class="live-chip"><span class="live-dot"></span> Live</span>
+      <div class="stage-hover">
+        <div class="stage-tilt" :class="{ tilted: active === 'space' }">
+          <div class="stage-spin" :class="{ spinning: active === 'space' }">
+            <!-- Group zone discs (groups view only) -->
+            <div
+              v-for="(g, gi) in GROUPS"
+              :key="'g' + gi"
+              class="disc"
+              :class="'disc-' + gi"
+              :style="discStyle(g)"
+            >
+              <span class="disc-label">{{ g.label }}</span>
+            </div>
 
-          <!-- Timeline year grid (timeline view only) -->
-          <div v-for="year in YEARS" :key="'y' + year" class="yearline" :style="yearStyle(year)">
-            <span class="yearline-label">{{ year }}</span>
-          </div>
+            <!-- Timeline year grid (timeline view only) -->
+            <div v-for="year in YEARS" :key="'y' + year" class="yearline" :style="yearStyle(year)">
+              <span class="yearline-label">{{ year }}</span>
+            </div>
 
-          <!-- Orbit rings (space view only) -->
-          <div class="orbit orbit-a"></div>
-          <div class="orbit orbit-b"></div>
+            <!-- Orbit rings (space view only) -->
+            <div class="orbit orbit-a"></div>
+            <div class="orbit orbit-b"></div>
 
-          <!-- Family links (tree view only) -->
-          <div
-            v-for="(link, li) in LINKS"
-            :key="'l' + li"
-            class="link"
-            :class="'link-' + link.kind"
-            :style="linkStyle(link)"
-          ></div>
+            <!-- Family links (tree view only) -->
+            <div
+              v-for="(link, li) in LINKS"
+              :key="'l' + li"
+              class="link"
+              :class="'link-' + link.kind"
+              :style="linkStyle(link)"
+            ></div>
 
-          <!-- The twelve family members -->
-          <div
-            v-for="(p, i) in PEOPLE"
-            :key="p.id"
-            class="dot"
-            :class="'c' + p.c"
-            :style="dotStyle(p, i)"
-          >
-            <span class="dot-label">
-              <span class="dot-name">{{ p.name }}</span>
-              <span class="dot-sub">b. {{ p.birth }}</span>
-            </span>
+            <!-- The twelve family members -->
+            <div
+              v-for="(p, i) in PEOPLE"
+              :key="p.id"
+              class="dot"
+              :class="'c' + p.c"
+              :style="dotStyle(p, i)"
+            >
+              <span class="dot-label">
+                <span class="dot-name">{{ p.name }}</span>
+                <span class="dot-sub">b. {{ p.birth }}</span>
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -178,6 +182,25 @@ const VIEWS = [
 const active = ref('tree')
 const autoplay = ref(true)
 const cycle = ref(0)
+
+// Pointer-tracked 3D tilt on the stage (its own layer, so it composes with
+// the space mode's scripted tilt underneath).
+const allowTilt = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+function stageTilt(e) {
+  if (!allowTilt) return
+  const el = e.currentTarget
+  const rect = el.getBoundingClientRect()
+  const nx = (e.clientX - rect.left) / rect.width - 0.5
+  const ny = (e.clientY - rect.top) / rect.height - 0.5
+  el.style.setProperty('--hx', (-ny * 4).toFixed(2) + 'deg')
+  el.style.setProperty('--hy', (nx * 5).toFixed(2) + 'deg')
+}
+
+function stageLeave(e) {
+  e.currentTarget.style.setProperty('--hx', '0deg')
+  e.currentTarget.style.setProperty('--hy', '0deg')
+}
 const activeView = computed(() => VIEWS.find((v) => v.id === active.value))
 
 let timer = 0
@@ -382,6 +405,123 @@ function yearStyle(year) {
     var(--surface);
   overflow: hidden;
   perspective: 900px;
+}
+
+/* an ember of light slowly orbiting the frame's border */
+@property --vspin {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.stage-frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--vspin),
+    transparent 0deg 40deg,
+    color-mix(in srgb, var(--accent) 85%, transparent) 90deg,
+    transparent 150deg 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: vspin-turn 7s linear infinite;
+  opacity: 0.8;
+  pointer-events: none;
+  z-index: 6;
+}
+
+@keyframes vspin-turn {
+  to {
+    --vspin: 360deg;
+  }
+}
+
+/* deep-space specks that fade in for the 3D lens */
+.stage-stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+  background-image:
+    radial-gradient(circle, color-mix(in srgb, var(--t1) 70%, transparent) 1px, transparent 1.6px),
+    radial-gradient(circle, color-mix(in srgb, var(--t1) 40%, transparent) 0.8px, transparent 1.4px);
+  background-size:
+    140px 120px,
+    90px 100px;
+  background-position:
+    20px 30px,
+    54px 72px;
+}
+
+.mode-space .stage-stars {
+  opacity: 0.5;
+  animation: star-drift 34s linear infinite;
+}
+
+@keyframes star-drift {
+  to {
+    background-position:
+      160px 30px,
+      144px 72px;
+  }
+}
+
+.live-chip {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--glass-strong);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--t2);
+  pointer-events: none;
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.75);
+  }
+}
+
+/* hover tilt lives on its own wrapper so it can be snappy while the space
+   mode's big scripted tilt below stays slow and cinematic */
+.stage-hover {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--hx, 0deg)) rotateY(var(--hy, 0deg));
+  transition: transform 0.3s ease-out;
 }
 
 .stage-tilt {
@@ -717,7 +857,11 @@ function yearStyle(year) {
   .link,
   .disc,
   .stage-tilt,
-  .stage-spin {
+  .stage-spin,
+  .stage-hover,
+  .stage-frame::before,
+  .stage-stars,
+  .live-dot {
     transition: none;
     animation: none !important;
   }

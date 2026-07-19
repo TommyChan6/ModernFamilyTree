@@ -32,6 +32,7 @@
             </span>
             <span class="cover-meta">{{ p.people }} people · {{ p.generations }} generations</span>
             <div class="cover-glare"></div>
+            <div class="cover-holo"></div>
           </div>
           <div class="body">
             <h3 class="title">{{ p.title }}</h3>
@@ -354,6 +355,31 @@ function avatarStyle(p) {
 
 .card:hover .cover-glare {
   opacity: 1;
+}
+
+/* holographic foil: a rainbow conic sheen anchored to the cursor, blended
+   like light bouncing off a trading card */
+.cover-holo {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg at var(--gx) var(--gy),
+    rgba(255, 60, 140, 0.3),
+    rgba(255, 210, 60, 0.24),
+    rgba(60, 255, 180, 0.26),
+    rgba(60, 170, 255, 0.3),
+    rgba(180, 60, 255, 0.26),
+    rgba(255, 60, 140, 0.3)
+  );
+  mix-blend-mode: color-dodge;
+  filter: blur(16px) saturate(1.5);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.card:hover .cover-holo {
+  opacity: 0.45;
 }
 
 .badge-pill {
