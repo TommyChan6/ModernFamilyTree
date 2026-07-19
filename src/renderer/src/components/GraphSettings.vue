@@ -7,6 +7,55 @@
       </div>
 
       <div class="settings-body">
+        <!-- Render quality -->
+        <div class="quality-row">
+          <button
+            class="quality-opt"
+            :class="{ active: gs.renderQuality !== 'performance' }"
+            title="Full resolution, ornaments, atmosphere and ambient motion"
+            @click="set('renderQuality', 'quality')"
+          >
+            ✨ Quality
+          </button>
+          <button
+            class="quality-opt"
+            :class="{ active: gs.renderQuality === 'performance' }"
+            title="Trimmed resolution, still ornaments, no atmosphere — for low-end machines"
+            @click="set('renderQuality', 'performance')"
+          >
+            ⚡ Performance
+          </button>
+        </div>
+
+        <!-- Themes -->
+        <div class="settings-group">
+          <button class="group-toggle" @click="toggle('themes')">
+            <span class="group-icon" :class="{ rotated: expanded.themes }">›</span>
+            <span>Theme</span>
+            <span v-if="gs.themePreset === 'custom'" class="custom-chip">custom</span>
+          </button>
+          <Transition name="expand">
+            <div v-if="expanded.themes" class="group-content">
+              <div class="theme-grid">
+                <button
+                  v-for="t in themes"
+                  :key="t.id"
+                  class="theme-card"
+                  :class="{ active: gs.themePreset === t.id }"
+                  :title="t.tagline"
+                  @click="applyTheme(t)"
+                >
+                  <span class="theme-icon">{{ t.icon }}</span>
+                  <span class="theme-name">{{ t.name }}</span>
+                  <span class="theme-swatch">
+                    <i v-for="(c, i) in t.swatch" :key="i" :style="{ background: c }"></i>
+                  </span>
+                </button>
+              </div>
+            </div>
+          </Transition>
+        </div>
+
         <!-- Node Appearance -->
         <div class="settings-group">
           <button class="group-toggle" @click="toggle('nodes')">
@@ -15,6 +64,48 @@
           </button>
           <Transition name="expand">
             <div v-if="expanded.nodes" class="group-content">
+              <div class="setting-item">
+                <label>Shape</label>
+                <div class="chip-grid">
+                  <button
+                    v-for="s in shapes"
+                    :key="s.id"
+                    class="shape-chip"
+                    :class="{ active: gs.nodeShape === s.id }"
+                    :title="s.label"
+                    @click="set('nodeShape', s.id)"
+                  >
+                    <span class="shape-preview" :class="'shape-' + s.id"></span>
+                  </button>
+                </div>
+              </div>
+              <div class="setting-item">
+                <label>Ornament</label>
+                <div class="chip-grid">
+                  <button
+                    v-for="d in decors"
+                    :key="d.id"
+                    class="decor-chip"
+                    :class="{ active: gs.nodeDecor === d.id }"
+                    :title="d.label"
+                    @click="set('nodeDecor', d.id)"
+                  >
+                    <span class="decor-preview" :class="'decor-' + d.id"></span>
+                    <span class="chip-label">{{ d.label }}</span>
+                  </button>
+                </div>
+              </div>
+              <div v-if="gs.nodeDecor !== 'none'" class="setting-item">
+                <label>Ornament Color</label>
+                <div class="color-row">
+                  <input
+                    type="color"
+                    :value="gs.decorColor"
+                    @input="set('decorColor', $event.target.value)"
+                  />
+                  <span class="color-hex">{{ gs.decorColor }}</span>
+                </div>
+              </div>
               <div class="setting-item">
                 <label>Node Size</label>
                 <div class="slider-row">
@@ -145,6 +236,33 @@
           <Transition name="expand">
             <div v-if="expanded.lines" class="group-content">
               <div class="setting-item">
+                <label>Line Style</label>
+                <div class="route-grid">
+                  <button
+                    v-for="r in routes"
+                    :key="r.id"
+                    class="route-chip"
+                    :class="{ active: gs.linkRoute === r.id }"
+                    :title="r.hint"
+                    @click="set('linkRoute', r.id)"
+                  >
+                    <svg viewBox="0 0 44 20" class="route-svg">
+                      <path
+                        v-for="(p, i) in r.paths"
+                        :key="i"
+                        :d="p"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                    <span class="chip-label">{{ r.label }}</span>
+                  </button>
+                </div>
+              </div>
+              <div class="setting-item">
                 <label>Line Opacity</label>
                 <div class="slider-row">
                   <input
@@ -158,7 +276,7 @@
                   <span class="slider-val">{{ Math.round(gs.linkOpacity * 100) }}%</span>
                 </div>
               </div>
-              <div class="setting-item">
+              <div v-if="gs.linkRoute === 'organic'" class="setting-item">
                 <label>Line Curvature</label>
                 <div class="slider-row">
                   <input
@@ -278,6 +396,67 @@
           </Transition>
         </div>
 
+        <!-- Atmosphere -->
+        <div class="settings-group">
+          <button class="group-toggle" @click="toggle('atmosphere')">
+            <span class="group-icon" :class="{ rotated: expanded.atmosphere }">›</span>
+            <span>Atmosphere</span>
+            <span v-if="gs.renderQuality === 'performance'" class="custom-chip">off in ⚡</span>
+          </button>
+          <Transition name="expand">
+            <div v-if="expanded.atmosphere" class="group-content">
+              <div class="setting-item">
+                <label>Effect</label>
+                <div class="chip-grid">
+                  <button
+                    v-for="a in ambients"
+                    :key="a.id"
+                    class="ambient-chip"
+                    :class="{ active: gs.ambientFx === a.id }"
+                    :title="a.label"
+                    @click="set('ambientFx', a.id)"
+                  >
+                    <span class="ambient-icon">{{ a.icon }}</span>
+                    <span class="chip-label">{{ a.label }}</span>
+                  </button>
+                </div>
+              </div>
+              <template v-if="gs.ambientFx !== 'none'">
+                <div class="setting-item">
+                  <label>Colors</label>
+                  <div class="color-row">
+                    <input
+                      type="color"
+                      :value="gs.ambientColorA"
+                      @input="set('ambientColorA', $event.target.value)"
+                    />
+                    <input
+                      type="color"
+                      :value="gs.ambientColorB"
+                      @input="set('ambientColorB', $event.target.value)"
+                    />
+                    <span class="color-hex">{{ gs.ambientColorA }} · {{ gs.ambientColorB }}</span>
+                  </div>
+                </div>
+                <div class="setting-item">
+                  <label>Density</label>
+                  <div class="slider-row">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      :value="gs.ambientDensity"
+                      @input="set('ambientDensity', +$event.target.value)"
+                    />
+                    <span class="slider-val">{{ Math.round(gs.ambientDensity * 100) }}%</span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </Transition>
+        </div>
+
         <!-- Physics (Advanced mode only) -->
         <div v-if="store.caps.style === 'full'" class="settings-group">
           <button class="group-toggle" @click="toggle('physics')">
@@ -330,14 +509,95 @@
 <script setup>
 import { reactive, computed } from 'vue'
 import { useMainStore } from '../store/index.js'
+import { GRAPH_THEMES, THEME_KEYS } from './graph/graphThemes.js'
 
 const store = useMainStore()
 const gs = computed(() => store.graphSettings)
+const themes = GRAPH_THEMES
+
+const shapes = [
+  { id: 'circle', label: 'Circle' },
+  { id: 'square', label: 'Square' },
+  { id: 'diamond', label: 'Diamond' },
+  { id: 'hexagon', label: 'Hexagon' },
+  { id: 'shield', label: 'Shield' },
+  { id: 'oval', label: 'Oval' },
+  { id: 'octagon', label: 'Octagon' },
+  { id: 'heart', label: 'Heart' }
+]
+
+const decors = [
+  { id: 'none', label: 'None' },
+  { id: 'aura', label: 'Aura' },
+  { id: 'runes', label: 'Runes' },
+  { id: 'orbit', label: 'Orbit' },
+  { id: 'burst', label: 'Burst' },
+  { id: 'pulse', label: 'Pulse' }
+]
+
+// Little SVG glyphs previewing each route system (44 × 20 viewBox).
+const routes = [
+  {
+    id: 'organic',
+    label: 'Organic',
+    hint: 'Soft curves with a natural per-line bend',
+    paths: ['M3,16 Q22,3 41,12']
+  },
+  {
+    id: 'straight',
+    label: 'Straight',
+    hint: 'Dead-straight lines',
+    paths: ['M3,16 L41,5']
+  },
+  {
+    id: 'arc',
+    label: 'Arc',
+    hint: 'Sweeping half-moon curves',
+    paths: ['M3,17 Q22,-7 41,17']
+  },
+  {
+    id: 'elbow',
+    label: 'Elbow',
+    hint: 'Right-angle runs, like a flowchart',
+    paths: ['M4,18 V10 H40 V3']
+  },
+  {
+    id: 'trident',
+    label: 'Trident',
+    hint: 'Classic genealogy: couple bar → stem → sibling rail → children',
+    paths: ['M14,3 H30', 'M22,3 V9', 'M6,9 H38', 'M6,9 V16', 'M22,9 V16', 'M38,9 V16']
+  },
+  {
+    id: 'circuit',
+    label: 'Circuit',
+    hint: 'Axis-then-45° traces, like a circuit board',
+    paths: ['M4,17 H22 L32,7 H41']
+  },
+  {
+    id: 'wave',
+    label: 'Wave',
+    hint: 'A sinuous ripple between people',
+    paths: ['M3,11 Q8,3 13,11 T23,11 T33,11 T41,11']
+  }
+]
+
+const ambients = [
+  { id: 'none', label: 'None', icon: '◦' },
+  { id: 'fireflies', label: 'Fireflies', icon: '✨' },
+  { id: 'stars', label: 'Stars', icon: '🌌' },
+  { id: 'petals', label: 'Petals', icon: '🌸' },
+  { id: 'snow', label: 'Snow', icon: '❄️' },
+  { id: 'embers', label: 'Embers', icon: '🔥' },
+  { id: 'rain', label: 'Rain', icon: '🌧️' },
+  { id: 'motes', label: 'Motes', icon: '🌫️' }
+]
 
 const expanded = reactive({
+  themes: true,
   nodes: true,
   colors: false,
   lines: true,
+  atmosphere: false,
   physics: false
 })
 
@@ -347,6 +607,13 @@ function toggle(key) {
 
 function set(key, value) {
   store.updateGraphSetting(key, value)
+  // Hand-tuning a theme-coordinated knob makes the look "custom".
+  if (THEME_KEYS.has(key) && store.graphSettings.themePreset !== 'custom')
+    store.updateGraphSetting('themePreset', 'custom')
+}
+
+function applyTheme(t) {
+  store.applyGraphSettings({ ...t.settings, themePreset: t.id })
 }
 </script>
 
@@ -356,7 +623,7 @@ function set(key, value) {
   top: 0;
   left: 0;
   bottom: 0;
-  width: 280px;
+  width: 300px;
   background: var(--surface);
   border-right: 1px solid var(--border);
   display: flex;
@@ -426,6 +693,18 @@ function set(key, value) {
   transform: rotate(90deg);
 }
 
+.custom-chip {
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 2px 7px;
+  border-radius: 8px;
+  background: var(--elevated);
+  color: var(--t3);
+  text-transform: lowercase;
+}
+
 .group-content {
   padding: 4px 16px 12px;
   display: flex;
@@ -450,6 +729,280 @@ function set(key, value) {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+}
+
+/* Quality segmented toggle */
+.quality-row {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.quality-opt {
+  flex: 1;
+  padding: 7px 0;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--t2);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.quality-opt.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
+/* Theme gallery */
+.theme-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  cursor: pointer;
+  font-family: var(--font);
+  transition:
+    transform 0.15s cubic-bezier(0.34, 1.4, 0.64, 1),
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.theme-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+}
+
+.theme-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.theme-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.theme-name {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--t1);
+}
+
+.theme-swatch {
+  display: flex;
+  gap: 3px;
+}
+
+.theme-swatch i {
+  width: 10px;
+  height: 4px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* Shape / decor / ambient chip grids */
+.chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.shape-chip,
+.decor-chip,
+.ambient-chip,
+.route-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--t2);
+  cursor: pointer;
+  font-family: var(--font);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    color 0.15s,
+    transform 0.15s;
+}
+
+.shape-chip {
+  width: 34px;
+  height: 34px;
+}
+
+.decor-chip,
+.ambient-chip {
+  width: 48px;
+  padding: 6px 0 5px;
+}
+
+.shape-chip:hover,
+.decor-chip:hover,
+.ambient-chip:hover,
+.route-chip:hover {
+  transform: translateY(-1px);
+  border-color: var(--t3);
+}
+
+.shape-chip.active,
+.decor-chip.active,
+.ambient-chip.active,
+.route-chip.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  color: var(--t1);
+}
+
+.chip-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+/* Shape previews — pure CSS silhouettes matching the shader SDFs */
+.shape-preview {
+  width: 18px;
+  height: 18px;
+  background: currentColor;
+  display: inline-block;
+}
+
+.shape-circle {
+  border-radius: 50%;
+}
+.shape-square {
+  border-radius: 4px;
+}
+.shape-diamond {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+.shape-hexagon {
+  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0% 50%);
+}
+.shape-shield {
+  clip-path: polygon(4% 8%, 96% 8%, 96% 52%, 50% 100%, 4% 52%);
+}
+.shape-oval {
+  border-radius: 50%;
+  transform: scaleY(0.72);
+}
+.shape-octagon {
+  clip-path: polygon(30% 4%, 70% 4%, 96% 30%, 96% 70%, 70% 96%, 30% 96%, 4% 70%, 4% 30%);
+}
+.shape-heart {
+  clip-path: polygon(
+    50% 100%,
+    10% 58%,
+    2% 34%,
+    12% 12%,
+    30% 5%,
+    50% 18%,
+    70% 5%,
+    88% 12%,
+    98% 34%,
+    90% 58%
+  );
+}
+
+/* Decor previews — a nucleus dot with the ornament hinted around it */
+.decor-preview {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  position: relative;
+  display: inline-block;
+  background: currentColor;
+  background-clip: content-box;
+  padding: 5px;
+}
+
+.decor-aura {
+  box-shadow:
+    inset 0 0 0 1.5px transparent,
+    0 0 0 0 transparent;
+  outline: 1.5px solid currentColor;
+  outline-offset: -2px;
+}
+.decor-runes {
+  outline: 1.5px dashed currentColor;
+  outline-offset: -1px;
+}
+.decor-orbit::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 1px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.decor-burst {
+  clip-path: polygon(
+    50% 0%,
+    61% 35%,
+    98% 35%,
+    68% 57%,
+    79% 91%,
+    50% 70%,
+    21% 91%,
+    32% 57%,
+    2% 35%,
+    39% 35%
+  );
+  padding: 2px;
+}
+.decor-pulse {
+  outline: 1.5px solid currentColor;
+  outline-offset: 1px;
+  opacity: 0.9;
+}
+
+/* Route picker */
+.route-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.route-chip {
+  padding: 6px 4px 5px;
+}
+
+.route-svg {
+  width: 44px;
+  height: 20px;
+  display: block;
+}
+
+.ambient-icon {
+  font-size: 14px;
+  line-height: 1;
 }
 
 /* Slider */
@@ -636,13 +1189,13 @@ function set(key, value) {
   transition:
     max-height 0.3s ease,
     opacity 0.25s ease;
-  max-height: 500px;
+  max-height: 900px;
 }
 .expand-leave-active {
   transition:
     max-height 0.2s ease,
     opacity 0.15s ease;
-  max-height: 500px;
+  max-height: 900px;
 }
 .expand-enter-from {
   max-height: 0;

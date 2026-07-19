@@ -1,10 +1,12 @@
 import * as THREE from 'three'
 import { NodeLayer } from './NodeLayer.js'
 import { LinkLayer } from './LinkLayer.js'
+import { AmbientLayer } from './AmbientLayer.js'
 import { AvatarAtlas } from './AvatarAtlas.js'
 import { TextGuideOverlay } from './TextGuideOverlay.js'
 import { Picker } from './Picking.js'
 import { approach, TWEEN_EPS } from './tween.js'
+import { nodeShapeId, nodeDecorId } from './NodeMaterial.js'
 
 const _col = new THREE.Color()
 function rgb(hex) {
@@ -86,6 +88,12 @@ export class WebGLGraphRenderer {
     this.world.add(this.linkLayer.arrowObject3d)
     this.world.add(this.nodeLayer.object3d)
 
+    // Atmosphere: screen-space particle weather behind everything (quality mode).
+    this.ambient = new AmbientLayer()
+    this.scene.add(this.ambient.object3d)
+    this._hasAmbient = false
+    this._quality = 'quality'
+
     this.overlay = new TextGuideOverlay(overlayCanvas)
     this.picker = new Picker()
 
@@ -103,7 +111,10 @@ export class WebGLGraphRenderer {
 
     // Ambient flow / selection pulse pause with the tab; restart when it returns.
     this._onVisibility = () => {
-      if (document.visibilityState === 'visible' && (this._hasFlow || this._hasNodeGlow))
+      if (
+        document.visibilityState === 'visible' &&
+        (this._hasFlow || this._hasNodeGlow || this._hasAmbient || this._decorAnim)
+      )
         this.requestRedraw()
     }
     document.addEventListener('visibilitychange', this._onVisibility)
@@ -119,7 +130,24 @@ export class WebGLGraphRenderer {
     this.camera.bottom = h
     this.camera.updateProjectionMatrix()
     this.overlay.resize(w, h, this.dpr)
+    this.ambient.resize(w, h)
     this.requestRedraw()
+  }
+
+  // Performance mode trims the backing-store resolution (the biggest lever on
+  // low-end GPUs); quality mode renders at full device pixels. Applied lazily
+  // from the settings each frame so the toggle is instant.
+  _applyQuality(quality) {
+    if (quality === this._quality) return
+    this._quality = quality
+    const raw = window.devicePixelRatio || 1
+    this.dpr = quality === 'performance' ? Math.min(raw, 1.25) : Math.min(raw, 2.5)
+    this.renderer.setPixelRatio(this.dpr)
+    this.nodeLayer.material.uniforms.uPixelRatio.value = this.dpr
+    if (this.width) {
+      this.renderer.setSize(this.width, this.height, false)
+      this.overlay.resize(this.width, this.height, this.dpr)
+    }
   }
 
   setData(nodes, links) {
@@ -339,6 +367,18 @@ export class WebGLGraphRenderer {
       links = this.links || []
     const gs = this.hooks.getSettings()
 
+    // ── Aesthetics: quality mode, node shape/decor uniforms, atmosphere ──────
+    const quality = gs.renderQuality === 'performance' ? 'performance' : 'quality'
+    this._applyQuality(quality)
+    const nu = this.nodeLayer.material.uniforms
+    nu.uShape.value = nodeShapeId(gs.nodeShape)
+    nu.uDecor.value = nodeDecorId(gs.nodeDecor)
+    nu.uDecorColor.value.set(gs.decorColor || '#d4af37')
+    // Decor ornaments animate only in quality mode; frozen (t=0) keeps them
+    // as static jewellery in performance mode.
+    this._decorAnim = quality === 'quality' && nodeDecorId(gs.nodeDecor) > 0
+    this._hasAmbient = this.ambient.sync(gs, quality)
+
     if (this.nodeStylesDirty) {
       this._syncNodeStyles()
       this.nodeStylesDirty = false
@@ -402,16 +442,20 @@ export class WebGLGraphRenderer {
     const clock = ts / 1000
     this.linkLayer.material.uniforms.uTime.value = clock
     this.nodeLayer.material.uniforms.uTime.value = clock
+    nu.uDecorTime.value = this._decorAnim ? clock : 0
+    this.ambient.setClock(clock, t.x, t.y)
 
     this.renderer.render(this.scene, this.camera)
     this.overlay.draw(this.hooks.overlayOpts())
 
-    // Keep the loop alive frame-to-frame while a tween is settling, dashes flow, or
-    // a node's focus halo is pulsing.
+    // Keep the loop alive frame-to-frame while a tween is settling, dashes flow,
+    // a node's focus halo is pulsing, decor ornaments are turning, or weather
+    // is drifting through the atmosphere layer.
     if (
       this._nodeTweening ||
       this._linkTweening ||
-      ((this._hasFlow || this._hasNodeGlow) && document.visibilityState === 'visible')
+      ((this._hasFlow || this._hasNodeGlow || this._hasAmbient || this._decorAnim) &&
+        document.visibilityState === 'visible')
     ) {
       this.requestRedraw()
     }
@@ -489,6 +533,8 @@ export class WebGLGraphRenderer {
       )
       this.world.matrixWorldNeedsUpdate = true
       this.nodeLayer.material.uniforms.uTime.value = 0 // neutral pulse phase for a still capture
+      this.nodeLayer.material.uniforms.uDecorTime.value = 0
+      this.ambient.object3d.visible = false // weather is ambience, not content
       this.renderer.render(this.scene, this.camera)
       this.overlay.resize(width, height, 1)
       this.overlay.draw(overlayOpts)
@@ -526,6 +572,7 @@ export class WebGLGraphRenderer {
     this.nodeLayer.dispose()
     this.linkLayer.dispose()
     this.haloLayer.dispose()
+    this.ambient.dispose()
     this.renderer.dispose()
   }
 }

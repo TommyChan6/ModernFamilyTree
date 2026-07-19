@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { createLinkMaterial, createArrowMaterial } from './LinkMaterial.js'
-import { linkCurvePoints } from '../linkHelpers.js'
+import { routePoints } from '../linkRouting.js'
 
 const SEG = 14 // bezier tessellation segments
 const VPL = (SEG + 1) * 2 // vertices per link (ribbon: 2 per sample point)
@@ -114,7 +114,7 @@ export class LinkLayer {
     for (let j = 0; j < links.length; j++) {
       const d = links[j]
       const vis = visual(d)
-      const { points, control } = linkCurvePoints(d, gs.lineCurvature, SEG)
+      const { points, control } = routePoints(d, gs, SEG)
       const halfW = vis.width / 2
       const base = j * VPL
       let acc = 0

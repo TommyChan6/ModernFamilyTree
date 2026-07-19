@@ -633,6 +633,7 @@ import { useGraphAnimation } from './graph/useGraphAnimation.js'
 import { useTimeTravel } from './time/useTimeTravel'
 import { toOrdinal } from '../../../shared/calendarMath'
 import { WebGLGraphRenderer } from './graph/webgl/WebGLGraphRenderer.js'
+import { stampFamilyContext } from './graph/linkRouting.js'
 import { screenToWorld, worldToScreen, nodesExtent, fitExtent } from './graph/webgl/coords.js'
 import { viewRectXYK } from './webgl/minimapMath'
 import { withAlpha } from './webgl/overlayUtils.js'
@@ -2374,6 +2375,10 @@ function updateGraph() {
   ctx.simulation.nodes(ctx.nodesData)
   ctx.simulation.force('link').links(ctx.linksData)
   ctx.simulation.force('repelLinks')?.links(ctx.linksData)
+  // The link force just resolved source/target to node objects — stamp the
+  // family context (couple junctions + sibling groups) the routed line styles
+  // (trident/elbow) read at draw time.
+  stampFamilyContext(ctx.linksData, store.relTypeRoles)
   if (currentMode.value === 'auto') ctx.simulation.alpha(hadNew ? 0.3 : 0.1).restart()
   recomputeCouplesSet()
   ctx.renderer.setData(ctx.nodesData, ctx.linksData)
@@ -3509,6 +3514,8 @@ watch(
   () => {
     if (!ctx.simulation) return
     applyLinkForceParams()
+    // Symmetry roles may have changed — re-derive the family routing context.
+    stampFamilyContext(ctx.linksData, store.relTypeRoles)
     if (currentMode.value === 'auto') ctx.simulation.alpha(0.3).restart()
     markLinkStyles()
   },

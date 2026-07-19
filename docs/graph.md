@@ -139,6 +139,50 @@ emphasis-aware `getLinkStroke` / `getLinkWidth` / `getLinkMarker` / `getDashArra
 Line style encodes type: solid = parent/child, dashed = spouse, dotted-ish = adopted;
 divorced spouses are faded and finely dashed.
 
+## Aesthetics system (shapes · ornaments · routes · themes · atmosphere)
+
+The Style panel ([`GraphSettings.vue`](../src/renderer/src/components/GraphSettings.vue))
+drives a coordinated look system, all persisted per project as `graph_*` settings
+(restored on load in the store):
+
+- **Node shapes** — every node is drawn as a signed-distance shape in the
+  instanced fragment shader ([`NodeMaterial.js`](../src/renderer/src/components/graph/webgl/NodeMaterial.js)):
+  circle / square / diamond / hexagon / shield / oval / octagon / heart
+  (`gs.nodeShape`, a single `uShape` uniform — still one draw call). Avatar,
+  border ring, drop shadow and focus haze all follow the SDF.
+- **Ornaments** (`gs.nodeDecor` + `decorColor`) — procedural decor around the rim,
+  same shader: `aura` (gilded double ring), `runes` (revolving dashed sigils),
+  `orbit` (comet spark on a track), `burst` (turning spike crown), `pulse`
+  (expanding echo rings). Animated off `uDecorTime`; frozen in performance mode.
+- **Link routes** (`gs.linkRoute`) — HOW a line travels, independent of its
+  color/dash styling, in pure [`linkRouting.js`](../src/renderer/src/components/graph/linkRouting.js)
+  (tests: `tests/linkRouting.test.js`): `organic` (the classic Bézier),
+  `straight`, `arc`, `elbow` (rounded orthogonal), **`trident`** (genealogy bus:
+  couple bar → stem → shared sibling rail → children), `circuit` (axis + 45°
+  chamfer), `wave` (anchored sine ripple). Every route returns the same
+  `{ points, control }` shape as `linkCurvePoints`, so ribbon tessellation,
+  arrowheads and analytic picking consume it unchanged. Trident/elbow only
+  reshape structural edges (symmetryRole vertical/horizontal — never type
+  literals); affinity overlays stay softly curved. `GraphCanvas.updateGraph`
+  stamps the family context (`stampFamilyContext`: shared per-sibling-group
+  `_fam` objects) right after d3 wires the links.
+- **Atmosphere** (`gs.ambientFx` + two colors + density) — a screen-space GPU
+  particle field behind the graph ([`AmbientLayer.js`](../src/renderer/src/components/graph/webgl/AmbientLayer.js)):
+  fireflies / stars / petals / snow / embers / rain / motes. One instanced draw
+  call; all motion computed in the vertex shader from a static seed + `uTime`
+  (zero per-frame CPU), with camera-pan parallax and viewport wrapping.
+- **Theme presets** ([`graphThemes.js`](../src/renderer/src/components/graph/graphThemes.js)) —
+  one-click coordinated patches (shape + ornament + route + palette +
+  atmosphere) applied via `store.applyGraphSettings`: Classic, Lineage,
+  Storybook, Neon Circuit, Noir, Dynasty, Ink & Blade, Celestial, Rosewater,
+  Winterhold. Hand-tuning any themed knob flips the chip to “custom”.
+- **Quality toggle** (`gs.renderQuality`) — ✨ Quality renders at full device
+  pixels with animated ornaments and atmosphere; ⚡ Performance caps the
+  backing store at 1.25× DPR, freezes ornaments and disables the atmosphere, so
+  the on-demand loop idles at 0% CPU exactly as before. The renderer keeps its
+  rAF loop alive only while flow/glow/ornament/atmosphere animation is actually
+  visible.
+
 ## Focus
 
 The Focus popover (toggled from the tool pill) layers non-destructive emphasis over

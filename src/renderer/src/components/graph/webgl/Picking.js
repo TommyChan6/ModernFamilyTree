@@ -1,5 +1,5 @@
 import { quadtree } from 'd3'
-import { linkCurvePoints } from '../linkHelpers.js'
+import { routePoints } from '../linkRouting.js'
 
 // CPU picking. A d3.quadtree over node positions handles node hit-tests (rebuilt only when
 // positions settle); links use analytic point-to-polyline distance on click. This avoids a
@@ -35,7 +35,7 @@ export class Picker {
     let best = null,
       bestD = tol
     for (const d of links) {
-      const { points } = linkCurvePoints(d, gs.lineCurvature, 10)
+      const { points } = routePoints(d, gs, 10)
       for (let i = 0; i < points.length - 1; i++) {
         const dist = segDist(wx, wy, points[i], points[i + 1])
         if (dist < bestD) {

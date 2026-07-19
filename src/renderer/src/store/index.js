@@ -102,8 +102,10 @@ export const useMainStore = defineStore('main', () => {
   const viewMode = ref('grid')
   const VIEW_MODES = ['grid', 'wheel', 'flow', 'fan', 'deck', 'hive', 'reel']
 
-  // Graph visual settings
-  const graphSettings = ref({
+  // Graph visual settings. GRAPH_SETTING_DEFAULTS is the single source of
+  // truth for keys + defaults: init, reset, and the settings:getAll restore
+  // (graph_* keys) all read from it, so adding a setting is a one-line change.
+  const GRAPH_SETTING_DEFAULTS = {
     nodeRadius: 22,
     parentChildColor: '#8b6cc5',
     parentChildWidth: 1.8,
@@ -122,8 +124,20 @@ export const useMainStore = defineStore('main', () => {
     lineCurvature: 0.04,
     glowOnHover: true,
     nodeOpacity: 1.0,
-    linkOpacity: 0.6
-  })
+    linkOpacity: 0.6,
+    // ── Aesthetics system (see components/graph/graphThemes.js) ─────────────
+    nodeShape: 'circle', // circle|square|diamond|hexagon|shield|oval|octagon|heart
+    nodeDecor: 'none', // none|aura|runes|orbit|burst|pulse
+    decorColor: '#d4af37',
+    linkRoute: 'organic', // organic|straight|arc|elbow|trident|circuit|wave
+    ambientFx: 'none', // none|fireflies|stars|petals|snow|embers|rain|motes
+    ambientColorA: '#ffd27a',
+    ambientColorB: '#7ac9ff',
+    ambientDensity: 0.5,
+    renderQuality: 'quality', // 'quality' | 'performance'
+    themePreset: 'classic'
+  }
+  const graphSettings = ref({ ...GRAPH_SETTING_DEFAULTS })
 
   // ── Computed ───────────────────────────────────────────────────────────────
   const selectedPerson = computed(
@@ -587,6 +601,20 @@ export const useMainStore = defineStore('main', () => {
     } catch {
       wheelSlots.value = null
     }
+    // Restore the graph style settings (saved as JSON under graph_* keys).
+    // Unknown keys are dropped; missing/garbage ones keep their default.
+    const restoredGraph = { ...GRAPH_SETTING_DEFAULTS }
+    for (const key of Object.keys(GRAPH_SETTING_DEFAULTS)) {
+      const raw = saved[`graph_${key}`]
+      if (raw == null) continue
+      try {
+        const v = JSON.parse(raw)
+        if (typeof v === typeof GRAPH_SETTING_DEFAULTS[key]) restoredGraph[key] = v
+      } catch {
+        /* stale value — keep the default */
+      }
+    }
+    graphSettings.value = restoredGraph
     // Restore the directory card style (unknown/stale values → classic)
     cardStyle.value = CARD_STYLES.includes(saved.cardStyle) ? saved.cardStyle : 'classic'
     // Restore the directory viewing mode (unknown/stale values → grid)
@@ -1272,28 +1300,16 @@ export const useMainStore = defineStore('main', () => {
     api.invoke('settings:set', { key: `graph_${key}`, value: JSON.stringify(value) })
   }
 
+  /** Apply several graph settings at once (theme presets) — one reactive
+   *  update, then persist each key. */
+  function applyGraphSettings(patch) {
+    graphSettings.value = { ...graphSettings.value, ...patch }
+    for (const [key, value] of Object.entries(patch))
+      api.invoke('settings:set', { key: `graph_${key}`, value: JSON.stringify(value) })
+  }
+
   function resetGraphSettings() {
-    graphSettings.value = {
-      nodeRadius: 22,
-      parentChildColor: '#8b6cc5',
-      parentChildWidth: 1.8,
-      spouseColor: '#d4af37',
-      spouseWidth: 2,
-      adoptedColor: '#2bb3a3',
-      adoptedWidth: 1.8,
-      maleColor: '#3a7bd5',
-      femaleColor: '#c95fa0',
-      unknownColor: '#5c6bc0',
-      linkDistance: 160,
-      chargeStrength: -380,
-      labelSize: 10,
-      showLabels: true,
-      showAge: false,
-      lineCurvature: 0.04,
-      glowOnHover: true,
-      nodeOpacity: 1.0,
-      linkOpacity: 0.6
-    }
+    applyGraphSettings({ ...GRAPH_SETTING_DEFAULTS })
   }
 
   return {
@@ -1452,6 +1468,7 @@ export const useMainStore = defineStore('main', () => {
     setLanguage,
     setCurrentYear,
     updateGraphSetting,
+    applyGraphSettings,
     resetGraphSettings,
     hasUnsavedChanges,
     saveCheckpoint,
