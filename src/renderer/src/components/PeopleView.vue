@@ -9,7 +9,10 @@
 
       <div class="pv-controls">
         <ViewModeSwitch />
-        <CardStylePicker />
+        <!-- Card styles only apply to the card-based modes -->
+        <Transition name="pv-stylepick">
+          <CardStylePicker v-if="isCardMode" />
+        </Transition>
 
         <div class="pv-search">
           <span class="pv-search-icon">🔍</span>
@@ -200,11 +203,20 @@
       </div>
     </div>
 
-    <!-- 3D stage modes (carousel / flow / hand / deck) — windowed rendering,
+    <!-- 3D card stages (carousel / flow / hand / deck) — windowed rendering,
          shared drag/momentum physics; see people/CardStage.vue. -->
     <CardStage
-      v-if="store.viewMode !== 'grid'"
+      v-if="isStageMode"
       :mode="store.viewMode"
+      :persons="displayed"
+      :stats-of="stats"
+      :ref-year="refYear"
+    />
+
+    <!-- Non-card mediums -->
+    <HiveView v-if="store.viewMode === 'hive'" :persons="displayed" :ref-year="refYear" />
+    <ReelView
+      v-if="store.viewMode === 'reel'"
       :persons="displayed"
       :stats-of="stats"
       :ref-year="refYear"
@@ -219,6 +231,8 @@ import PersonCard from './people/PersonCard.vue'
 import CardStylePicker from './people/CardStylePicker.vue'
 import ViewModeSwitch from './people/ViewModeSwitch.vue'
 import CardStage from './people/CardStage.vue'
+import HiveView from './people/HiveView.vue'
+import ReelView from './people/ReelView.vue'
 import { useVirtualGrid } from './people/useVirtualGrid.js'
 import { useDragScroll } from './people/useDragScroll.js'
 import { ageOf, CARD_W, CARD_H, GAP, PAD } from './people/peopleLayout.js'
@@ -226,6 +240,12 @@ import { ageOf, CARD_W, CARD_H, GAP, PAD } from './people/peopleLayout.js'
 const store = useMainStore()
 
 const refYear = computed(() => store.currentDate?.year ?? new Date().getFullYear())
+
+// Which family of renderer the current view mode belongs to: the card modes
+// (grid + 3D stages) show PersonCards and the style picker; the non-card
+// mediums (hive / reel) draw people their own way.
+const isStageMode = computed(() => ['wheel', 'flow', 'fan', 'deck'].includes(store.viewMode))
+const isCardMode = computed(() => store.viewMode === 'grid' || isStageMode.value)
 
 const query = ref('')
 const sortBy = ref('name')
@@ -680,6 +700,23 @@ onBeforeUnmount(() => {
 .pv-badge-leave-to {
   transform: scale(0);
   opacity: 0;
+}
+
+/* Card-style picker slips away when a non-card medium is active */
+.pv-stylepick-enter-active {
+  transition:
+    opacity 0.25s ease,
+    transform 0.3s cubic-bezier(0.34, 1.3, 0.5, 1);
+}
+.pv-stylepick-leave-active {
+  transition:
+    opacity 0.16s ease,
+    transform 0.18s ease;
+}
+.pv-stylepick-enter-from,
+.pv-stylepick-leave-to {
+  opacity: 0;
+  transform: scale(0.85);
 }
 
 /* ── Facet panel (grid-rows slide-open) ──────────────────── */

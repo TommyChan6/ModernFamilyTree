@@ -95,10 +95,12 @@ export const useMainStore = defineStore('main', () => {
   // Per-project setting; the picker lives in the Directory toolbar.
   const cardStyle = ref('classic')
   const CARD_STYLES = ['classic', 'poster', 'holo', 'neon', 'arcana']
-  // Directory viewing mode: the classic virtualized grid, or one of the 3D
-  // stage layouts (carousel ring / coverflow / hand fan / swipe deck).
+  // Directory viewing mode: the classic virtualized grid, one of the 3D card
+  // stages (carousel ring / coverflow / hand fan / swipe deck), or a non-card
+  // medium — 'hive' (honeycomb of hexagons) / 'reel' (a spinning drum of
+  // film-strip rows). Card style only applies to the card-based modes.
   const viewMode = ref('grid')
-  const VIEW_MODES = ['grid', 'wheel', 'flow', 'fan', 'deck']
+  const VIEW_MODES = ['grid', 'wheel', 'flow', 'fan', 'deck', 'hive', 'reel']
 
   // Graph visual settings
   const graphSettings = ref({
