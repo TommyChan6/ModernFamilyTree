@@ -297,7 +297,8 @@
       "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(Object.keys\\(p.devDependencies||{}\\).join\\('\\\\n'\\)\\)\")",
       "Bash(OUT=. node --experimental-vm-modules -e \"process.env.NODE_PATH='c:/Users/tommy/OneDrive/Desktop/newFamilyTree/node_modules'; require\\('module'\\).Module._initPaths\\(\\); import\\('./shot-profile.mjs'\\).catch\\(e=>{console.error\\(e\\);process.exit\\(1\\)}\\)\")",
       "Bash(cp \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\62049b0a-e776-46f4-ac67-c8b71b01c583\\\\scratchpad\\\\shot-profile.mjs\" .claude-shot.mjs)",
-      "Bash(OUT=\"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/62049b0a-e776-46f4-ac67-c8b71b01c583/scratchpad\" node .claude-shot.mjs)"
+      "Bash(OUT=\"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/62049b0a-e776-46f4-ac67-c8b71b01c583/scratchpad\" node .claude-shot.mjs)",
+      "Bash(cp \"C:\\\\Users\\\\tommy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-tommy-OneDrive-Desktop-newFamilyTree\\\\62049b0a-e776-46f4-ac67-c8b71b01c583\\\\scratchpad\\\\shot-cards.mjs\" .claude-shot.mjs)"
     ]
   }
 }

@@ -8,6 +8,8 @@
       </div>
 
       <div class="pv-controls">
+        <CardStylePicker />
+
         <div class="pv-search">
           <span class="pv-search-icon">🔍</span>
           <input v-model="query" class="pv-search-input" placeholder="Search people…" />
@@ -185,6 +187,8 @@
             :kin="stats(c.p.id).kin"
             :children="stats(c.p.id).children"
             :ref-year="refYear"
+            :tags="store.tagsOf.get(c.p.id) || []"
+            :card-style="store.cardStyle"
             :entering="animWindow"
             :stagger="c.stagger"
             @select="onCardClick"
@@ -199,6 +203,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useMainStore } from '../store/index.js'
 import PersonCard from './people/PersonCard.vue'
+import CardStylePicker from './people/CardStylePicker.vue'
 import { useVirtualGrid } from './people/useVirtualGrid.js'
 import { useDragScroll } from './people/useDragScroll.js'
 import { ageOf, CARD_W, CARD_H, GAP, PAD } from './people/peopleLayout.js'
@@ -427,6 +432,16 @@ watch([query, sortBy, lifeFilter, connFilter, genderSel, tagSel], () => {
     remeasure()
   }
 })
+
+// Switching card style re-deals the visible cards with the new style's
+// entrance animation — same re-key trick, but the scroll position stays put.
+watch(
+  () => store.cardStyle,
+  () => {
+    listVersion.value++
+    replayEntrance()
+  }
+)
 
 // Keep the window in sync when the data set (not just the view) changes size —
 // e.g. a person added/removed elsewhere clamps the native scroll position.

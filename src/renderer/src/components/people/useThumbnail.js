@@ -1,11 +1,12 @@
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { api } from '../../api'
 
 // Session-wide avatar thumbnail cache shared by every card.
 //
 // Two smoothness techniques live here:
-//   1. Downscale — the main process resizes each photo once (native, cheap); we
-//      cache the tiny data URL so scrolling never re-decodes the full image.
+//   1. Downscale — each photo is resized once per requested size (in the
+//      renderer, off the main thread); we cache the tiny data URL so scrolling
+//      never re-decodes the full image.
 //   2. Idle gating — actual requests are queued and drained in requestIdleCallback
 //      slots. During a fast fling the browser stays busy so the queue naturally
 //      waits until the user pauses, keeping the scroll itself jank-free. Cached
@@ -15,17 +16,19 @@ import { api } from '../../api'
 // older build without the handler) we fall back to the full-resolution image, so
 // an avatar always shows.
 
-const SIZE = 144 // 2× the 72px avatar → crisp on HiDPI
+const SIZE = 144 // 2× the 72px avatar → crisp on HiDPI (the default)
 
-const resolved = new Map() // filePath → final src (data URL or appimg URL)
-const inflight = new Map() // filePath → Promise<string>
-const pending = new Map() // filePath → [resolve, …]  (queued, not yet started)
+const resolved = new Map() // "size|filePath" → final src (data URL or appimg URL)
+const inflight = new Map() // "size|filePath" → Promise<string>
+const pending = new Map() // "size|filePath" → [resolve, …]  (queued, not yet started)
+
+const keyOf = (filePath, size) => size + '|' + filePath
 
 // Fetch the file's bytes, decode them off the main thread (Chromium handles
 // WebP/PNG/JPEG/GIF alike), and paint a square cover-crop into a small canvas.
 // The Blob is same-origin, so the canvas isn't tainted and toDataURL works.
 // WebP output keeps transparency (character cutouts) and stays tiny.
-async function downscale(filePath) {
+async function downscale(filePath, size) {
   const res = await api.invoke('images:bytes', { filePath })
   if (!res || !res.success || !res.data) return ''
   const blob = new Blob([res.data])
@@ -34,29 +37,30 @@ async function downscale(filePath) {
     const s = Math.min(bmp.width, bmp.height)
     if (!s) return ''
     const canvas = document.createElement('canvas')
-    canvas.width = SIZE
-    canvas.height = SIZE
+    canvas.width = size
+    canvas.height = size
     const ctx = canvas.getContext('2d')
-    ctx.drawImage(bmp, (bmp.width - s) / 2, (bmp.height - s) / 2, s, s, 0, 0, SIZE, SIZE)
+    ctx.drawImage(bmp, (bmp.width - s) / 2, (bmp.height - s) / 2, s, s, 0, 0, size, size)
     return canvas.toDataURL('image/webp', 0.8)
   } finally {
     bmp.close?.()
   }
 }
 
-function kickOff(filePath) {
-  if (resolved.has(filePath)) return Promise.resolve(resolved.get(filePath))
-  if (inflight.has(filePath)) return inflight.get(filePath)
-  const p = downscale(filePath)
+function kickOff(filePath, size) {
+  const key = keyOf(filePath, size)
+  if (resolved.has(key)) return Promise.resolve(resolved.get(key))
+  if (inflight.has(key)) return inflight.get(key)
+  const p = downscale(filePath, size)
     .catch(() => '')
     .then((url) => {
       // On any failure fall back to the full-resolution image so it still shows.
       const finalUrl = url || api.getImageUrl(filePath) || ''
-      resolved.set(filePath, finalUrl)
-      inflight.delete(filePath)
+      resolved.set(key, finalUrl)
+      inflight.delete(key)
       return finalUrl
     })
-  inflight.set(filePath, p)
+  inflight.set(key, p)
   return p
 }
 
@@ -67,10 +71,13 @@ function scheduleDrain() {
   const run = (deadline) => {
     draining = false
     while (pending.size && (!deadline || deadline.timeRemaining() > 3)) {
-      const filePath = pending.keys().next().value
-      const waiters = pending.get(filePath)
-      pending.delete(filePath)
-      kickOff(filePath).then((url) => waiters.forEach((r) => r(url)))
+      const key = pending.keys().next().value
+      const waiters = pending.get(key)
+      pending.delete(key)
+      const sep = key.indexOf('|')
+      kickOff(key.slice(sep + 1), Number(key.slice(0, sep))).then((url) =>
+        waiters.forEach((r) => r(url))
+      )
     }
     if (pending.size) scheduleDrain()
   }
@@ -78,13 +85,14 @@ function scheduleDrain() {
   else setTimeout(() => run(null), 32)
 }
 
-function request(filePath) {
-  if (resolved.has(filePath)) return Promise.resolve(resolved.get(filePath))
-  if (inflight.has(filePath)) return inflight.get(filePath)
+function request(filePath, size) {
+  const key = keyOf(filePath, size)
+  if (resolved.has(key)) return Promise.resolve(resolved.get(key))
+  if (inflight.has(key)) return inflight.get(key)
   return new Promise((resolve) => {
-    const waiters = pending.get(filePath)
+    const waiters = pending.get(key)
     if (waiters) waiters.push(resolve)
-    else pending.set(filePath, [resolve])
+    else pending.set(key, [resolve])
     scheduleDrain()
   })
 }
@@ -93,28 +101,32 @@ function request(filePath) {
 //   src     — '' until ready, then the image URL
 //   loading — true while a photo exists but its thumbnail hasn't resolved yet
 //             (drive a skeleton placeholder off this)
-export function useThumbnail(getFilePath) {
+// `getSize` (optional): a number or getter for the square edge in px — larger
+// card styles (full-art, TCG frames) ask for more pixels than the avatar dot.
+export function useThumbnail(getFilePath, getSize = SIZE) {
   const src = ref('')
   const loading = ref(false)
+  const sizeOf = typeof getSize === 'function' ? computed(getSize) : computed(() => getSize)
   let token = 0
   watch(
-    getFilePath,
-    (filePath) => {
+    [typeof getFilePath === 'function' ? computed(getFilePath) : getFilePath, sizeOf],
+    ([filePath, size]) => {
       const mine = ++token
       if (!filePath) {
         src.value = ''
         loading.value = false
         return
       }
-      if (resolved.has(filePath)) {
-        src.value = resolved.get(filePath)
+      const key = keyOf(filePath, size)
+      if (resolved.has(key)) {
+        src.value = resolved.get(key)
         loading.value = false
         return
       }
       src.value = ''
       loading.value = true
-      request(filePath).then((url) => {
-        if (mine !== token) return // path changed out from under us
+      request(filePath, size).then((url) => {
+        if (mine !== token) return // path/size changed out from under us
         src.value = url
         loading.value = false
       })

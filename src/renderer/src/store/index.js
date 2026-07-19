@@ -91,6 +91,10 @@ export const useMainStore = defineStore('main', () => {
   // The graph's Tab-hold action wheel: the user's 8 slot descriptors, or null
   // for the built-in defaults (see components/graph/wheelModes.js). Per project.
   const wheelSlots = ref(null)
+  // Directory card style ('classic' | 'poster' | 'holo' | 'neon' | 'arcana').
+  // Per-project setting; the picker lives in the Directory toolbar.
+  const cardStyle = ref('classic')
+  const CARD_STYLES = ['classic', 'poster', 'holo', 'neon', 'arcana']
 
   // Graph visual settings
   const graphSettings = ref({
@@ -577,6 +581,8 @@ export const useMainStore = defineStore('main', () => {
     } catch {
       wheelSlots.value = null
     }
+    // Restore the directory card style (unknown/stale values → classic)
+    cardStyle.value = CARD_STYLES.includes(saved.cardStyle) ? saved.cardStyle : 'classic'
   }
 
   // ── Save model: checkpoint + revert ────────────────────────────────────────
@@ -1147,6 +1153,13 @@ export const useMainStore = defineStore('main', () => {
     api.invoke('settings:set', { key: 'noun', value: noun.value })
   }
 
+  /** Switch the Directory's card style and remember it for this project. */
+  function setCardStyle(id) {
+    if (!CARD_STYLES.includes(id) || id === cardStyle.value) return
+    cardStyle.value = id
+    api.invoke('settings:set', { key: 'cardStyle', value: id })
+  }
+
   /** Save the action wheel's slot layout (null reverts to the defaults). */
   function setWheelSlots(slots) {
     wheelSlots.value = slots ? JSON.parse(JSON.stringify(slots)) : null
@@ -1266,6 +1279,8 @@ export const useMainStore = defineStore('main', () => {
     markSpaceHintSeen,
     wheelSlots,
     setWheelSlots,
+    cardStyle,
+    setCardStyle,
     // computed
     selectedPerson,
     personCount,
