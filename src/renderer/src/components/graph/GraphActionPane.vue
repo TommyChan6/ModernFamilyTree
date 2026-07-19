@@ -66,6 +66,102 @@
           </div>
         </div>
 
+        <!-- ══ Marquee selection (nodes + bonds, with a type filter) ═══════════ -->
+        <div v-else-if="mode === 'marquee'" key="marquee" class="ap-inner">
+          <div class="ap-header">
+            <span class="ap-glyph ap-glyph-marquee">◧</span>
+            <div class="ap-title-wrap">
+              <div class="ap-title">{{ marqueeTitle }}</div>
+              <div class="ap-sub">{{ marqueeSub }}</div>
+            </div>
+            <button class="ap-close" title="Clear selection (Esc)" @click="close">✕</button>
+          </div>
+
+          <div class="ap-row ap-stagger" style="--i: 0">
+            <span class="ap-sec-label">Pick</span>
+            <div class="ap-seg">
+              <button
+                v-for="f in FILTERS"
+                :key="f.v"
+                class="ap-seg-opt"
+                :class="{ on: selFilter === f.v }"
+                :title="f.title"
+                @click="setFilter(f.v)"
+              >
+                {{ f.label }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Bulk bond status: shown when every selected bond shares one type -->
+          <div
+            v-if="relCount && uniformStatuses.length > 1"
+            class="ap-row ap-stagger"
+            style="--i: 1"
+          >
+            <span class="ap-sec-label">Status</span>
+            <div class="ap-seg">
+              <button
+                v-for="s in uniformStatuses"
+                :key="s"
+                class="ap-seg-opt"
+                :class="{ on: uniformStatus === s }"
+                :title="`Set all ${relCount} bonds to ${statusLabel(s, uniformRelDef?.key).toLowerCase()}`"
+                @click="setStatusAll(s)"
+              >
+                {{ statusLabel(s, uniformRelDef?.key) }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Node styling — applies to every selected person -->
+          <div v-if="n && !mode3d" class="ap-section ap-stagger" style="--i: 2">
+            <div class="ap-row">
+              <span class="ap-sec-label">Size</span>
+              <div class="ap-seg">
+                <button
+                  v-for="s in SIZES"
+                  :key="s.label"
+                  class="ap-seg-opt"
+                  :class="{ on: styleSize === s.v }"
+                  :title="s.title"
+                  @click="$emit('set-size', s.v)"
+                >
+                  {{ s.label }}
+                </button>
+              </div>
+            </div>
+            <div class="ap-row">
+              <span class="ap-sec-label">Color</span>
+              <div class="ap-swatches">
+                <button
+                  class="ap-swatch ap-swatch-auto"
+                  :class="{ on: !styleColor }"
+                  title="Auto — the gender gradient"
+                  @click="$emit('set-color', null)"
+                ></button>
+                <button
+                  v-for="c in COLORS"
+                  :key="c"
+                  class="ap-swatch"
+                  :class="{ on: styleColor === c }"
+                  :style="{ background: c }"
+                  @click="$emit('set-color', c)"
+                ></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="ap-danger-row ap-stagger" style="--i: 3">
+            <button class="ap-btn ap-btn-danger" :disabled="!total" @click="deleteMarquee">
+              <span class="ap-ic">🗑</span>Delete{{ total ? ` ${total}` : '' }}
+            </button>
+            <button class="ap-btn" title="Keep everything, drop the selection" @click="close">
+              Clear
+            </button>
+          </div>
+        </div>
+
         <!-- ══ One or more people selected ══════════════════════════════════ -->
         <div v-else key="people" class="ap-inner">
           <div class="ap-header">
@@ -264,7 +360,73 @@ const COLORS = [
 const rel = computed(() => store.relPopup?.rel || null)
 const ids = computed(() => store.selectedPersonIds)
 const n = computed(() => ids.value.length)
-const mode = computed(() => (rel.value ? 'rel' : n.value ? 'people' : null))
+// A marquee that caught any bonds gets its own pane with the Both/Nodes/Bonds
+// filter (kept reachable even after narrowing to Nodes). A single clicked bond
+// stays the dedicated 'rel' pane; a pure-node marquee or plain pick uses the
+// richer 'people' pane (styling, pairing, pinning).
+const marqueeHasBonds = computed(() => store.lastMarquee.relIds.length > 0)
+const mode = computed(() => {
+  if (rel.value) return 'rel'
+  if (store.marqueeActive && marqueeHasBonds.value) return 'marquee'
+  return n.value ? 'people' : null
+})
+
+// ── Marquee mode (mixed node + bond selection) ──────────────────────────────
+const FILTERS = [
+  { v: 'both', label: 'Both', title: 'Select nodes and bonds' },
+  { v: 'nodes', label: 'Nodes', title: 'Select only people' },
+  { v: 'bonds', label: 'Bonds', title: 'Select only relationships' }
+]
+const relCount = computed(() => store.selectedRelationshipIds.length)
+const total = computed(() => n.value + relCount.value)
+const selFilter = computed(() => store.selectionFilter)
+const nodeNoun = computed(() => store.noun.toLowerCase())
+const marqueeTitle = computed(() => `${total.value} selected`)
+const marqueeSub = computed(() => {
+  const parts = []
+  if (n.value) parts.push(`${n.value} ${n.value === 1 ? nodeNoun.value : nodeNoun.value + 's'}`)
+  if (relCount.value) parts.push(`${relCount.value} bond${relCount.value === 1 ? '' : 's'}`)
+  return parts.length ? parts.join(' · ') : 'Nothing in range'
+})
+function setFilter(f) {
+  store.applySelectionFilter(f)
+}
+// Bulk bond editing: when every selected bond shares one type, its status
+// options apply to the whole set at once (mirrors the single-bond pane).
+const selRelObjs = computed(() => {
+  const byId = new Map(store.relationships.map((r) => [r.id, r]))
+  return store.selectedRelationshipIds.map((id) => byId.get(id)).filter(Boolean)
+})
+const uniformRelDef = computed(() => {
+  const rels = selRelObjs.value
+  if (!rels.length) return null
+  const t = rels[0].type
+  return rels.every((r) => r.type === t) ? store.relTypeByKey.get(t) : null
+})
+const uniformStatuses = computed(() => uniformRelDef.value?.statuses || [])
+const uniformStatus = computed(() => {
+  const rels = selRelObjs.value
+  if (!rels.length) return null
+  const s = rels[0].status
+  return rels.every((r) => r.status === s) ? s : null
+})
+async function setStatusAll(status) {
+  for (const r of selRelObjs.value) {
+    if (r.status !== status) await store.updateRelationship({ id: r.id, status })
+  }
+}
+async function deleteMarquee() {
+  const p = n.value,
+    b = relCount.value
+  const parts = []
+  if (p) parts.push(`${p} ${p === 1 ? nodeNoun.value : nodeNoun.value + 's'}`)
+  if (b) parts.push(`${b} bond${b === 1 ? '' : 's'}`)
+  if (!parts.length) return
+  if (!confirm(`Delete ${parts.join(' and ')}?`)) return
+  for (const id of [...store.selectedRelationshipIds]) await store.deleteRelationship(id)
+  for (const id of [...store.selectedPersonIds]) await store.deletePerson(id)
+  store.clearGraphSelection()
+}
 
 function personOf(id) {
   return store.persons.find((p) => p.id === id) || null
@@ -281,8 +443,7 @@ function colorOf(id) {
 }
 
 function close() {
-  store.relPopup = null
-  store.selectPerson(null, { modal: false })
+  store.clearGraphSelection()
 }
 
 // ── People mode ─────────────────────────────────────────────────────────────
@@ -405,8 +566,8 @@ const relDates = computed(() => {
   return ''
 })
 const relStatuses = computed(() => relDef.value?.statuses || [])
-function statusLabel(s) {
-  if (rel.value?.type === 'spouse' && s === 'active') return 'Married'
+function statusLabel(s, type = rel.value?.type) {
+  if (type === 'spouse' && s === 'active') return 'Married'
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
@@ -693,6 +854,12 @@ async function deleteRel() {
   width: 100%;
   justify-content: center;
   margin-top: 2px;
+}
+.ap-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
 }
 .ap-ic {
   font-size: 12px;

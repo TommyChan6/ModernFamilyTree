@@ -277,7 +277,15 @@
       "Read(//c/Users/tommy/.claude/projects/c--Users-tommy-OneDrive-Desktop-newFamilyTree/memory/**)",
       "Bash(node debug-shift.mjs)",
       "Bash(node rel-shot.mjs)",
-      "Bash(taskkill //F //IM node.exe //FI \"WINDOWTITLE ne *\")"
+      "Bash(taskkill //F //IM node.exe //FI \"WINDOWTITLE ne *\")",
+      "Bash(cd \"c:/Users/tommy/OneDrive/Desktop/newFamilyTree\" && ls scripts 2>/dev/null; echo \"---playwright---\"; ls node_modules/.bin | grep -i playwright; echo \"---edge---\"; ls \"/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe\" 2>/dev/null && echo \"edge found\")",
+      "Read(//c/Program Files \\\\\\(x86\\\\\\)/Microsoft/Edge/Application/**)",
+      "Bash(export SHOT_DIR=\"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/162368e6-cd74-499b-8751-aad165bb30a0/scratchpad\")",
+      "Bash(node __TRACKED_VAR__/drive.mjs)",
+      "Bash(node __TRACKED_VAR__/drive2.mjs)",
+      "Bash(node __TRACKED_VAR__/drive3.mjs)",
+      "Bash(node __TRACKED_VAR__/drive4.mjs)",
+      "Bash(node __TRACKED_VAR__/drive5.mjs)"
     ]
   }
 }

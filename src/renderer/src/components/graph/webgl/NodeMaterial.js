@@ -20,11 +20,12 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
       uAtlas: { value: atlasTexture },
       uHasAtlas: { value: atlasTexture ? 1 : 0 },
       uPixelRatio: { value: pixelRatio },
+      uTime: { value: 0 }, // drives the selection halo's gentle breathing pulse
       // Theme-dependent shadow (dark: tighter/darker, light: softer/lighter).
       uShadowColor: { value: new THREE.Color(0x000000) },
       uShadowStrength: { value: 0.35 },
       uShadowOffset: { value: new THREE.Vector2(0.09, 0.135) }, // corner units (dx2,dy3 @ r22)
-      uGlowColor: { value: new THREE.Color(0x6c8ef5) },
+      uGlowColor: { value: new THREE.Color(0xffffff) }, // focus haze; theme-set by NodeLayer
       uSilhouetteColor: { value: new THREE.Color(1, 1, 1) }
     },
     vertexShader: /* glsl */ `
@@ -75,6 +76,7 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
       uniform vec2 uShadowOffset;
       uniform vec3 uGlowColor;
       uniform vec3 uSilhouetteColor;
+      uniform float uTime;
 
       in vec2 vCorner;
       in vec3 vFill;
@@ -126,23 +128,21 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
         float ring = (1.0 - smoothstep(bw, bw + aa, abs(d - R)));
         col = over(vec4(vBorder, ring * vBorderA), col);
 
-        // ---- selection ring (just outside the border, accent colour) ----
-        if (vSelected > 0.5) {
-          float selW = 3.0 / ${QUAD_SCALE.toFixed(4)} * 0.045 + aa; // ~3px accent ring
-          float srEdge = R + bw + selW;
-          float sel = (1.0 - smoothstep(selW, selW + aa, abs(d - (R + bw + selW))));
-          col = over(vec4(uGlowColor, sel * 0.95), col);
-        }
-
-        // ---- glow (soft halo ring hugging the circle edge) ----
-        if (vGlow > 0.001) {
-          float halo = smoothstep(R * 1.5, R, d) * (1.0 - inside);
-          col.rgb += uGlowColor * halo * vGlow * 0.6;
-          // Composite the halo's alpha OVER the existing alpha rather than max():
-          // max() of the fill's falling edge and the halo's rising edge dips at the
-          // crossover, punching a thin see-through band that reads as an aliased ring.
-          float glowA = halo * vGlow * 0.5;
-          col.a = col.a + glowA * (1.0 - col.a);
+        // ---- focus haze (selection + hover) ----
+        // No rings, no accents: a soft frosted haze radiating from the rim.
+        // uGlowColor is theme-set (white on dark, deep slate on light). Selection
+        // breathes gently — a slow, subtle swell — hover is a fainter still haze.
+        float focus = max(vSelected, vGlow);
+        if (focus > 0.001) {
+          float breathe = vSelected > 0.5 ? (0.88 + 0.12 * sin(uTime * 2.0)) : 1.0;
+          float inner = R * 0.9;
+          float outer = R * 1.56;
+          float t = clamp((d - inner) / (outer - inner), 0.0, 1.0);
+          float haze = (1.0 - t) * (1.0 - t); // quadratic falloff — soft, no hard edge
+          float strength = vSelected > 0.5 ? 0.55 * breathe : 0.3;
+          float hazeA = haze * (1.0 - inside) * focus * strength;
+          col = over(col, vec4(uGlowColor, hazeA)); // haze sits BEHIND the shadow/disc
+          col = over(vec4(uGlowColor, hazeA * 0.35), col); // faint veil on top ties it together
         }
 
         col.a *= vOpacity;

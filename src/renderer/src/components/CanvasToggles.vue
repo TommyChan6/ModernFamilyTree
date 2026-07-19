@@ -4,7 +4,7 @@
       v-for="(t, i) in buttons"
       :key="t.key"
       class="ct-btn"
-      :class="{ on: t.active }"
+      :class="{ on: t.active, 'ct-sep': t.sep }"
       :style="{ '--tint': t.tint, '--i': i }"
       :title="t.title"
       :aria-pressed="t.active"
@@ -25,12 +25,15 @@ import { useMainStore } from '../store/index.js'
 // spatial view (graph / timeline / groups). Focus, Legend and Relationships
 // open right-side panes the host view renders; Clean view (owned globally by
 // the store) fades every canvas overlay away. Each button carries its own tint
-// so the cluster doubles as a colour key.
+// so the cluster doubles as a colour key. `showMarquee` adds the box/lasso
+// selection-tool pair (Shift-drag on the canvas); the tool choice lives in the
+// store so other spatial views can adopt the same marquee later.
 const props = defineProps({
   showFocus: { type: Boolean, default: false },
   showLegend: { type: Boolean, default: true },
   showRelTypes: { type: Boolean, default: false },
   showClean: { type: Boolean, default: true },
+  showMarquee: { type: Boolean, default: false },
   focus: { type: Boolean, default: false },
   legend: { type: Boolean, default: false },
   relTypes: { type: Boolean, default: false }
@@ -78,6 +81,26 @@ const buttons = computed(() => {
       tint: 'var(--amber)',
       active: store.cleanView,
       toggle: () => (store.cleanView = !store.cleanView)
+    })
+  }
+  if (props.showMarquee) {
+    // A radio pair, not toggles: one selection tool is always armed.
+    list.push({
+      key: 'box',
+      icon: '▧',
+      title: 'Box select — hold Shift and drag on the canvas',
+      tint: 'var(--accent)',
+      sep: true,
+      active: store.marqueeTool === 'box',
+      toggle: () => (store.marqueeTool = 'box')
+    })
+    list.push({
+      key: 'lasso',
+      icon: '◌',
+      title: 'Lasso select — hold Shift and drag a freeform loop',
+      tint: 'var(--accent)',
+      active: store.marqueeTool === 'lasso',
+      toggle: () => (store.marqueeTool = 'lasso')
     })
   }
   return list
@@ -129,6 +152,19 @@ const buttons = computed(() => {
   color: var(--t1);
   background: var(--hover);
   transform: translateY(-2px);
+}
+/* Hairline divider before a new button group (the selection-tool pair). */
+.ct-sep {
+  margin-left: 9px;
+}
+.ct-sep::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--border);
 }
 .ct-btn:active {
   transform: translateY(0) scale(0.9);

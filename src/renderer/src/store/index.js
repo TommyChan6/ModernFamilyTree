@@ -34,6 +34,14 @@ export const useMainStore = defineStore('main', () => {
   const draggingPersonId = ref(null) // person being dragged from the member list
   const selectedPersonId = ref(null)
   const selectedPersonIds = ref([]) // multi-selection set (graph canvas shift-click)
+  const selectedRelationshipIds = ref([]) // multi-selected bonds (graph marquee)
+  // Graph marquee selection: which object kinds it captures / the action pane
+  // narrows to ('both' | 'nodes' | 'bonds'), the region shape, and whether a
+  // marquee selection is currently the active one (drives the action pane mode).
+  const selectionFilter = ref('both')
+  const marqueeTool = ref('box') // 'box' | 'lasso'
+  const marqueeActive = ref(false)
+  const lastMarquee = ref({ personIds: [], relIds: [] }) // full capture, re-filtered live
   const inspectorTab = ref('directory') // right dock tab: 'inspector' | 'directory'
   const modalOpen = ref(false)
   const formOpen = ref(false)
@@ -393,6 +401,9 @@ export const useMainStore = defineStore('main', () => {
         characters.value = []
         activeSceneIds.value = { groups: null, graph: null, timeline: null }
         selectedPersonId.value = null
+        selectedPersonIds.value = []
+        selectedRelationshipIds.value = []
+        marqueeActive.value = false
         modalOpen.value = false
         formOpen.value = false
         editingPerson.value = null
@@ -478,6 +489,9 @@ export const useMainStore = defineStore('main', () => {
           activeProjectId.value = id
           // Reset UI state
           selectedPersonId.value = null
+          selectedPersonIds.value = []
+          selectedRelationshipIds.value = []
+          marqueeActive.value = false
           modalOpen.value = false
           formOpen.value = false
           editingPerson.value = null
@@ -1006,6 +1020,8 @@ export const useMainStore = defineStore('main', () => {
   function selectPerson(id, { modal = true } = {}) {
     selectedPersonId.value = id
     selectedPersonIds.value = id ? [id] : []
+    selectedRelationshipIds.value = []
+    marqueeActive.value = false
     if (modal) modalOpen.value = !!id
   }
 
@@ -1017,6 +1033,37 @@ export const useMainStore = defineStore('main', () => {
     const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]
     selectedPersonIds.value = next
     selectedPersonId.value = next.length ? next[next.length - 1] : null
+    selectedRelationshipIds.value = []
+    marqueeActive.value = false
+  }
+
+  // Graph marquee (box / lasso) result: remember the full capture, then apply the
+  // active type filter to derive what's actually selected.
+  function setMarqueeSelection({ personIds = [], relIds = [] }) {
+    lastMarquee.value = { personIds: [...personIds], relIds: [...relIds] }
+    marqueeActive.value = personIds.length > 0 || relIds.length > 0
+    relPopup.value = null
+    applySelectionFilter(selectionFilter.value)
+  }
+  // Re-derive the selection from the last marquee capture for a given filter, so
+  // the action pane's Both / Nodes / Bonds toggle narrows (and restores) live.
+  function applySelectionFilter(f) {
+    selectionFilter.value = f
+    const { personIds, relIds } = lastMarquee.value
+    const pids = f === 'bonds' ? [] : personIds
+    const rids = f === 'nodes' ? [] : relIds
+    selectedPersonIds.value = [...pids]
+    selectedPersonId.value = pids.length ? pids[pids.length - 1] : null
+    selectedRelationshipIds.value = [...rids]
+    if (modalOpen.value) modalOpen.value = false
+  }
+  function clearGraphSelection() {
+    selectedPersonId.value = null
+    selectedPersonIds.value = []
+    selectedRelationshipIds.value = []
+    marqueeActive.value = false
+    lastMarquee.value = { personIds: [], relIds: [] }
+    relPopup.value = null
   }
 
   function openForm(person = null) {
@@ -1163,6 +1210,14 @@ export const useMainStore = defineStore('main', () => {
     draggingPersonId,
     selectedPersonId,
     selectedPersonIds,
+    selectedRelationshipIds,
+    selectionFilter,
+    marqueeTool,
+    marqueeActive,
+    lastMarquee,
+    setMarqueeSelection,
+    applySelectionFilter,
+    clearGraphSelection,
     inspectorTab,
     modalOpen,
     formOpen,

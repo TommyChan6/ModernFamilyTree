@@ -112,10 +112,12 @@ export class NodeLayer {
       u.uShadowStrength.value = 0.15
       u.uShadowOffset.value.set(0.045, 0.09)
       u.uSilhouetteColor.value.setRGB(1, 1, 1)
+      u.uGlowColor.value.setRGB(0.16, 0.2, 0.3) // deep slate haze (white is invisible on light)
     } else {
       u.uShadowStrength.value = 0.35
       u.uShadowOffset.value.set(0.09, 0.135)
       u.uSilhouetteColor.value.setRGB(1, 1, 1)
+      u.uGlowColor.value.setRGB(1, 1, 1) // white haze
     }
   }
 

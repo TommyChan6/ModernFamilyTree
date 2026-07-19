@@ -61,6 +61,27 @@ export class WebGLGraphRenderer {
     })
     this.nodeLayer = new NodeLayer({ atlasTexture: this.atlas.texture, pixelRatio: this.dpr })
     this.linkLayer = new LinkLayer()
+    // Selection halo: a soft wide underlay drawn beneath emphasised links (white on
+    // dark, deep slate on light) — the link counterpart of the node focus haze.
+    this.haloLayer = new LinkLayer()
+    this.haloLayer.object3d.renderOrder = 0
+    this._haloRGB = [1, 1, 1]
+    this._haloKey = ''
+    this._haloVisual = (d) => {
+      const a = this._linkAnim.get(d.id)
+      return {
+        color: this._haloRGB,
+        opacity: a ? Math.min(1, a.op * 1.6) * 0.32 * a.h : 0,
+        dashLen: 0,
+        dashGap: 0,
+        width: (a ? a.w : 2) + 7,
+        arrowColorRGB: null,
+        arrowSize: 0,
+        flow: 0,
+        fadeTo: 1
+      }
+    }
+    this.world.add(this.haloLayer.object3d)
     this.world.add(this.linkLayer.object3d)
     this.world.add(this.linkLayer.arrowObject3d)
     this.world.add(this.nodeLayer.object3d)
@@ -80,9 +101,10 @@ export class WebGLGraphRenderer {
     glCanvas.addEventListener('webglcontextrestored', this._onContextRestored, false)
     this._glCanvas = glCanvas
 
-    // Ambient flow pauses with the tab; restart the loop when it comes back.
+    // Ambient flow / selection pulse pause with the tab; restart when it returns.
     this._onVisibility = () => {
-      if (document.visibilityState === 'visible' && this._hasFlow) this.requestRedraw()
+      if (document.visibilityState === 'visible' && (this._hasFlow || this._hasNodeGlow))
+        this.requestRedraw()
     }
     document.addEventListener('visibilitychange', this._onVisibility)
   }
@@ -105,6 +127,7 @@ export class WebGLGraphRenderer {
     this.links = links
     this.nodeLayer.setCount(nodes.length)
     this.linkLayer.setLinks(links)
+    this._haloKey = '' // force the halo underlay to re-sync against the new data
     this.markAllDirty()
     this.picker.invalidate()
     this.requestRedraw()
@@ -129,6 +152,7 @@ export class WebGLGraphRenderer {
 
   setTheme(isLight) {
     this.nodeLayer.setThemeUniforms(isLight)
+    this._haloRGB = isLight ? [0.16, 0.2, 0.3] : [1, 1, 1]
     this.overlay.setTheme(isLight)
     this.markAllDirty()
     this.requestRedraw()
@@ -157,6 +181,7 @@ export class WebGLGraphRenderer {
     this._nodeCache.length = nodes.length
     this._nodeIds.length = nodes.length
     const seen = new Set()
+    this._hasNodeGlow = false // any selected/glowing node keeps the pulse loop alive
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i],
         v = visual(n)
@@ -175,6 +200,7 @@ export class WebGLGraphRenderer {
       a.top = v.opacity
       a.trad = v.radius
       a.tglow = v.glow
+      if (v.glow > 0.001) this._hasNodeGlow = true
     }
     for (const id of this._nodeAnim.keys()) if (!seen.has(id)) this._nodeAnim.delete(id)
   }
@@ -235,7 +261,8 @@ export class WebGLGraphRenderer {
           ar: v.arrowSize,
           cr: v.colorRGB[0],
           cg: v.colorRGB[1],
-          cb: v.colorRGB[2]
+          cb: v.colorRGB[2],
+          h: 0
         }
       a.top = v.opacity
       a.tw = v.width
@@ -243,6 +270,7 @@ export class WebGLGraphRenderer {
       a.tcr = v.colorRGB[0]
       a.tcg = v.colorRGB[1]
       a.tcb = v.colorRGB[2]
+      a.th = v.halo || 0
       this._linkAnim.set(d.id, a)
     }
     for (const id of this._linkAnim.keys()) if (!seen.has(id)) this._linkAnim.delete(id)
@@ -257,13 +285,15 @@ export class WebGLGraphRenderer {
       a.cr = approach(a.cr, a.tcr, dt)
       a.cg = approach(a.cg, a.tcg, dt)
       a.cb = approach(a.cb, a.tcb, dt)
+      a.h = approach(a.h, a.th ?? 0, dt)
       if (
         Math.abs(a.op - a.top) > TWEEN_EPS ||
         Math.abs(a.w - a.tw) > TWEEN_EPS ||
         Math.abs(a.ar - a.tar) > TWEEN_EPS ||
         Math.abs(a.cr - a.tcr) > TWEEN_EPS ||
         Math.abs(a.cg - a.tcg) > TWEEN_EPS ||
-        Math.abs(a.cb - a.tcb) > TWEEN_EPS
+        Math.abs(a.cb - a.tcb) > TWEEN_EPS ||
+        Math.abs(a.h - (a.th ?? 0)) > TWEEN_EPS
       )
         moving = true
     }
@@ -340,6 +370,22 @@ export class WebGLGraphRenderer {
       this._linkStyleWrite = false
     }
 
+    // Selection halo underlay: keep it tracking the (few) emphasised links.
+    const haloLinks = []
+    for (const d of links) {
+      const a = this._linkAnim.get(d.id)
+      if (a && (a.h > 0.004 || (a.th ?? 0) > 0)) haloLinks.push(d)
+    }
+    const haloKey = haloLinks.length ? haloLinks.map((d) => d.id).join('|') : ''
+    if (haloKey !== this._haloKey) {
+      this._haloKey = haloKey
+      this.haloLayer.setLinks(haloLinks)
+    }
+    if (haloLinks.length) {
+      this.haloLayer.updateGeometry(haloLinks, gs, this._haloVisual, sx, sy)
+      this.haloLayer.updateStyles(haloLinks, this._haloVisual)
+    }
+
     this.atlas.flush()
 
     const t = this.transform
@@ -350,18 +396,22 @@ export class WebGLGraphRenderer {
     )
     this.world.matrixWorldNeedsUpdate = true
 
-    // Ambient dash flow: advance the shared clock; keep the loop alive while
-    // any link is flowing (and the tab visible) — otherwise idle at 0% as before.
-    this.linkLayer.material.uniforms.uTime.value = ts / 1000
+    // Ambient dash flow + the selection halo's breathing pulse: advance the shared
+    // clock; keep the loop alive while any link flows or any node glows (and the tab
+    // is visible) — otherwise idle at 0% as before.
+    const clock = ts / 1000
+    this.linkLayer.material.uniforms.uTime.value = clock
+    this.nodeLayer.material.uniforms.uTime.value = clock
 
     this.renderer.render(this.scene, this.camera)
     this.overlay.draw(this.hooks.overlayOpts())
 
-    // Keep the loop alive frame-to-frame while a tween is settling or dashes flow.
+    // Keep the loop alive frame-to-frame while a tween is settling, dashes flow, or
+    // a node's focus halo is pulsing.
     if (
       this._nodeTweening ||
       this._linkTweening ||
-      (this._hasFlow && document.visibilityState === 'visible')
+      ((this._hasFlow || this._hasNodeGlow) && document.visibilityState === 'visible')
     ) {
       this.requestRedraw()
     }
@@ -386,6 +436,7 @@ export class WebGLGraphRenderer {
       if (flip) {
         doc.dataset.theme = wantLight ? 'light' : 'dark'
         this.nodeLayer.setThemeUniforms(wantLight)
+        this._haloRGB = wantLight ? [0.16, 0.2, 0.3] : [1, 1, 1]
         this.overlay.setTheme(wantLight)
       }
       this.renderer.setPixelRatio(1)
@@ -416,11 +467,19 @@ export class WebGLGraphRenderer {
         a.cr = a.tcr
         a.cg = a.tcg
         a.cb = a.tcb
+        a.h = a.th ?? 0
       }
       const links = this.links || []
       const gs = this.hooks.getSettings()
       this.linkLayer.updateGeometry(links, gs, this._curLinkVisual)
       this.linkLayer.updateStyles(links, this._curLinkVisual)
+      const haloLinks = links.filter((d) => (this._linkAnim.get(d.id)?.h ?? 0) > 0.004)
+      this._haloKey = haloLinks.map((d) => d.id).join('|')
+      this.haloLayer.setLinks(haloLinks)
+      if (haloLinks.length) {
+        this.haloLayer.updateGeometry(haloLinks, gs, this._haloVisual)
+        this.haloLayer.updateStyles(haloLinks, this._haloVisual)
+      }
       this.atlas.flush()
 
       this.world.matrix.compose(
@@ -429,6 +488,7 @@ export class WebGLGraphRenderer {
         new THREE.Vector3(transform.k, transform.k, 1)
       )
       this.world.matrixWorldNeedsUpdate = true
+      this.nodeLayer.material.uniforms.uTime.value = 0 // neutral pulse phase for a still capture
       this.renderer.render(this.scene, this.camera)
       this.overlay.resize(width, height, 1)
       this.overlay.draw(overlayOpts)
@@ -445,6 +505,7 @@ export class WebGLGraphRenderer {
         if (prevTheme == null) delete doc.dataset.theme
         else doc.dataset.theme = prevTheme
         this.nodeLayer.setThemeUniforms(!wantLight)
+        this._haloRGB = !wantLight ? [0.16, 0.2, 0.3] : [1, 1, 1]
         this.overlay.setTheme(!wantLight)
       }
       this.renderer.setPixelRatio(this.dpr)
@@ -464,6 +525,7 @@ export class WebGLGraphRenderer {
     this.atlas.dispose()
     this.nodeLayer.dispose()
     this.linkLayer.dispose()
+    this.haloLayer.dispose()
     this.renderer.dispose()
   }
 }

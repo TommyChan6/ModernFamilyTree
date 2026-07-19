@@ -4,6 +4,7 @@
       <CanvasToggles
         :show-focus="store.caps.focus && !spaceActive"
         show-rel-types
+        :show-marquee="!spaceActive"
         :focus="focusOpen"
         :legend="legendOpen"
         :rel-types="relTypesOpen"
@@ -20,6 +21,20 @@
     >
       <canvas v-show="!spaceActive" ref="glCanvasEl" class="graph-gl"></canvas>
       <canvas v-show="!spaceActive" ref="overlayEl" class="graph-overlay"></canvas>
+      <!-- Marquee (box / lasso) selection region — screen-space, drawn over the
+         canvas while the user shift-drags. Pointer-events off so it never eats input. -->
+      <svg v-if="marquee" class="marquee-layer">
+        <rect
+          v-if="marqueeRect"
+          class="marquee-shape"
+          :x="marqueeRect.x"
+          :y="marqueeRect.y"
+          :width="marqueeRect.w"
+          :height="marqueeRect.h"
+          rx="5"
+        />
+        <polygon v-else class="marquee-shape" :points="marqueePoints" />
+      </svg>
       <!-- Experimental Space (3D) type takes over the stage; the 2D canvases keep
          their state hidden underneath, like the graph itself does across views -->
       <Graph3DView
@@ -523,7 +538,7 @@ import { useGraphAnimation } from './graph/useGraphAnimation.js'
 import { useTimeTravel } from './time/useTimeTravel'
 import { toOrdinal } from '../../../shared/calendarMath'
 import { WebGLGraphRenderer } from './graph/webgl/WebGLGraphRenderer.js'
-import { screenToWorld, nodesExtent, fitExtent } from './graph/webgl/coords.js'
+import { screenToWorld, worldToScreen, nodesExtent, fitExtent } from './graph/webgl/coords.js'
 import { viewRectXYK } from './webgl/minimapMath'
 import { withAlpha } from './webgl/overlayUtils.js'
 import SceneTabs from './SceneTabs.vue'
@@ -929,6 +944,23 @@ const egoMap = computed(() => {
 watch([egoDepth, egoMap], () => {
   markNodeStyles()
   markLinkStyles()
+})
+
+// The set of currently-selected people (multi-select aware). linkVisual() reads
+// this to light up the bonds touching the selection; null when nothing is picked.
+const selectionSet = computed(() => {
+  const ids = store.selectedPersonIds
+  if (ids && ids.length) return new Set(ids)
+  if (store.selectedPersonId) return new Set([store.selectedPersonId])
+  return null
+})
+// Bonds selected directly — a single clicked line (relPopup) or a marquee's bond
+// set. linkVisual() gives these the bright, flowing "selected" treatment.
+const selectedRelIdSet = computed(() => {
+  const set = new Set(store.selectedRelationshipIds || [])
+  const one = store.relPopup?.rel?.id
+  if (one) set.add(one)
+  return set.size ? set : null
 })
 
 // ── Romance intel (likes edges) ─────────────────────────────────────────────
@@ -1345,7 +1377,8 @@ function nodeVisual(n) {
   // Per-node overrides from the action pane (scene-scoped): custom fill + size.
   const ov = activeStyles[n.id]
   const baseFill = ov?.color || nodeColor(n.gender, gs, n.gender_t)
-  const fill = selected ? d3.color(baseFill)?.brighter(0.4)?.toString() || baseFill : baseFill
+  // A gentle lift, not a wash-out — the accent halo now carries the emphasis.
+  const fill = selected ? d3.color(baseFill)?.brighter(0.18)?.toString() || baseFill : baseFill
 
   let opacityMul = 1,
     radiusMul = 1
@@ -1421,9 +1454,11 @@ function nodeVisual(n) {
   return {
     radius: gs.nodeRadius * radiusMul * (ov?.size ?? 1),
     fill,
-    border: selected ? '#6c8ef5' : hl || '#ffffff',
-    borderPx: selected ? 3 : hl ? 2.6 : 1.5,
-    borderA: selected ? 0.95 : hl ? 0.92 : 0.18,
+    // A crisp white rim for selection; the accent halo/ring rides just outside it
+    // (drawn in the shader) so the blue reads as focus without a doubled rim.
+    border: selected ? '#ffffff' : hl || '#ffffff',
+    borderPx: selected ? 2.4 : hl ? 2.6 : 1.5,
+    borderA: selected ? 1 : hl ? 0.92 : 0.18,
     opacity: gs.nodeOpacity * opacityMul,
     selected,
     glow: selected || timeGlow || pathGlow || (hoverId === n.id && gs.glowOnHover) ? 1 : 0,
@@ -1544,6 +1579,42 @@ function linkVisual(d) {
   // The solo lens brings its isolated type to life.
   if (soloType.value === d.type && dashLen > 0 && !flow) flow = 24
 
+  // ── Selection emphasis ──────────────────────────────────────────────────────
+  // Selected bonds — and bonds touching a selected person — get a soft halo
+  // underlay (`halo`, drawn by the renderer beneath the links: white on dark,
+  // slate on light) plus a gentle lift. Selection adds light, it never dims the
+  // rest: every other line keeps its normal style. Skipped when a trace / orbit /
+  // solo / couples lens is active (those own the link styling).
+  let halo = 0
+  const selRels = selectedRelIdSet.value
+  const selNodes = selectionSet.value
+  if (
+    (selRels || selNodes) &&
+    !pathActive.value &&
+    !egoMap.value &&
+    !soloType.value &&
+    activeCouples.value === 'normal'
+  ) {
+    if (selRels?.has(d.id) && !timeHidden) {
+      // The picked line itself: a bright core inside its glow.
+      halo = 1
+      opacity = Math.min(1, Math.max(opacity, gs.linkOpacity * 1.4))
+      width = Math.max(width * 1.35, 3)
+      fadeTo = 1
+    } else if (
+      selNodes &&
+      (selNodes.has(d.person_a_id) || selNodes.has(d.person_b_id)) &&
+      !timeHidden &&
+      !timeDissolved
+    ) {
+      halo = 0.55
+      opacity = Math.min(1, gs.linkOpacity * 1.5)
+      width = Math.max(width * 1.2, 2.4)
+      if (!flow && dashLen > 0) flow = 18 // dashed bonds drift gently while lit
+      fadeTo = 1
+    }
+  }
+
   // Connection trace: the chain becomes flowing marching-ants; everything
   // off-path recedes. Applied last — the trace always wins.
   if (pathActive.value) {
@@ -1570,6 +1641,7 @@ function linkVisual(d) {
     dashGap,
     flow,
     fadeTo,
+    halo,
     arrowColor: marker ? markerColor(marker, gs, def) : null,
     arrowSize: timeHidden ? 0 : isPatMat ? 14 : 9
   }
@@ -1824,6 +1896,8 @@ function zoomFilter(event) {
   // handled by onStretchWheel instead, so keep d3 out of it.
   if (event.type === 'wheel') return !stretchArmed()
   if (event.button != null && event.button !== 0) return false
+  // Shift-drag is reserved for marquee select — never let d3 pan with it.
+  if (event.shiftKey) return false
   const w = clientToWorld(event.clientX, event.clientY)
   const hit = pickVisibleNode(w.x, w.y)
   if (hit && !store.lockNodes) return false // grabbing a node -> no pan
@@ -1899,6 +1973,120 @@ function onStretchWheel(e) {
     .call(ctx.zoomBehavior.transform, d3.zoomIdentity.translate(tx, ty).scale(t.k))
 }
 
+// ── Marquee select (box / lasso) ─────────────────────────────────────────────
+// Shift-drag on empty canvas sweeps a region and selects the nodes and/or bonds
+// inside it (per store.selectionFilter). The shape follows the toolbar's box/
+// lasso toggle. Region + hit-testing are done in screen space, so the same math
+// works under pan, zoom and the per-axis stretch. `marquee` (screen px, relative
+// to the container) drives the SVG overlay; `marqueeRaw` is the working state.
+const marquee = ref(null)
+let marqueeRaw = null
+
+const marqueeRect = computed(() => {
+  const m = marquee.value
+  if (!m || m.shape !== 'box') return null
+  return {
+    x: Math.min(m.x0, m.x1),
+    y: Math.min(m.y0, m.y1),
+    w: Math.abs(m.x1 - m.x0),
+    h: Math.abs(m.y1 - m.y0)
+  }
+})
+const marqueePoints = computed(() => {
+  const m = marquee.value
+  if (!m || m.shape !== 'lasso') return ''
+  return m.points.map((p) => `${p.x},${p.y}`).join(' ')
+})
+
+function containerXY(e) {
+  const rect = containerEl.value.getBoundingClientRect()
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+}
+
+function startMarquee(e) {
+  const { x, y } = containerXY(e)
+  const shape = store.marqueeTool === 'lasso' ? 'lasso' : 'box'
+  marqueeRaw = { shape, x0: x, y0: y, x1: x, y1: y, points: [{ x, y }], moved: false }
+  marquee.value = { shape, x0: x, y0: y, x1: x, y1: y, points: [{ x, y }] }
+  try {
+    overlayEl.value.setPointerCapture(e.pointerId)
+  } catch {}
+}
+
+function moveMarquee(e) {
+  const { x, y } = containerXY(e)
+  marqueeRaw.x1 = x
+  marqueeRaw.y1 = y
+  if (Math.hypot(x - marqueeRaw.x0, y - marqueeRaw.y0) > 3) marqueeRaw.moved = true
+  if (marqueeRaw.shape === 'lasso') {
+    const pts = marqueeRaw.points
+    const last = pts[pts.length - 1]
+    if (!last || Math.hypot(x - last.x, y - last.y) > 4) pts.push({ x, y })
+  }
+  marquee.value = {
+    shape: marqueeRaw.shape,
+    x0: marqueeRaw.x0,
+    y0: marqueeRaw.y0,
+    x1: x,
+    y1: y,
+    points: marqueeRaw.shape === 'lasso' ? marqueeRaw.points.slice() : []
+  }
+}
+
+// Ray-cast point-in-polygon (screen space).
+function pointInPolygon(px, py, poly) {
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x,
+      yi = poly[i].y,
+      xj = poly[j].x,
+      yj = poly[j].y
+    const hit = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi
+    if (hit) inside = !inside
+  }
+  return inside
+}
+
+function commitMarquee(mr) {
+  const t = ctx.transform
+  let contains
+  if (mr.shape === 'lasso') {
+    if (mr.points.length < 3) return
+    contains = (sx, sy) => pointInPolygon(sx, sy, mr.points)
+  } else {
+    const minX = Math.min(mr.x0, mr.x1),
+      maxX = Math.max(mr.x0, mr.x1)
+    const minY = Math.min(mr.y0, mr.y1),
+      maxY = Math.max(mr.y0, mr.y1)
+    contains = (sx, sy) => sx >= minX && sx <= maxX && sy >= minY && sy <= maxY
+  }
+
+  const byId = new Map(ctx.nodesData.map((n) => [n.id, n]))
+  const nodeIn = new Map()
+  const personIds = []
+  for (const n of ctx.nodesData) {
+    if (nodeTimeHidden(n)) continue
+    const s = worldToScreen(n.x, n.y, t)
+    const hit = contains(s.x, s.y)
+    nodeIn.set(n.id, hit)
+    if (hit) personIds.push(n.id)
+  }
+
+  const relIds = []
+  for (const d of ctx.linksData) {
+    if (linkTimeHidden(d)) continue
+    const a = byId.get(d.person_a_id),
+      b = byId.get(d.person_b_id)
+    if (!a || !b) continue
+    const sa = worldToScreen(a.x, a.y, t),
+      sb = worldToScreen(b.x, b.y, t)
+    const mid = contains((sa.x + sb.x) / 2, (sa.y + sb.y) / 2)
+    if (mid || (nodeIn.get(a.id) && nodeIn.get(b.id))) relIds.push(d.id)
+  }
+
+  store.setMarqueeSelection({ personIds, relIds })
+}
+
 function installPointerHandlers() {
   const el = overlayEl.value
   el.addEventListener('pointerdown', onPointerDown)
@@ -1942,33 +2130,63 @@ function onPointerDown(e) {
     store.toggleSelectPerson(node.id)
     return
   }
+  // Shift-drag on empty canvas = marquee select (box or lasso, per the toolbar).
+  if (e.shiftKey && !node && !spaceActive.value) {
+    startMarquee(e)
+    return
+  }
   if (node && !store.lockNodes) {
-    drag = { node, moved: false, downX: e.clientX, downY: e.clientY }
+    // Grabbing a node that's part of the multi-selection moves the whole
+    // selection together (bonds follow their endpoints automatically).
+    let group = null
+    const selIds = store.selectedPersonIds
+    if (selIds.length > 1 && selIds.includes(node.id)) {
+      const sel = new Set(selIds)
+      group = ctx.nodesData
+        .filter((n) => n !== node && sel.has(n.id))
+        .map((n) => ({ n, dx: n.x - node.x, dy: n.y - node.y }))
+    }
+    drag = { node, group, moved: false, downX: e.clientX, downY: e.clientY }
     grab = { dx: w.x - node.x, dy: w.y - node.y }
     try {
       overlayEl.value.setPointerCapture(e.pointerId)
     } catch {}
     const m = currentMode.value
-    if (m === 'auto') {
-      ctx.simulation.alphaTarget(0.3).restart()
-      node.fx = node.x
-      node.fy = node.y
-    } else if (m === 'custom') {
-      node.fx = node.x
-      node.fy = node.y
-    } else if (m === 'age') {
-      node.fx = node.x
-    } else if (m === 'generation') {
-      node.fx = node.x
-      node.fy = node.y
-      removeGenPreview(ctx)
-    }
+    if (m === 'auto') ctx.simulation.alphaTarget(0.3).restart()
+    if (m === 'generation') removeGenPreview(ctx)
+    holdNode(node, m)
+    if (group) for (const g of group) holdNode(g.n, m)
   } else {
     pending = { downX: e.clientX, downY: e.clientY, moved: false }
   }
 }
 
+// Per-node drag primitives shared by single- and group-drag. `hold` pins a node
+// where it stands at grab time; `moveTo` carries it while the pointer moves —
+// both follow the active layout type's rules (Birth keeps Y on the year axis).
+function holdNode(d, m) {
+  d.fx = d.x
+  if (m !== 'age') d.fy = d.y
+}
+function moveNodeTo(d, tx, ty, m) {
+  if (m === 'auto') {
+    d.fx = tx
+    d.fy = ty
+    return
+  }
+  d.x = tx
+  d.fx = tx
+  if (m !== 'age') {
+    d.y = ty
+    d.fy = ty
+  }
+}
+
 function onPointerMove(e) {
+  if (marqueeRaw) {
+    moveMarquee(e)
+    return
+  }
   if (drag) {
     if (!drag.moved && Math.hypot(e.clientX - drag.downX, e.clientY - drag.downY) > 3)
       drag.moved = true
@@ -1977,50 +2195,45 @@ function onPointerMove(e) {
       ty = w.y - grab.dy
     const d = drag.node,
       m = currentMode.value
-    if (m === 'auto') {
-      d.fx = tx
-      d.fy = ty
-    } else if (m === 'custom') {
-      d.x = tx
-      d.y = ty
-      d.fx = tx
-      d.fy = ty
-      ticked()
-    } else if (m === 'age') {
-      d.x = tx
-      d.fx = tx
-      ticked()
-    } else if (m === 'generation') {
-      d.x = tx
-      d.y = ty
-      d.fx = tx
-      d.fy = ty
-      ticked()
-      updateGenPreview(d.y, ctx)
-    }
+    moveNodeTo(d, tx, ty, m)
+    if (drag.group) for (const g of drag.group) moveNodeTo(g.n, tx + g.dx, ty + g.dy, m)
+    if (m !== 'auto') ticked()
+    if (m === 'generation') updateGenPreview(d.y, ctx)
   } else if (pending) {
     if (Math.hypot(e.clientX - pending.downX, e.clientY - pending.downY) > 3) pending.moved = true
   }
 }
 
 function onPointerUp(e) {
+  if (marqueeRaw) {
+    const mr = marqueeRaw
+    marqueeRaw = null
+    marquee.value = null
+    if (mr.moved) commitMarquee(mr)
+    return
+  }
   if (drag) {
     const d = drag.node,
       m = currentMode.value
+    const members = drag.group ? [d, ...drag.group.map((g) => g.n)] : [d]
     if (m === 'auto') {
       ctx.simulation.alphaTarget(0)
-      d.fx = null
-      d.fy = null
+      for (const n of members) {
+        n.fx = null
+        n.fy = null
+      }
     } else if (m === 'custom') {
       snapshotMode('custom')
     } else if (m === 'age') {
       snapshotMode('age')
     } else if (m === 'generation') {
       removeGenPreview(ctx)
-      const ty = resolveGenTarget(d.y, ctx)
-      d.fx = d.x
-      d.fy = ty
-      d.y = ty
+      for (const n of members) {
+        const ty = resolveGenTarget(n.y, ctx)
+        n.fx = n.x
+        n.fy = ty
+        n.y = ty
+      }
       ticked()
       cleanupEmptyGenRows(ctx, snapshotGenMode, ticked)
     }
@@ -2619,8 +2832,12 @@ let scenesInitialized = false
 function onGlobalKeydown(e) {
   if (e.key !== 'Escape') return
   if (store.modalOpen || store.formOpen) return
-  if (pathInfo.value || pathAnchor.value) clearPath()
+  if (marqueeRaw) {
+    marqueeRaw = null
+    marquee.value = null
+  } else if (pathInfo.value || pathAnchor.value) clearPath()
   else if (store.relPopup) store.relPopup = null
+  else if (store.marqueeActive || store.selectedRelationshipIds.length) store.clearGraphSelection()
   else if (store.selectedPersonIds.length) store.selectPerson(null, { modal: false })
 }
 
@@ -2667,11 +2884,22 @@ watch(
 )
 watch(
   () => store.selectedPersonId,
-  () => markNodeStyles()
+  () => {
+    markNodeStyles()
+    markLinkStyles() // light up / release the selected person's bonds
+  }
 )
 watch(
   () => store.selectedPersonIds,
-  () => markNodeStyles()
+  () => {
+    markNodeStyles()
+    markLinkStyles()
+  }
+)
+// A clicked / marquee-selected bond lights up the line itself.
+watch(
+  [() => store.relPopup, () => store.selectedRelationshipIds],
+  () => markLinkStyles()
 )
 // Time travel: re-sync styles per scrub/playback step, but only while this view
 // is actually on screen (it stays mounted, hidden, behind the other views);
@@ -2783,6 +3011,33 @@ watch(
   width: 100%;
   height: 100%;
   touch-action: none;
+}
+/* Marquee (box / lasso) selection region. */
+.marquee-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 6;
+  pointer-events: none;
+  overflow: visible;
+}
+.marquee-shape {
+  fill: color-mix(in srgb, var(--accent) 12%, transparent);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  animation: marquee-march 0.6s linear infinite;
+}
+@keyframes marquee-march {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-shape {
+    animation: none;
+  }
 }
 .graph-search {
   position: absolute;
