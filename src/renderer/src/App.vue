@@ -215,9 +215,10 @@
     <SettingsModal />
     <UserPage />
     <!-- Landing page: what signed-out visitors meet first (marketing + mock
-         community gallery); its CTAs hand off to the AuthGate below. Signed-in
-         users can revisit it via the topbar home button (its nav then shows
-         the account chip and "Open editor" instead of sign-in CTAs). -->
+         community gallery); its CTAs hand off to whichever sign-in gate the
+         build uses (native or Supabase). Signed-in users can revisit it via
+         the topbar home button (its nav then shows the account chip and
+         "Open editor" instead of sign-in CTAs). -->
     <Transition name="auth-gate">
       <HomePage
         v-if="store.authReady && (store.authUser ? homeOpen : !authOpen)"
@@ -226,10 +227,19 @@
         @close="homeOpen = false"
       />
     </Transition>
-    <!-- Sign-in gate: covers the workspace until a session exists -->
+    <!-- Native sign-in gate (desktop / local build) -->
     <Transition name="auth-gate">
       <AuthGate
-        v-if="store.authReady && !store.authUser && authOpen"
+        v-if="!store.usingSupabase && store.authReady && !store.authUser && authOpen"
+        :initial-mode="authMode"
+        @back="authOpen = false"
+      />
+    </Transition>
+    <!-- Supabase sign-in gate (hosted build): same flow as the native gate —
+         the homepage's CTAs open it; Back returns to the homepage. -->
+    <Transition name="auth-gate">
+      <SupabaseAuthGate
+        v-if="store.usingSupabase && store.authReady && !store.session && authOpen"
         :initial-mode="authMode"
         @back="authOpen = false"
       />
@@ -259,12 +269,15 @@ import PeopleView from './components/PeopleView.vue'
 import RelationshipsView from './components/RelationshipsView.vue'
 import TimelineView from './components/TimelineView.vue'
 import FactionsView from './components/FactionsView.vue'
-import CharacterView from './components/character/CharacterView.vue'
+// Lazy-loaded through the paid-features gate (chunk downloads on first open,
+// only when the plan/caps switchboard allows it) — see src/renderer/src/paid/.
+import { CharacterView } from './paid'
 import RightDock from './components/RightDock.vue'
 import PersonModal from './components/PersonModal.vue'
 import PersonForm from './components/PersonForm.vue'
 import GraphSettings from './components/GraphSettings.vue'
 import AuthGate from './components/AuthGate.vue'
+import SupabaseAuthGate from './components/SupabaseAuthGate.vue'
 import HomePage from './components/home/HomePage.vue'
 import AccountMenu from './components/AccountMenu.vue'
 import ExportModal from './components/ExportModal.vue'
@@ -555,12 +568,18 @@ onMounted(async () => {
     store.spaceHintSeen = globalRes.data.space3dHintSeen === 'yes'
   }
 
-  // Data loads only behind a session; without one the AuthGate takes over and
-  // login/register do the loading themselves after they succeed.
-  const restored = await store.restoreSession()
-  if (restored) {
-    await store.loadProjects()
-    await store.loadAll()
+  // Data loads only behind a session; without one the sign-in gate takes over
+  // and login/register do the loading themselves after they succeed.
+  if (store.usingSupabase) {
+    // Hosted build: resolve the Supabase session and keep it in sync. The
+    // auth-state listener loads the signed-in user's data (see the store).
+    await store.initSupabaseAuth()
+  } else {
+    const restored = await store.restoreSession()
+    if (restored) {
+      await store.loadProjects()
+      await store.loadAll()
+    }
   }
 
   // Exit-dialog hooks for the Electron main process (src/main/index.js)

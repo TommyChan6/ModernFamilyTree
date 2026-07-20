@@ -1,17 +1,23 @@
 import type { ApiBackend } from './types'
 import { ipcBackend } from './backends/ipc'
 import { localBackend } from './backends/local'
+import { supabaseBackend } from './backends/supabase'
 import { wrapRequest } from '../../../shared/auth'
 import { UNDOABLE_CHANNELS } from '../../../shared/history'
 import { getSessionToken } from './session'
 
 // The data-access seam. Everything above this line (store, components) is
 // backend-agnostic; everything below is swappable:
+//   - VITE_API_BACKEND=supabase → supabaseBackend (hosted Postgres via
+//     supabase-js; see docs/DEPLOYMENT_PLAN.md)
 //   - Electron desktop  → ipcBackend (preload bridge → main process → JSON file)
 //   - plain browser     → localBackend (shared data core over IndexedDB)
-//   - hosted web (later)→ an HTTP/Supabase backend added beside these and
-//     selected via import.meta.env.VITE_API_BACKEND, per docs/DEPLOYMENT_PLAN.md
-const backend: ApiBackend = window.electronAPI ? ipcBackend : localBackend
+const backend: ApiBackend =
+  import.meta.env.VITE_API_BACKEND === 'supabase'
+    ? supabaseBackend
+    : window.electronAPI
+      ? ipcBackend
+      : localBackend
 
 // Undoable-mutation listeners: every successful call to a channel the undo
 // stack records is announced here, so the store can keep the topbar's

@@ -309,7 +309,16 @@
       "PowerShell(npm run format:check; echo \"exit=$LASTEXITCODE\")",
       "PowerShell(npx prettier --write src/renderer/src/components/home/ViewShowcase.vue; npm run format:check; echo \"exit=$LASTEXITCODE\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" --max-time 3 http://localhost:5173/)",
-      "PowerShell($conn = Get-NetTCPConnection -LocalPort 5173 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1; if \\($conn\\) { Stop-Process -Id $conn.OwningProcess -Force -Confirm:$false; 'stopped' } else { 'not found' })"
+      "PowerShell($conn = Get-NetTCPConnection -LocalPort 5173 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1; if \\($conn\\) { Stop-Process -Id $conn.OwningProcess -Force -Confirm:$false; 'stopped' } else { 'not found' })",
+      "Bash(git branch *)",
+      "Bash(git push *)",
+      "Bash(node -p \"require\\('./node_modules/@supabase/supabase-js/package.json'\\).version\")",
+      "Bash(grep -v '^$')",
+      "Bash(node \"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/8968ae23-859d-4678-93cb-4223652158ae/scratchpad/test-client-construction.mjs\")",
+      "Bash(cp \"C:/Users/tommy/AppData/Local/Temp/claude/c--Users-tommy-OneDrive-Desktop-newFamilyTree/8968ae23-859d-4678-93cb-4223652158ae/scratchpad/test-client-construction.mjs\" scripts/__tmp-test-client.mjs)",
+      "Bash(sed -i \"s|new URL\\('../../../../../../OneDrive/Desktop/newFamilyTree/.env', import.meta.url\\)|new URL\\('../.env', import.meta.url\\)|\" scripts/__tmp-test-client.mjs)",
+      "Bash(node scripts/__tmp-test-client.mjs)",
+      "Bash(git check-ignore *)"
     ]
   }
 }

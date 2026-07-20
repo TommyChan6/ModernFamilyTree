@@ -642,7 +642,9 @@ import GraphActionPane from './graph/GraphActionPane.vue'
 import ActionWheel from './graph/ActionWheel.vue'
 import WheelConfigModal from './graph/WheelConfigModal.vue'
 import { resolveWheelSlots } from './graph/wheelModes.js'
-import Graph3DView from './Graph3DView.vue'
+// Lazy-loaded through the paid-features gate (its chunk only downloads when
+// the plan/caps switchboard allows the 3D view) — see src/renderer/src/paid/.
+import { Graph3DView } from '../paid'
 import MiniMap from './MiniMap.vue'
 import ViewHeader from './ViewHeader.vue'
 import CanvasToggles from './CanvasToggles.vue'

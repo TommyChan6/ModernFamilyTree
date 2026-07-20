@@ -92,6 +92,11 @@ export class AvatarAtlas {
   _load(personId, url) {
     this.state.set(personId, 'loading')
     const img = new Image()
+    // Hosted photos come from Supabase Storage (another origin). Without a
+    // CORS-enabled load the canvas taints and getImageData below throws →
+    // silhouette. Scoped to http(s): data: URLs and the desktop's appimg://
+    // protocol are same-origin-safe and must not get CORS semantics.
+    if (/^https?:/i.test(url)) img.crossOrigin = 'anonymous'
     img.onload = () => {
       if (this.disposed) return
       try {

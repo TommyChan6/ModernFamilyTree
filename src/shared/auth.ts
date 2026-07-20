@@ -185,6 +185,29 @@ export function limitsFor(user: User): PlanLimits {
   return PLAN_LIMITS[user.plan] || PLAN_LIMITS.free
 }
 
+// ── Plan features (the free/paid switchboard — deployment plan Step 2.7) ─────
+// Which capability flags each plan may use. The renderer's `caps` computed
+// consults this through planHasFeature() before a gated capability turns on —
+// the ONE place future paid features plug into. '*' grants every flag, so
+// today's behavior is unchanged for everyone; when a paid tier launches, list
+// its exclusive flags here (and move them out of free) — no other code change.
+export const PLAN_FEATURES: Record<string, string[]> = {
+  /** The free tier keeps everything it has today. */
+  free: ['*'],
+  /** Guests too — their Advanced-mode clamp is a separate store rule. */
+  guest: ['*'],
+  /** Placeholder for the first paid tier: no exclusive flags defined yet.
+   *  (Nobody is on this plan; it exists so the shape is settled early.) */
+  plus: []
+}
+
+/** May `plan` use capability `feature`? Unknown/absent plans fall back to
+ *  free, so a stale or future plan string can never brick the app. */
+export function planHasFeature(plan: string | null | undefined, feature: string): boolean {
+  const flags = PLAN_FEATURES[plan ?? 'free'] ?? PLAN_FEATURES.free
+  return flags.includes('*') || flags.includes(feature)
+}
+
 // ── Request envelope ──────────────────────────────────────────────────────────
 // The renderer's api seam wraps every payload with the session token — the
 // local equivalent of the browser attaching a session cookie to each request.

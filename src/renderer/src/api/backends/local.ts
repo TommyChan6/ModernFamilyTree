@@ -130,7 +130,8 @@ function persist(db: DB): Promise<void> {
 }
 
 // ── Platform channels (the desktop uses a native dialog / fs for these) ─────
-function pickImageAsDataUrl(): Promise<string | null> {
+// Exported so the Supabase backend reuses the same picker for images:openDialog.
+export function pickImageAsDataUrl(): Promise<string | null> {
   return new Promise((resolve, reject) => {
     const input = document.createElement('input')
     input.type = 'file'

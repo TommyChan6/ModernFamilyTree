@@ -8,6 +8,10 @@ dist/
 # Environment files
 .env
 .env.*
+# …except the production web config: it holds only public values (backend
+# selector + Supabase URL + public anon key) and is committed so deploys don't
+# depend on dashboard env vars. NEVER put the service_role key in here.
+!.env.production
 
 # Editor directories and files
 .vscode/*

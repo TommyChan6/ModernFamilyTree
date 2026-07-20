@@ -22,9 +22,16 @@ export default [
   // TypeScript files (src/shared, src/renderer/src/api) get the TS parser/rules
   ...tseslint.configs.recommended.map((cfg) => ({ ...cfg, files: ['**/*.ts'] })),
 
-  // Main process, preload, config and tests run in Node
+  // Main process, preload, config, tests and standalone scripts run in Node
   {
-    files: ['src/main/**', 'src/preload/**', 'electron.vite.config.js', 'tests/**'],
+    files: [
+      'src/main/**',
+      'src/preload/**',
+      'electron.vite.config.js',
+      'vite.config.web.js',
+      'scripts/**',
+      'tests/**'
+    ],
     languageOptions: { globals: { ...globals.node } }
   },
 

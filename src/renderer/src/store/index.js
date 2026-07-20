@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { api, onUndoableMutation } from '../api'
+import { planHasFeature } from '../../../shared/auth'
 import { setSessionToken, clearSessionToken, getSessionToken } from '../api/session'
 import { latestDataYear } from './currentYear.js'
 import { locale, setLocale, isSupportedLocale } from '../i18n'
@@ -13,6 +14,15 @@ export const useMainStore = defineStore('main', () => {
   // A passwordless "look around" visitor. Guests are held to Standard mode —
   // Advanced (physics, Labs, 3D) is a signed-in-account affordance.
   const isGuest = computed(() => authUser.value?.plan === 'guest')
+
+  // ── Supabase Auth (hosted web build only) ─────────────────────────────────
+  // Active only when the app runs against the hosted Postgres backend
+  // (VITE_API_BACKEND=supabase). Login is Supabase Auth's own email/password;
+  // `user` / `session` mirror its state, and `authUser` above is derived from
+  // `user` so the rest of the app (AccountMenu, undo gating, caps) is unchanged.
+  const usingSupabase = import.meta.env.VITE_API_BACKEND === 'supabase'
+  const user = ref(null) // the raw Supabase auth user, or null
+  const session = ref(null) // the raw Supabase session, or null
 
   // ── Project management ────────────────────────────────────────────────────
   const projects = ref([])
@@ -219,11 +229,21 @@ export const useMainStore = defineStore('main', () => {
   //   Standard: all views, scenes, Focus + basic Style, manual tags
   //   Advanced: everything (full Style incl. physics sliders)
   const caps = computed(() => {
+    // Plan switchboard (deployment plan Step 2.7): gated capabilities consult
+    // the account's plan through PLAN_FEATURES before they may turn on — the
+    // same clamp pattern as guests below. Free grants '*', so nothing changes
+    // for anyone today; future paid tiers flip flags here, nowhere else.
+    const allow = (flag) => planHasFeature(authUser.value?.plan, flag)
     // Guests never get Advanced — clamp the effective mode so every derived
     // capability (Labs, full Style, 3D Space, extra time controls) folds back
-    // to Standard in one place.
-    const m = isGuest.value && programMode.value === 'advanced' ? 'standard' : programMode.value
-    const labs = m === 'advanced' && labsEnabled.value
+    // to Standard in one place. A plan without the 'advanced' flag clamps the
+    // same way.
+    const clamped =
+      (isGuest.value || !allow('advanced')) && programMode.value === 'advanced'
+        ? 'standard'
+        : programMode.value
+    const m = clamped
+    const labs = m === 'advanced' && labsEnabled.value && allow('labs')
     return {
       views:
         m === 'simple'
@@ -235,7 +255,7 @@ export const useMainStore = defineStore('main', () => {
               'timeline',
               'groups',
               // The experimental Character view rides the same gate as Space 3D
-              ...(labs ? ['character'] : [])
+              ...(labs && allow('character') ? ['character'] : [])
             ],
       scenes: m !== 'simple',
       typePicker: m !== 'simple',
@@ -255,9 +275,9 @@ export const useMainStore = defineStore('main', () => {
        *  the slider itself is available in every mode. */
       timeControls: m === 'advanced',
       /** …and the experimental Space (3D) graph type needs it switched on too. */
-      space3d: labs,
+      space3d: labs && allow('space3d'),
       /** The experimental Character view (buildable portraits). */
-      character: labs
+      character: labs && allow('character')
     }
   })
 
@@ -403,7 +423,37 @@ export const useMainStore = defineStore('main', () => {
     return api.invoke('auth:guest').then(completeSignIn)
   }
 
+  // Drop everything owned by the account so the next sign-in starts clean.
+  // Shared by native logout and the Supabase signed-out transition.
+  function clearWorkspace() {
+    projects.value = []
+    activeProjectId.value = null
+    persons.value = []
+    fieldDefs.value = []
+    fieldValues.value = []
+    relationships.value = []
+    relTypes.value = []
+    tags.value = []
+    entityTags.value = []
+    scenes.value = []
+    sceneTags.value = []
+    characters.value = []
+    activeSceneIds.value = { groups: null, graph: null, timeline: null }
+    selectedPersonId.value = null
+    selectedPersonIds.value = []
+    selectedRelationshipIds.value = []
+    marqueeActive.value = false
+    modalOpen.value = false
+    formOpen.value = false
+    editingPerson.value = null
+    relPopup.value = null
+    checkpoint.value = null
+    userCurrentYear.value = null
+  }
+
   async function logout() {
+    // On the hosted build, sign-out is Supabase's; the state teardown is shared.
+    if (usingSupabase) return signOut()
     // Close the profile page first so it doesn't linger over the curtain.
     userPageOpen.value = false
     await runWithCurtain(
@@ -414,29 +464,115 @@ export const useMainStore = defineStore('main', () => {
         clearSessionToken()
         authUser.value = null
         authUsage.value = null
-        // Drop everything owned by the account so the next sign-in starts clean
-        projects.value = []
-        activeProjectId.value = null
-        persons.value = []
-        fieldDefs.value = []
-        fieldValues.value = []
-        relationships.value = []
-        tags.value = []
-        entityTags.value = []
-        scenes.value = []
-        sceneTags.value = []
-        characters.value = []
-        activeSceneIds.value = { groups: null, graph: null, timeline: null }
-        selectedPersonId.value = null
-        selectedPersonIds.value = []
-        selectedRelationshipIds.value = []
-        marqueeActive.value = false
-        modalOpen.value = false
-        formOpen.value = false
-        editingPerson.value = null
-        relPopup.value = null
-        checkpoint.value = null
-        userCurrentYear.value = null
+        clearWorkspace()
+      },
+      { min: 950, sub: 'See you soon' }
+    )
+  }
+
+  // ── Supabase Auth actions (hosted web build) ──────────────────────────────
+  // The supabase-js client persists its own session (localStorage) and attaches
+  // the JWT to every query, so RLS just works once signed in. We lazy-import
+  // the client so desktop/local builds never touch it (its module throws when
+  // the .env is unset).
+  let _sbClient = null
+  function sbClient() {
+    if (!_sbClient) _sbClient = import('../supabaseClient').then((m) => m.supabase)
+    return _sbClient
+  }
+
+  // Derive the app's `authUser` from a Supabase user (or clear it). Keeps the
+  // shape AccountMenu / caps expect; plan defaults to free (reads from the
+  // profiles table can refine it later).
+  function mirrorAuthUser(sbUser) {
+    authUser.value = sbUser
+      ? {
+          id: sbUser.id,
+          username: sbUser.email,
+          plan: 'free',
+          display_name: sbUser.user_metadata?.display_name || null,
+          bio: null,
+          avatar_hue: null,
+          created_at: sbUser.created_at
+        }
+      : null
+  }
+
+  // Only (re)load data when the signed-in user actually changes, so the
+  // repeated auth-state events supabase-js emits don't reload on every tick.
+  let _loadedUserId = null
+  async function applySupabaseSession(newSession, { initial = false } = {}) {
+    session.value = newSession
+    user.value = newSession?.user ?? null
+
+    if (newSession?.user) {
+      mirrorAuthUser(newSession.user)
+      if (_loadedUserId === newSession.user.id) return
+      _loadedUserId = newSession.user.id
+      const load = async () => {
+        await loadProjects()
+        await loadAll()
+      }
+      // The very first restore on page load is silent; a fresh sign-in plays
+      // the welcome curtain (same as the native flow).
+      if (initial) await load()
+      else {
+        const name = newSession.user.email
+        await runWithCurtain('login', `Welcome${name ? ', ' + name : ''}`, load, {
+          min: 1200,
+          sub: 'Growing your family tree…'
+        })
+      }
+    } else {
+      _loadedUserId = null
+      mirrorAuthUser(null)
+      clearWorkspace()
+    }
+  }
+
+  // Called once on mount (hosted build). Resolves the stored session, then
+  // keeps `user`/`session`/`authUser` in sync with Supabase for the app's life.
+  async function initSupabaseAuth() {
+    try {
+      const supabase = await sbClient()
+      const { data } = await supabase.auth.getSession()
+      await applySupabaseSession(data.session, { initial: true })
+      supabase.auth.onAuthStateChange((_event, newSession) => {
+        applySupabaseSession(newSession)
+      })
+    } finally {
+      authReady.value = true
+    }
+  }
+
+  // { success, error?, needsConfirmation? }. With email confirmation on
+  // (Supabase default) there is no session until the user confirms — the
+  // login screen shows a "check your email" note in that case.
+  async function signUp({ email, password }) {
+    const supabase = await sbClient()
+    const { data, error } = await supabase.auth.signUp({ email, password })
+    if (error) return { success: false, error: error.message }
+    return { success: true, needsConfirmation: !data.session }
+  }
+
+  // On success the onAuthStateChange listener does the data load (behind the
+  // welcome curtain), so callers just need to know it worked.
+  async function signIn({ email, password }) {
+    const supabase = await sbClient()
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  }
+
+  async function signOut() {
+    userPageOpen.value = false
+    const supabase = await sbClient()
+    await runWithCurtain(
+      'logout',
+      'Signing out…',
+      // The listener fires SIGNED_OUT → applySupabaseSession(null) clears state.
+      async () => {
+        await supabase.auth.signOut()
       },
       { min: 950, sub: 'See you soon' }
     )
@@ -1323,6 +1459,14 @@ export const useMainStore = defineStore('main', () => {
     login,
     guestLogin,
     logout,
+    // Supabase Auth (hosted web build)
+    usingSupabase,
+    user,
+    session,
+    initSupabaseAuth,
+    signUp,
+    signIn,
+    signOut,
     refreshUsage,
     updateProfile,
     changePassword,

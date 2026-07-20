@@ -7,8 +7,7 @@
 // (GraphCanvas and TimelineView are keyed by project and come and go).
 
 import { ref, computed, watch, effectScope, type Ref, type ComputedRef } from 'vue'
-// @ts-expect-error — the store is still JS; drop this when it converts to TS
-import { useMainStore } from '../../store/index.js'
+import { useMainStore } from '../../store/index.js' // typed via store/index.d.ts
 import { computeTimeRange, computeTimeEvents, type TimeRange, type TimeEvent } from './timeMath'
 
 export const TIME_SPEEDS = [

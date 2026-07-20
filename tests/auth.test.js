@@ -9,6 +9,8 @@ import {
   wrapRequest,
   unwrapRequest,
   PLAN_LIMITS,
+  PLAN_FEATURES,
+  planHasFeature,
   PUBLIC_CHANNELS
 } from '../src/shared/auth'
 
@@ -419,5 +421,39 @@ describe('EMPTY_DB shape', () => {
     const fresh = EMPTY_DB()
     expect(fresh.users).toEqual({})
     expect(fresh.sessions).toEqual({})
+  })
+})
+
+// The free/paid switchboard (deployment plan Step 2.7): PLAN_FEATURES says
+// which capability flags a plan may use; the store's caps computed consults it
+// via planHasFeature. Free must keep everything until a paid tier launches.
+describe('plan features (the free/paid switchboard)', () => {
+  it('free and guest plans keep every capability today', () => {
+    for (const plan of ['free', 'guest']) {
+      expect(planHasFeature(plan, 'advanced')).toBe(true)
+      expect(planHasFeature(plan, 'labs')).toBe(true)
+      expect(planHasFeature(plan, 'space3d')).toBe(true)
+      expect(planHasFeature(plan, 'character')).toBe(true)
+      expect(planHasFeature(plan, 'some-future-flag')).toBe(true) // '*' semantics
+    }
+  })
+
+  it('unknown or missing plans fall back to free (never brick the app)', () => {
+    expect(planHasFeature('mystery-tier', 'advanced')).toBe(true)
+    expect(planHasFeature(null, 'space3d')).toBe(true)
+    expect(planHasFeature(undefined, 'labs')).toBe(true)
+  })
+
+  it('the plus placeholder exists and grants no exclusive flags yet', () => {
+    expect(PLAN_FEATURES.plus).toEqual([])
+    // No one is on plus; when it launches its flags get listed. Until then a
+    // hypothetical plus user would grant nothing extra — and that's explicit.
+    expect(planHasFeature('plus', 'space3d')).toBe(false)
+  })
+
+  it('every plan in PLAN_LIMITS has a features entry (no half-defined tiers)', () => {
+    for (const plan of Object.keys(PLAN_LIMITS)) {
+      expect(PLAN_FEATURES[plan]).toBeDefined()
+    }
   })
 })
