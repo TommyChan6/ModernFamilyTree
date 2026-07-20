@@ -7,7 +7,7 @@ and do the few clicks Claude can't do yourself.*
 
 ---
 
-## ⏸ Current status & ground rules (updated 2026-07-10)
+## ⏸ Current status & ground rules (updated 2026-07-20)
 
 **Deployment is deferred for now.** The current focus is building client-side features
 in the local app. This plan stays valid — do it whenever you're ready — and the code
@@ -39,6 +39,15 @@ requirements.
 **📱 Mobile is on the roadmap** (see the new Phase 6): web-first and responsive, then
 an installable PWA (free), and only later — if ever — native store apps (store fees
 are paid, so deferred).
+
+**🛡️ Code protection is built in (added 2026-07-20):** steps that make the website
+hard to download and re-host, and that keep future paid features out of free users'
+hands, are woven into the phases below and marked **(protection)**. They were chosen
+to cost you almost no extra manual work and **zero performance** — the heavy tricks
+that slow websites down are deliberately banned in the prompts. The full reasoning
+(what works, what's snake oil, and why) lives in
+[`CODE_PROTECTION_PLAN.md`](./CODE_PROTECTION_PLAN.md); you don't need to read it to
+follow this plan.
 
 ---
 
@@ -85,6 +94,29 @@ By the end of **Phase 3** you have a real website: people can sign up, log in, b
 tree, and it saves to the cloud. Phases 4–5 make it safe and shareable for the public.
 **Do not invite real users before Phase 4** (the legal/privacy steps) — that part is not
 optional if real people's data goes online.
+
+### How the code protection works (in plain terms)
+
+One honest fact first: **anything a browser can show, a visitor can save.** No
+library or trick changes that — "disable right-click" scripts and DevTools blockers
+stop nobody and annoy real users, so this plan skips them entirely. What actually
+works is four layers, and they're already placed in the right steps below:
+
+1. **Keep the valuable part in the cloud** (Phases 1–2). After the migration, the
+   website's files are just the *screen* — all the data, accounts, and rules live in
+   Supabase. Someone who copies the site's files gets an empty shell with no
+   database: like stealing a TV remote without the TV. The plan limits are enforced
+   *inside* the database (Step 1.2b) where nobody can edit them.
+2. **Don't send paid code to free users** (Steps 2.7–2.8). Features get split into
+   separate code files ("chunks") that the browser only downloads when allowed.
+   Bonus: the first page load gets *faster*, because visitors download less.
+3. **Scramble what you do send** (Steps 3.2b–3.2c). An "obfuscator" turns your
+   readable code into working-but-unreadable gibberish, so a copied site is
+   miserable to modify, rebrand, or maintain. Done with light settings only — zero
+   speed difference for users.
+4. **Own it on paper** (Steps 4.1 & 4.5). Private code repo, copyright notice, and
+   Terms that forbid re-hosting. If someone clones your site anyway, this is what
+   gets it taken down — you send their web host a standard takedown notice.
 
 ---
 
@@ -185,6 +217,25 @@ them into Supabase's built-in SQL editor and click Run.*
 > the owner, OR the current user is in `tree_collaborators` for that tree. The rule for
 > writing: only the owner or a collaborator with role `editor`/`owner`. Enable RLS on
 > every table. Explain each policy in a comment above it."
+
+### Step 1.2b 🤖 CLAUDE — Put the plan limits inside the database (protection)
+
+**Why:** the free-tier limits (max trees, people, photos) currently live in the
+app's own code — and on a website, that code runs in the *visitor's* browser, where
+a cheater can simply edit it. A rule that lives in the database can't be touched by
+anyone but you. This costs you no extra clicks — it goes into the same
+`schema.sql` file you paste in Step 1.3.
+
+> **Prompt to paste to Claude:**
+> "In `supabase/schema.sql`, add a `profiles` table (id referencing `auth.users`,
+> plus a `plan` text column defaulting to `'free'`) with a trigger that creates a
+> profile row automatically when a user signs up. Add a `plan_limits` table keyed by
+> plan name with columns for max trees, max persons, and max images per user, and
+> insert the free tier using the numbers from `PLAN_LIMITS` in `src/shared/auth.ts`.
+> Then write BEFORE INSERT triggers on `trees`, `persons`, and `images` that count
+> the user's existing rows and raise a clear error when the plan's limit is reached.
+> Read the limit from `plan_limits` so a paid tier can later be added by inserting
+> one row — no code change. Comment everything so I can read it."
 
 ### Step 1.3 🧑 YOU — Run the schema in Supabase
 1. In the Supabase dashboard, click **SQL Editor** in the left sidebar → **New query**.
@@ -292,6 +343,56 @@ that build. No Electron or Node code is included — the renderer never imports 
 4. Anything broken → copy the browser's error (press F12 → Console tab → copy the red text)
    and paste it to Claude.
 
+### Step 2.7 🤖 CLAUDE — Create the free/paid switchboard (protection)
+
+**Why:** today everything is free, but the *switch* deciding who gets what should
+exist before launch — retrofitting it later means touching every feature. This step
+changes **nothing** users can see; it just creates one central place that future
+paid features will ask for permission.
+
+> **Prompt to paste to Claude:**
+> "In `src/shared/auth.ts`, next to `PLAN_LIMITS`, add a `PLAN_FEATURES` map listing
+> which capability flags each plan gets (the `free` plan keeps everything it has
+> today; add an empty `plus` placeholder for later). In the Pinia store
+> (`src/renderer/src/store/index.js`), make the `caps` computed consult the
+> logged-in user's plan through `PLAN_FEATURES` — the same pattern that already
+> forces guest accounts out of Advanced mode. Behavior must not change for anyone
+> today; this is only the single switchboard future paid features will read.
+> Update the auth tests to cover it."
+
+**🧑 YOU:** nothing to do — no visible change. Takes Claude a few minutes.
+
+### Step 2.8 🤖 CLAUDE — Split big gated features into separate chunks (protection + speed)
+
+**Why:** right now the whole app is one big bundle of code every visitor downloads.
+Splitting the largest gated features into separate files ("chunks") means the
+browser only fetches them when someone actually opens that feature — so a future
+free user's browser **never even receives** the paid code. Side benefit: the first
+page load gets *faster*. There is no performance downside.
+
+> **Prompt to paste to Claude:**
+> "In the web build, convert the biggest capability-gated features to lazy-loaded
+> chunks, starting with the 3D space view (`Graph3DView.vue` +
+> `components/graph/graph3d/`): load it with `defineAsyncComponent` / dynamic
+> `import()` only when the user opens it, and use
+> `build.rollupOptions.output.manualChunks` in `vite.config.web.js` so those files
+> land in chunks named `paid-*`. Create one small gate module (e.g.
+> `src/renderer/src/paid/index.ts`) as the **only** place that imports these chunks;
+> it checks the `caps`/plan switchboard from Step 2.7 before loading and shows a
+> friendly 'this needs a higher plan' message when refused. Current behavior must
+> not change for anyone. Afterwards run `npm run build:web` and show me the output
+> proving the `paid-*` chunk is a separate file."
+
+**🧑 YOU:** repeat the Step 2.6 checks once, especially opening the 3D space view
+(Advanced mode + 🧪 Labs) — it should appear after a barely-noticeable loading beat
+the first time, then instantly.
+
+> **Deferred on purpose (keep it simple):** truly *withholding* the paid chunks on
+> the server (an endpoint that checks the login before handing the file over) only
+> matters once a paid tier actually exists. Skip it for now — when you launch a paid
+> plan, ask Claude: *"Serve the `paid-*` chunks through an auth-checked serverless
+> function instead of the public folder, per `CODE_PROTECTION_PLAN.md` Phase 3."*
+
 > ✅ **End of Phase 2.** The app now works as a website on your own computer, backed by the
 > cloud. It's not public yet, but it's real.
 
@@ -315,6 +416,59 @@ that build. No Electron or Node code is included — the renderer never imports 
 2. Ask Claude for the exact command, which will look like:
    `SUPABASE_SERVICE_KEY=... node scripts/importToSupabase.js path/to/familytree.json`
 3. Paste your **service_role** key when the command needs it. Run it. Check the summary.
+
+### Step 3.2b 🤖 CLAUDE — Scramble the shipped code (protection) — BEFORE your first deploy
+
+**Why now and not later:** the moment a clean, readable build is on the internet —
+even for an hour — caches and archive sites can keep a copy forever. So the very
+first public build should already be scrambled. After this step it's automatic on
+every deploy; you never think about it again.
+
+**Will it slow the site down? No.** The prompt below uses only the *light*
+scrambling options (renaming things, hiding text strings) and explicitly **bans**
+the heavy ones (control-flow flattening, dead-code injection, debug traps) — those
+can slow the graph engine up to 10× and break browsers, which is why they're
+forbidden here. It also leaves the performance-critical drawing code and the
+public libraries (Three.js, D3, Vue) untouched — scrambling public code protects
+nothing and just bloats the download.
+
+> **Prompt to paste to Claude:**
+> "Add code obfuscation to the production web build only. Install
+> `javascript-obfuscator` with a Vite/Rollup wrapper plugin (e.g.
+> `rollup-obfuscator`) and wire it into `vite.config.web.js` so it runs **only**
+> during `npm run build:web` — never in dev, never in the Electron build, never in
+> tests. Apply it only to our own code: exclude everything under `node_modules`,
+> and exclude the hot render modules (`components/graph/`, `components/timeline/`,
+> `components/webgl/`, `components/factions/webgl/`) so performance cannot regress.
+> Use only light transforms: `identifierNamesGenerator: 'hexadecimal'`,
+> `stringArray: true` with rotation and shuffling, `simplify: true`. Explicitly set
+> `controlFlowFlattening: false`, `deadCodeInjection: false`,
+> `debugProtection: false`, `selfDefending: false`. Also set
+> `build.sourcemap: false`, and add a copyright banner comment to every built chunk
+> via `build.rollupOptions.output.banner` (© 2026 [my name] — all rights reserved,
+> unauthorized copying or re-hosting prohibited). Then run `npm run build:web`,
+> confirm it succeeds, and tell me how much the bundle size changed."
+
+### Step 3.2c 🧑 YOU — Check the scrambled build still works (5–10 minutes)
+
+Obfuscators very occasionally break code, so this one manual pass is not optional —
+you're the only one who can judge "it feels exactly the same."
+
+1. In your terminal: `npm run build:web`, then `npm run preview:web`. Open the local
+   address it prints.
+2. Click through this checklist:
+   - sign up / sign in
+   - all five views (graph, timeline, groups, directory, relationships)
+   - the 3D space view (Advanced mode + 🧪 Labs)
+   - drag some nodes around the graph — it should feel exactly as smooth as before
+   - upload a photo
+   - switch between dark and light theme
+3. Press **F12 → Console tab**. Any red errors → copy and paste them to Claude.
+4. (Fun check) Right-click the page → View Page Source, or open a `.js` file in
+   `dist/assets/` — you should see unreadable gibberish with your copyright line on
+   top. That's what a thief gets now.
+5. **Repeat this checklist any time the obfuscation settings change.** Otherwise
+   it's automatic from here on.
 
 ### Step 3.3 🧑 YOU — Connect the project to Vercel and go live
 1. Go to **vercel.com** → **Add New… → Project**.
@@ -355,8 +509,10 @@ free generators exist (e.g. search "privacy policy generator"), but read what th
 > "Draft a plain-language Privacy Policy and Terms of Service for a family-tree website
 > hosted in the EU (Supabase, Frankfurt) that stores data about real people. Cover: what we
 > store, that users must not upload data about living people without a basis, how to export
-> and delete an account, and our contact email. Add them as pages in the app. Note clearly
-> that this is a starting draft, not legal advice."
+> and delete an account, and our contact email. The Terms must also explicitly forbid
+> copying, scraping, redistributing, or re-hosting the website or its code — this is the
+> legal basis for takedowns if someone clones the site. Add them as pages in the app. Note
+> clearly that this is a starting draft, not legal advice."
 
 ### Step 4.2 🤖 CLAUDE — Add account & data deletion and export (GDPR "right to be forgotten")
 > **Prompt to paste to Claude:**
@@ -379,6 +535,29 @@ free generators exist (e.g. search "privacy policy generator"), but read what th
 Then: **🧑 YOU** — make a free **sentry.io** account (the free "Developer" tier needs no
 card — zero-cost rule holds), create a project, copy the key Claude asks for into your
 Vercel environment variables.
+
+### Step 4.5 🧑 YOU + 🤖 CLAUDE — Own your code on paper (protection, ~10 minutes)
+
+Scrambling the website is pointless if the clean source code is one click away on
+GitHub. Two quick things:
+
+1. **🧑 Check your repo is private.** Go to **github.com → your `newFamilyTree`
+   repo → Settings** (the tab on the repo itself, not your account) → scroll to the
+   bottom **"Danger Zone"** → look at **"Change repository visibility"**:
+   - If it offers *"Change to private"* → your code is currently **public**. Click
+     it, choose **Private**, type the repo name to confirm. Vercel keeps deploying
+     fine — it's already authorized to read your private repos.
+   - If it offers *"Change to public"* → you're already private. Do nothing.
+2. **🤖 Prompt to paste to Claude:**
+   > "Add a proprietary `LICENSE` file stating the code is copyright [my name], all
+   > rights reserved, not open source, and may not be copied, redistributed, or
+   > re-hosted. Add a matching one-line copyright notice to the app's About/legal
+   > area and to `README.md`."
+
+**Why this matters:** if someone clones your site anyway, you don't fight them with
+technology — you email their web host a standard **DMCA takedown notice** pointing
+at your copyright, your git history, and the banner inside the scrambled files
+(Step 3.2b). Hosts comply with these routinely. That's the whole game.
 
 > ✅ **End of Phase 4.** You can now safely invite a small group ("invite-only alpha").
 
@@ -446,7 +625,14 @@ notifications on iOS or store visibility).
 | 5 | Sharing, GEDCOM; domain & AI marked [PAID — deferred] | 🤖 (mostly) | ongoing | Mixed |
 | 6 | Mobile: responsive → PWA (free) → stores [PAID — deferred] | 🤖 (mostly) | ongoing | Free until M3 |
 
-### The five things only YOU can do (Claude cannot)
+**🛡️ Protection steps woven in above** (all free, all near-zero manual work):
+Step 1.2b (limits enforced inside the database) · Steps 2.7–2.8 (free/paid
+switchboard + paid code in separate chunks) · Steps 3.2b–3.2c (scramble the shipped
+code before the first deploy + one manual click-through) · Steps 4.1 & 4.5 (Terms
+forbid re-hosting; private repo + copyright). Deferred until a paid tier exists:
+auth-gated *serving* of the paid chunks (see the note in Step 2.8).
+
+### The six things only YOU can do (Claude cannot)
 1. **Create the accounts** on GitHub, Supabase, and Vercel (login, CAPTCHA, email codes).
 2. **Copy secret keys** from dashboards and paste them into `.env` / Vercel.
 3. **Click "Run" in Supabase's SQL editor** and **"Deploy" in Vercel**.
@@ -454,5 +640,7 @@ notifications on iOS or store visibility).
    every required step here works without a card. Paid items are marked
    **[PAID — deferred]** and skipped.
 5. **Make the legal decisions** — what your privacy policy promises is your call.
+6. **Click through the scrambled build once** (Step 3.2c) before the first deploy —
+   only you can judge "it looks and feels exactly the same."
 
 Everything else — all the actual code — you can hand to Claude, one step at a time.

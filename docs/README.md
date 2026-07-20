@@ -16,6 +16,7 @@ here, read them roughly in this order:
 | [contributing.md](./contributing.md) | Branch/PR workflow and the definition of done. |
 | [design.md](./design.md) | Product vision, UX principles, the visual design system, roadmap. |
 | [WILD_IDEAS.md](./WILD_IDEAS.md) | Blue-sky brainstorm — future & wild ideas, status of what's captured, new concepts to grow into, and profitability bets by audience/ROI/risk. |
+| [CODE_PROTECTION_PLAN.md](./CODE_PROTECTION_PLAN.md) | Anti-theft plan for the deployed website — server-side enforcement, paid-feature chunk gating, obfuscation, legal footing, and what to do before vs. after deploy. |
 
 ### How the docs fit together
 
