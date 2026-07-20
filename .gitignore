@@ -13,6 +13,10 @@ dist/
 # depend on dashboard env vars. NEVER put the service_role key in here.
 !.env.production
 
+# Claude Code per-machine settings (permission allowlist etc.) — local only,
+# not for the repo. The skills under .claude/ stay tracked intentionally.
+.claude/settings.local.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
