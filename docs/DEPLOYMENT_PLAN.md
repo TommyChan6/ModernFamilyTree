@@ -51,6 +51,67 @@ follow this plan.
 
 ---
 
+## ▶ Resuming the website later (start here when you come back)
+
+*Added 2026-07-22. Website work is paused so we can build client-side features in the
+Electron app. This section is the single "pick up where we left off" entry point — read
+it first, then drop back into the phases below only for the steps still marked pending.*
+
+### What "paused" actually did (and how to un-pause)
+
+Just **one line** in the git-ignored local `.env` was commented out:
+`# VITE_API_BACKEND=supabase`. While it's commented, `npm run dev` uses the local JSON
+file and `npm run dev:web` uses IndexedDB — no Supabase traffic. The Supabase URL + anon
+key are still in `.env`, and `.env.production` (committed) is untouched, so the hosted
+build config is intact.
+
+**To develop against the hosted backend again:** uncomment that line in `.env` (or run
+`VITE_API_BACKEND=supabase npm run dev:web`). Nothing else is needed to re-connect.
+
+### How much is already built (as of the pause)
+
+More than the original Phase 2 prose implies. The cloud backend
+[`src/renderer/src/api/backends/supabase.ts`](../src/renderer/src/api/backends/supabase.ts)
+already implements, against `supabase/schema.sql`:
+
+- projects (trees), persons, relationships, tags (factions) + membership, scenes
+  (scenarios) + placements, settings + global settings;
+- **the full trait system (`fields:*`) and relationship-type registry (`relTypes:*`)** —
+  by reusing the real shared handlers from `src/shared/` over an in-memory slice, so the
+  trait/registry math has one source of truth with desktop;
+- **images** — photos compressed to WebP and stored in the Supabase Storage `images`
+  bucket, signed at read time.
+
+### What's still pending before a real deploy
+
+1. **`auth:*` channels** — the app's AuthGate flow (`auth:register` / `auth:login` /
+   profile / password) is **not** routed in the Supabase backend yet; it needs wiring to
+   Supabase Auth (`supabase.auth`). This is the biggest remaining piece (Step 2.3 in
+   spirit, adapted to the channel seam).
+2. **characters** and **history/checkpoint / undo-redo** channels — return a clear "not
+   implemented" error today; decide whether the hosted build needs them at launch.
+3. The protection + launch steps that were always deferred: **2.7–2.8** (paid
+   switchboard + chunk splitting), **3.2b–3.2c** (obfuscation), **3.1–3.2** (data
+   importer), **3.3–3.4** (Vercel deploy + Supabase URL config), and all of **Phase 4**
+   (legal/privacy/deletion/error-tracking) before any real user.
+
+### One prompt to hand Claude when you're ready to resume
+
+> "We're resuming the website (see the 'Resuming the website later' section of
+> `docs/DEPLOYMENT_PLAN.md`). Re-enable the Supabase backend, then implement the pending
+> `auth:*` channels in `src/renderer/src/api/backends/supabase.ts` by wiring them to
+> Supabase Auth, keeping the exact `{ success, data }` envelope the other backends return.
+> Then walk me through the remaining pending items in that section in order. Verify each
+> step with `npm run dev:web` before moving on, and stop for the 🧑 (human) steps."
+
+> **Note:** because the shared core in `src/shared/` powers both desktop and the
+> browser-local (IndexedDB) backend, any client-side data feature you build during the
+> pause automatically works on `npm run dev:web`. The *only* migration debt it creates is
+> porting that channel into `supabase.ts` (which is why keeping new data logic in
+> `src/shared/`, not bespoke IPC handlers, matters).
+
+---
+
 ## 0. Read this first — how the plan works
 
 Right now this app is a **desktop program** (Electron). It runs on one computer, saves

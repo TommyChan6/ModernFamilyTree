@@ -127,6 +127,7 @@ export function removeCurrentYearLine(ctx) {
 // ── Mode guide lines ─────────────────────────────────────────────────────────
 export function removeGuides(ctx) {
   cancelGuideTimers(ctx)
+  ctx.yearGuideCtx = null
   const ov = overlay(ctx)
   if (ov) {
     ov.guides = []
@@ -134,27 +135,57 @@ export function removeGuides(ctx) {
   }
 }
 
+// ── Adaptive year guides (Birth mode) ────────────────────────────────────────
+// The year interval adapts to the vertical zoom: zooming in reveals finer
+// subdivisions (10y → 5y → 2y → 1y…) once neighbouring lines would sit far
+// enough apart on SCREEN, so the axis stays readable at every zoom level.
+// Guides that were already visible keep their opacity; freshly revealed ones
+// fade in. Multiples of the next coarser "nice" step draw as majors, the
+// in-between subdivisions as dimmer minors.
+const YEAR_STEPS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000]
+const MIN_GUIDE_SPACING_PX = 44
+
+/** Smallest nice interval whose on-screen spacing clears MIN_GUIDE_SPACING_PX. */
+export function pickYearInterval(info, transform) {
+  const k = transform?.k ?? 1
+  const sy = transform?.sy ?? 1
+  const range = Math.max(1e-6, info.maxYear - info.minYear)
+  const pxPerYear = (info.usableHeight / range) * k * sy
+  for (const step of YEAR_STEPS) {
+    if (step * pxPerYear >= MIN_GUIDE_SPACING_PX) return step
+  }
+  return YEAR_STEPS[YEAR_STEPS.length - 1]
+}
+
 export function drawYearGuides(ctx, minYear, maxYear, padding, usableHeight) {
+  ctx.yearGuideCtx = { minYear, maxYear, padding, usableHeight, interval: 0 }
+  updateAdaptiveYearGuides(ctx, true)
+}
+
+/** Re-derive the guide set for the current zoom; cheap no-op while the
+ *  interval is unchanged, so it can run on every camera event. */
+export function updateAdaptiveYearGuides(ctx, force = false) {
   const ov = overlay(ctx)
-  if (!ov) return
+  const info = ctx.yearGuideCtx
+  if (!ov || !info) return
+  const interval = pickYearInterval(info, ctx.transform)
+  if (!force && interval === info.interval) return
+  info.interval = interval
 
-  const range = maxYear - minYear
-  let interval = 10
-  if (range <= 30) interval = 5
-  if (range <= 10) interval = 2
-  if (range <= 4) interval = 1
-
-  const startYear = Math.floor(minYear / interval) * interval
-  const endYear = Math.ceil(maxYear / interval) * interval
-
+  // The major cadence: ×5 for 1/2/10/20/…, ×4 for the 5-series (5→20, 50→200).
+  const majorStep = interval * (/^5/.test(String(interval)) ? 4 : 5)
+  const keep = new Map((ov.guides || []).map((g) => [g.label, g.opacity ?? 0]))
+  const startYear = Math.floor(info.minYear / interval) * interval
+  const endYear = Math.ceil(info.maxYear / interval) * interval
   const guides = []
   for (let year = startYear; year <= endYear; year += interval) {
-    const yRatio = (year - minYear) / (maxYear - minYear || 1)
+    const yRatio = (year - info.minYear) / (info.maxYear - info.minYear || 1)
     guides.push({
-      y: padding + yRatio * usableHeight,
+      y: info.padding + yRatio * info.usableHeight,
       label: String(year),
       kind: 'year',
-      opacity: 0
+      minor: year % majorStep !== 0,
+      opacity: force ? 0 : (keep.get(String(year)) ?? 0)
     })
   }
   ov.guides = guides
@@ -175,9 +206,14 @@ function fadeInGuides(ctx, guides) {
     ctx.guideTimers.forEach((t) => t.stop())
     ctx.guideTimers = []
   }
+  // Each guide rises from ITS OWN current opacity, so lines that were already
+  // visible don't blink when the adaptive interval reveals new siblings.
+  const starts = guides.map((g) => g.opacity ?? 0)
   runGuideTimer(ctx, (el) => {
-    const t = Math.min(1, el / 600)
-    for (const g of guides) g.opacity = t
+    const t = Math.min(1, el / 450)
+    guides.forEach((g, i) => {
+      g.opacity = starts[i] + (1 - starts[i]) * t
+    })
     redraw(ctx)
     return t >= 1
   })

@@ -686,11 +686,22 @@ const pickerPlaceholder = computed(() => {
   return intent ? intent.hint : 'Type a name…'
 })
 
+// Hide only people already linked with the SAME bond type as the open picker's
+// intent — a pair may hold several different bonds at once (married AND
+// parent, mentor AND rival…); only an exact duplicate is off the table.
 const excludedPersonIds = computed(() => {
   const ids = new Set()
   if (store.editingPerson) ids.add(store.editingPerson.id)
-  existingRels.value.forEach((r) => ids.add(r.otherId))
-  pendingLinks.value.forEach((l) => ids.add(l.personId))
+  const intent = allIntents.value.find((i) => i.id === pickerFor.value)
+  const typeKey = intent?.defKey
+  if (typeKey) {
+    existingRels.value.forEach((r) => {
+      if (r.relType === typeKey) ids.add(r.otherId)
+    })
+    pendingLinks.value.forEach((l) => {
+      if (l.defKey === typeKey) ids.add(l.personId)
+    })
+  }
   return [...ids]
 })
 

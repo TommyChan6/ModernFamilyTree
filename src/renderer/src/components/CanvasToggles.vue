@@ -1,19 +1,71 @@
 <template>
-  <div class="ct-rail" role="toolbar" aria-label="Canvas overlays">
-    <button
-      v-for="(t, i) in buttons"
-      :key="t.key"
-      class="ct-btn"
-      :class="{ on: t.active, 'ct-sep': t.sep }"
-      :style="{ '--tint': t.tint, '--i': i }"
-      :title="t.title"
-      :aria-pressed="t.active"
-      @click="t.toggle"
-    >
-      <span class="ct-aura" aria-hidden="true"></span>
-      <span class="ct-glyph">{{ t.icon }}</span>
-      <span class="ct-dot" aria-hidden="true"></span>
-    </button>
+  <div class="ct-cluster" role="toolbar" aria-label="Canvas overlays">
+    <!-- Overlay toggles: Focus / Legend / Relationships / Clean view -->
+    <div class="ct-rail">
+      <button
+        v-for="(t, i) in buttons"
+        :key="t.key"
+        class="ct-btn"
+        :class="{ on: t.active }"
+        :style="{ '--tint': t.tint, '--i': i }"
+        :title="t.title"
+        :aria-pressed="t.active"
+        @click="t.toggle"
+      >
+        <span class="ct-aura" aria-hidden="true"></span>
+        <span class="ct-glyph">{{ t.icon }}</span>
+        <span class="ct-dot" aria-hidden="true"></span>
+      </button>
+    </div>
+
+    <!-- Selection tools: their own pill so the box/lasso radio pair reads as a
+         different kind of control than the overlay toggles above. -->
+    <div v-if="showMarquee" class="ct-rail ct-rail-tools">
+      <span class="ct-rail-tag">Select</span>
+      <button
+        v-for="(t, i) in marqueeButtons"
+        :key="t.key"
+        class="ct-btn"
+        :class="{ on: t.active }"
+        :style="{ '--tint': t.tint, '--i': buttons.length + i }"
+        :title="t.title"
+        :aria-pressed="t.active"
+        @click="t.toggle"
+      >
+        <span class="ct-aura" aria-hidden="true"></span>
+        <span class="ct-glyph">{{ t.icon }}</span>
+        <span class="ct-dot" aria-hidden="true"></span>
+      </button>
+    </div>
+
+    <!-- Edit modes: the action wheel's slots, one click away (hold Tab for the
+         radial version). The host view resolves the slots and owns the active
+         mode; picking the running mode again turns it off. -->
+    <div v-if="modes && modes.length" class="ct-rail ct-rail-modes">
+      <span class="ct-rail-tag">Edit</span>
+      <button
+        v-for="(m, i) in modes"
+        :key="m.id + ':' + i"
+        class="ct-btn ct-btn-mode"
+        :class="{ on: activeModeId === m.id, 'ct-locked': m.disabled }"
+        :style="{ '--tint': m.color || 'var(--accent)', '--i': buttons.length + 2 + i }"
+        :title="m.disabled ? m.disabledHint || m.label : `${m.label} — ${m.hint}`"
+        :aria-pressed="activeModeId === m.id"
+        @click="emit('pick-mode', m)"
+      >
+        <span class="ct-aura" aria-hidden="true"></span>
+        <span class="ct-glyph">{{ m.icon }}</span>
+        <span class="ct-dot" aria-hidden="true"></span>
+      </button>
+      <button
+        class="ct-btn ct-btn-mode ct-btn-gear"
+        :style="{ '--tint': 'var(--accent)', '--i': buttons.length + 2 + modes.length }"
+        title="Customize edit modes (or hold Tab for the wheel)"
+        @click="emit('config-modes')"
+      >
+        <span class="ct-glyph">⚙</span>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -21,13 +73,15 @@
 import { computed } from 'vue'
 import { useMainStore } from '../store/index.js'
 
-// The shared canvas-overlay toggle cluster, dropped into the header of every
-// spatial view (graph / timeline / groups). Focus, Legend and Relationships
-// open right-side panes the host view renders; Clean view (owned globally by
-// the store) fades every canvas overlay away. Each button carries its own tint
-// so the cluster doubles as a colour key. `showMarquee` adds the box/lasso
-// selection-tool pair (Shift-drag on the canvas); the tool choice lives in the
-// store so other spatial views can adopt the same marquee later.
+// The shared canvas-control cluster, dropped into the header of every spatial
+// view (graph / timeline / groups). It renders up to three pills: the overlay
+// toggles (Focus, Legend, Relationships open right-side panes the host view
+// renders; Clean view — owned globally by the store — fades every canvas
+// overlay away), the box/lasso selection-tool pair (`showMarquee`; the tool
+// choice lives in the store so other spatial views can adopt the same marquee
+// later), and the graph's edit modes (`modes` — the resolved action-wheel
+// slots; the host handles `pick-mode` / `config-modes`). Each button carries
+// its own tint so the cluster doubles as a colour key.
 const props = defineProps({
   showFocus: { type: Boolean, default: false },
   showLegend: { type: Boolean, default: true },
@@ -36,9 +90,18 @@ const props = defineProps({
   showMarquee: { type: Boolean, default: false },
   focus: { type: Boolean, default: false },
   legend: { type: Boolean, default: false },
-  relTypes: { type: Boolean, default: false }
+  relTypes: { type: Boolean, default: false },
+  /** Resolved wheel slots ({ id, icon, color, label, hint, disabled… }) or null. */
+  modes: { type: Array, default: null },
+  activeModeId: { type: String, default: null }
 })
-const emit = defineEmits(['update:focus', 'update:legend', 'update:relTypes'])
+const emit = defineEmits([
+  'update:focus',
+  'update:legend',
+  'update:relTypes',
+  'pick-mode',
+  'config-modes'
+])
 const store = useMainStore()
 
 const buttons = computed(() => {
@@ -83,31 +146,37 @@ const buttons = computed(() => {
       toggle: () => (store.cleanView = !store.cleanView)
     })
   }
-  if (props.showMarquee) {
-    // A radio pair, not toggles: one selection tool is always armed.
-    list.push({
-      key: 'box',
-      icon: '▧',
-      title: 'Box select — hold Shift and drag on the canvas',
-      tint: 'var(--accent)',
-      sep: true,
-      active: store.marqueeTool === 'box',
-      toggle: () => (store.marqueeTool = 'box')
-    })
-    list.push({
-      key: 'lasso',
-      icon: '◌',
-      title: 'Lasso select — hold Shift and drag a freeform loop',
-      tint: 'var(--accent)',
-      active: store.marqueeTool === 'lasso',
-      toggle: () => (store.marqueeTool = 'lasso')
-    })
-  }
   return list
 })
+
+// A radio pair, not toggles: one selection tool is always armed.
+const marqueeButtons = computed(() => [
+  {
+    key: 'box',
+    icon: '▧',
+    title: 'Box select — hold Shift and drag on the canvas',
+    tint: 'var(--accent)',
+    active: store.marqueeTool === 'box',
+    toggle: () => (store.marqueeTool = 'box')
+  },
+  {
+    key: 'lasso',
+    icon: '◌',
+    title: 'Lasso select — hold Shift and drag a freeform loop',
+    tint: 'var(--accent)',
+    active: store.marqueeTool === 'lasso',
+    toggle: () => (store.marqueeTool = 'lasso')
+  }
+])
 </script>
 
 <style scoped>
+.ct-cluster {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .ct-rail {
   display: flex;
   align-items: center;
@@ -119,6 +188,31 @@ const buttons = computed(() => {
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+  animation: ct-rail-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.ct-rail-tools {
+  animation-delay: 0.08s;
+}
+.ct-rail-modes {
+  animation-delay: 0.16s;
+}
+@keyframes ct-rail-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+}
+
+/* Tiny caption chip that names what a pill does */
+.ct-rail-tag {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  color: var(--t3);
+  padding: 0 3px 0 7px;
+  user-select: none;
+  writing-mode: horizontal-tb;
 }
 
 .ct-btn {
@@ -153,21 +247,25 @@ const buttons = computed(() => {
   background: var(--hover);
   transform: translateY(-2px);
 }
-/* Hairline divider before a new button group (the selection-tool pair). */
-.ct-sep {
-  margin-left: 9px;
-}
-.ct-sep::before {
-  content: '';
-  position: absolute;
-  left: -6px;
-  top: 8px;
-  bottom: 8px;
-  width: 1px;
-  background: var(--border);
-}
 .ct-btn:active {
   transform: translateY(0) scale(0.9);
+}
+
+/* Edit-mode buttons: a touch smaller so eight of them stay compact */
+.ct-btn-mode {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+.ct-btn-gear .ct-glyph {
+  font-size: 13px;
+  color: var(--t3);
+}
+.ct-btn-gear:hover .ct-glyph {
+  color: var(--t1);
+}
+.ct-locked {
+  opacity: 0.4;
 }
 
 .ct-glyph {
@@ -176,6 +274,9 @@ const buttons = computed(() => {
   font-size: 15px;
   line-height: 1;
   transition: transform 0.3s cubic-bezier(0.34, 1.6, 0.5, 1);
+}
+.ct-btn-mode .ct-glyph {
+  font-size: 13.5px;
 }
 .ct-btn:hover .ct-glyph {
   transform: scale(1.14) rotate(-6deg);
@@ -269,6 +370,7 @@ const buttons = computed(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .ct-rail,
   .ct-btn,
   .ct-btn.on .ct-aura,
   .ct-btn.on .ct-dot {

@@ -735,11 +735,9 @@ const issuesByRel = computed(() => {
   const pairKey = (r) => [r.person_a_id, r.person_b_id].sort().join('~')
 
   const byPairType = {}
-  const byPair = {}
   const parentCount = {} // childId -> number of biological parents
   rels.forEach((r) => {
     ;(byPairType[pairKey(r) + '~' + r.type] ||= []).push(r.id)
-    ;(byPair[pairKey(r)] ||= []).push(r)
     if (r.type === 'parent_child')
       parentCount[r.person_b_id] = (parentCount[r.person_b_id] || 0) + 1
   })
@@ -751,22 +749,8 @@ const issuesByRel = computed(() => {
     if (!a || !b) add(r.id, 'References a person that no longer exists')
     if (byPairType[pairKey(r) + '~' + r.type].length > 1)
       add(r.id, 'Duplicate — this pair already has this relationship')
-    const pairRels = byPair[pairKey(r)]
-    // Couple + parent/child on the same pair is a conflict; couple + a social
-    // overlay (friends, rival, …) is fine.
-    const roleOfType = (t) =>
-      store.relTypeRoles.get(t) ||
-      (t === 'parent_child' || t === 'adopted'
-        ? 'vertical'
-        : t === 'spouse'
-          ? 'horizontal'
-          : 'none')
-    if (
-      pairRels.some((o) => roleOfType(o.type) === 'horizontal') &&
-      pairRels.some((o) => roleOfType(o.type) === 'vertical')
-    ) {
-      add(r.id, 'Conflict — this pair is linked as both partners and parent/child')
-    }
+    // A pair holding several DIFFERENT bonds (married + parent, mentor +
+    // rival…) is deliberate and allowed — only exact duplicates are flagged.
     if (
       (r.type === 'parent_child' || r.type === 'adopted') &&
       a?.birth?.year &&

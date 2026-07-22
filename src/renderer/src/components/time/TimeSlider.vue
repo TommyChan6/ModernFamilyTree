@@ -271,7 +271,9 @@ onBeforeUnmount(() => {
 .time-slider {
   position: absolute;
   left: 14px;
-  top: 14px;
+  /* Sits below the view header (≈72px tall with the toggle pills) so the
+     title stays readable. */
+  top: 82px;
   bottom: 14px;
   width: 58px;
   z-index: 6;

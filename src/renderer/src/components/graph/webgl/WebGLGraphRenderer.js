@@ -192,8 +192,8 @@ export class WebGLGraphRenderer {
   pickNode(wx, wy, radius) {
     return this.picker.pickNode(wx, wy, this.nodes || [], radius)
   }
-  pickLink(wx, wy, gs) {
-    return this.picker.pickLink(wx, wy, this.links || [], gs)
+  pickLink(wx, wy, gs, tol) {
+    return this.picker.pickLink(wx, wy, this.links || [], gs, tol)
   }
 
   requestRedraw() {

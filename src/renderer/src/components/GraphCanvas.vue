@@ -8,9 +8,13 @@
         :focus="focusOpen"
         :legend="legendOpen"
         :rel-types="relTypesOpen"
+        :modes="spaceActive ? null : pillModes"
+        :active-mode-id="editMode?.id || null"
         @update:focus="focusOpen = $event"
         @update:legend="legendOpen = $event"
         @update:rel-types="relTypesOpen = $event"
+        @pick-mode="pickPillMode"
+        @config-modes="openWheelConfig()"
       />
     </ViewHeader>
     <div
@@ -78,6 +82,37 @@
           >
             －
           </button>
+          <template v-if="!spaceActive">
+            <div class="ctrl-sep"></div>
+            <button
+              class="ctrl-btn ctrl-btn-axis"
+              title="Horizontal zoom in — stretch the layout wider (or hold X and scroll)"
+              @click="stretchBy('x', 1.3)"
+            >
+              <span class="axis-arrow">↔</span><span class="axis-sign">＋</span>
+            </button>
+            <button
+              class="ctrl-btn ctrl-btn-axis"
+              title="Horizontal zoom out — squeeze the layout narrower"
+              @click="stretchBy('x', 1 / 1.3)"
+            >
+              <span class="axis-arrow">↔</span><span class="axis-sign">－</span>
+            </button>
+            <button
+              class="ctrl-btn ctrl-btn-axis"
+              title="Vertical zoom in — stretch the layout taller (or hold Z and scroll)"
+              @click="stretchBy('y', 1.3)"
+            >
+              <span class="axis-arrow">↕</span><span class="axis-sign">＋</span>
+            </button>
+            <button
+              class="ctrl-btn ctrl-btn-axis"
+              title="Vertical zoom out — squeeze the layout shorter"
+              @click="stretchBy('y', 1 / 1.3)"
+            >
+              <span class="axis-arrow">↕</span><span class="axis-sign">－</span>
+            </button>
+          </template>
           <div class="ctrl-sep"></div>
           <button
             class="ctrl-btn"
@@ -619,6 +654,7 @@ import {
 } from './graph/graphInsights.js'
 import {
   drawYearGuides,
+  updateAdaptiveYearGuides,
   drawGenGuides,
   removeGuides,
   updateGenPreview,
@@ -779,6 +815,7 @@ const ctx = {
   requestRedraw: null
 }
 let hoverId = null // node currently hovered (for glow)
+let hoverLinkId = null // bond currently hovered (halo preview + pointer cursor)
 let couplesHiSet = null // ids highlighted by the Marriage filter, or null
 
 const { cancelAnimation, animateToPositionsWithReset } = useGraphAnimation(ctx)
@@ -1317,6 +1354,25 @@ const wheelEnv = computed(() => ({
 }))
 const wheelSlots = computed(() => resolveWheelSlots(store.wheelSlots, wheelEnv.value))
 
+// The header's Edit pill mirrors the wheel: the same resolved slots, minus
+// empty ones and duplicates, each one click away.
+const pillModes = computed(() => {
+  const seen = new Set()
+  return wheelSlots.value.filter((s) => {
+    if (s.empty || seen.has(s.id)) return false
+    seen.add(s.id)
+    return true
+  })
+})
+
+function pickPillMode(s) {
+  if (s.disabled) {
+    showWheelFlash('🔒', s.disabledHint || 'Not available right now')
+    return
+  }
+  activateEditMode(s)
+}
+
 const hudHint = computed(() => {
   const m = editMode.value
   if (!m) return ''
@@ -1475,7 +1531,7 @@ function handleModeClick(w, node) {
     return
   }
   // Empty canvas: the bond-targeting modes pick the line under the cursor.
-  let link = ctx.renderer?.pickLink(w.x, w.y, store.graphSettings)
+  let link = ctx.renderer?.pickLink(w.x, w.y, store.graphSettings, linkPickTol())
   if (link && linkTimeHidden(link)) link = null
   if (link && m.kind === 'delete') return armOrDelete({ id: link.id, isRel: true })
   if (link && m.kind === 'end') return endBondClick(link)
@@ -2118,6 +2174,14 @@ function linkVisual(d) {
     }
   }
 
+  // Bond hover: a soft halo + lift on the line under the cursor — the click
+  // target is unambiguous before you commit to it.
+  if (hoverLinkId === d.id && !timeHidden) {
+    halo = Math.max(halo, 0.5)
+    width = Math.max(width * 1.25, 2.6)
+    opacity = Math.min(1, Math.max(opacity, gs.linkOpacity * 1.3))
+  }
+
   // Connection trace: the chain becomes flowing marching-ants; everything
   // off-path recedes. Applied last — the trace always wins.
   if (pathActive.value) {
@@ -2212,6 +2276,9 @@ function initGraph() {
         sy: ctx.transform.sy ?? 1
       }
       ctx.renderer.setCamera(ctx.transform)
+      // Birth mode: the year guides re-derive their interval from the zoom, so
+      // zooming in reveals finer subdivisions (no-op while it's unchanged).
+      if (currentMode.value === 'age') updateAdaptiveYearGuides(ctx)
       minimapRef.value?.redraw()
     })
   ctx.zoomSelection = d3.select(overlayEl.value)
@@ -2373,6 +2440,7 @@ function updateGraph() {
   })
   // Drop stale interaction refs to nodes that no longer exist.
   if (hoverId && !newNodes.some((n) => n.id === hoverId)) hoverId = null
+  if (hoverLinkId && !ctx.linksData.some((l) => l.id === hoverLinkId)) hoverLinkId = null
   if (drag && !newNodes.includes(drag.node)) drag = null
   ctx.simulation.nodes(ctx.nodesData)
   ctx.simulation.force('link').links(ctx.linksData)
@@ -2401,6 +2469,15 @@ function clientToWorld(clientX, clientY) {
 }
 function hitRadius() {
   return store.graphSettings.nodeRadius
+}
+
+// Bond hit-testing tolerance in WORLD units, sized so a line is always pickable
+// within ~10 SCREEN px whatever the zoom / per-axis stretch — the old fixed
+// world tolerance made lines nearly unclickable when zoomed out.
+function linkPickTol() {
+  const t = ctx.transform
+  const s = (t.k || 1) * (((t.sx ?? 1) + (t.sy ?? 1)) / 2)
+  return Math.max(6, 10 / Math.max(0.01, s))
 }
 
 // Picker that ignores nodes hidden by the Time slider (they're invisible but
@@ -2610,6 +2687,7 @@ function installPointerHandlers() {
   const el = overlayEl.value
   el.addEventListener('pointerdown', onPointerDown)
   el.addEventListener('pointermove', onHoverMove)
+  el.addEventListener('pointerleave', onHoverLeave)
   el.addEventListener('dblclick', onDblClick)
   window.addEventListener('pointermove', onPointerMove)
   window.addEventListener('pointerup', onPointerUp)
@@ -2619,6 +2697,7 @@ function removePointerHandlers() {
   if (el) {
     el.removeEventListener('pointerdown', onPointerDown)
     el.removeEventListener('pointermove', onHoverMove)
+    el.removeEventListener('pointerleave', onHoverLeave)
     el.removeEventListener('dblclick', onDblClick)
     el.removeEventListener('wheel', onStretchWheel)
   }
@@ -2784,7 +2863,9 @@ function onPointerUp(e) {
         store.selectPerson(node.id, { modal: false })
       }
     } else {
-      let link = store.lockLines ? null : ctx.renderer?.pickLink(w.x, w.y, store.graphSettings)
+      let link = store.lockLines
+        ? null
+        : ctx.renderer?.pickLink(w.x, w.y, store.graphSettings, linkPickTol())
       if (link && linkTimeHidden(link)) link = null
       if (link) {
         store.selectPerson(null, { modal: false })
@@ -2855,6 +2936,37 @@ function onHoverMove(e) {
     hoverId = id
     markNodeStyles()
   }
+  // Bond hover: a halo preview of the line a click would select, so picking
+  // relationships feels precise. Skipped on huge graphs (CPU picking per move),
+  // while locked, and in edit modes that don't target bonds.
+  let overLink = null
+  const mk = editMode.value?.kind
+  const bondMode = !mk || mk === 'delete' || mk === 'end' || mk === 'swap'
+  if (!node && !store.lockLines && bondMode && ctx.linksData.length <= 4000) {
+    overLink = ctx.renderer?.pickLink(w.x, w.y, store.graphSettings, linkPickTol())
+    if (overLink && linkTimeHidden(overLink)) overLink = null
+  }
+  const lid = overLink ? overLink.id : null
+  if (lid !== hoverLinkId) {
+    hoverLinkId = lid
+    markLinkStyles()
+  }
+  if (overlayEl.value) {
+    overlayEl.value.style.cursor = node ? 'grab' : overLink ? 'pointer' : ''
+  }
+}
+
+// Pointer left the canvas: drop the hover glow/halo so nothing stays lit.
+function onHoverLeave() {
+  if (hoverId) {
+    hoverId = null
+    markNodeStyles()
+  }
+  if (hoverLinkId) {
+    hoverLinkId = null
+    markLinkStyles()
+  }
+  if (overlayEl.value) overlayEl.value.style.cursor = ''
 }
 
 // Positions/handlers are global now; kept as a no-op hook so mode-enter code is unchanged.
@@ -3248,6 +3360,43 @@ function cycleEmphasis(which) {
 function zoomIn() {
   ctx.zoomSelection?.transition().duration(300).call(ctx.zoomBehavior.scaleBy, 1.3)
 }
+// Directional (per-axis) zoom buttons — the button twin of hold-X/Z + scroll.
+// Tweens sx/sy about the viewport centre; each frame re-emits the pan through
+// d3 so its internal transform stays in sync (the zoom handler preserves sx/sy).
+let stretchTween = null
+function stretchBy(axis, factor) {
+  if (spaceActive.value || !overlayEl.value || !ctx.zoomSelection) return
+  const rect = overlayEl.value.getBoundingClientRect()
+  const anchor = axis === 'x' ? rect.width / 2 : rect.height / 2
+  const t = ctx.transform
+  const cur = (axis === 'x' ? t.sx : t.sy) ?? 1
+  const target = Math.min(STRETCH_MAX, Math.max(STRETCH_MIN, cur * factor))
+  if (Math.abs(target - cur) < 1e-4) return
+  const pan0 = axis === 'x' ? t.x : t.y
+  if (stretchTween) stretchTween.stop()
+  const timer = d3.timer((el) => {
+    const p = Math.min(1, d3.easeCubicOut(el / 260))
+    const ns = cur + (target - cur) * p
+    const pan = anchor - (anchor - pan0) * (ns / cur)
+    let x = ctx.transform.x,
+      y = ctx.transform.y
+    if (axis === 'x') {
+      ctx.transform.sx = ns
+      x = pan
+    } else {
+      ctx.transform.sy = ns
+      y = pan
+    }
+    ctx.zoomSelection
+      ?.interrupt()
+      .call(ctx.zoomBehavior.transform, d3.zoomIdentity.translate(x, y).scale(ctx.transform.k))
+    if (p >= 1) {
+      timer.stop()
+      if (stretchTween === timer) stretchTween = null
+    }
+  })
+  stretchTween = timer
+}
 function zoomOut() {
   ctx.zoomSelection?.transition().duration(300).call(ctx.zoomBehavior.scaleBy, 0.77)
 }
@@ -3409,6 +3558,7 @@ onUnmounted(() => {
   ctx.simulation?.stop()
   ctx.resizeObserver?.disconnect()
   cancelAnimation()
+  if (stretchTween) stretchTween.stop()
   if (refreshSpinTimer) clearTimeout(refreshSpinTimer)
   if (persistTimer) {
     // flush the pending autosave (fire-and-forget — the component is going away)
@@ -3690,6 +3840,20 @@ watch(
 .ctrl-btn-help {
   font-weight: 700;
   font-size: 13px;
+}
+/* Per-axis zoom: arrow glyph + a tiny sign, reads as one compact control */
+.ctrl-btn-axis {
+  gap: 0;
+}
+.ctrl-btn-axis .axis-arrow {
+  font-size: 13px;
+  line-height: 1;
+}
+.ctrl-btn-axis .axis-sign {
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
+  margin-top: -8px;
 }
 .ctrl-btn-refresh .refresh-icon {
   display: inline-block;

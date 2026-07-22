@@ -42,7 +42,7 @@ export class TextGuideOverlay {
       age: l ? '#9099b8' : 'rgba(158,163,184,0.85)',
       sel: '#6c8ef5',
       yearStroke: l ? 'rgba(0,0,0,0.10)' : 'rgba(232,234,246,0.12)',
-      yearFill: l ? 'rgba(0,0,0,0.25)' : 'rgba(232,234,246,0.3)',
+      yearFill: l ? 'rgba(0,0,0,0.42)' : 'rgba(232,234,246,0.5)',
       genStroke: l ? 'rgba(0,0,0,0.08)' : 'rgba(232,234,246,0.10)',
       genFill: l ? 'rgba(0,0,0,0.20)' : 'rgba(232,234,246,0.25)',
       cyStroke: l ? 'rgba(108,142,245,0.75)' : 'rgba(108,142,245,0.65)',
@@ -96,21 +96,25 @@ export class TextGuideOverlay {
         ctx.font = `${weight} 10px system-ui, sans-serif`
         ctx.textAlign = 'right'
         ctx.textBaseline = 'middle'
-        ctx.fillText(label, s1.x - 14, s1.y)
+        // Clamp into the viewport so the year stays readable when the line's
+        // world-space left end has scrolled off-screen (zoomed in). The left
+        // clamp sits clear of the Time-travel slider panel (~86px wide).
+        ctx.fillText(label, Math.min(Math.max(s1.x - 14, 128), this.w - 12), s1.y)
       }
       ctx.restore()
     }
     for (const g of this.guides) {
       const isYear = g.kind === 'year'
-      ctx.globalAlpha = g.opacity ?? 1
+      // Adaptive subdivisions (minor year lines) sit back behind the majors.
+      ctx.globalAlpha = (g.opacity ?? 1) * (g.minor ? 0.55 : 1)
       drawGuide(
         g.y,
         g.label,
         isYear ? c.yearStroke : c.genStroke,
         isYear ? c.yearFill : c.genFill,
-        isYear ? [6, 4] : [8, 5],
+        isYear ? (g.minor ? [3, 5] : [6, 4]) : [8, 5],
         1,
-        600
+        g.minor ? 500 : 600
       )
     }
     ctx.globalAlpha = 1
