@@ -47,6 +47,15 @@ const PlanRefusal = defineComponent({
               'div',
               { style: 'font-size:12.5px;line-height:1.5;' },
               'Your current plan doesn’t include this feature yet.'
+            ),
+            h(
+              'button',
+              {
+                class: 'btn btn-primary btn-sm',
+                style: 'margin-top:14px;',
+                onClick: () => useMainStore().openPricing({ reason: 'feature' })
+              },
+              'See plans'
             )
           ]
         )

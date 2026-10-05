@@ -483,10 +483,15 @@ create table plan_limits (
   max_images   integer not null           -- app's maxImages (photos)
 );
 
--- Seed the free tier. To add a paid tier later, just add another row here, e.g.
---   insert into plan_limits values ('pro', 1000, 1000000, 100000);
+-- Seed every tier in PLAN_LIMITS (src/shared/auth.ts). Plus/Pro exist for the
+-- premium plans (src/shared/billing.ts); nobody is moved onto them until the
+-- payment webhooks land (docs/MONETIZATION.md) — a user's plan changes ONLY
+-- server-side, never from the browser.
 insert into plan_limits (plan, max_trees, max_persons, max_images)
-values ('free', 10, 2500, 300);
+values
+  ('free', 10, 2500, 300),
+  ('plus', 50, 25000, 5000),
+  ('pro', 500, 250000, 50000);
 
 
 -- ── profiles ────────────────────────────────────────────────────────────────
@@ -653,12 +658,29 @@ alter table plan_limits enable row level security;
 
 -- profiles: a user may read and update only their own row. (Inserts happen via
 -- the SECURITY DEFINER sign-up trigger, which bypasses RLS, so no insert policy
--- is needed. Changing your own `plan` is allowed here — lock this down to a
--- server-side/service-role flow once billing exists.)
+-- is needed.) The `plan` column is guarded separately below.
 create policy profiles_select on profiles
   for select using (id = auth.uid());
 create policy profiles_update on profiles
   for update using (id = auth.uid()) with check (id = auth.uid());
+
+-- Nobody upgrades themselves: with paid rows in plan_limits, a browser-side
+-- `update profiles set plan = 'pro'` would otherwise pass RLS. API requests run
+-- as `authenticated`/`anon` — those may never change `plan`. The payment
+-- webhook (service_role) and you in the SQL editor (postgres) still can.
+-- See docs/MONETIZATION.md.
+create or replace function profiles_guard_plan() returns trigger
+language plpgsql as $$
+begin
+  if new.plan is distinct from old.plan and current_user in ('authenticated', 'anon') then
+    raise exception 'The plan can only be changed by billing';
+  end if;
+  return new;
+end;
+$$;
+create trigger profiles_guard_plan
+  before update on profiles
+  for each row execute function profiles_guard_plan();
 
 -- plan_limits: reference data — readable by everyone, writable by no one
 -- (manage tiers with the service role / SQL editor, which bypasses RLS).

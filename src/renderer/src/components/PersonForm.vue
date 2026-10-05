@@ -1,7 +1,7 @@
 <template>
   <Transition name="sheet">
-    <div v-if="store.formOpen" class="pf-backdrop" @click.self="cancel">
-      <div class="pf-sheet" role="dialog" aria-modal="true">
+    <div v-if="store.formOpen" class="pf-backdrop ink-veil" @click.self="cancel">
+      <div class="pf-sheet ink-mount ink-unroll ink-rollers" role="dialog" aria-modal="true">
         <!-- ── Left rail: live preview ─────────────────────────────────── -->
         <aside class="pf-rail">
           <div class="pf-rail-aurora"></div>
@@ -1244,7 +1244,7 @@ function scrollToSection(id) {
   box-shadow: 0 12px 32px color-mix(in srgb, var(--green) 30%, transparent);
 }
 .pf-ghost.invalid {
-  border-color: #ef5350;
+  border-color: var(--danger);
   animation: ghost-shake 0.3s;
 }
 @keyframes ghost-shake {
@@ -1298,8 +1298,8 @@ function scrollToSection(id) {
   font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
-  color: #ef5350;
-  background: rgba(239, 83, 80, 0.12);
+  color: var(--danger);
+  background: rgba(var(--danger-rgb), 0.12);
   padding: 2px 7px;
   border-radius: 8px;
 }
@@ -1321,7 +1321,7 @@ function scrollToSection(id) {
   font-size: 11px;
 }
 .pf-rel-x:hover {
-  color: #ef5350;
+  color: var(--danger);
 }
 .pf-rel-fields {
   display: flex;
@@ -1603,7 +1603,7 @@ function scrollToSection(id) {
   background: rgba(255, 255, 255, 0.4);
 }
 .pf-extra-del:hover {
-  background: rgba(239, 83, 80, 0.65);
+  background: rgba(var(--danger-rgb), 0.65);
 }
 .pf-extra-add {
   width: 62px;
@@ -1646,13 +1646,217 @@ function scrollToSection(id) {
 .pf-error {
   margin-right: auto;
   font-size: 11.5px;
-  color: #ef5350;
+  color: var(--danger);
   animation: fr-slide 0.2s ease-out;
 }
 @keyframes fr-slide {
   from {
     transform: translateY(3px);
     opacity: 0;
+  }
+}
+
+/* ── 水墨 ink theme ───────────────────────────────────────────────────────
+   The sheet is a hanging scroll (.ink-mount/.ink-unroll/.ink-rollers) that
+   unrolls from its top roller. The preview rail is a small painting: misty
+   mountains drift along its foot, the node is an ink-wash disc in an ensō,
+   and "live preview" is a vertical inscription (题款) with a seal under it. */
+:root[data-theme='ink'] .pf-sheet {
+  overflow: visible;
+}
+:root[data-theme='ink'] .sheet-enter-active .pf-sheet {
+  animation: ink-unroll 0.4s cubic-bezier(0.3, 0.75, 0.3, 1) backwards;
+}
+:root[data-theme='ink'] .sheet-leave-active .pf-sheet {
+  animation: none;
+}
+:root[data-theme='ink'] .pf-rail {
+  border-right: 1px solid var(--ink-mount-line);
+  box-shadow: inset -4px 0 0 rgba(214, 199, 166, 0.45);
+  background:
+    radial-gradient(ellipse 90% 50% at 50% 42%, rgba(255, 252, 244, 0.7), transparent 70%),
+    var(--ink-sheet), var(--surface);
+  background-size:
+    100% 100%,
+    100% 100%,
+    512px 512px;
+}
+:root[data-theme='ink'] .pf-rail-aurora {
+  inset: auto -60% 0 -60%;
+  height: 42%;
+  background: var(--ink-landscape, none) center bottom / 700px 140px repeat-x;
+  opacity: 0.22;
+  -webkit-mask: linear-gradient(transparent, #000 55%);
+  mask: linear-gradient(transparent, #000 55%);
+  animation: pf-mist-drift 48s ease-in-out infinite alternate;
+}
+@keyframes pf-mist-drift {
+  from {
+    transform: translateX(-12%);
+  }
+  to {
+    transform: translateX(12%);
+  }
+}
+:root[data-theme='ink'] .pf-rail-life {
+  font-family: var(--font-ink-label);
+  font-size: 13px;
+  font-style: italic;
+  letter-spacing: 0.06em;
+}
+:root[data-theme='ink'] .pf-rail-tag {
+  border-radius: 2px;
+  font-family: var(--font-ink-label);
+  font-size: 11px;
+}
+:root[data-theme='ink'] .pf-rail-note {
+  bottom: auto;
+  top: 18px;
+  right: 14px;
+  writing-mode: vertical-rl;
+  font-family: var(--font-brush);
+  font-size: 15px;
+  text-transform: none;
+  letter-spacing: 0.12em;
+  color: var(--t2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+:root[data-theme='ink'] .pf-rail-note::after {
+  content: '';
+  width: 22px;
+  height: 22px;
+  background: var(--ink-seal, none) center / contain no-repeat;
+  mix-blend-mode: multiply;
+  opacity: 0.9;
+}
+
+:root[data-theme='ink'] .pf-header {
+  border-bottom-color: rgba(48, 36, 20, 0.14);
+}
+:root[data-theme='ink'] .pf-title {
+  position: relative;
+  font-size: 25px;
+  overflow: visible;
+}
+:root[data-theme='ink'] .pf-title::after {
+  content: '';
+  position: absolute;
+  left: -3%;
+  right: -6%;
+  bottom: -4px;
+  height: 7px;
+  background-color: var(--accent);
+  opacity: 0.75;
+  -webkit-mask: var(--ink-underline) center / 100% 100% no-repeat;
+  mask: var(--ink-underline) center / 100% 100% no-repeat;
+  animation: pf-ink-write 0.9s 0.25s var(--ease-out) backwards;
+}
+@keyframes pf-ink-write {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+:root[data-theme='ink'] .pf-nav-chip {
+  position: relative;
+  border-radius: 2px;
+  font-family: var(--font-ink-label);
+  font-size: 13px;
+  background: transparent;
+}
+:root[data-theme='ink'] .pf-nav-chip::after {
+  content: '';
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 0;
+  height: 5px;
+  background-color: currentColor;
+  opacity: 0.6;
+  -webkit-mask: var(--ink-underline) center / 100% 100% no-repeat;
+  mask: var(--ink-underline) center / 100% 100% no-repeat;
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.45s var(--ease-out);
+}
+:root[data-theme='ink'] .pf-nav-chip:hover::after {
+  clip-path: inset(0 0 0 0);
+}
+:root[data-theme='ink'] .pf-close {
+  border-radius: 3px;
+}
+:root[data-theme='ink'] .pf-section-label {
+  font-family: var(--font-brush);
+  font-size: 17px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0.03em;
+  color: var(--t1);
+  border-bottom: none;
+  padding-bottom: 6px;
+  background: linear-gradient(rgba(28, 26, 23, 0.22), rgba(28, 26, 23, 0.22)) 0 100% / 100% 1px
+    no-repeat;
+}
+:root[data-theme='ink'] .pf-section-hint {
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--t3);
+}
+:root[data-theme='ink'] .pf-rel-card {
+  border-radius: 2px;
+  background: rgba(255, 251, 240, 0.5);
+  border-color: rgba(48, 36, 20, 0.16);
+}
+:root[data-theme='ink'] .pf-rel-type,
+:root[data-theme='ink'] .pf-rel-field span,
+:root[data-theme='ink'] .pf-sibs-label,
+:root[data-theme='ink'] .pf-band-label {
+  font-family: var(--font-ink-label);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant: small-caps;
+  text-transform: lowercase;
+  letter-spacing: 0.1em;
+}
+:root[data-theme='ink'] .pf-rel-name {
+  font-family: var(--font-brush);
+  font-size: 15.5px;
+  font-weight: 400;
+}
+:root[data-theme='ink'] .pf-rel-divorced,
+:root[data-theme='ink'] .pf-rel-pending,
+:root[data-theme='ink'] .pf-sib-chip {
+  border-radius: 2px;
+}
+:root[data-theme='ink'] .pf-intent {
+  border-radius: 3px 5px 4px 6px / 5px 3px 6px 4px;
+  font-family: var(--font-ink-label);
+  font-size: 13px;
+}
+:root[data-theme='ink'] .pf-intent:hover {
+  transform: none;
+  background: rgba(179, 53, 42, 0.05);
+}
+:root[data-theme='ink'] .pf-intent.active {
+  background: rgba(179, 53, 42, 0.08);
+}
+:root[data-theme='ink'] .pf-img-slot,
+:root[data-theme='ink'] .pf-extra,
+:root[data-theme='ink'] .pf-extra-add {
+  border-radius: 2px;
+}
+:root[data-theme='ink'] .pf-footer {
+  border-top-color: rgba(48, 36, 20, 0.14);
+  background: rgba(214, 199, 166, 0.18);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='ink'] .pf-rail-aurora,
+  :root[data-theme='ink'] .pf-title::after {
+    animation: none;
   }
 }
 </style>

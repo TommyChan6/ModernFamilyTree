@@ -233,4 +233,19 @@ function create() {
   cursor: pointer;
   flex-shrink: 0;
 }
+
+/* ── 水墨 ink theme ─────────────────────────────────────────────────────── */
+:root[data-theme='ink'] .afb-toggle,
+:root[data-theme='ink'] .afb-type,
+:root[data-theme='ink'] .afb-input,
+:root[data-theme='ink'] .afb-picked {
+  border-radius: 3px;
+  font-family: var(--font-ink-label);
+}
+:root[data-theme='ink'] .afb-type:hover {
+  background: rgba(179, 53, 42, 0.05);
+}
+:root[data-theme='ink'] .afb-name {
+  font-size: 12.5px;
+}
 </style>

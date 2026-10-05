@@ -1,8 +1,8 @@
 import * as THREE from 'three'
-import { createLinkMaterial, createArrowMaterial } from './LinkMaterial.js'
+import { createLinkMaterial, createArrowMaterial, BRUSH_HEADROOM } from './LinkMaterial.js'
 import { routePoints } from '../linkRouting.js'
 
-const SEG = 14 // bezier tessellation segments
+const SEG = 18 // tessellation segments (enough for the rounded trident/elbow fillets)
 const VPL = (SEG + 1) * 2 // vertices per link (ribbon: 2 per sample point)
 const IPL = SEG * 6 // indices per link
 
@@ -23,6 +23,9 @@ export class LinkLayer {
     this.arrowMesh.renderOrder = 1
     this._a = {}
     this._arr = {}
+    // 水墨 brush mode (set by the renderer): the ribbon is laid out wider than the
+    // visible stroke so the fragment shader can taper / swell it inside.
+    this.brush = false
     this._allocate(16) // ensure geometry/attributes always exist (empty tree, first frame)
   }
 
@@ -50,6 +53,12 @@ export class LinkLayer {
     this.dash = mk('aDash', 2)
     this.opacity = mk('aOpacity', 1)
     this.flow = mk('aFlow', 1)
+    this.len = mk('aLen', 1)
+    this.meta = mk('aMeta', 2)
+    this.fx = mk('aFx', 3) // (effect id, core fraction, padded half-width)
+    // Static across-ribbon coordinate: even verts are the left rim (+1), odd the right (-1).
+    const side = mk('aSide', 1)
+    for (let v = 0; v < capacity * VPL; v++) side[v] = v & 1 ? -1 : 1
     const index = new Uint32Array(capacity * IPL)
     for (let j = 0; j < capacity; j++) {
       const base = j * VPL,
@@ -115,7 +124,10 @@ export class LinkLayer {
       const d = links[j]
       const vis = visual(d)
       const { points, control } = routePoints(d, gs, SEG)
-      const halfW = vis.width / 2
+      // Headroom around the visible line: brush strokes swell inside it, line
+      // effects (lineFx.js) glow / spark / twist inside it.
+      const pad = this.brush ? BRUSH_HEADROOM : vis.fxPad || 1
+      const halfW = (vis.width / 2) * pad
       const base = j * VPL
       let acc = 0
       for (let i = 0; i <= SEG; i++) {
@@ -142,6 +154,10 @@ export class LinkLayer {
         this.arc[base + i * 2] = acc
         this.arc[base + i * 2 + 1] = acc
       }
+      for (let v = 0; v < VPL; v++) {
+        this.len[base + v] = acc
+        this.fx[(base + v) * 3 + 2] = halfW
+      }
 
       // Arrowhead at the target end, pulled back by the node radius, along the end tangent.
       if (vis.arrowColorRGB) {
@@ -167,11 +183,14 @@ export class LinkLayer {
     }
     this._a.position.needsUpdate = true
     this._a.aArc.needsUpdate = true
+    this._a.aLen.needsUpdate = true
+    this._a.aFx.needsUpdate = true
     for (const k of ['iPos', 'iAngle', 'iScale', 'iColor']) this._arr[k].needsUpdate = true
   }
 
   // On style change: per-link colour / opacity / dash pattern (same value on all its verts).
-  // `visual(d)` returns { color:[r,g,b], opacity, dashLen, dashGap, flow?, fadeTo? }
+  // `visual(d)` returns { color:[r,g,b], opacity, dashLen, dashGap, flow?, fadeTo?,
+  // born?, seed? } — born/seed drive the brush write-on + per-stroke texture.
   // (already tweened). `fadeTo` (0..1) ramps opacity along the curve toward the target —
   // the "longing gradient" on one-way likes; `flow` drifts the dashes (see LinkMaterial).
   updateStyles(links, visual) {
@@ -185,6 +204,11 @@ export class LinkLayer {
         gl = vis.dashGap || 0
       const flow = vis.flow || 0
       const fadeTo = vis.fadeTo == null ? 1 : vis.fadeTo
+      // Brush write-on birth time (uTime clock; very negative = already written) + seed.
+      const born = vis.born == null ? -1e4 : vis.born
+      const seed = vis.seed || 0
+      const fxId = vis.fx || 0
+      const fxCore = 1 / (vis.fxPad || 1)
       const base = j * VPL
       for (let v = 0; v < VPL; v++) {
         const vi = base + v
@@ -197,12 +221,18 @@ export class LinkLayer {
         this.dash[vi * 2] = dl
         this.dash[vi * 2 + 1] = gl
         this.flow[vi] = flow
+        this.meta[vi * 2] = born
+        this.meta[vi * 2 + 1] = seed
+        this.fx[vi * 3] = fxId
+        this.fx[vi * 3 + 1] = fxCore
       }
     }
     this._a.aColor.needsUpdate = true
     this._a.aOpacity.needsUpdate = true
     this._a.aDash.needsUpdate = true
     this._a.aFlow.needsUpdate = true
+    this._a.aMeta.needsUpdate = true
+    this._a.aFx.needsUpdate = true
   }
 
   dispose() {

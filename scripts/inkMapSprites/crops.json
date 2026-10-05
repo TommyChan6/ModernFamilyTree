@@ -1,0 +1,237 @@
+{
+  "fankuan-massif": [
+    "fankuan.jpg",
+    "ink",
+    0.12,
+    0.02,
+    0.86,
+    0.64,
+    {
+      "foot": 0.3,
+      "oval": true
+    }
+  ],
+  "fankuan-crag": [
+    "fankuan.jpg",
+    "ink",
+    0.0,
+    0.39,
+    0.22,
+    0.68,
+    {
+      "foot": 0.35,
+      "oval": true
+    }
+  ],
+  "guoxi-main": [
+    "guoxi.jpg",
+    "ink",
+    0.34,
+    0.05,
+    0.83,
+    0.47,
+    {
+      "foot": 0.4,
+      "erase": [[0.55, 0, 1, 0.13]]
+    }
+  ],
+  "guoxi-left": [
+    "guoxi.jpg",
+    "ink",
+    0.12,
+    0.2,
+    0.42,
+    0.5,
+    {
+      "foot": 0.4,
+      "oval": true
+    }
+  ],
+  "guoxi-far": [
+    "guoxi.jpg",
+    "ink",
+    0.79,
+    0.37,
+    1.0,
+    0.56,
+    {
+      "foot": 0.4,
+      "oval": true
+    }
+  ],
+  "litang-peak": [
+    "litang.jpg",
+    "ink",
+    0.22,
+    0.07,
+    0.64,
+    0.42,
+    {
+      "foot": 0.35
+    }
+  ],
+  "litang-spires": [
+    "litang.jpg",
+    "ink",
+    0.63,
+    0.16,
+    0.78,
+    0.42,
+    {
+      "foot": 0.3
+    }
+  ],
+  "miyouren-range": [
+    "miyouren_met.jpg",
+    "ink",
+    0.22,
+    0.24,
+    0.64,
+    0.5,
+    {
+      "foot": 0.45,
+      "d0": 0.1,
+      "d1": 0.5
+    }
+  ],
+  "miyouren-peaks": [
+    "miyouren_met.jpg",
+    "ink",
+    0.66,
+    0.06,
+    0.97,
+    0.5,
+    {
+      "foot": 0.45,
+      "d0": 0.1,
+      "d1": 0.5
+    }
+  ],
+  "miyouren-tree": [
+    "miyouren_met.jpg",
+    "ink",
+    0.5,
+    0.44,
+    0.68,
+    0.82,
+    {
+      "foot": 0.3,
+      "d0": 0.1,
+      "d1": 0.5,
+      "erase": [[0.6, 0, 1, 0.42]]
+    }
+  ],
+  "huang-pines": [
+    "huang.jpg",
+    "ink",
+    0.12,
+    0.38,
+    0.47,
+    0.93,
+    {
+      "foot": 0.2
+    }
+  ],
+  "huang-boat": [
+    "huang.jpg",
+    "ink",
+    0.695,
+    0.84,
+    0.78,
+    0.915,
+    {
+      "foot": 0,
+      "side": 0.06,
+      "top": 0.06
+    }
+  ],
+  "huang-slopes": [
+    "huang.jpg",
+    "ink",
+    0.5,
+    0.0,
+    1.0,
+    0.72,
+    {
+      "foot": 0.35
+    }
+  ],
+  "wx-peak-a": [
+    "wx1.jpg",
+    "color",
+    0.5,
+    0.27,
+    0.67,
+    0.7,
+    {
+      "foot": 0.3
+    }
+  ],
+  "wx-peak-b": [
+    "wx1.jpg",
+    "color",
+    0.14,
+    0.36,
+    0.26,
+    0.72,
+    {
+      "foot": 0.3
+    }
+  ],
+  "wx-peak-c": [
+    "wx1.jpg",
+    "color",
+    0.73,
+    0.36,
+    0.82,
+    0.76,
+    {
+      "foot": 0.3
+    }
+  ],
+  "wx-peak-d": [
+    "wxbridge.jpg",
+    "color",
+    0.5,
+    0.15,
+    0.63,
+    0.62,
+    {
+      "foot": 0.3
+    }
+  ],
+  "wx-peak-e": [
+    "wxbridge.jpg",
+    "color",
+    0.38,
+    0.26,
+    0.5,
+    0.72,
+    {
+      "foot": 0.3
+    }
+  ],
+  "wx-peak-f": [
+    "wxend.jpg",
+    "color",
+    0.25,
+    0.2,
+    0.41,
+    0.72,
+    {
+      "foot": 0.3,
+      "erase": [[0, 0, 0.1, 0.3]]
+    }
+  ],
+  "wx-hills": [
+    "wxend.jpg",
+    "color",
+    0.6,
+    0.38,
+    0.92,
+    0.56,
+    {
+      "foot": 0.4
+    }
+  ]
+}

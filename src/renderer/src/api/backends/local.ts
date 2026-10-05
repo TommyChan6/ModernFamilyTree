@@ -75,7 +75,11 @@ const env: Env = {
   uuid: () => crypto.randomUUID(),
   nowStr,
   storeImageFile: (srcPath) => srcPath, // already a data: URL — store as-is
-  removeImageFile: () => {} // nothing external to delete
+  removeImageFile: () => {}, // nothing external to delete
+  // Simulated checkout in dev (`npm run dev:web`) or when explicitly opted in;
+  // a production build refuses checkout until a real provider is wired
+  // (docs/MONETIZATION.md).
+  billingSandbox: import.meta.env.DEV || import.meta.env.VITE_BILLING_SANDBOX === '1'
 }
 
 let dbPromise: Promise<DB> | null = null

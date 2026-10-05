@@ -59,7 +59,7 @@ defineProps({
   line-height: 1;
   transform-origin: 50% 60%;
   animation: vh-breathe 5.5s ease-in-out infinite;
-  filter: drop-shadow(0 2px 6px rgba(108, 142, 245, 0.35));
+  filter: drop-shadow(0 2px 6px rgba(var(--accent-rgb), 0.35));
 }
 @keyframes vh-breathe {
   0%,
@@ -157,6 +157,74 @@ defineProps({
 @media (prefers-reduced-motion: reduce) {
   .vh-icon,
   .vh-rule {
+    animation: none;
+  }
+}
+
+/* ── 水墨 ink theme: the title is brushed and underlined by a stroke that
+   writes itself in; the count is a little seal; the glyph is ink-washed ── */
+:root[data-theme='ink'] .vh {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom-color: rgba(48, 36, 20, 0.14);
+}
+:root[data-theme='ink'] .vh-icon {
+  filter: grayscale(1) sepia(0.4) contrast(1.15);
+  animation: none;
+}
+:root[data-theme='ink'] .vh-title {
+  position: relative;
+  font-family: var(--font-brush);
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+:root[data-theme='ink'] .vh-title::after {
+  content: '';
+  position: absolute;
+  left: -3%;
+  right: -6%;
+  bottom: -5px;
+  height: 7px;
+  background-color: var(--accent);
+  opacity: 0.75;
+  -webkit-mask: var(--ink-underline) center / 100% 100% no-repeat;
+  mask: var(--ink-underline) center / 100% 100% no-repeat;
+  animation: vh-ink-write 0.9s 0.15s var(--ease-out) backwards;
+}
+@keyframes vh-ink-write {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+:root[data-theme='ink'] .vh-count {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(179, 53, 42, 0.6);
+  border-radius: 2px 3px 2px 4px;
+  font-family: var(--font-ink-label);
+  padding: 0 7px;
+}
+:root[data-theme='ink'] .vh-hint {
+  font-style: italic;
+  font-size: 12.5px;
+}
+/* the flowing hairline becomes a dry brush stroke */
+:root[data-theme='ink'] .vh-rule {
+  height: 5px;
+  bottom: -3px;
+  background: rgba(28, 26, 23, 0.32);
+  -webkit-mask: var(--ink-divider) center / 100% 100% no-repeat;
+  mask: var(--ink-divider) center / 100% 100% no-repeat;
+  opacity: 1;
+  animation: vh-ink-write 1.1s var(--ease-out) backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='ink'] .vh-title::after,
+  :root[data-theme='ink'] .vh-rule {
     animation: none;
   }
 }

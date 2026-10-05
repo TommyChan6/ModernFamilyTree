@@ -71,6 +71,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { api } from '../api'
+import { inkAvatarBg } from './ui/inkChrome'
 
 const store = useMainStore()
 const searchQuery = ref('')
@@ -172,12 +173,15 @@ onBeforeUnmount(() => {
 })
 
 function genderColor(gender) {
+  if (store.isInk)
+    return gender === 'male' ? '#3d5a73' : gender === 'female' ? '#a2496a' : '#6e6a61'
   if (gender === 'male') return '#3a7bd5'
   if (gender === 'female') return '#c95fa0'
   return '#5c6bc0'
 }
 
 function avatarGradient(gender) {
+  if (store.isInk) return inkAvatarBg(gender)
   if (gender === 'male') return 'linear-gradient(135deg, #3a7bd5, #2351a0)'
   if (gender === 'female') return 'linear-gradient(135deg, #c95fa0, #923075)'
   return 'linear-gradient(135deg, #5c6bc0, #3c4a9e)'
@@ -270,7 +274,7 @@ function avatarGradient(gender) {
 
 .person-card.selected {
   background: var(--adim);
-  outline: 1px solid rgba(108, 142, 245, 0.3);
+  outline: 1px solid rgba(var(--accent-rgb), 0.3);
 }
 
 .avatar {
@@ -369,5 +373,89 @@ function avatarGradient(gender) {
   padding: 10px 12px;
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+}
+
+/* ── 水墨 ink theme: the roster is a paper list; names are brushed, the
+   selected one carries a cinnabar mark, hovers bloom like wet ink ──────── */
+:root[data-theme='ink'] .right-sidebar {
+  background: transparent;
+}
+:root[data-theme='ink'] .sidebar-header {
+  border-bottom-color: transparent;
+  background: linear-gradient(rgba(28, 26, 23, 0.32), rgba(28, 26, 23, 0.32)) 12px 100% /
+    calc(100% - 24px) 1px no-repeat;
+}
+:root[data-theme='ink'] .sidebar-title {
+  font-size: 19px;
+}
+:root[data-theme='ink'] .search-wrap {
+  border-bottom-color: rgba(48, 36, 20, 0.12);
+}
+:root[data-theme='ink'] .search-icon,
+:root[data-theme='ink'] .person-location,
+:root[data-theme='ink'] .empty-icon {
+  filter: grayscale(1) sepia(0.35);
+}
+:root[data-theme='ink'] .search-input {
+  font-size: 13.5px;
+  background: none;
+  box-shadow: none;
+}
+:root[data-theme='ink'] .person-card {
+  border-radius: 3px;
+  background: radial-gradient(closest-side, rgba(40, 30, 18, 0.08), transparent) 30% 50% / 0% 0%
+    no-repeat;
+  transition: background-size 0.55s var(--ease-out);
+}
+:root[data-theme='ink'] .person-card:hover {
+  background-size: 190% 260%;
+}
+:root[data-theme='ink'] .person-card.selected {
+  outline: none;
+  background:
+    linear-gradient(90deg, rgba(179, 53, 42, 0.1), rgba(179, 53, 42, 0.02) 70%, transparent),
+    transparent;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+:root[data-theme='ink'] .avatar {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 3px rgba(48, 36, 20, 0.16);
+}
+:root[data-theme='ink'] .avatar-icon {
+  fill: rgba(251, 244, 230, 0.88);
+}
+:root[data-theme='ink'] .person-name {
+  font-family: var(--font-brush);
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+:root[data-theme='ink'] .person-name.unnamed {
+  font-family: var(--font);
+  font-size: 13px;
+}
+:root[data-theme='ink'] .gender-dot {
+  border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%;
+}
+:root[data-theme='ink'] .empty-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 70px;
+  height: 70px;
+  font-size: 22px;
+}
+:root[data-theme='ink'] .empty-icon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: var(--ink-black);
+  -webkit-mask: var(--ink-enso) center / contain no-repeat;
+  mask: var(--ink-enso) center / contain no-repeat;
+  animation: ink-enso-draw 1.4s var(--ease-out) both;
+}
+:root[data-theme='ink'] .sidebar-footer {
+  border-top-color: rgba(48, 36, 20, 0.14);
 }
 </style>

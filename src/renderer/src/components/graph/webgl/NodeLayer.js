@@ -48,6 +48,8 @@ export class NodeLayer {
     this.selected = mk('iSelected', 1)
     this.glow = mk('iGlow', 1)
     this.avatar = mk('iAvatar', 1)
+    this.born = mk('iBorn', 1)
+    this.born.fill(-1e4)
 
     g.instanceCount = this.count
     this.geometry = g
@@ -82,6 +84,7 @@ export class NodeLayer {
     this.selected[i] = s.selected ? 1 : 0
     this.glow[i] = s.glow || 0
     this.avatar[i] = s.avatar
+    this.born[i] = s.born == null ? -1e4 : s.born
   }
 
   commitPositions() {
@@ -101,7 +104,8 @@ export class NodeLayer {
       'iOpacity',
       'iSelected',
       'iGlow',
-      'iAvatar'
+      'iAvatar',
+      'iBorn'
     ])
       this._attr[k].needsUpdate = true
   }
@@ -119,6 +123,26 @@ export class NodeLayer {
       u.uSilhouetteColor.value.setRGB(1, 1, 1)
       u.uGlowColor.value.setRGB(1, 1, 1) // white haze
     }
+  }
+
+  // 水墨 wash roundels. `on` switches the shader's ink branch; `mode` is
+  // inkLook().mode ('paper' = rice paper, 'moon' = pale ink on dark, 'light').
+  setInkUniforms(on, mode, sealHex) {
+    const u = this.material.uniforms
+    u.uInk.value = on ? 1 : 0
+    const moon = mode === 'moon'
+    u.uInkMoon.value = moon ? 1 : 0
+    if (moon) {
+      u.uInkColor.value.set('#e4dccb')
+      u.uInkPaper.value.set('#1a1c22')
+    } else {
+      u.uInkColor.value.set('#1f1b16')
+      u.uInkPaper.value.set('#efe6d2')
+    }
+    u.uSealColor.value.set(sealHex || '#b3352a')
+    if (on && mode === 'paper') u.uSilhouetteColor.value.set('#f4eddd')
+    else if (on && moon) u.uSilhouetteColor.value.set('#e9e2d2')
+    else u.uSilhouetteColor.value.setRGB(1, 1, 1)
   }
 
   dispose() {

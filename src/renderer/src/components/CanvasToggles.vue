@@ -58,6 +58,7 @@
         <span class="ct-dot" aria-hidden="true"></span>
       </button>
       <button
+        v-if="modeGear"
         class="ct-btn ct-btn-mode ct-btn-gear"
         :style="{ '--tint': 'var(--accent)', '--i': buttons.length + 2 + modes.length }"
         title="Customize edit modes (or hold Tab for the wheel)"
@@ -86,19 +87,30 @@ const props = defineProps({
   showFocus: { type: Boolean, default: false },
   showLegend: { type: Boolean, default: true },
   showRelTypes: { type: Boolean, default: false },
+  showKinship: { type: Boolean, default: false },
+  showChronicle: { type: Boolean, default: false },
+  showStyle: { type: Boolean, default: false },
   showClean: { type: Boolean, default: true },
   showMarquee: { type: Boolean, default: false },
   focus: { type: Boolean, default: false },
   legend: { type: Boolean, default: false },
   relTypes: { type: Boolean, default: false },
+  kinship: { type: Boolean, default: false },
+  chronicle: { type: Boolean, default: false },
+  stylePane: { type: Boolean, default: false },
   /** Resolved wheel slots ({ id, icon, color, label, hint, disabled… }) or null. */
   modes: { type: Array, default: null },
-  activeModeId: { type: String, default: null }
+  activeModeId: { type: String, default: null },
+  /** Show the ⚙ (customize the wheel) after the edit modes. */
+  modeGear: { type: Boolean, default: true }
 })
 const emit = defineEmits([
   'update:focus',
   'update:legend',
   'update:relTypes',
+  'update:kinship',
+  'update:chronicle',
+  'update:stylePane',
   'pick-mode',
   'config-modes'
 ])
@@ -134,6 +146,36 @@ const buttons = computed(() => {
       tint: 'var(--pink)',
       active: props.relTypes,
       toggle: () => emit('update:relTypes', !props.relTypes)
+    })
+  }
+  if (props.showChronicle) {
+    list.push({
+      key: 'chronicle',
+      icon: '📜',
+      title: 'Chronicle — eras & story events',
+      tint: 'var(--kin-blood)',
+      active: props.chronicle,
+      toggle: () => emit('update:chronicle', !props.chronicle)
+    })
+  }
+  if (props.showStyle) {
+    list.push({
+      key: 'style',
+      icon: '🎨',
+      title: 'Style — lifeline looks, canvas & atmosphere',
+      tint: 'var(--accent-2)',
+      active: props.stylePane,
+      toggle: () => emit('update:stylePane', !props.stylePane)
+    })
+  }
+  if (props.showKinship) {
+    list.push({
+      key: 'kinship',
+      icon: '🧬',
+      title: 'Kinship — name every relative, see through their eyes',
+      tint: 'var(--kin-blood)',
+      active: props.kinship,
+      toggle: () => emit('update:kinship', !props.kinship)
     })
   }
   if (props.showClean) {

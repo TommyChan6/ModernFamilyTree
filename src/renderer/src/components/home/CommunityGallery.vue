@@ -402,7 +402,7 @@ function avatarStyle(p) {
 }
 
 .badge-Staffpick {
-  background: linear-gradient(120deg, rgba(108, 142, 245, 0.75), rgba(139, 108, 197, 0.75));
+  background: linear-gradient(120deg, rgba(var(--accent-rgb), 0.75), rgba(139, 108, 197, 0.75));
 }
 
 .badge-New {
@@ -694,5 +694,92 @@ function avatarStyle(p) {
 .peek-enter-from .peek-card,
 .peek-leave-to .peek-card {
   transform: translateY(22px) scale(0.95);
+}
+
+/* ── 水墨 ink theme: the generated night-sky covers are printed in negative —
+   the dark sky turns to paper and every star to a dot of ink ──────────── */
+:root[data-theme='ink'] .chip {
+  border-radius: 3px 5px 4px 6px / 5px 3px 6px 4px;
+  font-family: var(--font-ink-label);
+}
+:root[data-theme='ink'] .card-inner {
+  border-radius: 2px;
+  border-color: var(--ink-mount-line);
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  box-shadow:
+    0 0 0 3px var(--ink-silk),
+    0 0 0 4px rgba(58, 42, 22, 0.2),
+    0 10px 22px rgba(60, 40, 15, 0.12);
+}
+:root[data-theme='ink'] .cover {
+  border-radius: 1px;
+  background: #efe7d4;
+}
+:root[data-theme='ink'] .cover-canvas {
+  filter: invert(1) grayscale(1) sepia(0.45) contrast(0.92) brightness(1.04);
+  mix-blend-mode: multiply;
+}
+:root[data-theme='ink'] .cover-glare,
+:root[data-theme='ink'] .cover-holo {
+  display: none;
+}
+:root[data-theme='ink'] .cover-meta {
+  color: var(--t1);
+  text-shadow: none;
+  font-family: var(--font-ink-label);
+}
+:root[data-theme='ink'] .badge-pill {
+  border-radius: 2px 3px 2px 4px;
+  color: #fbf4e6;
+  background:
+    var(--ink-paper-light, none) center / 200px 200px,
+    var(--accent);
+  background-blend-mode: multiply, normal;
+  font-family: var(--font-ink-label);
+}
+:root[data-theme='ink'] .title {
+  font-family: var(--font-brush);
+  font-size: 19px;
+  font-weight: 400;
+}
+:root[data-theme='ink'] .avatar {
+  border-radius: 3px 4px 2px 5px / 4px 2px 5px 3px;
+}
+:root[data-theme='ink'] .peek-card {
+  border-radius: 2px;
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  box-shadow:
+    var(--ink-mount-rings),
+    0 30px 70px rgba(45, 28, 10, 0.32);
+}
+:root[data-theme='ink'] .peek-cover {
+  filter: invert(1) grayscale(1) sepia(0.45) contrast(0.92);
+}
+
+:root[data-theme='ink'] .peek-backdrop {
+  background: radial-gradient(ellipse at 50% 40%, rgba(40, 30, 18, 0.22), rgba(28, 20, 10, 0.42));
+  backdrop-filter: blur(3px) sepia(0.25);
+}
+:root[data-theme='ink'] .peek-close {
+  border-radius: 3px;
+  background: rgba(245, 239, 224, 0.88);
+  color: var(--t1);
+  box-shadow: inset 0 0 0 1px var(--ink-mount-line);
+}
+:root[data-theme='ink'] .peek-close:hover {
+  background: rgba(245, 239, 224, 1);
+}
+:root[data-theme='ink'] .peek-cover-shade {
+  background: linear-gradient(180deg, transparent 35%, rgba(245, 239, 224, 0.85));
+}
+:root[data-theme='ink'] .peek-headline {
+  color: var(--t1);
+}
+:root[data-theme='ink'] .peek-headline h3 {
+  font-family: var(--font-brush);
+  font-weight: 400;
+  font-size: 24px;
 }
 </style>

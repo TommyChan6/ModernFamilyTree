@@ -30,6 +30,17 @@ export function onUndoableMutation(cb: MutationListener): () => void {
   return () => mutationListeners.delete(cb)
 }
 
+// Plan-limit listeners: any channel refusing with a quota error ("Free plan
+// limit reached: …") is announced here, so ONE place (App.vue) can offer the
+// upgrade — however deep in the UI the refused action started.
+type PlanLimitListener = (channel: string, error: string) => void
+const planLimitListeners = new Set<PlanLimitListener>()
+export function onPlanLimit(cb: PlanLimitListener): () => void {
+  planLimitListeners.add(cb)
+  return () => planLimitListeners.delete(cb)
+}
+const PLAN_LIMIT_RE = /plan limit reached/i
+
 // Every request carries the session token, the way a browser attaches its
 // session cookie — the shells resolve it back to a user before dispatching.
 export const api: ApiBackend = {
@@ -37,6 +48,9 @@ export const api: ApiBackend = {
     const res = await backend.invoke(channel, wrapRequest(getSessionToken(), data))
     if (res?.success && UNDOABLE_CHANNELS.has(channel)) {
       for (const cb of mutationListeners) cb(channel)
+    }
+    if (res && !res.success && PLAN_LIMIT_RE.test(res.error || '')) {
+      for (const cb of planLimitListeners) cb(channel, res.error as string)
     }
     return res
   },

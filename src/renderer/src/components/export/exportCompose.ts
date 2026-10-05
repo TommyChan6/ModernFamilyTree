@@ -5,6 +5,8 @@
 // stamp, crop — so the modal preview and the final download go through the
 // exact same code path at different resolutions.
 
+import { INK, INK_FONTS, paperCanvas, sealCanvas } from '../../lib/inkArt'
+
 export interface ExportSize {
   width: number
   height: number
@@ -69,6 +71,9 @@ export interface ComposeOptions extends ExportSize {
   subtitle: string
   stamp: string // small caption bottom-right ('' = none)
   crop: CropRect | null
+  /** 水墨 finish: rice-paper ground, brushed title, a cinnabar seal beside the
+   *  stamp. Defaults to whether the app is in the Ink theme. */
+  ink?: boolean
 }
 
 export interface Rect {
@@ -191,6 +196,15 @@ export function sanitizeFilename(name: string, fallback = 'family-tree'): string
 
 const FONT_STACK = `-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`
 
+function inkThemeOn(): boolean {
+  return typeof document !== 'undefined' && document.documentElement.dataset.theme === 'ink'
+}
+
+/** The seal's edge length for a given stamp text size. */
+export function inkSealSize(stampSize: number): number {
+  return Math.max(28, Math.round(stampSize * 2.8))
+}
+
 // Assemble the final image. `scene` is the captured (transparent-background)
 // view; returns a fresh canvas of opts.width × opts.height.
 export function composeExport(
@@ -204,11 +218,22 @@ export function composeExport(
   if (!g) return out
   const L = computeComposeLayout(opts)
   const c = opts.colors
+  const ink = opts.ink ?? inkThemeOn()
 
   if (!opts.transparent) {
     g.fillStyle = c.bg
     g.fillRect(0, 0, opts.width, opts.height)
-    if (c.tint) {
+    if (ink) {
+      // Rice paper: the shared paper tile, scaled so its grain reads at any size.
+      const tile = paperCanvas(512, 512, { tone: INK.paper, fiber: 0.65, seed: 11 })
+      const pat = g.createPattern(tile, 'repeat')
+      if (pat) {
+        const k = Math.max(1, Math.min(opts.width, opts.height) / 1100)
+        pat.setTransform?.(new DOMMatrix().scale(k, k))
+        g.fillStyle = pat
+        g.fillRect(0, 0, opts.width, opts.height)
+      }
+    } else if (c.tint) {
       // The views' signature ambient wash: a wide radial tint from the top.
       const r = Math.max(opts.width, opts.height) * 0.85
       const grad = g.createRadialGradient(
@@ -237,23 +262,38 @@ export function composeExport(
 
   const cx = opts.width / 2
   if (opts.title.trim()) {
-    g.font = `700 ${L.titleSize}px ${FONT_STACK}`
+    g.font = ink
+      ? `400 ${L.titleSize * 1.15}px ${INK_FONTS.kai}`
+      : `700 ${L.titleSize}px ${FONT_STACK}`
     g.fillStyle = c.t1
     g.textAlign = 'center'
     g.textBaseline = 'alphabetic'
     g.fillText(opts.title.trim(), cx, L.titleBaseline)
   }
   if (opts.subtitle.trim()) {
-    g.font = `500 ${L.subtitleSize}px ${FONT_STACK}`
+    g.font = ink
+      ? `italic 400 ${L.subtitleSize}px ${INK_FONTS.serif}`
+      : `500 ${L.subtitleSize}px ${FONT_STACK}`
     g.fillStyle = c.t2
     g.textAlign = 'center'
     g.fillText(opts.subtitle.trim(), cx, L.subtitleBaseline)
   }
+  let stampRight = opts.width - L.pad
+  if (ink && !opts.transparent) {
+    // A cinnabar seal pressed into the bottom-right corner (印章).
+    const s = inkSealSize(L.stampSize)
+    const seal = sealCanvas(opts.title.trim() || '家譜', { size: s, mode: 'yin' })
+    g.save()
+    g.globalCompositeOperation = 'multiply'
+    g.drawImage(seal, opts.width - L.pad - s, opts.height - L.pad - s, s, s)
+    g.restore()
+    stampRight -= s + L.stampSize * 0.8
+  }
   if (opts.stamp) {
-    g.font = `600 ${L.stampSize}px ${FONT_STACK}`
+    g.font = ink ? `400 ${L.stampSize}px ${INK_FONTS.serif}` : `600 ${L.stampSize}px ${FONT_STACK}`
     g.fillStyle = c.t3
     g.textAlign = 'right'
-    g.fillText(opts.stamp, opts.width - L.pad, opts.height - L.pad)
+    g.fillText(opts.stamp, stampRight, opts.height - L.pad)
   }
   return out
 }

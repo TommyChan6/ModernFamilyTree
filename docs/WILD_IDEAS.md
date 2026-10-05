@@ -44,7 +44,9 @@ Five views (Graph WebGL · Timeline WebGL · Groups WebGL · Directory · Relati
 Projects · Program Modes (Simple/Standard/Advanced) · Scenes + layout types + autosave/
 checkpoint · Tags over a membership join · Accounts/auth · **3D Space** graph (Labs) ·
 **Character View Phase 1** (paper-doll portraits, Cartoon pack, age binding, set-as-portrait) ·
-web build (IndexedDB) · CI + TS adoption started.
+web build (IndexedDB) · CI + TS adoption started · **Kinship** (2026-09-30: A1 kinship
+calculator in EN/NO/简/繁, A2 Bloodline meter + pedigree collapse, A5 linchpins, D2
+bloodline flow, D5 POV lens, F2/F4 quiz + six-degrees, a Kin Walker, ancestor fan).
 
 ### 📋 Already planned / documented (don't duplicate — extend instead)
 - **Platform:** Supabase backend, cloud auth, sharing/visibility, fork & remix, public
@@ -339,6 +341,8 @@ person/photo quotas, GEDCOM + high-res image export, and the AI/procedural build
 *ROI:* the standard freemium SaaS engine; recurring, compounding. *Risk:* low technically;
 the real risk is a free tier so generous no one upgrades — gate *scale and privacy*, never
 core joy. 💸 Requires the deferred payment/billing stack (Stripe → needs card details).
+*Update 2026-09-28:* the Plus/Pro **client is built** (pricing, sandbox checkout, billing
+panel, house-ad slots). The backend to-do is in [`MONETIZATION.md`](./MONETIZATION.md).
 
 **P2. Print-on-demand heirlooms** 💰💰💰 · ⚠️ med · 👥 Margaret
 The **reunion pack** (G2), the **fan chart** (D1), and the **family fingerprint** (D4) are

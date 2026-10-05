@@ -243,4 +243,31 @@ function hueOf(p) {
   color: var(--accent);
   font-size: 14px;
 }
+
+/* ── 水墨 ink theme ─────────────────────────────────────────────────────── */
+:root[data-theme='ink'] .pp {
+  border-radius: 2px;
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  border-color: var(--ink-mount-line);
+  box-shadow:
+    0 0 0 2px var(--ink-silk),
+    0 0 0 3px rgba(58, 42, 22, 0.2),
+    var(--shadow);
+}
+:root[data-theme='ink'] .pp-row {
+  border-radius: 2px;
+}
+:root[data-theme='ink'] .pp-row.active {
+  background: rgba(179, 53, 42, 0.07);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+:root[data-theme='ink'] .pp-name {
+  font-family: var(--font-brush);
+  font-size: 15.5px;
+  font-weight: 400;
+}
+:root[data-theme='ink'] .pp-glass {
+  filter: grayscale(1) sepia(0.4);
+}
 </style>

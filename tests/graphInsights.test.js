@@ -4,7 +4,8 @@ import {
   egoDistances,
   derivedSiblings,
   romanceInsights,
-  mutualLikesKeys
+  mutualLikesKeys,
+  generationCount
 } from '../src/renderer/src/components/graph/graphInsights'
 
 const rel = (a, b, type = 'parent_child', id = `${type}:${a}:${b}`) => ({
@@ -79,6 +80,41 @@ describe('derivedSiblings', () => {
     // default roles: adopted + parent_child both vertical
     const s2 = derivedSiblings([rel('p', 'a', 'adopted'), rel('p', 'b')])
     expect(s2.get('a').has('b')).toBe(true)
+  })
+})
+
+describe('generationCount', () => {
+  const everyone = ['gp', 'p1', 'p2', 'kid', 'f']
+
+  it('counts people on the longest parent → child chain', () => {
+    expect(generationCount(everyone, family())).toBe(3) // gp → p1 → kid
+  })
+
+  it('is 0 with nobody and 1 with people but no lineage', () => {
+    expect(generationCount([], family())).toBe(0)
+    expect(generationCount(['a', 'b'], [rel('a', 'b', 'spouse')])).toBe(1)
+  })
+
+  it('ignores edges to people outside the set and duplicate rows', () => {
+    const rels = [rel('a', 'b'), rel('a', 'b', 'adopted'), rel('b', 'ghost')]
+    expect(generationCount(['a', 'b'], rels)).toBe(2)
+  })
+
+  it('takes the longest branch, not the widest', () => {
+    const rels = [rel('r', 'x'), rel('r', 'y'), rel('y', 'z'), rel('z', 'w')]
+    expect(generationCount(['r', 'x', 'y', 'z', 'w'], rels)).toBe(4)
+  })
+
+  it('survives a cycle in bad data', () => {
+    const rels = [rel('a', 'b'), rel('b', 'a'), rel('c', 'd')]
+    expect(generationCount(['a', 'b', 'c', 'd'], rels)).toBe(2)
+  })
+
+  it('honours custom vertical types via roleOfType', () => {
+    const rels = [rel('m', 'a', 'mentor_of'), rel('a', 'b', 'mentor_of')]
+    const role = (t) => (t === 'mentor_of' ? 'vertical' : 'none')
+    expect(generationCount(['m', 'a', 'b'], rels, role)).toBe(3)
+    expect(generationCount(['m', 'a', 'b'], rels)).toBe(1)
   })
 })
 

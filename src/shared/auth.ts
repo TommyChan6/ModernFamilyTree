@@ -178,7 +178,10 @@ export interface PlanLimits {
 }
 
 export const PLAN_LIMITS: Record<string, PlanLimits> = {
-  free: { maxProjects: 10, maxPersons: 2500, maxImages: 300 }
+  free: { maxProjects: 10, maxPersons: 2500, maxImages: 300 },
+  // Paid tiers (catalog + prices: src/shared/billing.ts).
+  plus: { maxProjects: 50, maxPersons: 25000, maxImages: 5000 },
+  pro: { maxProjects: 500, maxPersons: 250000, maxImages: 50000 }
 }
 
 export function limitsFor(user: User): PlanLimits {
@@ -196,9 +199,12 @@ export const PLAN_FEATURES: Record<string, string[]> = {
   free: ['*'],
   /** Guests too — their Advanced-mode clamp is a separate store rule. */
   guest: ['*'],
-  /** Placeholder for the first paid tier: no exclusive flags defined yet.
-   *  (Nobody is on this plan; it exists so the shape is settled early.) */
-  plus: []
+  /** Paid tiers are a superset of free — paying must never remove a
+   *  feature. Nothing is paid-exclusive yet; when something is, give free an
+   *  explicit list and keep '*' here. (Ads and badges are plan PERKS, not
+   *  caps flags — see billing.ts planHasPerk.) */
+  plus: ['*'],
+  pro: ['*']
 }
 
 /** May `plan` use capability `feature`? Unknown/absent plans fall back to

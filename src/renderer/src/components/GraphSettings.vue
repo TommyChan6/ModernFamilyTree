@@ -36,6 +36,10 @@
           </button>
           <Transition name="expand">
             <div v-if="expanded.themes" class="group-content">
+              <p v-if="store.isInk" class="ink-note">
+                水墨 — in the Ink theme every look is painted in brush and wash on rice paper;
+                shapes, routes and atmosphere still follow the theme you pick.
+              </p>
               <div class="theme-grid">
                 <button
                   v-for="t in themes"
@@ -257,6 +261,12 @@
                         stroke-linecap="round"
                         stroke-linejoin="round"
                       />
+                      <path
+                        v-for="(p, i) in r.fills || []"
+                        :key="'f' + i"
+                        :d="p"
+                        fill="currentColor"
+                      />
                     </svg>
                     <span class="chip-label">{{ r.label }}</span>
                   </button>
@@ -396,6 +406,103 @@
           </Transition>
         </div>
 
+        <!-- Line Effects -->
+        <div class="settings-group">
+          <button class="group-toggle" @click="toggle('fx')">
+            <span class="group-icon" :class="{ rotated: expanded.fx }">›</span>
+            <span>Line Effects</span>
+            <span v-if="gs.lineFx !== 'none'" class="custom-chip fx-live-chip">
+              {{ fxCurrent.icon }} live
+            </span>
+          </button>
+          <Transition name="expand">
+            <div v-if="expanded.fx" class="group-content">
+              <div v-if="brushOwns" class="fx-paused">
+                <span
+                  >🖌 Brush strokes own the lines right now — effects resume on any other line
+                  style.</span
+                >
+                <button class="fx-paused-btn" @click="set('linkRoute', 'organic')">
+                  Use Organic
+                </button>
+              </div>
+              <div class="fx-grid">
+                <button
+                  v-for="(f, i) in fxList"
+                  :key="f.id"
+                  class="fx-tile"
+                  :class="{ active: gs.lineFx === f.id }"
+                  :style="{ '--i': i }"
+                  :title="f.hint"
+                  @click="set('lineFx', f.id)"
+                >
+                  <FxPreview :id="f.id" />
+                  <span class="fx-name"
+                    ><span class="fx-ic">{{ f.icon }}</span
+                    >{{ f.label }}</span
+                  >
+                </button>
+              </div>
+              <div v-if="gs.lineFx !== 'none'" class="fx-hint">{{ fxCurrent.hint }}</div>
+              <template v-if="gs.lineFx !== 'none'">
+                <div class="setting-item">
+                  <label>Applies to</label>
+                  <div class="fx-seg">
+                    <button
+                      v-for="sc in fxScopes"
+                      :key="sc.id"
+                      :class="{ on: gs.lineFxScope === sc.id }"
+                      :title="sc.hint"
+                      @click="set('lineFxScope', sc.id)"
+                    >
+                      {{ sc.label }}
+                    </button>
+                  </div>
+                </div>
+                <div class="setting-item">
+                  <label>Palette</label>
+                  <div class="fx-seg">
+                    <button :class="{ on: !gs.lineFxKeep }" @click="set('lineFxKeep', false)">
+                      Effect colours
+                    </button>
+                    <button :class="{ on: gs.lineFxKeep }" @click="set('lineFxKeep', true)">
+                      Relationship colours
+                    </button>
+                  </div>
+                </div>
+                <div class="setting-item">
+                  <label>Speed</label>
+                  <div class="slider-row">
+                    <input
+                      type="range"
+                      min="0"
+                      max="3"
+                      step="0.1"
+                      :value="gs.lineFxSpeed"
+                      @input="set('lineFxSpeed', +$event.target.value)"
+                    />
+                    <span class="slider-val">{{ gs.lineFxSpeed.toFixed(1) }}×</span>
+                  </div>
+                </div>
+                <div class="setting-item">
+                  <label>Glow</label>
+                  <div class="slider-row">
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.05"
+                      :value="gs.lineFxGlow"
+                      @input="set('lineFxGlow', +$event.target.value)"
+                    />
+                    <span class="slider-val">{{ Math.round(gs.lineFxGlow * 100) }}%</span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </Transition>
+        </div>
+
         <!-- Atmosphere -->
         <div class="settings-group">
           <button class="group-toggle" @click="toggle('atmosphere')">
@@ -510,6 +617,9 @@
 import { reactive, computed } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { GRAPH_THEMES, THEME_KEYS } from './graph/graphThemes.js'
+import { LINE_FX, lineFxSpec } from './graph/webgl/lineFx.js'
+import FxPreview from './graph/FxPreview.vue'
+import { inkLook } from './graph/inkStyle.js'
 
 const store = useMainStore()
 const gs = computed(() => store.graphSettings)
@@ -532,7 +642,8 @@ const decors = [
   { id: 'runes', label: 'Runes' },
   { id: 'orbit', label: 'Orbit' },
   { id: 'burst', label: 'Burst' },
-  { id: 'pulse', label: 'Pulse' }
+  { id: 'pulse', label: 'Pulse' },
+  { id: 'enso', label: 'Ensō' } // 水墨 ink-wash roundel + dry-brush ring
 ]
 
 // Little SVG glyphs previewing each route system (44 × 20 viewBox).
@@ -565,7 +676,12 @@ const routes = [
     id: 'trident',
     label: 'Trident',
     hint: 'Classic genealogy: couple bar → stem → sibling rail → children',
-    paths: ['M14,3 H30', 'M22,3 V9', 'M6,9 H38', 'M6,9 V16', 'M22,9 V16', 'M38,9 V16']
+    paths: [
+      'M14,3 H30',
+      'M22,3 V16',
+      'M22,4 Q22,9 17,9 H11 Q6,9 6,14 V16',
+      'M22,4 Q22,9 27,9 H33 Q38,9 38,14 V16'
+    ]
   },
   {
     id: 'circuit',
@@ -578,6 +694,22 @@ const routes = [
     label: 'Wave',
     hint: 'A sinuous ripple between people',
     paths: ['M3,11 Q8,3 13,11 T23,11 T33,11 T41,11']
+  },
+  {
+    id: 'bezier',
+    label: 'Bezier',
+    hint: 'Smooth curves you shape yourself — select a line, then drag it or its handles (double-click resets)',
+    paths: ['M3,17 C18,17 26,3 41,3']
+  },
+  {
+    id: 'brush',
+    label: 'Brush',
+    hint: '水墨 — calligraphic brush strokes with dry-brush flying white',
+    paths: [],
+    // a filled, tapered calligraphic stroke (pressed head, trailing tail)
+    fills: [
+      'M3,15.5 C4,12 9,7.5 14,7.6 C22,7.8 28,13 41,5.2 C29,15.6 21,11.4 14,11 C9,10.8 5.5,13.5 3.6,17.4 Z'
+    ]
   }
 ]
 
@@ -589,10 +721,28 @@ const ambients = [
   { id: 'snow', label: 'Snow', icon: '❄️' },
   { id: 'embers', label: 'Embers', icon: '🔥' },
   { id: 'rain', label: 'Rain', icon: '🌧️' },
-  { id: 'motes', label: 'Motes', icon: '🌫️' }
+  { id: 'motes', label: 'Motes', icon: '🌫️' },
+  { id: 'mist', label: 'Mist', icon: '⛰️' },
+  { id: 'plum', label: 'Plum', icon: '🌺' }
 ]
 
+// Line effects: the shader catalog, plus which bonds they dress.
+const fxList = LINE_FX
+const fxCurrent = computed(() => lineFxSpec(gs.value.lineFx))
+const fxScopes = [
+  {
+    id: 'lineage',
+    label: 'Lineage',
+    hint: 'Parent → child lines (every vertical relationship type)'
+  },
+  { id: 'family', label: 'Family', hint: 'Lineage plus couples' },
+  { id: 'all', label: 'All', hint: 'Every bond, social ones too' }
+]
+// The 水墨 brush look owns the links (Ink theme or the Brush line style).
+const brushOwns = computed(() => inkLook(gs.value, store.theme).links)
+
 const expanded = reactive({
+  fx: true,
   themes: true,
   nodes: true,
   colors: false,
@@ -929,6 +1079,13 @@ function applyTheme(t) {
   );
 }
 
+.ink-note {
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--t2);
+}
+
 /* Decor previews — a nucleus dot with the ornament hinted around it */
 .decor-preview {
   width: 18px;
@@ -976,6 +1133,14 @@ function applyTheme(t) {
     39% 35%
   );
   padding: 2px;
+}
+.decor-enso {
+  background: radial-gradient(circle, currentColor 0 34%, transparent 62%);
+  padding: 0;
+  opacity: 0.85;
+  box-shadow: inset 0 0 0 1.6px currentColor;
+  -webkit-mask: conic-gradient(from 20deg, #000 0 300deg, transparent 330deg);
+  mask: conic-gradient(from 20deg, #000 0 300deg, transparent 330deg);
 }
 .decor-pulse {
   outline: 1.5px solid currentColor;
@@ -1204,5 +1369,112 @@ function applyTheme(t) {
 .expand-leave-to {
   max-height: 0;
   opacity: 0;
+}
+
+/* ── Line effects picker ─────────────────────────────────────────────────── */
+.fx-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.fx-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 7px 6px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--t2);
+  font-family: var(--font);
+  cursor: pointer;
+  text-align: left;
+  animation: cp-row-in 0.4s var(--ease-out) backwards;
+  animation-delay: calc(var(--i) * 0.03s);
+  transition:
+    border-color var(--dur) ease,
+    transform 0.2s var(--ease-spring),
+    box-shadow var(--dur) ease;
+}
+.fx-tile:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+}
+.fx-tile.active {
+  border-color: var(--accent);
+  color: var(--t1);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 4px 16px rgba(var(--accent-rgb), 0.25);
+}
+.fx-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 650;
+}
+.fx-ic {
+  font-size: 12px;
+}
+.fx-hint {
+  font-size: 10.5px;
+  color: var(--t3);
+  line-height: 1.4;
+  margin-top: 6px;
+}
+.fx-live-chip {
+  background: rgba(var(--accent-rgb), 0.16);
+  color: var(--accent);
+}
+.fx-paused {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border-radius: var(--r-sm);
+  border: 1px dashed var(--border-strong);
+  font-size: 10.5px;
+  color: var(--t2);
+}
+.fx-paused-btn {
+  align-self: flex-start;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--t1);
+  border-radius: var(--r-pill);
+  padding: 2px 10px;
+  font-family: var(--font);
+  font-size: 10.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.fx-seg {
+  display: flex;
+  gap: 3px;
+  padding: 2px;
+  border-radius: var(--r-sm);
+  background: var(--elevated);
+}
+.fx-seg button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--t3);
+  border-radius: 6px;
+  padding: 4px 4px;
+  font-family: var(--font);
+  font-size: 10.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    background var(--dur) ease,
+    color var(--dur) ease;
+}
+.fx-seg button.on {
+  background: var(--surface);
+  color: var(--t1);
+  box-shadow: var(--shadow-sm);
 }
 </style>

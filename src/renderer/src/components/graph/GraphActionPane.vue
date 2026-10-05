@@ -115,7 +115,7 @@
           </div>
 
           <!-- Node styling — applies to every selected person -->
-          <div v-if="n && !mode3d" class="ap-section ap-stagger" style="--i: 2">
+          <div v-if="n && !mode3d && nodeStyle" class="ap-section ap-stagger" style="--i: 2">
             <div class="ap-row">
               <span class="ap-sec-label">Size</span>
               <div class="ap-seg">
@@ -210,6 +210,22 @@
               <span class="ap-ic">🧭</span>Trace
             </button>
             <button
+              v-if="!mode3d"
+              class="ap-btn"
+              title="Kinship lens — label everyone by what they are to this person"
+              @click="$emit('kin-lens', ids[0])"
+            >
+              <span class="ap-ic">🧬</span>Kin
+            </button>
+            <button
+              v-if="!mode3d && spotlight"
+              class="ap-btn"
+              title="Spotlight — make this the main character, everyone else in rings around them"
+              @click="$emit('spotlight', ids[0])"
+            >
+              <span class="ap-ic">🌟</span>Spotlight
+            </button>
+            <button
               v-if="canPin"
               class="ap-btn"
               :class="{ on: pinned }"
@@ -222,6 +238,22 @@
 
           <!-- Exactly two: forge a relationship between them -->
           <div v-if="n === 2" class="ap-section ap-stagger" style="--i: 0">
+            <!-- What they already are to each other, before linking anything -->
+            <button
+              v-if="pairKin"
+              class="ap-kin"
+              :style="{ '--kc': pairKin.color }"
+              title="Show how they're related"
+              @click="$emit('trace-pair', [pairA, pairB])"
+            >
+              <span class="ap-kin-ic">🧬</span>
+              <span class="ap-kin-text">
+                <b :style="{ color: colorOf(pairB) }">{{ shortName(pairB) }}</b>
+                <span class="ap-kin-arrow">→</span>
+                <b :style="{ color: colorOf(pairA) }">{{ shortName(pairA) }}</b>
+              </span>
+              <span class="ap-kin-rel">{{ pairKin.text }}</span>
+            </button>
             <div class="ap-sec-head">
               <span class="ap-sec-label">Link</span>
               <button
@@ -265,7 +297,7 @@
           </div>
 
           <!-- Node styling (2D canvas only) — applies to the whole selection -->
-          <div v-if="!mode3d" class="ap-section ap-stagger" style="--i: 1">
+          <div v-if="!mode3d && nodeStyle" class="ap-section ap-stagger" style="--i: 1">
             <div class="ap-row">
               <span class="ap-sec-label">Size</span>
               <div class="ap-seg">
@@ -325,6 +357,10 @@
 import { ref, computed, watch } from 'vue'
 import { useMainStore } from '../../store/index.js'
 import { nodeColor } from './linkHelpers.js'
+import { confirmDialog } from '../../lib/dialogs.js'
+import { undoToast } from '../../lib/undoToast.js'
+import { translate as tr } from '../../i18n'
+import { useKinship, kinClass, kinPalette } from '../kinship/useKinship'
 
 defineProps({
   mode3d: { type: Boolean, default: false },
@@ -332,9 +368,22 @@ defineProps({
   pinned: { type: Boolean, default: false },
   styleSize: { type: Number, default: 1 },
   styleColor: { type: String, default: null },
-  soloType: { type: String, default: null }
+  soloType: { type: String, default: null },
+  // Hosts other than the graph (the Timeline) hide the graph-only verbs.
+  spotlight: { type: Boolean, default: true },
+  nodeStyle: { type: Boolean, default: true }
 })
-defineEmits(['focus-person', 'trace', 'trace-pair', 'toggle-pin', 'set-size', 'set-color', 'solo'])
+defineEmits([
+  'focus-person',
+  'trace',
+  'trace-pair',
+  'kin-lens',
+  'spotlight',
+  'toggle-pin',
+  'set-size',
+  'set-color',
+  'solo'
+])
 
 const store = useMainStore()
 
@@ -418,14 +467,23 @@ async function setStatusAll(status) {
 async function deleteMarquee() {
   const p = n.value,
     b = relCount.value
-  const parts = []
-  if (p) parts.push(`${p} ${p === 1 ? nodeNoun.value : nodeNoun.value + 's'}`)
-  if (b) parts.push(`${b} bond${b === 1 ? '' : 's'}`)
-  if (!parts.length) return
-  if (!confirm(`Delete ${parts.join(' and ')}?`)) return
-  for (const id of [...store.selectedRelationshipIds]) await store.deleteRelationship(id)
-  for (const id of [...store.selectedPersonIds]) await store.deletePerson(id)
+  if (!p && !b) return
+  const title =
+    p && b
+      ? tr('confirm.deleteSelection', { people: p, bonds: b })
+      : p
+        ? p === 1
+          ? tr('confirm.deletePerson', { name: nameOf(store.selectedPersonIds[0]) })
+          : tr('confirm.deletePeople', { count: p })
+        : tr('confirm.deleteBonds', { count: b })
+  const ok = await confirmDialog({ title, message: tr('dialog.undoHint'), tone: 'danger' })
+  if (!ok) return
+  // One atomic write → one undo step for the whole selection.
+  const res = await store.deletePersons([...store.selectedPersonIds], {
+    relationshipIds: [...store.selectedRelationshipIds]
+  })
   store.clearGraphSelection()
+  if (res?.success) undoToast(tr('toasts.deletedSelection'), 'persons:deleteMany')
 }
 
 function personOf(id) {
@@ -479,13 +537,25 @@ function openEdit() {
 
 async function deleteSelected() {
   const count = n.value
-  const label =
-    count === 1
-      ? `Delete ${nameOf(ids.value[0])} and their relationships?`
-      : `Delete these ${count} people and all their relationships?`
-  if (!confirm(label)) return
-  for (const id of [...ids.value]) await store.deletePerson(id)
+  const name = nameOf(ids.value[0])
+  const ok = await confirmDialog({
+    title:
+      count === 1 ? tr('confirm.deletePerson', { name }) : tr('confirm.deletePeople', { count }),
+    message:
+      (count === 1 ? tr('confirm.deletePersonBody') : tr('confirm.deletePeopleBody')) +
+      ' ' +
+      tr('dialog.undoHint'),
+    tone: 'danger'
+  })
+  if (!ok) return
+  const res = await store.deletePersons([...ids.value]) // one undo step
   store.selectPerson(null, { modal: false })
+  if (res?.success) {
+    undoToast(
+      count === 1 ? tr('toasts.deletedPerson', { name }) : tr('toasts.deletedPeople', { count }),
+      'persons:deleteMany'
+    )
+  }
 }
 
 // ── Pair linking (exactly two selected) ─────────────────────────────────────
@@ -498,6 +568,19 @@ watch(ids, () => {
 })
 const pairA = computed(() => (flipped.value ? ids.value[1] : ids.value[0]))
 const pairB = computed(() => (flipped.value ? ids.value[0] : ids.value[1]))
+
+// Their existing kinship, named in the kinship language (null when unrelated).
+const kinship = useKinship()
+const pairKin = computed(() => {
+  if (n.value !== 2) return null
+  const k = kinship.lensOf(pairA.value).get(pairB.value)
+  if (!k || k.kind === 'distant') return null
+  const cls = kinClass(k)
+  return {
+    text: kinship.nameOf(k, pairA.value, pairB.value),
+    color: cls ? kinPalette()[cls] : 'var(--accent)'
+  }
+})
 
 // Simple mode keeps the picker to the family band, same as PersonForm's chips.
 const linkTypes = computed(() =>
@@ -590,9 +673,20 @@ async function swapRel() {
 async function deleteRel() {
   const r = rel.value
   if (!r) return
-  if (!confirm(`Delete this ${relTitle.value.toLowerCase()} bond?`)) return
+  const ok = await confirmDialog({
+    title: tr('confirm.deleteBond', { kind: relTitle.value.toLowerCase() }),
+    message:
+      tr('confirm.deleteBondBetween', { a: nameOf(r.person_a_id), b: nameOf(r.person_b_id) }) +
+      ' ' +
+      tr('dialog.undoHint'),
+    tone: 'danger'
+  })
+  if (!ok) return
   const res = await store.deleteRelationship(r.id)
-  if (res?.success) store.relPopup = null
+  if (res?.success) {
+    store.relPopup = null
+    undoToast(tr('toasts.deletedBond'), 'relationships:delete')
+  }
 }
 </script>
 
@@ -866,13 +960,13 @@ async function deleteRel() {
   line-height: 1;
 }
 .ap-btn-danger {
-  color: #ef5350;
-  background: rgba(239, 83, 80, 0.1);
+  color: var(--danger);
+  background: rgba(var(--danger-rgb), 0.1);
 }
 .ap-btn-danger:hover {
   color: #ff6f6c;
-  background: rgba(239, 83, 80, 0.18);
-  border-color: rgba(239, 83, 80, 0.4);
+  background: rgba(var(--danger-rgb), 0.18);
+  border-color: rgba(var(--danger-rgb), 0.4);
 }
 .ap-danger-row {
   display: flex;
@@ -1100,5 +1194,58 @@ async function deleteRel() {
   .action-pane::before {
     animation: none;
   }
+}
+
+/* ── Pair kinship line ─────────────────────────────────────────────────── */
+.ap-kin {
+  --kc: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 6px 9px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--kc) 35%, var(--border));
+  background: color-mix(in srgb, var(--kc) 10%, transparent);
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 11.5px;
+  cursor: pointer;
+  text-align: left;
+  animation: ap-kin-in 0.45s var(--ease-spring) backwards;
+  transition:
+    transform 0.2s var(--ease-spring),
+    box-shadow 0.2s ease;
+}
+.ap-kin:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--kc) 25%, transparent);
+}
+@keyframes ap-kin-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+.ap-kin-ic {
+  font-size: 13px;
+}
+.ap-kin-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.ap-kin-arrow {
+  color: var(--t3);
+}
+.ap-kin-rel {
+  margin-left: auto;
+  font-weight: 800;
+  color: var(--kc);
+  white-space: nowrap;
 }
 </style>

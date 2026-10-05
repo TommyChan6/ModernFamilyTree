@@ -1,71 +1,108 @@
 <template>
-  <div class="curtain" :class="'kind-' + kind" role="status" aria-live="polite">
-    <!-- Drifting aurora backdrop (same visual family as AuthGate / UserPage) -->
-    <div class="aurora">
-      <span class="blob blob-a"></span>
-      <span class="blob blob-b"></span>
-      <span class="blob blob-c"></span>
-    </div>
+  <div
+    class="curtain"
+    :class="['kind-' + kind, { 'ink-curtain': store.isInk }]"
+    role="status"
+    aria-live="polite"
+  >
+    <!-- 水墨 ink theme: ink washes over rice paper, mountains rise out of the
+         mist, and a single character is brushed inside a turning ensō. -->
+    <template v-if="store.isInk">
+      <span
+        v-for="w in WASHES"
+        :key="w.k"
+        class="ic-wash"
+        :class="'ic-wash-' + w.k"
+        :style="{ '--blot': blotUrl(w.seed) }"
+        aria-hidden="true"
+      ></span>
+      <span class="ic-hills" aria-hidden="true"></span>
+      <span class="ic-mist ic-mist-a" aria-hidden="true"></span>
+      <span class="ic-mist ic-mist-b" aria-hidden="true"></span>
+      <div class="ic-stage">
+        <div class="ic-emblem" aria-hidden="true">
+          <span class="ic-enso"></span>
+          <span class="ic-char">{{ inkChar }}</span>
+        </div>
+        <div class="ic-caption">
+          <div class="ic-label">{{ label }}<span class="ic-seal" aria-hidden="true"></span></div>
+          <div v-if="sub" class="ic-sub">{{ sub }}</div>
+          <span class="ic-stroke" aria-hidden="true"></span>
+        </div>
+      </div>
+    </template>
+    <template v-else>
+      <!-- Drifting aurora backdrop (same visual family as AuthGate / UserPage) -->
+      <div class="aurora">
+        <span class="blob blob-a"></span>
+        <span class="blob blob-b"></span>
+        <span class="blob blob-c"></span>
+      </div>
 
-    <div class="stage">
-      <!-- Emblem: a family-tree constellation that assembles, orbited by a
+      <div class="stage">
+        <!-- Emblem: a family-tree constellation that assembles, orbited by a
            conic loader ring. Doubles as the "still working" indicator. -->
-      <div class="emblem">
-        <span class="ring ring-outer"></span>
-        <span class="ring ring-inner"></span>
+        <div class="emblem">
+          <span class="ring ring-outer"></span>
+          <span class="ring ring-inner"></span>
 
-        <svg class="graph" viewBox="0 0 220 220" aria-hidden="true">
-          <!-- ring chords between neighbouring satellites -->
-          <line
-            v-for="(c, i) in chords"
-            :key="'c' + i"
-            class="chord"
-            :x1="nodes[c[0]].x"
-            :y1="nodes[c[0]].y"
-            :x2="nodes[c[1]].x"
-            :y2="nodes[c[1]].y"
-            :style="{ animationDelay: 0.35 + i * 0.07 + 's' }"
-          />
-          <!-- spokes from the heart out to each person -->
-          <line
-            v-for="(n, i) in nodes"
-            :key="'s' + i"
-            class="spoke"
-            x1="110"
-            y1="110"
-            :x2="n.x"
-            :y2="n.y"
-            :style="{ animationDelay: n.d + 's' }"
-          />
-          <!-- satellite people -->
-          <circle
-            v-for="(n, i) in nodes"
-            :key="'n' + i"
-            class="node"
-            :cx="n.x"
-            :cy="n.y"
-            :r="n.r"
-            :style="{ animationDelay: n.d + 0.1 + 's', '--tw': n.d + 's' }"
-          />
-          <!-- the heart -->
-          <circle class="core-glow" cx="110" cy="110" r="30" />
-          <circle class="core" cx="110" cy="110" r="20" />
-        </svg>
+          <svg class="graph" viewBox="0 0 220 220" aria-hidden="true">
+            <!-- ring chords between neighbouring satellites -->
+            <line
+              v-for="(c, i) in chords"
+              :key="'c' + i"
+              class="chord"
+              :x1="nodes[c[0]].x"
+              :y1="nodes[c[0]].y"
+              :x2="nodes[c[1]].x"
+              :y2="nodes[c[1]].y"
+              :style="{ animationDelay: 0.35 + i * 0.07 + 's' }"
+            />
+            <!-- spokes from the heart out to each person -->
+            <line
+              v-for="(n, i) in nodes"
+              :key="'s' + i"
+              class="spoke"
+              x1="110"
+              y1="110"
+              :x2="n.x"
+              :y2="n.y"
+              :style="{ animationDelay: n.d + 's' }"
+            />
+            <!-- satellite people -->
+            <circle
+              v-for="(n, i) in nodes"
+              :key="'n' + i"
+              class="node"
+              :cx="n.x"
+              :cy="n.y"
+              :r="n.r"
+              :style="{ animationDelay: n.d + 0.1 + 's', '--tw': n.d + 's' }"
+            />
+            <!-- the heart -->
+            <circle class="core-glow" cx="110" cy="110" r="30" />
+            <circle class="core" cx="110" cy="110" r="20" />
+          </svg>
 
-        <span class="glyph">{{ glyph }}</span>
+          <span class="glyph">{{ glyph }}</span>
+        </div>
+
+        <div class="caption">
+          <div class="label">{{ label }}</div>
+          <div v-if="sub" class="sub">{{ sub }}</div>
+          <div class="shimmer"><span></span></div>
+        </div>
       </div>
-
-      <div class="caption">
-        <div class="label">{{ label }}</div>
-        <div v-if="sub" class="sub">{{ sub }}</div>
-        <div class="shimmer"><span></span></div>
-      </div>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { useMainStore } from '../store/index.js'
+import { inkBlotMaskUrl } from '../lib/inkArt'
+
+const store = useMainStore()
 
 const props = defineProps({
   kind: { type: String, default: 'login' }, // login | logout | profile | switch
@@ -95,6 +132,20 @@ const chords = [
 
 const GLYPHS = { login: '🌳', logout: '👋', profile: '👤', switch: '🗂️' }
 const glyph = computed(() => GLYPHS[props.kind] || '🌳')
+
+// Ink theme: the brushed character per kind — 家 home (signing in), 别
+// farewell, 吾 oneself (profile), 迁 moving house (switching project).
+const INK_CHARS = { login: '家', logout: '别', profile: '吾', switch: '迁' }
+const inkChar = computed(() => INK_CHARS[props.kind] || '家')
+// Three overlapping blots, each its own ragged shape (cached by inkArt).
+const WASHES = [
+  { k: 'a', seed: 17 },
+  { k: 'b', seed: 29 },
+  { k: 'c', seed: 41 }
+]
+function blotUrl(seed) {
+  return `url("${inkBlotMaskUrl(seed)}")`
+}
 </script>
 
 <style scoped>
@@ -112,7 +163,7 @@ const glyph = computed(() => GLYPHS[props.kind] || '🌳')
   --cx: var(--accent);
 }
 .kind-login {
-  --cx: #6c8ef5;
+  --cx: var(--accent);
 }
 .kind-profile {
   --cx: #f06292;
@@ -440,6 +491,234 @@ const glyph = computed(() => GLYPHS[props.kind] || '🌳')
     width: 100%;
     background: var(--cx);
     opacity: 0.6;
+  }
+}
+
+/* ── 水墨 ink theme ───────────────────────────────────────────────────────
+   Paper; three blots of ink bloom and settle (晕染), a far range of hills
+   rises through drifting mist, and the kind's character is brushed in the
+   middle of an ensō that keeps turning while work continues. */
+.ink-curtain {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 80% 70% at 50% 45%, rgba(255, 252, 244, 0.65), transparent 70%),
+    var(--ink-paper, none);
+  background-size:
+    100% 100%,
+    512px 512px;
+}
+.ic-wash {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 120vmax;
+  height: 120vmax;
+  margin: -60vmax 0 0 -60vmax;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side,
+    rgba(28, 26, 23, 0.15),
+    rgba(28, 26, 23, 0.07) 45%,
+    rgba(28, 26, 23, 0.03) 75%,
+    transparent
+  );
+  -webkit-mask: var(--blot) center / contain no-repeat;
+  mask: var(--blot) center / contain no-repeat;
+  filter: blur(2px);
+  animation: ic-bloom 2.6s cubic-bezier(0.16, 0.8, 0.3, 1) both;
+}
+.ic-wash-b {
+  top: 30%;
+  left: 30%;
+  width: 70vmax;
+  height: 70vmax;
+  margin: -35vmax 0 0 -35vmax;
+  transform: rotate(40deg);
+  opacity: 0.8;
+  animation-delay: 0.12s;
+}
+.ic-wash-c {
+  top: 70%;
+  left: 74%;
+  width: 60vmax;
+  height: 60vmax;
+  margin: -30vmax 0 0 -30vmax;
+  background: radial-gradient(
+    closest-side,
+    rgba(61, 90, 115, 0.18),
+    rgba(61, 90, 115, 0.06) 55%,
+    transparent
+  );
+  animation-delay: 0.24s;
+}
+@keyframes ic-bloom {
+  from {
+    transform: scale(0.08) rotate(-20deg);
+    opacity: 0;
+    filter: blur(14px);
+  }
+  35% {
+    opacity: 1;
+  }
+}
+.ic-hills {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 34vh;
+  background: var(--ink-landscape, none) center bottom / auto 100% repeat-x;
+  opacity: 0.32;
+  pointer-events: none;
+  animation: ic-hills-rise 1.6s 0.1s var(--ease-out) both;
+}
+@keyframes ic-hills-rise {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+    filter: blur(8px);
+  }
+}
+.ic-mist {
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  height: 16vh;
+  pointer-events: none;
+  background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(245, 239, 224, 0.85), transparent);
+  animation: ic-mist-drift 9s ease-in-out infinite alternate;
+}
+.ic-mist-a {
+  bottom: 14vh;
+}
+.ic-mist-b {
+  bottom: 4vh;
+  animation-duration: 12s;
+  animation-direction: alternate-reverse;
+}
+@keyframes ic-mist-drift {
+  from {
+    transform: translateX(-8%);
+  }
+  to {
+    transform: translateX(8%);
+  }
+}
+
+.ic-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+}
+.ic-emblem {
+  position: relative;
+  width: 168px;
+  height: 168px;
+  display: grid;
+  place-items: center;
+}
+.ic-enso {
+  position: absolute;
+  inset: 0;
+  background-color: var(--ink-black);
+  opacity: 0.85;
+  -webkit-mask: var(--ink-enso) center / contain no-repeat;
+  mask: var(--ink-enso) center / contain no-repeat;
+  animation:
+    ink-enso-draw 1.2s var(--ease-out) both,
+    ic-turn 9s 1.2s linear infinite;
+}
+@keyframes ic-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.ic-char {
+  font-family: var(--font-brush);
+  font-size: 72px;
+  line-height: 1;
+  color: var(--ink-black);
+  animation: ic-write 0.9s 0.45s var(--ease-out) both;
+}
+.kind-logout .ic-char {
+  color: var(--ink-indigo);
+}
+@keyframes ic-write {
+  from {
+    clip-path: inset(0 0 100% 0);
+    opacity: 0.3;
+    transform: translateY(-3px);
+  }
+}
+.ic-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  animation: ic-caption-in 0.7s 0.5s var(--ease-out) both;
+}
+@keyframes ic-caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(4px);
+  }
+}
+.ic-label {
+  position: relative;
+  font-family: var(--font-brush);
+  font-size: 32px;
+  color: var(--t1);
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ic-seal {
+  width: 30px;
+  height: 30px;
+  background: var(--ink-seal, var(--accent)) center / contain no-repeat;
+  mix-blend-mode: multiply;
+  animation: ink-stamp 0.45s 1s var(--ease-spring) both;
+}
+.ic-sub {
+  font-size: 15px;
+  font-style: italic;
+  color: var(--t2);
+}
+.ic-stroke {
+  width: 220px;
+  height: 9px;
+  margin-top: 6px;
+  background-color: var(--accent);
+  opacity: 0.7;
+  -webkit-mask: var(--ink-underline) center / 100% 100% no-repeat;
+  mask: var(--ink-underline) center / 100% 100% no-repeat;
+  animation: ic-stroke 1.8s 0.6s var(--ease-out) infinite;
+}
+@keyframes ic-stroke {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  60% {
+    clip-path: inset(0 0 0 0);
+    opacity: 0.7;
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ic-wash,
+  .ic-hills,
+  .ic-mist,
+  .ic-enso,
+  .ic-char,
+  .ic-caption,
+  .ic-seal,
+  .ic-stroke {
+    animation: none;
   }
 }
 </style>

@@ -7,6 +7,8 @@
           <div class="up-blob up-blob-a"></div>
           <div class="up-blob up-blob-b"></div>
         </div>
+        <!-- 水墨 ink theme: rice paper with a 吾 (oneself) watermark -->
+        <InkBackdrop watermark="吾" />
 
         <header class="up-topbar">
           <button class="up-back" @click="close">
@@ -192,6 +194,13 @@
               </div>
             </section>
 
+            <!-- ── Plan & billing (monetization client; docs/MONETIZATION.md) -->
+            <section class="up-section up-reveal" style="--d: 280ms">
+              <h2 class="up-section-title">💳 {{ t('billing.panel.title') }}</h2>
+              <p class="up-card-desc">{{ t('billing.panel.desc') }}</p>
+              <BillingPanel />
+            </section>
+
             <!-- ── Sharing (preview of the planned feature) ─────────────── -->
             <section class="up-section up-reveal" style="--d: 320ms">
               <div class="up-section-head">
@@ -234,6 +243,8 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import BillingPanel from './billing/BillingPanel.vue'
+import InkBackdrop from './ui/InkBackdrop.vue'
 import { useMainStore } from '../store/index.js'
 import { useI18n } from '../i18n'
 import { derivedHue, gradientForHue } from '../lib/avatar.js'
@@ -528,7 +539,7 @@ onUnmounted(() => {
 .up-back:hover {
   color: var(--t1);
   background: var(--hover);
-  border-color: rgba(108, 142, 245, 0.4);
+  border-color: rgba(var(--accent-rgb), 0.4);
 }
 
 .up-back-arrow {
@@ -554,8 +565,8 @@ onUnmounted(() => {
 }
 
 .up-signout:hover {
-  background: rgba(239, 83, 80, 0.12);
-  color: #ef5350;
+  background: rgba(var(--danger-rgb), 0.12);
+  color: var(--danger);
 }
 
 /* ── Scroll body ────────────────────────────────────────────────────────── */
@@ -603,7 +614,7 @@ onUnmounted(() => {
 .up-avatar-ring {
   padding: 4px;
   border-radius: 50%;
-  border: 1.5px dashed rgba(108, 142, 245, 0.45);
+  border: 1.5px dashed rgba(var(--accent-rgb), 0.45);
   animation: up-spin 24s linear infinite;
   flex-shrink: 0;
 }
@@ -672,7 +683,7 @@ onUnmounted(() => {
   padding: 2px 10px;
   border-radius: 999px;
   background: var(--adim);
-  border: 1px solid rgba(108, 142, 245, 0.35);
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
   color: var(--accent);
   font-size: 10.5px;
   font-weight: 700;
@@ -717,7 +728,7 @@ onUnmounted(() => {
 }
 
 .up-card:hover {
-  border-color: rgba(108, 142, 245, 0.25);
+  border-color: rgba(var(--accent-rgb), 0.25);
 }
 
 .up-card-title {
@@ -883,7 +894,7 @@ onUnmounted(() => {
 }
 
 .up-error {
-  color: #ef5350;
+  color: var(--danger);
   font-size: 12px;
 }
 
@@ -934,7 +945,7 @@ onUnmounted(() => {
 }
 
 .up-usage-fill.warn {
-  background: linear-gradient(90deg, var(--amber), #ef5350);
+  background: linear-gradient(90deg, var(--amber), var(--danger));
 }
 
 /* ── Sections ───────────────────────────────────────────────────────────── */
@@ -984,14 +995,14 @@ onUnmounted(() => {
 
 .up-project:hover {
   transform: translateY(-3px);
-  border-color: rgba(108, 142, 245, 0.45);
+  border-color: rgba(var(--accent-rgb), 0.45);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
 }
 
 .up-project.active {
-  border-color: rgba(108, 142, 245, 0.55);
+  border-color: rgba(var(--accent-rgb), 0.55);
   background: linear-gradient(var(--surface), var(--surface)) padding-box;
-  box-shadow: inset 0 0 0 1px rgba(108, 142, 245, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.2);
 }
 
 .up-project-head {
@@ -1250,5 +1261,142 @@ onUnmounted(() => {
   .up-hero-meta {
     justify-content: center;
   }
+}
+
+/* ── 水墨 ink theme ───────────────────────────────────────────────────────
+   The profile is an album leaf: paper backdrop (<InkBackdrop>), the avatar a
+   name seal (名章) in the chosen colour, cards in narrow silk mounts. */
+:root[data-theme='ink'] .up-aurora {
+  display: none;
+}
+:root[data-theme='ink'] .up-back,
+:root[data-theme='ink'] .up-signout,
+:root[data-theme='ink'] .up-input,
+:root[data-theme='ink'] .up-project,
+:root[data-theme='ink'] .up-project-new,
+:root[data-theme='ink'] .up-share-card,
+:root[data-theme='ink'] .up-share-pill,
+:root[data-theme='ink'] .up-share-url,
+:root[data-theme='ink'] .up-share-copy,
+:root[data-theme='ink'] .up-plan-badge,
+:root[data-theme='ink'] .up-soon-badge {
+  border-radius: 3px 5px 4px 6px / 5px 3px 6px 4px;
+}
+:root[data-theme='ink'] .up-back,
+:root[data-theme='ink'] .up-signout {
+  font-family: var(--font-ink-label);
+  font-size: 13px;
+  background: rgba(255, 251, 240, 0.55);
+}
+:root[data-theme='ink'] .up-avatar-ring {
+  border: none;
+  border-radius: 6px;
+  background: none;
+  box-shadow: none;
+  animation: none;
+}
+:root[data-theme='ink'] .up-avatar-ring .up-avatar,
+:root[data-theme='ink'] .up-avatar {
+  border-radius: 5px 8px 4px 9px / 8px 4px 9px 5px;
+  font-family: var(--font-brush);
+  font-weight: 400;
+  color: #fbf4e6;
+  box-shadow:
+    inset 0 0 0 3px rgba(251, 244, 230, 0.45),
+    inset 0 0 0 5px rgba(60, 20, 10, 0.2),
+    0 6px 16px rgba(60, 30, 10, 0.28);
+  transform: rotate(-3deg);
+  animation: up-ink-stamp 0.55s 0.15s var(--ease-spring) backwards;
+}
+@keyframes up-ink-stamp {
+  from {
+    transform: scale(1.4) rotate(-12deg);
+    opacity: 0;
+  }
+}
+:root[data-theme='ink'] .up-name {
+  font-size: 40px;
+}
+:root[data-theme='ink'] .up-handle,
+:root[data-theme='ink'] .up-since {
+  font-style: italic;
+}
+:root[data-theme='ink'] .up-card {
+  border-radius: 2px;
+  border-color: var(--ink-mount-line);
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow:
+    0 0 0 3px var(--ink-silk),
+    0 0 0 4px rgba(58, 42, 22, 0.2),
+    0 10px 24px rgba(60, 40, 15, 0.12);
+}
+:root[data-theme='ink'] .up-card-title,
+:root[data-theme='ink'] .up-section-title {
+  font-family: var(--font-brush);
+  font-size: 21px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+:root[data-theme='ink'] .up-label {
+  font-family: var(--font-ink-label);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant: small-caps;
+  text-transform: lowercase;
+  letter-spacing: 0.14em;
+}
+:root[data-theme='ink'] .up-input {
+  background: rgba(255, 251, 240, 0.55);
+  border-color: rgba(48, 36, 20, 0.2);
+}
+:root[data-theme='ink'] .up-input:focus {
+  border-color: rgba(179, 53, 42, 0.6);
+  box-shadow: 0 0 0 3px rgba(179, 53, 42, 0.12);
+}
+:root[data-theme='ink'] .up-swatch {
+  border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%;
+}
+:root[data-theme='ink'] .up-primary {
+  border-radius: 2px 4px 3px 5px / 4px 2px 5px 3px;
+  background:
+    var(--ink-paper-light, none) center / 256px 256px,
+    var(--accent);
+  background-blend-mode: multiply, normal;
+  box-shadow:
+    inset 0 0 0 1px rgba(90, 15, 10, 0.3),
+    0 3px 10px rgba(140, 36, 28, 0.22);
+  font-family: var(--font-ink-label);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--on-accent);
+}
+:root[data-theme='ink'] .up-usage-track {
+  border-radius: 1px;
+  background: rgba(110, 88, 56, 0.12);
+}
+:root[data-theme='ink'] .up-usage-fill {
+  border-radius: 1px;
+  background: var(--ink-black);
+  opacity: 0.75;
+}
+:root[data-theme='ink'] .up-usage-fill.warn {
+  background: var(--accent);
+  opacity: 1;
+}
+:root[data-theme='ink'] .up-project {
+  background: rgba(255, 251, 240, 0.5);
+  border-color: rgba(48, 36, 20, 0.18);
+}
+:root[data-theme='ink'] .up-project.active {
+  border-color: rgba(179, 53, 42, 0.5);
+}
+:root[data-theme='ink'] .up-project-name,
+:root[data-theme='ink'] .up-share-name {
+  font-family: var(--font-brush);
+  font-size: 17px;
+  font-weight: 400;
 }
 </style>

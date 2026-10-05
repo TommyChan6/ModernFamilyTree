@@ -1,6 +1,6 @@
 <template>
-  <div class="rtp-backdrop" @click.self="$emit('close')">
-    <div class="rtp">
+  <div class="rtp-backdrop ink-veil" @click.self="$emit('close')">
+    <div class="rtp ink-mount ink-unroll">
       <div class="rtp-head">
         <div class="rtp-title">Relationship types</div>
         <button class="rtp-x" @click="$emit('close')">✕</button>
@@ -17,7 +17,9 @@
       <div class="rtp-list">
         <div v-for="def in store.relTypes" :key="def.id" class="rtp-row">
           <div class="rtp-row-main">
-            <span class="rtp-glyph" :style="{ color: swatchOf(def) }">{{ def.glyph }}</span>
+            <span class="rtp-glyph" :style="{ color: swatchOf(def), '--rel-c': glyphColor(def) }">{{
+              glyphOf(def)
+            }}</span>
             <input
               class="rtp-label"
               :value="def.label"
@@ -135,9 +137,21 @@
 <script setup>
 import { reactive } from 'vue'
 import { useMainStore } from '../store/index.js'
+import { inkRelColor, inkRelGlyph } from './ui/inkChrome'
+import { confirmDialog } from '../lib/dialogs.js'
+import { translate as tr } from '../i18n'
 
 defineEmits(['close'])
 const store = useMainStore()
+
+// Ink theme: each type is stamped with its brushed character (the same one the
+// Relationships view shows); otherwise its own glyph.
+function glyphOf(def) {
+  return (store.isInk && inkRelGlyph(def.key, def.label)) || def.glyph
+}
+function glyphColor(def) {
+  return inkRelColor(def.key, swatchOf(def), store.isInk)
+}
 
 // The generational role a type plays in the generations layout. Maps 1:1 to
 // RelationshipTypeDef.symmetryRole — the field the pure tree math reads.
@@ -188,10 +202,14 @@ function patchWeight(def, val) {
 
 async function removeDef(def) {
   const inUse = store.relationships.filter((r) => r.type === def.key).length
-  const msg = inUse
-    ? `Delete "${def.label}"? Its ${inUse} relationship${inUse > 1 ? 's' : ''} will be deleted too.`
-    : `Delete "${def.label}"?`
-  if (!confirm(msg)) return
+  const ok = await confirmDialog({
+    title: tr('confirm.deleteRelType', { name: def.label }),
+    message:
+      (inUse ? tr('confirm.deleteRelTypeBody', { count: inUse }) + ' ' : '') +
+      tr('dialog.undoHint'),
+    tone: 'danger'
+  })
+  if (!ok) return
   await store.deleteRelType(def.id)
 }
 
@@ -353,8 +371,8 @@ async function create() {
   border-radius: 6px;
 }
 .rtp-del:hover {
-  color: #ef5350;
-  background: rgba(239, 83, 80, 0.12);
+  color: var(--danger);
+  background: rgba(var(--danger-rgb), 0.12);
 }
 .rtp-builtin {
   color: var(--t3);
@@ -479,5 +497,66 @@ async function create() {
 .rtp-new-gen {
   padding-left: 0;
   margin-top: 10px;
+}
+
+/* ── 水墨 ink theme: a mounted sheet (.ink-mount/.ink-unroll); each type's
+   glyph is its brushed character pressed as a small seal ──────────────── */
+:root[data-theme='ink'] .rtp {
+  border-radius: 2px;
+}
+:root[data-theme='ink'] .rtp-title {
+  font-family: var(--font-brush);
+  font-size: 24px;
+  font-weight: 400;
+}
+:root[data-theme='ink'] .rtp-hint {
+  font-style: italic;
+}
+:root[data-theme='ink'] .rtp-row {
+  border-radius: 2px;
+  border-color: rgba(48, 36, 20, 0.14);
+  background: rgba(255, 251, 240, 0.45);
+}
+:root[data-theme='ink'] .rtp-glyph {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  font-family: var(--font-brush);
+  font-size: 17px;
+  color: #fbf4e6 !important;
+  background: var(--rel-c);
+  border-radius: 2px 4px 2px 5px;
+  box-shadow: inset 0 0 0 1px rgba(251, 244, 230, 0.35);
+  transform: rotate(-4deg);
+}
+:root[data-theme='ink'] .rtp-label,
+:root[data-theme='ink'] .rtp-input,
+:root[data-theme='ink'] .rtp-badge,
+:root[data-theme='ink'] .rtp-seg,
+:root[data-theme='ink'] .rtp-seg-btn,
+:root[data-theme='ink'] .rtp-x,
+:root[data-theme='ink'] .rtp-del {
+  border-radius: 2px;
+}
+:root[data-theme='ink'] .rtp-label {
+  font-family: var(--font-brush);
+  font-size: 16px;
+}
+:root[data-theme='ink'] .rtp-badge {
+  font-family: var(--font-ink-label);
+  font-variant: small-caps;
+  text-transform: lowercase;
+}
+:root[data-theme='ink'] .rtp-new {
+  border-radius: 2px;
+  background: rgba(214, 199, 166, 0.2);
+}
+:root[data-theme='ink'] .rtp-new-title {
+  font-family: var(--font-brush);
+  font-size: 18px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0.02em;
 }
 </style>

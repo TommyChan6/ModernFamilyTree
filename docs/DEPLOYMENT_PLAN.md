@@ -94,6 +94,11 @@ already implements, against `supabase/schema.sql`:
    switchboard + chunk splitting), **3.2b–3.2c** (obfuscation), **3.1–3.2** (data
    importer), **3.3–3.4** (Vercel deploy + Supabase URL config), and all of **Phase 4**
    (legal/privacy/deletion/error-tracking) before any real user.
+4. **Payments & ads backend** — the premium-plan client (pricing, checkout, billing
+   panel, ad slots) is built against a local *sandbox*; the real payment provider,
+   webhooks, customer portal and any ad network are still to do. Everything is listed
+   in [`MONETIZATION.md`](./MONETIZATION.md) (blocked by the zero-cost rule until
+   you decide to take payments).
 
 ### One prompt to hand Claude when you're ready to resume
 

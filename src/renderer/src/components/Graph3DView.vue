@@ -1,5 +1,5 @@
 <template>
-  <div ref="containerEl" class="space3d">
+  <div ref="containerEl" class="space3d" :class="{ ink: store.isInk }">
     <canvas ref="glCanvasEl" class="space3d-gl"></canvas>
     <canvas ref="overlayEl" class="space3d-overlay"></canvas>
 
@@ -75,6 +75,7 @@ import {
   getDashArray
 } from './graph/linkHelpers.js'
 import { Graph3DRenderer } from './graph/graph3d/Graph3DRenderer.js'
+import { inkLinkColor, inkNodeFill, inkSealColor } from './graph/inkStyle.js'
 import {
   seedPositions3D,
   computePivot2D,
@@ -262,17 +263,25 @@ const minimapAdapter = {
 function nodeVisual(n) {
   const g = gs()
   const selected = store.selectedPersonId === n.id
-  const baseFill = nodeColor(n.gender, g, n.gender_t)
-  const fill = selected ? d3.color(baseFill)?.brighter(0.4)?.toString() || baseFill : baseFill
+  // 水墨 (Ink theme): pale tinted washes on rice paper, cinnabar selection.
+  const ink = store.isInk
+  const rawFill = nodeColor(n.gender, g, n.gender_t)
+  const baseFill = ink ? inkNodeFill(rawFill, 'paper') : rawFill
+  const fill = selected
+    ? d3
+        .color(baseFill)
+        ?.brighter(ink ? 0.15 : 0.4)
+        ?.toString() || baseFill
+    : baseFill
   let opacityMul = 1
   const q = (props.searchQuery || '').toLowerCase().trim()
   if (q && !(n.name || '').toLowerCase().includes(q)) opacityMul *= 0.15
   return {
     radius: g.nodeRadius * (selected ? 1.08 : 1),
     fill,
-    border: selected ? '#6c8ef5' : '#ffffff',
-    borderPx: selected ? 3 : 1.5,
-    borderA: selected ? 0.95 : 0.25,
+    border: selected ? (ink ? inkSealColor('paper') : '#6c8ef5') : ink ? '#1f1b16' : '#ffffff',
+    borderPx: selected ? 3 : ink ? 2 : 1.5,
+    borderA: selected ? 0.95 : ink ? 0.7 : 0.25,
     opacity: g.nodeOpacity * opacityMul,
     selected,
     glow: selected || (hoverId === n.id && g.glowOnHover) ? 1 : 0,
@@ -284,8 +293,11 @@ function linkVisual(d) {
   const g = gs()
   const persons = store.persons
   const def = store.relTypeByKey.get(d.type)
-  const colorHex = getLinkStroke(d, 'neutral', g, persons, def)
-  const width = getLinkWidth(d, 'neutral', g, persons)
+  const ink = store.isInk
+  const role = store.relTypeRoles.get(d.type) || 'none'
+  const rawColor = getLinkStroke(d, 'neutral', g, persons, def)
+  const colorHex = ink ? inkLinkColor(rawColor, role, 'paper') : rawColor
+  const width = getLinkWidth(d, 'neutral', g, persons) * (ink ? 1.5 : 1)
   const opacity = getLinkEmphOpacity(d, 'neutral', g, persons)
   const dashStr = getDashArray(d, def)
   let dashLen = 0,
@@ -296,17 +308,18 @@ function linkVisual(d) {
     dashGap = p[1]
   }
   const marker = getLinkMarker(d, 'neutral', persons, def)
+  const rawArrow = marker
+    ? d.type === 'adopted'
+      ? g.adoptedColor
+      : def?.color || g.parentChildColor
+    : null
   return {
     colorHex,
     width,
     opacity,
     dashLen,
     dashGap,
-    arrowColor: marker
-      ? d.type === 'adopted'
-        ? g.adoptedColor
-        : def?.color || g.parentChildColor
-      : null,
+    arrowColor: rawArrow && ink ? inkLinkColor(rawArrow, role, 'paper') : rawArrow,
     arrowSize: 9
   }
 }
@@ -835,7 +848,7 @@ onUnmounted(() => {
 
 function applyTheme() {
   const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()
-  renderer?.setTheme({ isLight: store.theme === 'light', bg })
+  renderer?.setTheme({ isLight: store.isLightTheme, bg, ink: store.isInk })
 }
 
 // ── Watchers ─────────────────────────────────────────────────────────────────
@@ -868,10 +881,7 @@ watch(
     renderer?.requestRedraw()
   }
 )
-watch(
-  () => store.theme,
-  () => applyTheme()
-)
+watch([() => store.theme, () => store.accent], () => applyTheme())
 watch(
   () => store.graphSettings,
   () => {
@@ -905,6 +915,12 @@ watch(
   position: absolute;
   inset: 0;
   overflow: hidden;
+}
+/* 水墨: the 3D scene floats over rice paper (depth fog fades into it). */
+.space3d.ink {
+  background-color: var(--bg);
+  background-image: var(--ink-paper, none);
+  background-size: 512px 512px;
 }
 .space3d-gl,
 .space3d-overlay {

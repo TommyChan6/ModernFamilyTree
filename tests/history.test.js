@@ -200,6 +200,86 @@ describe('history — deferred image-file deletion', () => {
   })
 })
 
+describe('history — sheet batch channels are single undo steps', () => {
+  const nameDef = (db) =>
+    Object.values(db.field_defs).find(
+      (d) => d.project_id === db.activeProjectId && d.sys === 'name'
+    )
+
+  it('undoes a whole fields:setValuesBatch at once', () => {
+    const [a, b] = personsOf(db)
+    const names = [a.name, b.name]
+    invoke(db, 'fields:setValuesBatch', {
+      updates: [
+        { personId: a.id, values: [{ field_id: nameDef(db).id, value: 'X' }] },
+        { personId: b.id, values: [{ field_id: nameDef(db).id, value: 'Y' }] }
+      ]
+    })
+    expect(status(db).undoChannel).toBe('fields:setValuesBatch')
+    invoke(db, 'history:undo')
+    expect([db.persons[a.id].name, db.persons[b.id].name]).toEqual(names)
+    expect(status(db).canUndo).toBe(false)
+  })
+
+  it('undoes persons:createMany and persons:deleteMany in one step each', () => {
+    const before = personsOf(db).length
+    const { persons } = invoke(db, 'persons:createMany', { rows: [{}, {}, {}] })
+    expect(personsOf(db)).toHaveLength(before + 3)
+    invoke(db, 'persons:deleteMany', { ids: persons.map((p) => p.id) })
+    expect(personsOf(db)).toHaveLength(before)
+
+    invoke(db, 'history:undo') // the delete
+    expect(personsOf(db)).toHaveLength(before + 3)
+    invoke(db, 'history:undo') // the create
+    expect(personsOf(db)).toHaveLength(before)
+  })
+
+  it('persons:deleteMany with relationshipIds drops people + bonds as one undo step', () => {
+    const rels = () =>
+      Object.values(db.relationships).filter((r) => r.project_id === db.activeProjectId)
+    const [a, b, c] = personsOf(db)
+    const bond = invoke(db, 'relationships:create', {
+      person_a_id: b.id,
+      person_b_id: c.id,
+      type: 'friends'
+    })
+    const relsBefore = rels().length
+    const res = invoke(db, 'persons:deleteMany', { ids: [a.id], relationshipIds: [bond.id] })
+    expect(res.relationshipIds).toEqual([bond.id])
+    expect(db.persons[a.id]).toBeUndefined()
+    expect(db.relationships[bond.id]).toBeUndefined()
+    expect(db.persons[b.id]).toBeDefined() // bond ends survive
+
+    invoke(db, 'history:undo')
+    expect(db.persons[a.id]).toBeDefined()
+    expect(db.relationships[bond.id]).toBeDefined()
+    expect(rels()).toHaveLength(relsBefore)
+  })
+
+  it('persons:deleteMany rejects an unknown relationship id without partial writes', () => {
+    const [a] = personsOf(db)
+    expect(() =>
+      invoke(db, 'persons:deleteMany', { ids: [a.id], relationshipIds: ['ghost'] })
+    ).toThrow(/Relationship not found/)
+    expect(db.persons[a.id]).toBeDefined()
+  })
+
+  it('a failing batch leaves no undo step and no partial write', () => {
+    const [a] = personsOf(db)
+    const name = a.name
+    expect(() =>
+      invoke(db, 'fields:setValuesBatch', {
+        updates: [
+          { personId: a.id, values: [{ field_id: nameDef(db).id, value: 'Partial' }] },
+          { personId: 'ghost', values: [] }
+        ]
+      })
+    ).toThrow()
+    expect(db.persons[a.id].name).toBe(name)
+    expect(status(db).canUndo).toBe(false)
+  })
+})
+
 describe('history — cap', () => {
   it('keeps at most 50 undo steps', () => {
     for (let i = 0; i < 60; i++) invoke(db, 'persons:create', { name: `n${i}` })
@@ -217,5 +297,13 @@ describe('history — write channel registration', () => {
     const { WRITE_CHANNELS } = await import('../src/shared/dbCore')
     expect(WRITE_CHANNELS.has('history:undo')).toBe(true)
     expect(WRITE_CHANNELS.has('history:redo')).toBe(true)
+  })
+
+  it('the sheet batch channels persist and are undoable', async () => {
+    const { WRITE_CHANNELS, UNDOABLE_CHANNELS } = await import('../src/shared/dbCore')
+    for (const ch of ['fields:setValuesBatch', 'persons:createMany', 'persons:deleteMany']) {
+      expect(WRITE_CHANNELS.has(ch)).toBe(true)
+      expect(UNDOABLE_CHANNELS.has(ch)).toBe(true)
+    }
   })
 })

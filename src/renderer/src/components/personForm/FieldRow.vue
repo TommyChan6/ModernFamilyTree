@@ -185,6 +185,8 @@ import { yearDate } from '../../../../shared/calendarMath'
 import { slotAccepts } from '../../../../shared/fields'
 import { typeMeta, SLOT_META } from './fieldUi.js'
 import FieldInput from './FieldInput.vue'
+import { confirmDialog } from '../../lib/dialogs.js'
+import { translate as tr } from '../../i18n'
 
 const props = defineProps({
   def: { type: Object, required: true },
@@ -310,10 +312,12 @@ function removeFromPerson() {
 async function deleteDef() {
   menuOpen.value = false
   const n = store.fieldValues.filter((v) => v.field_id === props.def.id).length
-  const msg = n
-    ? `Delete “${props.def.label}” and its values on ${n} ${n === 1 ? 'person' : 'people'}?`
-    : `Delete “${props.def.label}”?`
-  if (!confirm(msg)) return
+  const ok = await confirmDialog({
+    title: tr('confirm.deleteTrait', { name: props.def.label }),
+    message: (n ? tr('confirm.deleteTraitBody', { count: n }) + ' ' : '') + tr('dialog.undoHint'),
+    tone: 'danger'
+  })
+  if (!ok) return
   await store.deleteFieldDef(props.def.id)
 }
 </script>
@@ -556,7 +560,7 @@ async function deleteDef() {
   font-size: 10px;
 }
 .fr-opt-x:hover {
-  color: #ef5350;
+  color: var(--danger);
 }
 .fr-opt-add {
   align-self: flex-start;
@@ -680,10 +684,10 @@ async function deleteDef() {
   border-color: var(--accent);
 }
 .fr-mi-danger {
-  color: #ef5350;
+  color: var(--danger);
 }
 .fr-mi-danger:hover {
-  background: rgba(239, 83, 80, 0.1);
+  background: rgba(var(--danger-rgb), 0.1);
 }
 .fr-mi-sep {
   height: 1px;
@@ -725,5 +729,39 @@ async function deleteDef() {
 .fr-mi-slot:disabled {
   opacity: 0.25;
   cursor: not-allowed;
+}
+
+/* ── 水墨 ink theme: rows bloom on hover; the drag handle is three strokes ── */
+:root[data-theme='ink'] .fr {
+  border-radius: 2px;
+}
+:root[data-theme='ink'] .fr:hover,
+:root[data-theme='ink'] .fr.menuOpen {
+  background: rgba(214, 199, 166, 0.22);
+  border-color: rgba(48, 36, 20, 0.12);
+}
+:root[data-theme='ink'] .fr-handle span {
+  border-radius: 1px 3px 1px 2px;
+  height: 2.5px;
+}
+:root[data-theme='ink'] .fr-label {
+  font-size: 13px;
+  color: var(--t1);
+}
+:root[data-theme='ink'] .fr-type,
+:root[data-theme='ink'] .fr-menu,
+:root[data-theme='ink'] .fr-menu-btn,
+:root[data-theme='ink'] .fr-mi,
+:root[data-theme='ink'] .fr-mi-slot {
+  border-radius: 2px;
+}
+:root[data-theme='ink'] .fr-menu {
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  border-color: var(--ink-mount-line);
+  box-shadow:
+    0 0 0 2px var(--ink-silk),
+    0 0 0 3px rgba(58, 42, 22, 0.2),
+    var(--shadow);
 }
 </style>

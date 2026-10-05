@@ -448,6 +448,125 @@ describe('fields:* channels', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// The Directory Sheet's batch channels: one write (and one undo step) for a
+// paste / fill / multi-row delete.
+describe('sheet batch channels', () => {
+  let db, bySys, ids
+  beforeEach(() => {
+    db = makeDB()
+    bySys = Object.fromEntries(Object.values(db.field_defs).map((d) => [d.sys, d]))
+    ids = Object.keys(db.persons).slice(0, 3)
+  })
+
+  it('fields:setValuesBatch writes several people and returns their fresh snapshots', () => {
+    const res = channelHandlers['fields:setValuesBatch'](
+      db,
+      {
+        updates: [
+          { personId: ids[0], values: [{ field_id: bySys.name.id, value: 'Ada' }] },
+          {
+            personId: ids[1],
+            values: [
+              { field_id: bySys.name.id, value: 'Grace' },
+              { field_id: bySys.birth.id, value: yearDate(1906) }
+            ]
+          },
+          { personId: ids[2], removals: [bySys.occupation.id] }
+        ]
+      },
+      env
+    )
+    expect(res.persons.map((p) => p.id).sort()).toEqual([...ids].sort())
+    expect(db.persons[ids[0]].name).toBe('Ada')
+    expect(db.persons[ids[1]]).toMatchObject({ name: 'Grace', birth: { year: 1906 } })
+    expect(db.persons[ids[2]].occupation).toBe('')
+    // Returned values cover exactly the touched people.
+    expect(new Set(res.values.map((v) => v.person_id))).toEqual(new Set(ids))
+  })
+
+  it('fields:setValuesBatch coerces values like the single-person path', () => {
+    channelHandlers['fields:setValuesBatch'](
+      db,
+      { updates: [{ personId: ids[0], values: [{ field_id: bySys.gender.id, value: 'nope' }] }] },
+      env
+    )
+    const row = Object.values(db.field_values).find(
+      (v) => v.person_id === ids[0] && v.field_id === bySys.gender.id
+    )
+    expect(row.value).toBeNull()
+  })
+
+  it('fields:setValuesBatch validates every person first — a bad id changes nothing', () => {
+    const before = db.persons[ids[0]].name
+    expect(() =>
+      channelHandlers['fields:setValuesBatch'](
+        db,
+        {
+          updates: [
+            { personId: ids[0], values: [{ field_id: bySys.name.id, value: 'Changed' }] },
+            { personId: 'ghost', values: [{ field_id: bySys.name.id, value: 'Boo' }] }
+          ]
+        },
+        env
+      )
+    ).toThrow(/Person not found/)
+    expect(db.persons[ids[0]].name).toBe(before)
+  })
+
+  it('fields:setValuesBatch refuses people from another project', () => {
+    const other = randomUUID()
+    db.persons[other] = { ...db.persons[ids[0]], id: other, project_id: 'elsewhere' }
+    expect(() =>
+      channelHandlers['fields:setValuesBatch'](
+        db,
+        { updates: [{ personId: other, values: [{ field_id: bySys.name.id, value: 'X' }] }] },
+        env
+      )
+    ).toThrow(/Person not found/)
+  })
+
+  it('persons:createMany creates rows with their trait values', () => {
+    const count = Object.keys(db.persons).length
+    const res = channelHandlers['persons:createMany'](
+      db,
+      {
+        rows: [
+          { values: [{ field_id: bySys.name.id, value: 'New One' }] },
+          { values: [{ field_id: bySys.name.id, value: 'New Two' }] },
+          { values: [] }
+        ]
+      },
+      env
+    )
+    expect(res.persons).toHaveLength(3)
+    expect(Object.keys(db.persons)).toHaveLength(count + 3)
+    expect(res.persons.map((p) => p.name)).toEqual(['New One', 'New Two', ''])
+    expect(res.persons.every((p) => p.project_id === db.activeProjectId)).toBe(true)
+    expect(res.values.filter((v) => v.field_id === bySys.name.id)).toHaveLength(2)
+  })
+
+  it('persons:deleteMany cascades like persons:delete and is all-or-nothing', () => {
+    const [a, b] = ids
+    expect(() => channelHandlers['persons:deleteMany'](db, { ids: [a, 'ghost'] }, env)).toThrow(
+      /Person not found/
+    )
+    expect(db.persons[a]).toBeDefined()
+
+    const res = channelHandlers['persons:deleteMany'](db, { ids: [a, b, a] }, env)
+    expect(res.ids).toEqual([a, b])
+    expect(db.persons[a]).toBeUndefined()
+    expect(db.persons[b]).toBeUndefined()
+    const gone = new Set([a, b])
+    expect(Object.values(db.field_values).some((v) => gone.has(v.person_id))).toBe(false)
+    expect(
+      Object.values(db.relationships).some(
+        (r) => gone.has(r.person_a_id) || gone.has(r.person_b_id)
+      )
+    ).toBe(false)
+  })
+})
+
 describe('migrateFieldSystem', () => {
   it('adopts legacy person columns into defs + values, idempotently', () => {
     const db = EMPTY_DB()

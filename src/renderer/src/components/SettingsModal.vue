@@ -1,8 +1,13 @@
 <template>
   <Teleport to="body">
     <Transition name="settings-modal">
-      <div v-if="store.appSettingsOpen" class="sm-backdrop" @click.self="close">
-        <div class="sm-box" role="dialog" aria-modal="true" aria-label="Settings">
+      <div v-if="store.appSettingsOpen" class="sm-backdrop ink-veil" @click.self="close">
+        <div
+          class="sm-box ink-mount ink-unroll ink-rollers"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Settings"
+        >
           <!-- Sidebar tabs -->
           <nav class="sm-nav">
             <div class="sm-nav-title">{{ t('settings.title') }}</div>
@@ -68,6 +73,63 @@
                     @click="store.setTheme('dark')"
                   >
                     🌙 {{ t('settings.theme.dark') }}
+                  </button>
+                  <button
+                    class="sm-seg-btn sm-seg-ink"
+                    :class="{ active: store.theme === 'ink' }"
+                    @click="store.setTheme('ink')"
+                  >
+                    <span class="sm-ink-seal">墨</span> {{ t('settings.theme.ink') }}
+                  </button>
+                </div>
+              </div>
+
+              <div class="sm-field">
+                <div class="sm-field-head">
+                  <span class="sm-field-icon">✨</span>
+                  <div>
+                    <div class="sm-field-title">{{ t('settings.accent.title') }}</div>
+                    <p class="sm-field-desc">{{ t('settings.accent.desc') }}</p>
+                    <p v-if="store.isInk" class="sm-field-desc">
+                      {{ t('settings.accent.inkNote') }}
+                    </p>
+                  </div>
+                </div>
+                <div class="sm-accents">
+                  <button
+                    v-for="a in ACCENT_PRESETS"
+                    :key="a.id"
+                    class="sm-accent"
+                    :class="{ active: store.accent === a.hex }"
+                    :style="{ '--sw': a.hex }"
+                    :title="t('settings.accent.presets.' + a.id)"
+                    :aria-label="t('settings.accent.presets.' + a.id)"
+                    :aria-pressed="store.accent === a.hex"
+                    @click="pickAccent(a.hex)"
+                  >
+                    <span class="sm-accent-check" aria-hidden="true">✓</span>
+                  </button>
+                  <label
+                    class="sm-accent sm-accent-custom"
+                    :class="{ active: !ACCENT_PRESETS.some((a) => a.hex === store.accent) }"
+                    :style="{ '--sw': customAccent }"
+                    :title="t('settings.accent.custom')"
+                  >
+                    <input
+                      type="color"
+                      :value="customAccent"
+                      :aria-label="t('settings.accent.custom')"
+                      @input="onCustomAccent"
+                      @change="onCustomAccent"
+                    />
+                    <span class="sm-accent-plus" aria-hidden="true">+</span>
+                  </label>
+                  <button
+                    v-if="store.accent !== DEFAULT_ACCENT"
+                    class="btn btn-ghost btn-xs sm-accent-reset"
+                    @click="pickAccent(DEFAULT_ACCENT)"
+                  >
+                    ↺ {{ t('settings.accent.reset') }}
                   </button>
                 </div>
               </div>
@@ -208,6 +270,7 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { useI18n } from '../i18n'
+import { ACCENT_PRESETS, DEFAULT_ACCENT } from '../lib/accent.js'
 
 const store = useMainStore()
 const { t, SUPPORTED_LOCALES } = useI18n()
@@ -244,13 +307,26 @@ function sendFeedback() {
   window.open(href, '_blank')
 }
 
-// Reset to a sensible starting tab each time the modal opens; Esc closes.
+// Open on the requested tab (General unless a caller such as the `?` hotkey
+// asked for another); Esc closes.
+watch([() => store.appSettingsOpen, () => store.appSettingsTab], ([open, tab]) => {
+  if (open) active.value = tab || 'general'
+})
+
+// ── Accent colour ────────────────────────────────────────────────────────────
+const customAccent = ref(store.accent)
 watch(
-  () => store.appSettingsOpen,
-  (open) => {
-    if (open) active.value = 'general'
-  }
+  () => store.accent,
+  (hex) => (customAccent.value = hex)
 )
+function pickAccent(hex) {
+  if (hex !== store.accent) store.setAccent(hex)
+}
+function onCustomAccent(e) {
+  // `input` fires continuously while dragging in the native picker — apply
+  // live (cheap: a few CSS vars) but persist once the picker settles.
+  store.setAccent(e.target.value, { persist: e.type === 'change' })
+}
 
 function onKeydown(e) {
   if (e.key === 'Escape' && store.appSettingsOpen) close()
@@ -423,7 +499,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .sm-lang:hover {
-  border-color: rgba(108, 142, 245, 0.4);
+  border-color: rgba(var(--accent-rgb), 0.4);
   color: var(--t1);
 }
 
@@ -740,5 +816,239 @@ kbd {
   .sm-nav-title {
     display: none;
   }
+}
+
+/* ── Accent swatches ──────────────────────────────────────────────────────── */
+.sm-accents {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.sm-accent {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  background: radial-gradient(
+    circle at 32% 28%,
+    color-mix(in srgb, var(--sw) 55%, #fff),
+    var(--sw) 62%
+  );
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 3px transparent,
+    0 3px 10px color-mix(in srgb, var(--sw) 40%, transparent);
+  display: grid;
+  place-items: center;
+  transition:
+    transform var(--dur-slow) var(--ease-spring),
+    box-shadow var(--dur) ease;
+}
+
+.sm-accent:hover {
+  transform: translateY(-2px) scale(1.08);
+}
+
+.sm-accent.active {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--sw),
+    0 4px 14px color-mix(in srgb, var(--sw) 55%, transparent);
+}
+
+.sm-accent-check {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transform: scale(0);
+  transition: transform var(--dur-slow) var(--ease-spring);
+}
+.sm-accent.active .sm-accent-check {
+  transform: scale(1);
+}
+
+.sm-accent-custom {
+  background: conic-gradient(#f06292, #f5a623, #4caf72, #22b3c4, #6c8ef5, #9b7cf5, #f06292);
+  overflow: hidden;
+}
+.sm-accent-custom.active {
+  background: var(--sw);
+}
+.sm-accent-custom input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+}
+.sm-accent-plus {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.sm-accent-reset {
+  margin-left: 4px;
+}
+.sm-ink-seal {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 2px;
+  font-family: var(--font-brush);
+  font-size: 12px;
+  line-height: 1;
+  color: #fbf4e6;
+  background: #b3352a;
+  border-radius: 2px 3px 2px 4px;
+  vertical-align: -3px;
+}
+
+/* ── 水墨 ink theme: a hanging scroll (.ink-mount/.ink-unroll/.ink-rollers
+   from styles/ink.css). The tab column is the silk band of the mount; the
+   active tab is stamped with the family seal. ────────────────────────── */
+:root[data-theme='ink'] .sm-box {
+  overflow: visible; /* the rollers stick out past the mount */
+  position: relative;
+}
+:root[data-theme='ink'] .sm-nav {
+  background:
+    repeating-linear-gradient(45deg, rgba(90, 70, 40, 0.035) 0 2px, transparent 2px 5px),
+    var(--ink-silk);
+  border-right: 1px solid var(--ink-mount-line);
+  box-shadow: inset -3px 0 0 rgba(245, 239, 224, 0.7);
+}
+:root[data-theme='ink'] .sm-nav-title {
+  font-family: var(--font-brush);
+  font-size: 22px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0.04em;
+  color: var(--t1);
+}
+:root[data-theme='ink'] .sm-nav-item {
+  border-radius: 2px;
+  font-family: var(--font-ink-label);
+  font-size: 14px;
+  background: radial-gradient(closest-side, rgba(40, 30, 18, 0.1), transparent) center / 0% 0%
+    no-repeat;
+  transition:
+    background-size 0.5s var(--ease-out),
+    color 0.15s;
+}
+:root[data-theme='ink'] .sm-nav-item:hover {
+  background-size: 170% 240%;
+}
+:root[data-theme='ink'] .sm-nav-item.active {
+  background: rgba(245, 239, 224, 0.75);
+  color: var(--t1);
+  box-shadow: inset 0 0 0 1px rgba(58, 42, 22, 0.16);
+}
+:root[data-theme='ink'] .sm-nav-item.active::after {
+  content: '';
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  background: var(--ink-seal, var(--accent)) center / contain no-repeat;
+  mix-blend-mode: multiply;
+  animation: ink-stamp 0.45s var(--ease-spring) both;
+}
+:root[data-theme='ink'] .sm-nav-icon,
+:root[data-theme='ink'] .sm-field-icon {
+  filter: grayscale(1) sepia(0.4) contrast(1.1);
+}
+:root[data-theme='ink'] .sm-close {
+  border-radius: 3px;
+  font-family: var(--font-brush);
+  font-size: 24px;
+}
+:root[data-theme='ink'] .sm-field-title {
+  font-family: var(--font-brush);
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+:root[data-theme='ink'] .sm-field-desc {
+  font-size: 13px;
+  color: var(--t2);
+}
+:root[data-theme='ink'] .sm-field + .sm-field {
+  padding-top: 20px;
+  background: linear-gradient(rgba(28, 26, 23, 0.16), rgba(28, 26, 23, 0.16)) 28px 0 /
+    calc(100% - 28px) 1px no-repeat;
+}
+:root[data-theme='ink'] .sm-lang {
+  border-radius: 2px;
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  border-color: rgba(48, 36, 20, 0.2);
+}
+:root[data-theme='ink'] .sm-lang.active {
+  border-color: rgba(179, 53, 42, 0.6);
+  box-shadow:
+    inset 0 0 0 2px var(--surface),
+    inset 0 0 0 3px rgba(179, 53, 42, 0.22);
+}
+:root[data-theme='ink'] .sm-lang-native {
+  font-family: var(--font-brush);
+  font-size: 18px;
+  font-weight: 400;
+}
+:root[data-theme='ink'] .sm-lang-check {
+  font-family: var(--font-brush);
+}
+:root[data-theme='ink'] .sm-segment,
+:root[data-theme='ink'] .sm-noun-input,
+:root[data-theme='ink'] .sm-textarea {
+  border-radius: 3px;
+}
+:root[data-theme='ink'] .sm-noun-input,
+:root[data-theme='ink'] .sm-textarea {
+  background: rgba(255, 251, 240, 0.55);
+}
+:root[data-theme='ink'] .sm-seg-btn {
+  border-radius: 2px;
+  font-family: var(--font-ink-label);
+  font-size: 13.5px;
+}
+:root[data-theme='ink'] .sm-seg-btn.active {
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  box-shadow:
+    inset 0 0 0 1px rgba(179, 53, 42, 0.35),
+    0 1px 3px rgba(60, 40, 15, 0.18);
+}
+:root[data-theme='ink'] .sm-h {
+  font-family: var(--font-brush);
+  font-size: 24px;
+  font-weight: 400;
+}
+:root[data-theme='ink'] .sm-sub {
+  font-family: var(--font-brush);
+  font-size: 17px;
+  font-weight: 400;
+}
+:root[data-theme='ink'] .sm-primary {
+  border-radius: 2px 4px 3px 5px;
+  font-family: var(--font-ink-label);
+  background:
+    var(--ink-paper-light, none) center / 256px 256px,
+    var(--accent);
+  background-blend-mode: multiply, normal;
+}
+:root[data-theme='ink'] .sm-accent {
+  border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%;
 }
 </style>

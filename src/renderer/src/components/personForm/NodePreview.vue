@@ -121,4 +121,59 @@ const initial = computed(() => {
     animation: none;
   }
 }
+
+/* ── 水墨 ink theme: the node is a wash of its colour ground with ink, held
+   in a slowly breathing ensō; the name is brushed ───────────────────────── */
+:root[data-theme='ink'] .np-node {
+  background: radial-gradient(
+    circle at 34% 30%,
+    color-mix(in srgb, var(--node-c) 40%, #f3ecdc),
+    color-mix(in srgb, var(--node-c) 55%, #2b2722) 64%,
+    color-mix(in srgb, var(--node-c) 30%, #1c1a17)
+  );
+  box-shadow:
+    0 0 0 3px var(--surface),
+    0 0 0 4px rgba(48, 36, 20, 0.2),
+    0 8px 20px rgba(60, 40, 15, 0.22);
+}
+:root[data-theme='ink'] .np-glyph {
+  font-family: var(--font-brush);
+  font-weight: 400;
+  font-size: 32px;
+  color: rgba(251, 244, 230, 0.94);
+  text-shadow: 0 1px 3px rgba(30, 20, 10, 0.35);
+}
+:root[data-theme='ink'] .np-ring {
+  inset: -10px;
+  border: none;
+  border-radius: 0;
+  background-color: var(--ring-c);
+  -webkit-mask: var(--ink-enso) center / contain no-repeat;
+  mask: var(--ink-enso) center / contain no-repeat;
+  animation:
+    ink-enso-draw 1.2s var(--ease-out) backwards,
+    np-ink-breathe 6s 1.2s ease-in-out infinite;
+}
+@keyframes np-ink-breathe {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: rotate(8deg) scale(1.04);
+    opacity: 0.65;
+  }
+}
+:root[data-theme='ink'] .np-label {
+  font-family: var(--font-brush);
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+}
+:root[data-theme='ink'] .np-unnamed {
+  font-family: var(--font);
+  font-size: 15px;
+}
 </style>

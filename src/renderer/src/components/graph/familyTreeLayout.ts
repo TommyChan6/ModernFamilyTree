@@ -1,31 +1,47 @@
-// Pure family-tree layout — a layered, crossing-minimizing heuristic shared by the
-// Tree view's Generation mode and the Timeline's lane ordering.
+// Pure family-tree layout — a layered (Sugiyama-style) heuristic shared by the
+// graph's refresh / Generations / Birth arrangements and the Timeline's lane order.
 //
 // Philosophy: generally good, never absolute. Genealogy graphs (remarriage,
 // half-siblings, entry mistakes that form cycles) have no single perfect drawing,
 // so every rule below is a soft preference applied in decreasing order of strength:
-//   1. parents sit above their children (row assignment by longest ancestor path)
-//   2. married couples sit side by side as one block, father on the left
-//   3. rows are ordered to minimize link crossings (weighted barycenter sweeps,
-//      with a slight extra pull along father→child edges)
-//   4. nodes keep a minimum spacing and children center under their parents
-//      (alternating top-down/bottom-up coordinate refinement with a symmetric
-//      overlap resolver that never reorders a row)
+//   1. parents sit above their children. Rows come from walking each family
+//      outward from its deepest lineage (so an in-law's parents land one row
+//      above them instead of stranded at the top), repaired so every child is
+//      below every parent and partners share a row, then tightened so no line
+//      is longer than it has to be
+//   2. partners sit side by side as one block — father on the left unless the
+//      couple's own parents sit the other way round (that would force a
+//      crossing); unmarried co-parents of a child pair up the same way
+//   3. rows are ordered to minimize crossings: weighted barycenter sweeps plus
+//      adjacent-swap (transpose) refinement, keeping the best ordering seen.
+//      A couple's lines are counted from their midpoint, as they're drawn
+//   4. coordinates pull parent→child lines vertical with an L1-style fit (many
+//      perfectly straight lines rather than many slightly bent ones), solved row
+//      by row with an exact order-preserving projection; siblings keep a minimum
+//      gap and unrelated neighbours a wider one, so families read as clusters
 // Disconnected families are laid out independently and placed side by side.
 //
-// Everything is deterministic (stable sorts, id tie-breaks) and O(sweeps · (N + E)
-// + N log N per row sort), so a few thousand people stay well under a frame.
+// Everything is deterministic (stable sorts, id tie-breaks) and roughly
+// O(passes · (N + E) + N log N per row sort), so a few thousand people stay fast.
 
 import type { DateValue, SymmetryRole } from '../../../../shared/types'
 import { toOrdinal } from '../../../../shared/calendarMath'
 
-export const NODE_GAP = 90 // min horizontal gap between neighbouring blocks
+export const NODE_GAP = 100 // min horizontal gap between neighbouring blocks
 export const SPOUSE_GAP = 56 // gap between partners inside a couple block
+export const FAMILY_GAP = 40 // extra gap between neighbouring blocks that aren't siblings
 export const COMPONENT_GAP = 170 // gap between disconnected family components
-const FATHER_PULL = 1.15 // slight extra weight on father→child edges
-const ORDER_SWEEPS = 4 // barycenter ordering passes (down + up each)
-const REFINE_PASSES = 6 // coordinate refinement passes (alternating)
-const LAYER_RELAX_PASSES = 20 // cap for the spouse/child row relaxation
+export const BASE_NODE_RADIUS = 22 // the node radius the gaps above are tuned for
+const FATHER_PULL = 1.15 // slight extra weight on single-father→child lines
+const ORDER_SWEEPS = 12 // max barycenter ordering sweeps (down + up each)
+const ORDER_PATIENCE = 3 // stop after this many sweeps without fewer crossings
+const TRANSPOSE_ROUNDS = 4 // adjacent-swap passes per row per sweep
+const LAYER_RELAX_PASSES = 20 // cap for the row repair / tightening loops
+const COORD_L2_PASSES = 12 // least-squares coordinate passes (smooth start)
+const COORD_SNAP_PASSES = 16 // reweighted passes that snap near-straight lines straight
+const SNAP_EPS = 2 // px — below this a family counts as aligned
+const SNAP_RANGE = 60 // px — misalignment beyond this is shared out (least squares)
+const FREE_WEIGHT = 1e-3 // how strongly an unconnected block holds its place
 
 export interface LayoutPerson {
   id: string
@@ -44,6 +60,11 @@ export interface LayoutRelationship {
  *  it always did and any other type is ignored by the tree math. */
 export type TypeRoles = ReadonlyMap<string, SymmetryRole>
 
+export interface GenLayoutOptions {
+  /** Drawn node radius — gaps and row height scale up for bigger nodes. */
+  nodeRadius?: number
+}
+
 const legacyRoleOf = (type: string): SymmetryRole =>
   type === 'parent_child' || type === 'adopted'
     ? 'vertical'
@@ -61,13 +82,43 @@ export interface GenLayoutResult {
 }
 
 interface Block {
-  members: string[] // left→right member ids (spouse chains stay adjacent)
-  width: number // (members - 1) · SPOUSE_GAP
+  members: string[] // left→right member ids (partner chains stay adjacent)
+  base: string[] // default (father-left) orientation — the tie-break for flips
+  width: number // (members - 1) · spouseGap
   x: number // center x of the block
+  row: number
+  parents: Set<string> // every parent of every member (the sibling test)
+  edges: Incident[]
+}
+
+// One drawn parent→child line: from the midpoint of the child's parents that
+// share a block (a couple's line leaves from between them) down to the child.
+interface UnitEdge {
+  up: string[]
+  upBlock: Block
+  down: string
+  downBlock: Block
+  fam: Family
+  w: number
+  upOff: number // endpoint offsets from their block centers (coordinate phase)
+  downOff: number
+}
+
+// A parent unit and all its children — the coordinate phase straightens
+// families as a whole, so the unit stays centered over its sibling group.
+interface Family {
+  edges: UnitEdge[]
+  irls: number // current reweighting factor (1 / |unit x − mean child x|)
+}
+
+interface Incident {
+  e: UnitEdge
+  top: boolean // true = this block holds the parent end
 }
 
 const isMale = (p: LayoutPerson | undefined): boolean => p?.gender === 'male'
 const birthOf = (p: LayoutPerson | undefined): number => toOrdinal(p?.birth) ?? Infinity
+const SEP = '\u0000'
 
 function pushUnique(map: Map<string, string[]>, key: string, value: string): void {
   const arr = map.get(key)
@@ -75,13 +126,50 @@ function pushUnique(map: Map<string, string[]>, key: string, value: string): voi
   else if (!arr.includes(value)) arr.push(value)
 }
 
+/** Strict inversions in `seq` (pairs i < j with seq[i] > seq[j]) — merge sort. */
+function countInversions(seq: number[]): number {
+  if (seq.length < 2) return 0
+  let inv = 0
+  let a = seq.slice()
+  let b = new Array<number>(a.length)
+  for (let width = 1; width < a.length; width *= 2) {
+    for (let lo = 0; lo < a.length; lo += 2 * width) {
+      const mid = Math.min(lo + width, a.length)
+      const hi = Math.min(lo + 2 * width, a.length)
+      let i = lo
+      let j = mid
+      let k = lo
+      while (i < mid && j < hi) {
+        if (a[i] <= a[j]) b[k++] = a[i++]
+        else {
+          inv += mid - i
+          b[k++] = a[j++]
+        }
+      }
+      while (i < mid) b[k++] = a[i++]
+      while (j < hi) b[k++] = a[j++]
+    }
+    const t = a
+    a = b
+    b = t
+  }
+  return inv
+}
+
 export function computeGenLayout(
   nodesData: readonly LayoutPerson[],
   relationships: readonly LayoutRelationship[],
   width: number,
   height: number,
-  typeRoles?: TypeRoles
+  typeRoles?: TypeRoles,
+  opts?: GenLayoutOptions
 ): GenLayoutResult {
+  const scale = Math.max(1, (opts?.nodeRadius ?? BASE_NODE_RADIUS) / BASE_NODE_RADIUS)
+  const nodeGap = NODE_GAP * scale
+  const spouseGap = SPOUSE_GAP * scale
+  const familyGap = FAMILY_GAP * scale
+  const componentGap = COMPONENT_GAP * scale
+
   const byId = new Map<string, LayoutPerson>()
   for (const p of nodesData) byId.set(p.id, p)
 
@@ -105,66 +193,136 @@ export function computeGenLayout(
       pushUnique(spousesOf, b, a)
     }
   }
-  // Father→child edges pull slightly harder in every averaging step below.
+  // Partners = spouses, plus unmarried co-parents (two recorded parents of a
+  // child, neither with a spouse) — they read as a couple, so they sit as one.
+  const partnersOf = new Map<string, string[]>()
+  for (const [id, s] of spousesOf) partnersOf.set(id, [...s])
+  for (const p of nodesData) {
+    const ps = parentsOf.get(p.id)
+    if (!ps || ps.length !== 2 || spousesOf.has(ps[0]) || spousesOf.has(ps[1])) continue
+    pushUnique(partnersOf, ps[0], ps[1])
+    pushUnique(partnersOf, ps[1], ps[0])
+  }
   const edgeWeight = (parentId: string): number => (isMale(byId.get(parentId)) ? FATHER_PULL : 1)
+
+  // Back edges of the parent→child digraph (entry mistakes that form cycles)
+  // are ignored by the row math, so a cycle can't ratchet rows downward.
+  const backEdge = new Set<string>()
+  {
+    const state = new Map<string, 1 | 2>() // 1 = on the DFS stack, 2 = done
+    for (const p of nodesData) {
+      if (state.has(p.id)) continue
+      state.set(p.id, 1)
+      const stack: { id: string; i: number }[] = [{ id: p.id, i: 0 }]
+      while (stack.length) {
+        const top = stack[stack.length - 1]
+        const kids = childrenOf.get(top.id) ?? []
+        if (top.i < kids.length) {
+          const c = kids[top.i++]
+          const s = state.get(c)
+          if (s === 1) backEdge.add(top.id + SEP + c)
+          else if (!s) {
+            state.set(c, 1)
+            stack.push({ id: c, i: 0 })
+          }
+        } else {
+          state.set(top.id, 2)
+          stack.pop()
+        }
+      }
+    }
+  }
+  const isTreeEdge = (parent: string, child: string): boolean => !backEdge.has(parent + SEP + child)
 
   // ── Connected components ──────────────────────────────────────────────────
   const compOf = new Map<string, number>()
+  const compIds = new Map<number, string[]>()
   let compCount = 0
   for (const p of nodesData) {
     if (compOf.has(p.id)) continue
     const queue = [p.id]
+    const ids: string[] = []
     compOf.set(p.id, compCount)
     while (queue.length) {
       const id = queue.pop() as string
+      ids.push(id)
       for (const n of [
         ...(parentsOf.get(id) ?? []),
         ...(childrenOf.get(id) ?? []),
-        ...(spousesOf.get(id) ?? [])
+        ...(partnersOf.get(id) ?? [])
       ]) {
         if (!compOf.has(n)) {
-          compOf.set(n, compOf.get(id) as number)
+          compOf.set(n, compCount)
           queue.push(n)
         }
       }
     }
+    compIds.set(compCount, ids)
     compCount++
   }
 
   // ── Row (generation) assignment ───────────────────────────────────────────
-  // Longest path from ancestors, then a bounded relaxation so spouses share a
-  // row while children stay below every parent. Caps keep pathological data
-  // (cycles, spouse chains across generations) from looping forever.
-  const gen = new Map<string, number>()
-  const genOf = (id: string, seen: Set<string>): number => {
-    const cached = gen.get(id)
+  // 1. Walk each family breadth-first from its anchor — the founder of its
+  //    deepest lineage — giving parents g-1, children g+1, partners g. On
+  //    consistent data every line is exactly one row long.
+  const below = new Map<string, number>() // longest descent beneath a person
+  const depthBelow = (id: string): number => {
+    const cached = below.get(id)
     if (cached !== undefined) return cached
-    if (seen.has(id)) return 0 // cycle guard
-    seen.add(id)
-    let g = 0
-    for (const pid of parentsOf.get(id) ?? []) g = Math.max(g, genOf(pid, seen) + 1)
-    gen.set(id, g)
-    return g
+    below.set(id, 0) // provisional — guards any cycle the back-edge pass missed
+    let d = 0
+    for (const c of childrenOf.get(id) ?? []) {
+      if (isTreeEdge(id, c)) d = Math.max(d, depthBelow(c) + 1)
+    }
+    below.set(id, d)
+    return d
   }
-  for (const p of nodesData) genOf(p.id, new Set())
+  const gen = new Map<string, number>()
+  for (const ids of compIds.values()) {
+    let anchor = ids[0]
+    for (const id of ids) {
+      const d = depthBelow(id) - depthBelow(anchor)
+      const b = birthOf(byId.get(id)) - birthOf(byId.get(anchor))
+      if (d > 0 || (d === 0 && (b < 0 || (b === 0 && id < anchor)))) anchor = id
+    }
+    gen.set(anchor, 0)
+    const queue = [anchor]
+    for (let head = 0; head < queue.length; head++) {
+      const id = queue[head]
+      const g = gen.get(id) as number
+      const visit = (list: string[] | undefined, ng: number): void => {
+        for (const n of list ?? []) {
+          if (gen.has(n)) continue
+          gen.set(n, ng)
+          queue.push(n)
+        }
+      }
+      visit(partnersOf.get(id), g)
+      visit(parentsOf.get(id), g - 1)
+      visit(childrenOf.get(id), g + 1)
+    }
+  }
 
+  // 2. Repair: partners share a row, every child sits below every parent
+  //    (conflicting data — e.g. cross-generation marriages — pushes down).
+  const genOf = (id: string): number => gen.get(id) ?? 0
   for (let pass = 0; pass < LAYER_RELAX_PASSES; pass++) {
     let changed = false
-    for (const [id, spouses] of spousesOf) {
-      for (const s of spouses) {
-        const g = Math.max(gen.get(id) ?? 0, gen.get(s) ?? 0)
-        if (gen.get(id) !== g || gen.get(s) !== g) {
+    for (const [id, partners] of partnersOf) {
+      for (const s of partners) {
+        const g = Math.max(genOf(id), genOf(s))
+        if (genOf(id) !== g || genOf(s) !== g) {
           gen.set(id, g)
           gen.set(s, g)
           changed = true
         }
       }
     }
-    const byGen = [...nodesData].sort((a, b) => (gen.get(a.id) ?? 0) - (gen.get(b.id) ?? 0))
+    const byGen = [...nodesData].sort((a, b) => genOf(a.id) - genOf(b.id))
     for (const p of byGen) {
-      const g = gen.get(p.id) ?? 0
+      const g = genOf(p.id)
       for (const c of childrenOf.get(p.id) ?? []) {
-        if ((gen.get(c) ?? 0) <= g) {
+        if (isTreeEdge(p.id, c) && genOf(c) <= g) {
           gen.set(c, g + 1)
           changed = true
         }
@@ -173,28 +331,78 @@ export function computeGenLayout(
     if (!changed) break
   }
 
-  // Each component starts at its own top row.
-  const compMinGen = new Map<number, number>()
-  for (const p of nodesData) {
-    const c = compOf.get(p.id) as number
-    const g = gen.get(p.id) ?? 0
-    compMinGen.set(c, Math.min(compMinGen.get(c) ?? Infinity, g))
+  // 3. Tighten: a partner group with slack moves toward whichever side has
+  //    more lines (its children below or its own parents above), as long as
+  //    every line still points down.
+  {
+    const groups: string[][] = []
+    const seen = new Set<string>()
+    for (const p of nodesData) {
+      if (seen.has(p.id)) continue
+      const grp = [p.id]
+      seen.add(p.id)
+      for (let i = 0; i < grp.length; i++) {
+        for (const s of partnersOf.get(grp[i]) ?? []) {
+          if (!seen.has(s)) {
+            seen.add(s)
+            grp.push(s)
+          }
+        }
+      }
+      groups.push(grp)
+    }
+    for (let pass = 0; pass < LAYER_RELAX_PASSES; pass++) {
+      let changed = false
+      for (const grp of groups) {
+        const g = genOf(grp[0])
+        if (grp.some((m) => genOf(m) !== g)) continue
+        const inGrp = new Set(grp)
+        let lo = -Infinity
+        let hi = Infinity
+        let ups = 0
+        const kids = new Set<string>()
+        for (const m of grp) {
+          let hasParent = false
+          for (const p of parentsOf.get(m) ?? []) {
+            if (!isTreeEdge(p, m) || inGrp.has(p)) continue
+            hasParent = true
+            lo = Math.max(lo, genOf(p) + 1)
+          }
+          if (hasParent) ups++
+          for (const c of childrenOf.get(m) ?? []) {
+            if (!isTreeEdge(m, c) || inGrp.has(c)) continue
+            kids.add(c)
+            hi = Math.min(hi, genOf(c) - 1)
+          }
+        }
+        let target = g
+        if (kids.size > ups && hi !== Infinity && hi > g) target = hi
+        else if (ups > kids.size && lo !== -Infinity && lo < g) target = lo
+        if (target !== g) {
+          for (const m of grp) gen.set(m, target)
+          changed = true
+        }
+      }
+      if (!changed) break
+    }
   }
-  for (const p of nodesData) {
-    const c = compOf.get(p.id) as number
-    gen.set(p.id, (gen.get(p.id) ?? 0) - (compMinGen.get(c) ?? 0))
+
+  // Each component starts at its own top row.
+  for (const ids of compIds.values()) {
+    let min = Infinity
+    for (const id of ids) min = Math.min(min, genOf(id))
+    for (const id of ids) gen.set(id, genOf(id) - min)
   }
 
   // Compress to used rows (global), so guides never label an empty row.
   const usedRows = [...new Set([...gen.values()])].sort((a, b) => a - b)
   const rowIndex = new Map<number, number>()
   usedRows.forEach((g, i) => rowIndex.set(g, i))
-  const rowOf = (id: string): number => rowIndex.get(gen.get(id) ?? 0) ?? 0
+  const rowOf = (id: string): number => rowIndex.get(genOf(id)) ?? 0
 
-  // ── Couple blocks per (component, row) ────────────────────────────────────
-  // Same-row spouse chains merge into one block so partners are always adjacent
-  // (spouse edges inside a row can never cross anything).
+  // ── Blocks, positions, gaps ───────────────────────────────────────────────
   const posX = new Map<string, number>() // current x per person, kept in sync
+  const blockOf = new Map<string, Block>()
 
   const orientChain = (members: string[]): string[] => {
     if (members.length < 2) return members
@@ -205,18 +413,19 @@ export function computeGenLayout(
     return members
   }
 
-  const buildBlocks = (ids: string[]): Block[] => {
+  // Same-row partner chains merge into one block so partners are always
+  // adjacent (partner lines inside a row can never cross anything).
+  const buildBlocks = (ids: string[], row: number): Block[] => {
     const inGroup = new Set(ids)
     const seen = new Set<string>()
     const blocks: Block[] = []
     for (const id of ids) {
       if (seen.has(id)) continue
-      // Collect the whole same-row spouse chain.
       const chain = new Set<string>([id])
       const queue = [id]
       while (queue.length) {
         const cur = queue.pop() as string
-        for (const s of spousesOf.get(cur) ?? []) {
+        for (const s of partnersOf.get(cur) ?? []) {
           if (inGroup.has(s) && !chain.has(s)) {
             chain.add(s)
             queue.push(s)
@@ -225,24 +434,34 @@ export function computeGenLayout(
       }
       chain.forEach((m) => seen.add(m))
       // Walk the chain as a path from an endpoint (falls back gracefully on
-      // branching/cyclic spouse data — heuristic, not absolute).
+      // branching/cyclic partner data — heuristic, not absolute).
       const degree = (m: string): number =>
-        (spousesOf.get(m) ?? []).filter((s) => chain.has(s)).length
-      const start =
-        [...chain].sort((a, b) => a.localeCompare(b)).find((m) => degree(m) <= 1) ??
-        [...chain].sort((a, b) => a.localeCompare(b))[0]
+        (partnersOf.get(m) ?? []).filter((s) => chain.has(s)).length
+      const sorted = [...chain].sort((a, b) => a.localeCompare(b))
+      const start = sorted.find((m) => degree(m) <= 1) ?? sorted[0]
       const members: string[] = []
       const visited = new Set<string>()
       let cur: string | undefined = start
       while (cur && !visited.has(cur)) {
         visited.add(cur)
         members.push(cur)
-        cur = (spousesOf.get(cur) ?? []).find((s) => chain.has(s) && !visited.has(s))
+        cur = (partnersOf.get(cur) ?? []).find((s) => chain.has(s) && !visited.has(s))
       }
-      for (const m of [...chain].sort((a, b) => a.localeCompare(b))) {
-        if (!visited.has(m)) members.push(m)
+      for (const m of sorted) if (!visited.has(m)) members.push(m)
+      const base = orientChain(members)
+      const parents = new Set<string>()
+      for (const m of chain) for (const p of parentsOf.get(m) ?? []) parents.add(p)
+      const block: Block = {
+        members: base,
+        base,
+        width: (chain.size - 1) * spouseGap,
+        x: 0,
+        row,
+        parents,
+        edges: []
       }
-      blocks.push({ members: orientChain(members), width: (chain.size - 1) * SPOUSE_GAP, x: 0 })
+      for (const m of chain) blockOf.set(m, block)
+      blocks.push(block)
     }
     return blocks
   }
@@ -250,79 +469,78 @@ export function computeGenLayout(
   // Write member positions from a block's center x.
   const syncBlock = (b: Block): void => {
     const left = b.x - b.width / 2
-    b.members.forEach((m, i) => posX.set(m, left + i * SPOUSE_GAP))
+    b.members.forEach((m, i) => posX.set(m, left + i * spouseGap))
+  }
+
+  // Siblings (sharing a parent) sit closer; unrelated neighbours get extra air.
+  const gapBetween = (a: Block, b: Block): number => {
+    let siblings = false
+    for (const p of a.parents) {
+      if (b.parents.has(p)) {
+        siblings = true
+        break
+      }
+    }
+    return (a.width + b.width) / 2 + nodeGap + (siblings ? 0 : familyGap)
   }
 
   const compactRow = (blocks: Block[]): void => {
-    let cursor = 0
-    for (const b of blocks) {
-      b.x = cursor + b.width / 2
-      cursor += b.width + NODE_GAP
+    let x = 0
+    blocks.forEach((b, i) => {
+      if (i) x += gapBetween(blocks[i - 1], b)
+      b.x = x
       syncBlock(b)
-    }
-  }
-
-  // Mean position of a member's relations in the given direction (undefined if none).
-  const pullOf = (member: string, dir: 'parents' | 'children'): { x: number; w: number } | null => {
-    const rels = (dir === 'parents' ? parentsOf : childrenOf).get(member)
-    if (!rels || !rels.length) return null
-    let sum = 0
-    let wsum = 0
-    for (const r of rels) {
-      const x = posX.get(r)
-      if (x === undefined) continue
-      const w = dir === 'parents' ? edgeWeight(r) : edgeWeight(member)
-      sum += x * w
-      wsum += w
-    }
-    return wsum > 0 ? { x: sum / wsum, w: wsum } : null
-  }
-
-  // Desired center for a block: each member votes with its relations' mean
-  // position (minus the member's offset inside the block), weighted by how many
-  // relations actually pull on it.
-  const desiredX = (b: Block, dir: 'parents' | 'children'): number => {
-    let sum = 0
-    let wsum = 0
-    b.members.forEach((m, i) => {
-      const pull = pullOf(m, dir)
-      if (!pull) return
-      const offset = i * SPOUSE_GAP - b.width / 2
-      sum += (pull.x - offset) * pull.w
-      wsum += pull.w
     })
-    return wsum > 0 ? sum / wsum : b.x
   }
 
-  // Symmetric overlap resolver: forward pass (leftmost feasible ≥ desired) and
-  // backward pass (rightmost feasible ≤ desired) are both gap-feasible, so their
-  // average is too — and it drifts neither left nor right. Order never changes.
-  const resolveRow = (blocks: Block[], desired: number[]): void => {
+  // Exact weighted least-squares placement of a row with its order fixed and
+  // minimum gaps enforced: substitute away the cumulative gaps and the problem
+  // becomes isotonic regression, solved by pool-adjacent-violators.
+  const placeRow = (blocks: Block[], gaps: number[], desired: number[], weight: number[]): void => {
     const n = blocks.length
     if (!n) return
-    const gap = (i: number): number => (blocks[i - 1].width + blocks[i].width) / 2 + NODE_GAP
-    const fp = new Array<number>(n)
-    const bp = new Array<number>(n)
-    for (let i = 0; i < n; i++) fp[i] = i ? Math.max(desired[i], fp[i - 1] + gap(i)) : desired[i]
-    for (let i = n - 1; i >= 0; i--)
-      bp[i] = i < n - 1 ? Math.min(desired[i], bp[i + 1] - gap(i + 1)) : desired[i]
+    const off = new Array<number>(n)
+    off[0] = 0
+    for (let i = 1; i < n; i++) off[i] = off[i - 1] + gaps[i - 1]
+    const pw: number[] = []
+    const ps: number[] = []
+    const start: number[] = []
     for (let i = 0; i < n; i++) {
-      blocks[i].x = (fp[i] + bp[i]) / 2
-      syncBlock(blocks[i])
+      let w = weight[i]
+      let s = w * (desired[i] - off[i])
+      let st = i
+      while (pw.length && ps[ps.length - 1] / pw[pw.length - 1] > s / w) {
+        w += pw.pop() as number
+        s += ps.pop() as number
+        st = start.pop() as number
+      }
+      pw.push(w)
+      ps.push(s)
+      start.push(st)
+    }
+    for (let k = 0; k < pw.length; k++) {
+      const mean = ps[k] / pw[k]
+      const end = k + 1 < start.length ? start[k + 1] : n
+      for (let i = start[k]; i < end; i++) {
+        blocks[i].x = mean + off[i]
+        syncBlock(blocks[i])
+      }
     }
   }
 
-  // ── Per-component layout ──────────────────────────────────────────────────
-  const compIds = new Map<number, string[]>()
-  for (const p of nodesData) {
-    const c = compOf.get(p.id) as number
-    const arr = compIds.get(c)
-    if (arr) arr.push(p.id)
-    else compIds.set(c, [p.id])
+  const meanX = (ids: string[]): number => {
+    let s = 0
+    for (const id of ids) s += posX.get(id) ?? 0
+    return s / ids.length
   }
+  const otherX = (inc: Incident): number =>
+    inc.top ? (posX.get(inc.e.down) ?? 0) : meanX(inc.e.up)
+  const ownX = (inc: Incident): number => (inc.top ? meanX(inc.e.up) : (posX.get(inc.e.down) ?? 0))
+  const otherRow = (inc: Incident): number => (inc.top ? inc.e.downBlock.row : inc.e.upBlock.row)
 
+  // ── Per-component layout ──────────────────────────────────────────────────
   const layoutComponent = (ids: string[]): void => {
-    // Group members by row.
+    // Rows of blocks, eldest first as the deterministic starting order.
     const rows = new Map<number, string[]>()
     for (const id of ids) {
       const r = rowOf(id)
@@ -333,59 +551,263 @@ export function computeGenLayout(
     const rowKeys = [...rows.keys()].sort((a, b) => a - b)
     const rowBlocks = new Map<number, Block[]>()
     for (const r of rowKeys) {
-      const blocks = buildBlocks(rows.get(r) as string[])
-      // Deterministic initial order: eldest first, then id.
-      blocks.sort((a, b) => {
-        const ba = Math.min(...a.members.map((m) => birthOf(byId.get(m))))
-        const bb = Math.min(...b.members.map((m) => birthOf(byId.get(m))))
-        if (ba !== bb) return ba - bb
-        return a.members[0].localeCompare(b.members[0])
-      })
+      const blocks = buildBlocks(rows.get(r) as string[], r)
+      const eldest = (b: Block): number => Math.min(...b.members.map((m) => birthOf(byId.get(m))))
+      blocks.sort((a, b) => eldest(a) - eldest(b) || a.members[0].localeCompare(b.members[0]))
       rowBlocks.set(r, blocks)
       compactRow(blocks)
     }
 
-    // Crossing minimization: reorder each row by the (weighted) mean position of
-    // its relations in the neighbouring rows, sweeping down then up.
-    const sortRow = (r: number, dir: 'parents' | 'children'): void => {
-      const blocks = rowBlocks.get(r) as Block[]
-      if (blocks.length < 2) return
-      const keyed = blocks.map((b, i) => ({ b, key: desiredX(b, dir), i }))
-      keyed.sort((a, c) => a.key - c.key || a.i - c.i)
-      const sorted = keyed.map((k) => k.b)
-      rowBlocks.set(r, sorted)
-      compactRow(sorted)
-    }
-    for (let sweep = 0; sweep < ORDER_SWEEPS; sweep++) {
-      for (let i = 1; i < rowKeys.length; i++) sortRow(rowKeys[i], 'parents')
-      for (let i = rowKeys.length - 2; i >= 0; i--) sortRow(rowKeys[i], 'children')
+    // Lines: one per (child, parents-in-one-block) group.
+    const edges: UnitEdge[] = []
+    const families = new Map<string, Family>()
+    for (const c of ids) {
+      const ps = parentsOf.get(c)
+      if (!ps) continue
+      const downBlock = blockOf.get(c) as Block
+      const byBlock = new Map<Block, string[]>()
+      for (const p of ps) {
+        const b = blockOf.get(p) as Block
+        const arr = byBlock.get(b)
+        if (arr) arr.push(p)
+        else byBlock.set(b, [p])
+      }
+      for (const [upBlock, up] of byBlock) {
+        if (upBlock === downBlock || upBlock.row === downBlock.row) continue
+        const famKey = [...up].sort().join(SEP)
+        let fam = families.get(famKey)
+        if (!fam) families.set(famKey, (fam = { edges: [], irls: 1 }))
+        const e: UnitEdge = {
+          up,
+          upBlock,
+          down: c,
+          downBlock,
+          fam,
+          w: up.length > 1 ? 1 : edgeWeight(up[0]),
+          upOff: 0,
+          downOff: 0
+        }
+        edges.push(e)
+        fam.edges.push(e)
+        upBlock.edges.push({ e, top: true })
+        downBlock.edges.push({ e, top: false })
+      }
     }
 
-    // Coordinate refinement: children center under parents (and parents over
-    // children), order fixed, minimum gaps enforced symmetrically.
-    for (let pass = 0; pass < REFINE_PASSES; pass++) {
-      const down = pass % 2 === 0
-      const order = down ? rowKeys.slice(1) : rowKeys.slice(0, -1).reverse()
-      const dir: 'parents' | 'children' = down ? 'parents' : 'children'
-      for (const r of order) {
-        const blocks = rowBlocks.get(r) as Block[]
-        resolveRow(
-          blocks,
-          blocks.map((b) => desiredX(b, dir))
-        )
+    // ── Ordering ────────────────────────────────────────────────────────────
+    const countCrossings = (): number => {
+      const groups = new Map<string, [number, number][]>()
+      for (const e of edges) {
+        const ux = meanX(e.up)
+        const dx = posX.get(e.down) ?? 0
+        const upTop = e.upBlock.row < e.downBlock.row
+        const key = upTop
+          ? `${e.upBlock.row}:${e.downBlock.row}`
+          : `${e.downBlock.row}:${e.upBlock.row}`
+        const pair: [number, number] = upTop ? [ux, dx] : [dx, ux]
+        const arr = groups.get(key)
+        if (arr) arr.push(pair)
+        else groups.set(key, [pair])
+      }
+      let total = 0
+      for (const pairs of groups.values()) {
+        pairs.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+        total += countInversions(pairs.map((p) => p[1]))
+      }
+      return total
+    }
+
+    // Flip a partner chain when its lines reach the other way round (e.g. the
+    // wife's family sits to the left) — father-left only breaks ties.
+    const orientBlock = (b: Block): void => {
+      if (b.members.length < 2) return
+      const left = b.x - b.width / 2
+      const costOf = (members: string[]): number => {
+        const at = new Map<string, number>()
+        members.forEach((m, i) => at.set(m, left + i * spouseGap))
+        let cost = 0
+        for (const inc of b.edges) {
+          const mine = inc.top
+            ? inc.e.up.reduce((s, id) => s + (at.get(id) ?? 0), 0) / inc.e.up.length
+            : (at.get(inc.e.down) ?? 0)
+          cost += inc.e.w * Math.abs(mine - otherX(inc))
+        }
+        return cost
+      }
+      const rev = [...b.base].reverse()
+      b.members = costOf(rev) < costOf(b.base) - 1e-6 ? rev : b.base
+      syncBlock(b)
+    }
+
+    // Reorder a row by the weighted mean position of its lines' far ends in
+    // one direction (blocks with no such lines keep their place as the key).
+    const sortRow = (r: number, wantTop: boolean): void => {
+      const blocks = rowBlocks.get(r) as Block[]
+      if (blocks.length > 1) {
+        const keyed = blocks.map((b, i) => {
+          let s = 0
+          let ws = 0
+          for (const inc of b.edges) {
+            if (inc.top !== wantTop) continue
+            s += inc.e.w * (otherX(inc) - (ownX(inc) - b.x))
+            ws += inc.e.w
+          }
+          return { b, key: ws > 0 ? s / ws : b.x, i }
+        })
+        keyed.sort((a, c) => a.key - c.key || a.i - c.i)
+        const sorted = keyed.map((k) => k.b)
+        rowBlocks.set(r, sorted)
+        compactRow(sorted)
+      }
+      for (const b of rowBlocks.get(r) as Block[]) orientBlock(b)
+    }
+
+    // Swap neighbours while that strictly removes crossings with other rows.
+    const transposeRow = (r: number): void => {
+      const blocks = rowBlocks.get(r) as Block[]
+      if (blocks.length < 2) return
+      let swapped = false
+      for (let round = 0; round < TRANSPOSE_ROUNDS; round++) {
+        let improved = false
+        for (let i = 0; i + 1 < blocks.length; i++) {
+          const a = blocks[i]
+          const b = blocks[i + 1]
+          if (!a.edges.length || !b.edges.length) continue
+          let ab = 0
+          let ba = 0
+          for (const ia of a.edges) {
+            const ra = otherRow(ia)
+            const xa = otherX(ia)
+            for (const ib of b.edges) {
+              if (otherRow(ib) !== ra) continue
+              const xb = otherX(ib)
+              if (xa > xb) ab++
+              else if (xa < xb) ba++
+            }
+          }
+          if (ba < ab) {
+            blocks[i] = b
+            blocks[i + 1] = a
+            improved = true
+            swapped = true
+          }
+        }
+        if (!improved) break
+      }
+      if (swapped) compactRow(blocks)
+    }
+
+    const snapshot = (): { r: number; blocks: Block[]; members: string[][] }[] =>
+      rowKeys.map((r) => {
+        const blocks = [...(rowBlocks.get(r) as Block[])]
+        return { r, blocks, members: blocks.map((b) => b.members) }
+      })
+    const restore = (snap: ReturnType<typeof snapshot>): void => {
+      for (const { r, blocks, members } of snap) {
+        blocks.forEach((b, i) => (b.members = members[i]))
+        rowBlocks.set(r, blocks)
+        compactRow(blocks)
+      }
+    }
+
+    if (edges.length) {
+      let best = countCrossings()
+      let bestSnap = snapshot()
+      let stale = 0
+      for (let sweep = 0; sweep < ORDER_SWEEPS && best > 0; sweep++) {
+        for (let i = 1; i < rowKeys.length; i++) sortRow(rowKeys[i], false)
+        for (let i = rowKeys.length - 2; i >= 0; i--) sortRow(rowKeys[i], true)
+        for (const r of rowKeys) transposeRow(r)
+        const c = countCrossings()
+        if (c < best) {
+          best = c
+          bestSnap = snapshot()
+          stale = 0
+        } else if (++stale >= ORDER_PATIENCE) break
+      }
+      restore(bestSnap)
+    }
+
+    // ── Coordinates ─────────────────────────────────────────────────────────
+    // Pull every line toward vertical with the row orders fixed: least-squares
+    // passes first, then iteratively reweighted ones where each family (a
+    // parent unit + its children) is weighted by 1 / its misalignment. That
+    // approximates an L1 fit over families — most families end up exactly
+    // centered over their children (an only child straight below) and any
+    // unavoidable slack collects in a few, instead of every line bending a
+    // little. Each row is solved exactly given its neighbours (block
+    // coordinate descent).
+    const measureOffsets = (): void => {
+      for (const e of edges) {
+        e.upOff = meanX(e.up) - e.upBlock.x
+        e.downOff = (posX.get(e.down) ?? 0) - e.downBlock.x
+      }
+    }
+    measureOffsets()
+    const rowGaps = new Map<number, number[]>()
+    for (const r of rowKeys) {
+      const blocks = rowBlocks.get(r) as Block[]
+      rowGaps.set(
+        r,
+        blocks.slice(1).map((b, i) => gapBetween(blocks[i], b))
+      )
+    }
+    if (edges.length) {
+      const passes = COORD_L2_PASSES + COORD_SNAP_PASSES
+      const snapEps = SNAP_EPS * scale
+      const snapRange = SNAP_RANGE * scale
+      for (let pass = 0; pass < passes; pass++) {
+        if (pass === COORD_L2_PASSES >> 1) {
+          // Positions are near final now — re-decide which way each couple
+          // faces against them (the ordering phase only saw compact rows).
+          for (const r of rowKeys) for (const b of rowBlocks.get(r) as Block[]) orientBlock(b)
+          measureOffsets()
+        }
+        if (pass >= COORD_L2_PASSES) {
+          for (const fam of families.values()) {
+            let ux = 0
+            let cx = 0
+            for (const e of fam.edges) {
+              ux += e.upBlock.x + e.upOff
+              cx += e.downBlock.x + e.downOff
+            }
+            const r = Math.abs(ux - cx) / fam.edges.length
+            fam.irls = snapRange / Math.min(Math.max(r, snapEps), snapRange)
+          }
+        }
+        const order = pass % 2 === 0 ? rowKeys : [...rowKeys].reverse()
+        for (const r of order) {
+          const blocks = rowBlocks.get(r) as Block[]
+          const desired: number[] = []
+          const weight: number[] = []
+          for (const b of blocks) {
+            let s = 0
+            let ws = 0
+            for (const { e, top } of b.edges) {
+              const ux = e.upBlock.x + e.upOff
+              const dx = e.downBlock.x + e.downOff
+              const w = e.w * e.fam.irls
+              s += w * (top ? dx - e.upOff : ux - e.downOff)
+              ws += w
+            }
+            desired.push(ws > 0 ? s / ws : b.x)
+            weight.push(ws > 0 ? ws : FREE_WEIGHT)
+          }
+          placeRow(blocks, rowGaps.get(r) as number[], desired, weight)
+        }
       }
     }
   }
 
   // Largest families first (left), then by id for determinism.
-  const comps = [...compIds.entries()].sort(
-    (a, b) => b[1].length - a[1].length || a[1][0].localeCompare(b[1][0])
+  const comps = [...compIds.values()].sort(
+    (a, b) => b.length - a.length || a[0].localeCompare(b[0])
   )
-  for (const [, ids] of comps) layoutComponent(ids)
+  for (const ids of comps) layoutComponent(ids)
 
   // ── Compose components side by side, then center on the canvas ────────────
   let cursor = 0
-  for (const [, ids] of comps) {
+  for (const ids of comps) {
     let min = Infinity
     let max = -Infinity
     for (const id of ids) {
@@ -396,15 +818,23 @@ export function computeGenLayout(
     if (min === Infinity) continue
     const shift = cursor - min
     for (const id of ids) posX.set(id, (posX.get(id) ?? 0) + shift)
-    cursor += max - min + COMPONENT_GAP
+    cursor += max - min + componentGap
   }
-  const allX = [...posX.values()]
-  const offsetX = allX.length ? width / 2 - (Math.min(...allX) + Math.max(...allX)) / 2 : width / 2
+  let minX = Infinity
+  let maxX = -Infinity
+  for (const x of posX.values()) {
+    minX = Math.min(minX, x)
+    maxX = Math.max(maxX, x)
+  }
+  const offsetX = posX.size ? width / 2 - (minX + maxX) / 2 : width / 2
   for (const [id, x] of posX) posX.set(id, x + offsetX)
 
   // ── Rows → y ──────────────────────────────────────────────────────────────
   const rowCount = usedRows.length
-  const rowHeight = Math.max(120, Math.min(150, (height - 160) / Math.max(rowCount, 1)))
+  const rowHeight = Math.max(
+    120 * scale,
+    Math.min(150 * scale, (height - 160) / Math.max(rowCount, 1))
+  )
   const totalH = Math.max(0, rowCount - 1) * rowHeight
   const startY = (height - totalH) / 2
 

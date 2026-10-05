@@ -190,7 +190,7 @@ function removeTag(tagId) {
 }
 
 .chip-remove:hover {
-  color: #ef5350;
+  color: var(--danger);
 }
 
 .tag-empty {

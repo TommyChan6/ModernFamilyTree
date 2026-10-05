@@ -208,7 +208,8 @@ function onWheel(e) {
 // Keyboard: arrows / Home / End / Enter — only while nothing overlays us.
 function onKeydown(e) {
   if (store.modalOpen || store.formOpen || store.curtain.active) return
-  if (store.appSettingsOpen || store.userPageOpen) return
+  if (store.appSettingsOpen || store.userPageOpen || store.projectsPageOpen || store.browsePageOpen)
+    return
   const t = e.target
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return
   if (e.key === 'ArrowLeft') {
@@ -370,8 +371,8 @@ const capSub = computed(() => {
   transform: translateX(-50%);
   background: radial-gradient(
     50% 50% at 50% 50%,
-    rgba(108, 142, 245, 0.14),
-    rgba(108, 142, 245, 0.04) 55%,
+    rgba(var(--accent-rgb), 0.14),
+    rgba(var(--accent-rgb), 0.04) 55%,
     transparent 75%
   );
   pointer-events: none;
@@ -643,7 +644,7 @@ const capSub = computed(() => {
   height: 14px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 10px rgba(108, 142, 245, 0.6);
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.6);
   transition: transform 0.15s;
 }
 .stage-range::-webkit-slider-thumb:hover {

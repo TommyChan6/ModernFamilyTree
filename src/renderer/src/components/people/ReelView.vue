@@ -200,7 +200,8 @@ function onWheel(e) {
 
 function onKeydown(e) {
   if (store.modalOpen || store.formOpen || store.curtain.active) return
-  if (store.appSettingsOpen || store.userPageOpen) return
+  if (store.appSettingsOpen || store.userPageOpen || store.projectsPageOpen || store.browsePageOpen)
+    return
   const t = e.target
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return
   if (e.key === 'ArrowUp') {

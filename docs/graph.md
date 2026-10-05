@@ -50,7 +50,21 @@ into rows with a springy overshoot. Motion is a staggered, per-node tween
 | ⚡ Organic | `organic` | D3 force-directed layout (`forceLink`, `forceManyBody`, `forceCenter`, `forceCollide`). Dragging perturbs the simulation. |
 | 📅 Birth | `birth` | Y position is fixed by birth date (older = higher); X is free to drag. Draws year guide lines and a "Present" line. See [`layoutAge.js`](../src/renderer/src/components/graph/layoutAge.js). |
 | 🏛 Generations | `generations` | Hierarchical top-down layout computed from parent/child + spouse relationships. Nodes snap to generation rows; dragging between rows previews and creates new rows. See [`familyTreeLayout.ts`](../src/renderer/src/components/graph/familyTreeLayout.ts). |
+| 🌟 Spotlight | `spotlight` | A **main character** at centre stage (chosen per scene from the header chip or the action pane's 🌟 button; default = the most connected person). Everyone else stands on concentric rings by kinship closeness — inner circle, close family, extended family, distant kin, not connected — keeping a bearing (ancestors above, descendants below, paternal left, maternal and in-laws right). Kin titles float above every node; the lead gets a crowned halo of light rays. The cast blooms outward ring by ring. See [`spotlightLayout.ts`](../src/renderer/src/components/graph/spotlightLayout.ts). |
 | 🪐 Space | `space` | **Experimental (Labs).** The graph in 3D — see [Space (3D)](#space-3d) below. |
+
+## Line effects
+
+Style → **Line Effects** dresses bonds in an animated shader effect —
+Bloodstream (cells on a heartbeat), River, Neon (data packets), Helix (DNA),
+Ember, Aurora, Storm, Starlight, Gilded — scoped to lineage (vertical types),
+family (+ couples) or every bond, with speed / glow / palette knobs. Each effect
+is a branch of the link fragment shader (`graph/webgl/lineFx.js`), driven by the
+shared `uTime` clock: the ribbon is laid out `pad`× wider than the line
+(`aFx.z` = padded half-width, `aSide` across) and layers are composited in
+premultiplied alpha. Lenses that draw the line themselves (the trace chain, the
+kin bloodline flow, the delete arm) and time-travel ghosts keep the plain look;
+the 水墨 brush look owns the links when it's on.
 
 ## Space (3D) {#space-3d}
 
@@ -89,6 +103,17 @@ positions, so nothing is ever lost.
 Layout math lives in **pure functions** (`computeAgeYPositions`, `computeGenLayout`)
 that take data and dimensions and return target positions — no D3, no store, so they
 are easy to reason about and test.
+
+`computeGenLayout` (the ↻ refresh for Free/Organic/Birth/Generations, and the
+Timeline's lane order) is a Sugiyama-style pipeline: rows by a breadth-first walk
+from each family's deepest lineage (in-laws' parents land one row above them, so
+lines span one generation), repaired + tightened; partner blocks (spouses and
+unmarried co-parents) turned to face their own families; crossing minimization by
+barycenter sweeps + adjacent swaps, keeping the best ordering; then coordinates by
+a reweighted least-squares fit per family (near-straight lines snap exactly
+vertical, real conflicts are shared out) with an exact order-preserving row
+projection. Siblings sit `NODE_GAP` apart, unrelated neighbours `+FAMILY_GAP`, and
+all gaps scale with the node radius.
 
 ## Scenes
 
@@ -166,6 +191,16 @@ drives a coordinated look system, all persisted per project as `graph_*` setting
   literals); affinity overlays stay softly curved. `GraphCanvas.updateGraph`
   stamps the family context (`stampFamilyContext`: shared per-sibling-group
   `_fam` objects) right after d3 wires the links.
+- **`bezier` route — hand-shaped curves.** Each link is a cubic Bézier; the
+  default is a vertical tree swoop for parent→child edges and a gentle arc
+  otherwise. Selecting a bond (while lines aren't locked and no edit mode is
+  active) shows two control handles on the overlay canvas: drag a handle, or
+  drag the line itself (`bendCurveAt` — the grabbed point tracks the cursor),
+  and double-click to reset. Shapes live scene-wide in the layouts bag as
+  `layouts.curves[relId] = { a:[u,v], b:[u,v], s: person_a_id }` — control
+  points in the link's chord frame, so curves follow their people; `s` lets
+  `applyCurves` mirror the frame if the endpoints get swapped. Autosaved via
+  `scenes:save`; `projects:duplicate` remaps them onto the copied ids.
 - **Atmosphere** (`gs.ambientFx` + two colors + density) — a screen-space GPU
   particle field behind the graph ([`AmbientLayer.js`](../src/renderer/src/components/graph/webgl/AmbientLayer.js)):
   fireflies / stars / petals / snow / embers / rain / motes. One instanced draw
@@ -195,6 +230,21 @@ only — they never mutate data.
 | Gender | Default / Male / Female |
 | Marriage | Default / Married / Divorced / Single |
 | Deceased | Default / Deceased / Living — **requires** a Present date (Project ▾ menu) |
+
+## Kinship lens
+
+The 🧬 header toggle opens the **Kinship** pane (`components/kinship/KinshipPane.vue`).
+With a viewpoint person and the lens on, `nodeVisual()` rings every node in its kin
+class colour (`--kin-*` tokens: blood, spouse, by-marriage, step, social) and fades
+outsiders; `linkVisual()` keeps only bonds between people in view, and the
+Ancestors/Descendants filters stream the direct line with dash flow. The overlay
+(`TextGuideOverlay._drawKin`) draws a named pill above each node (closest kin win
+space; far zoom keeps only close ranks) plus the reveal ripple — `startKinReveal()`
+runs a short rAF loop that restyles per frame so kin fade in by closeness. A
+connection trace or Orbit rings take precedence while active. Tracing two people
+shows `KinshipCard` (name both ways, arch through the common ancestor, degree,
+expected shared DNA, and the Bloodline meter for couples who share blood). All
+math is pure in `kinship/kinshipGraph.ts` + `kinshipNames.ts`.
 
 ## Action wheel (edit modes)
 
@@ -235,6 +285,18 @@ operation) writes the active scene through `scenes:save`, lightly debounced and
 flushed on scene/project switches and exit. On load, `GraphCanvas` enters the
 project's saved active graph scene (the `activeSceneId:graph` setting), creating a
 default `organic` scene for a brand-new project.
+
+Snapshots always record where nodes are **heading**, never an in-between frame:
+layout transitions publish `ctx.motionTargets` (useGraphAnimation) and the
+Generations row glide publishes `ctx.rowTargets` (guideLines
+`redistributeGenRows`), and `snapshotActiveScene` prefers those over live x/y.
+Scene/type switches therefore save *before* `cancelAnimation()`, and grabbing a
+node lands any in-flight transition (`finishAnimation`). Entering Generations
+runs the saved positions through `reconcileGenRows`, which keeps a healthy save
+untouched and snaps anyone between rows back onto one (by rank when the saved
+heights still form one cluster per row), re-saving if it repaired anything.
+People placed by hand in Generations (Add mode, Directory drop) snap to a row
+like a dragged node.
 
 On top of autosave sits the manual **checkpoint**: **Save** (Ctrl/Cmd+S or the
 Project ▾ menu) snapshots the project's arrangement state (scenes + Groups

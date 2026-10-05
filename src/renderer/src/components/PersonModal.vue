@@ -1,27 +1,414 @@
 <template>
-  <Transition name="pv">
+  <Transition
+    :name="isScroll ? 'pvs' : 'pv'"
+    :duration="isScroll ? { enter: 500, leave: 900 } : undefined"
+  >
     <div
       v-if="store.modalOpen && person"
       class="pv-overlay"
+      :class="{ 'pv-ink': store.isInk, 'pv-is-scroll': isScroll }"
       :style="accentVars"
       @pointermove="onOverlayMove"
     >
-      <!-- ── Ambient background: blurred portrait, aurora, giant monogram ── -->
-      <div class="pv-bg" aria-hidden="true">
-        <div
-          v-if="portraitUrl"
-          class="pv-bg-photo"
-          :style="{ backgroundImage: `url('${portraitUrl}')` }"
-        ></div>
-        <div class="pv-aurora pv-aurora-a"></div>
-        <div class="pv-aurora pv-aurora-b"></div>
-        <div class="pv-aurora pv-aurora-c"></div>
-        <div class="pv-bg-word">{{ initialsOf(person.name) }}</div>
-        <div class="pv-vignette"></div>
-      </div>
+      <!-- ── The presentation: cinematic page or 卷 handscroll (store.profileStyle).
+           Swapping cross-plays: the page dissolves into ink as the scroll unrolls. ── -->
+      <Transition name="pv-swap" :duration="{ enter: 1300, leave: 900 }">
+        <div v-if="!isScroll" key="cine" class="pv-cine">
+          <!-- ── Ambient background: blurred portrait, aurora, giant monogram ── -->
+          <div class="pv-bg" aria-hidden="true">
+            <div
+              v-if="portraitUrl"
+              class="pv-bg-photo"
+              :style="{ backgroundImage: `url('${portraitUrl}')` }"
+            ></div>
+            <div class="pv-aurora pv-aurora-a"></div>
+            <div class="pv-aurora pv-aurora-b"></div>
+            <div class="pv-aurora pv-aurora-c"></div>
+            <div class="pv-bg-word">{{ initialsOf(person.name) }}</div>
+            <div class="pv-vignette"></div>
+          </div>
 
-      <!-- Cursor-following light -->
-      <div ref="spotEl" class="pv-spotlight" aria-hidden="true"></div>
+          <!-- Cursor-following light -->
+          <div ref="spotEl" class="pv-spotlight" aria-hidden="true"></div>
+
+          <!-- ── Person content (keyed → animated person-to-person travel) ── -->
+          <div class="pv-stage">
+            <Transition :name="navDir < 0 ? 'pv-nav-b' : 'pv-nav-f'">
+              <main :key="person.id" class="pv-main">
+                <!-- Identity column -->
+                <aside class="pv-identity">
+                  <div
+                    ref="cardEl"
+                    class="pv-card"
+                    :class="{ 'pv-card-tilting': tilt.on, 'pv-card-dead': deceased }"
+                    :style="cardStyle"
+                    @pointermove="onCardMove"
+                    @pointerleave="onCardLeave"
+                    @click="portraitIndex >= 0 && (lightbox = portraitIndex)"
+                  >
+                    <div class="pv-card-float">
+                      <div class="pv-card-inner">
+                        <img
+                          v-if="portraitUrl"
+                          class="pv-card-img"
+                          :src="portraitUrl"
+                          alt=""
+                          draggable="false"
+                          decoding="async"
+                        />
+                        <div v-else class="pv-monogram">
+                          <div class="pv-monogram-halo"></div>
+                          <span class="pv-monogram-text">{{ initialsOf(person.name) }}</span>
+                        </div>
+                        <div class="pv-card-glare"></div>
+                        <div class="pv-card-rim"></div>
+                        <div v-if="deceased" class="pv-memoriam">🕊 In memoriam</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <h1 class="pv-name">
+                    <span
+                      v-for="(ch, i) in nameChars"
+                      :key="i + '-' + ch"
+                      class="pv-ch"
+                      :style="{ '--d': Math.min(i, 24) * 0.032 + 's' }"
+                      >{{ ch }}</span
+                    >
+                  </h1>
+                  <div class="pv-name-rule"></div>
+
+                  <div class="pv-lifespan">
+                    <template v-if="person.birth?.year || person.death?.year">
+                      <span class="pv-year">{{ fmtDate(person.birth) || '?' }}</span>
+                      <span class="pv-life-line">
+                        <span class="pv-life-dot" :class="{ 'pv-alive': !deceased }"></span>
+                      </span>
+                      <span class="pv-year">{{
+                        deceased ? fmtDate(person.death) || '?' : 'present'
+                      }}</span>
+                      <span v-if="age !== null" class="pv-age">{{ age }} yrs</span>
+                    </template>
+                    <span v-else class="pv-dim">No dates recorded</span>
+                  </div>
+
+                  <div class="pv-chips">
+                    <span v-if="person.gender && person.gender !== 'unknown'" class="pv-chip">
+                      {{ genderGlyph }} {{ person.gender }}
+                    </span>
+                    <span v-if="person.occupation" class="pv-chip">💼 {{ person.occupation }}</span>
+                    <span v-if="person.location" class="pv-chip">📍 {{ person.location }}</span>
+                  </div>
+
+                  <div v-if="personTags.length" class="pv-tags">
+                    <span
+                      v-for="tag in personTags"
+                      :key="tag.id"
+                      class="pv-tag"
+                      :style="{ '--tc': tag.color || 'var(--pa)' }"
+                    >
+                      <span class="pv-tag-dot"></span>{{ tag.icon ? tag.icon + ' ' : ''
+                      }}{{ tag.label }}
+                    </span>
+                  </div>
+
+                  <div class="pv-stats">
+                    <div class="pv-stat" style="--i: 0">
+                      <span class="pv-stat-val">{{ statsShown.bonds }}</span>
+                      <span class="pv-stat-key">Bonds</span>
+                    </div>
+                    <div class="pv-stat" style="--i: 1">
+                      <span class="pv-stat-val">{{ statsShown.circle }}</span>
+                      <span class="pv-stat-key">Circle</span>
+                    </div>
+                    <div class="pv-stat" style="--i: 2">
+                      <span class="pv-stat-val">{{ statsShown.traits }}</span>
+                      <span class="pv-stat-key">Traits</span>
+                    </div>
+                    <div class="pv-stat" style="--i: 3">
+                      <span class="pv-stat-val">{{ statsShown.photos }}</span>
+                      <span class="pv-stat-key">Photos</span>
+                    </div>
+                  </div>
+                </aside>
+
+                <!-- Detail column -->
+                <section class="pv-content">
+                  <!-- Constellation -->
+                  <section v-if="ring1.length" class="pv-section" style="--i: 0">
+                    <h2 class="pv-h">
+                      Constellation
+                      <span class="pv-h-sub">{{ circleCount }} within two bonds</span>
+                    </h2>
+                    <div class="pv-orbit" :class="{ 'pv-orbit-lg': ring2.length }">
+                      <div v-if="ring2.length" class="pv-ring pv-ring-2"></div>
+                      <div class="pv-ring pv-ring-1"></div>
+
+                      <div class="pv-orbit-center">
+                        <div class="pv-orbit-halo"></div>
+                        <div class="pv-orbit-me">
+                          <img v-if="portraitUrl" :src="portraitUrl" alt="" draggable="false" />
+                          <span v-else>{{ initialsOf(person.name) }}</span>
+                        </div>
+                      </div>
+
+                      <div class="pv-spinner pv-spin-1">
+                        <button
+                          v-for="(sat, i) in ring1"
+                          :key="sat.otherId"
+                          class="pv-sat pv-sat-1"
+                          :class="{ 'pv-sat-ended': sat.ended }"
+                          :style="satStyle(i, ring1.length, ring2.length ? 132 : 118)"
+                          :title="sat.roles + ' — ' + sat.name"
+                          @click="navigateTo(sat.otherId)"
+                        >
+                          <span class="pv-sat-inner pv-counter-1">
+                            <span class="pv-sat-avatar">
+                              <img
+                                v-if="sat.img"
+                                :src="imageUrl(sat.img)"
+                                alt=""
+                                draggable="false"
+                              />
+                              <span v-else>{{ initialsOf(sat.name) }}</span>
+                            </span>
+                            <span class="pv-sat-label">
+                              <b>{{ sat.roles }}</b
+                              >{{ sat.name }}
+                            </span>
+                          </span>
+                        </button>
+                      </div>
+
+                      <div v-if="ring2.length" class="pv-spinner pv-spin-2">
+                        <button
+                          v-for="(sat, i) in ring2"
+                          :key="sat.otherId"
+                          class="pv-sat pv-sat-2"
+                          :style="satStyle(i, ring2.length, 208, 14)"
+                          :title="sat.name"
+                          @click="navigateTo(sat.otherId)"
+                        >
+                          <span class="pv-sat-inner pv-counter-2">
+                            <span class="pv-sat-avatar">
+                              <img
+                                v-if="sat.img"
+                                :src="imageUrl(sat.img)"
+                                alt=""
+                                draggable="false"
+                              />
+                              <span v-else>{{ initialsOf(sat.name) }}</span>
+                            </span>
+                            <span class="pv-sat-label"><b>2 hops</b>{{ sat.name }}</span>
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+
+                  <!-- Kinship: the whole family, named, beside the ancestor fan -->
+                  <section v-if="relationshipChips.length" class="pv-section" style="--i: 1">
+                    <h2 class="pv-h pv-h-kin">
+                      Kinship
+                      <span class="pv-h-sub">family, named</span>
+                      <KinLangPicker class="pv-kin-lang" />
+                    </h2>
+                    <KinshipSection :person-id="person.id" @navigate="navigateTo" />
+                  </section>
+
+                  <!-- Story -->
+                  <section v-if="person.bio" class="pv-section" style="--i: 1">
+                    <h2 class="pv-h">Story</h2>
+                    <p class="pv-bio" :class="{ 'pv-bio-cap': person.bio.length > 140 }">
+                      {{ person.bio }}
+                    </p>
+                  </section>
+
+                  <!-- Traits -->
+                  <section v-if="traitRows.length" class="pv-section" style="--i: 2">
+                    <h2 class="pv-h">
+                      Traits <span class="pv-h-sub">{{ traitRows.length }}</span>
+                    </h2>
+                    <div class="pv-traits">
+                      <div
+                        v-for="(t, i) in traitRows"
+                        :key="t.id"
+                        class="pv-trait"
+                        :class="{ 'pv-trait-wide': t.kind === 'para' }"
+                        :style="{ '--i': i }"
+                      >
+                        <div class="pv-trait-head">
+                          <span v-if="t.icon" class="pv-trait-icon">{{ t.icon }}</span>
+                          {{ t.label }}
+                        </div>
+                        <div v-if="t.kind === 'slider'" class="pv-trait-slider">
+                          <div class="pv-bar">
+                            <div class="pv-bar-fill" :style="{ width: t.pct + '%' }"></div>
+                            <div class="pv-bar-spark" :style="{ left: t.pct + '%' }"></div>
+                          </div>
+                          <div v-if="t.left || t.right" class="pv-bar-labels">
+                            <span>{{ t.left }}</span>
+                            <span>{{ t.right }}</span>
+                          </div>
+                        </div>
+                        <div v-else-if="t.kind === 'select'" class="pv-trait-value">
+                          <span
+                            v-if="t.color"
+                            class="pv-select-dot"
+                            :style="{ background: t.color }"
+                          ></span>
+                          {{ t.text }}
+                        </div>
+                        <div
+                          v-else-if="t.kind === 'bool'"
+                          class="pv-trait-value"
+                          :class="t.bool ? 'pv-bool-yes' : 'pv-bool-no'"
+                        >
+                          {{ t.bool ? '✓ Yes' : '✕ No' }}
+                        </div>
+                        <div v-else-if="t.kind === 'para'" class="pv-trait-para">{{ t.text }}</div>
+                        <div v-else class="pv-trait-value">{{ t.text }}</div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <!-- Chronicle: their life, their story events, the eras they lived through -->
+                  <section
+                    v-if="lifeEvents.length || livedEras.length"
+                    class="pv-section"
+                    style="--i: 3"
+                  >
+                    <h2 class="pv-h pv-h-chron">
+                      Chronicle
+                      <button
+                        class="pv-chron-add"
+                        title="Add a story event they took part in"
+                        @click="addStoryEvent"
+                      >
+                        ＋ Event
+                      </button>
+                    </h2>
+                    <div v-if="livedEras.length" class="pv-eras">
+                      <span class="pv-eras-k">Lived through</span>
+                      <button
+                        v-for="(e, i) in livedEras"
+                        :key="e.id"
+                        class="pv-era"
+                        :style="{ '--ec': e.color, '--i': i }"
+                        :title="e.description || e.name"
+                        @click="store.openEraEditor({ id: e.id })"
+                      >
+                        <span class="pv-era-ic">{{ e.icon || '◆' }}</span
+                        >{{ e.name }}
+                      </button>
+                    </div>
+                    <div class="pv-chron">
+                      <div
+                        v-for="(ev, i) in lifeEvents"
+                        :key="i"
+                        class="pv-ev"
+                        :class="{ 'pv-ev-link': !!ev.personId || !!ev.eventId }"
+                        :style="{ '--i': i, '--ec': ev.color || null }"
+                        @click="onChronicleClick(ev)"
+                      >
+                        <div class="pv-ev-year">{{ ev.when }}</div>
+                        <div class="pv-ev-node">
+                          <span class="pv-ev-dot" :class="'pv-ev-' + ev.kind"></span>
+                        </div>
+                        <div class="pv-ev-body">
+                          <span v-if="ev.glyph" class="pv-ev-glyph">{{ ev.glyph }}</span>
+                          <span class="pv-ev-title">{{ ev.title }}</span>
+                          <span v-if="ev.sub" class="pv-ev-sub">{{ ev.sub }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <!-- Bonds -->
+                  <section v-if="bondGroups.length" class="pv-section" style="--i: 4">
+                    <h2 class="pv-h">
+                      Bonds <span class="pv-h-sub">{{ relationshipChips.length }}</span>
+                    </h2>
+                    <div v-for="g in bondGroups" :key="g.key" class="pv-band">
+                      <div class="pv-band-name">{{ g.label }}</div>
+                      <div class="pv-band-chips">
+                        <button
+                          v-for="(c, i) in g.chips"
+                          :key="c.id"
+                          class="pv-bond"
+                          :class="{ 'pv-bond-ended': c.ended }"
+                          :style="{ '--bc': c.color, '--i': i }"
+                          @click="navigateTo(c.otherId)"
+                        >
+                          <span class="pv-bond-avatar">
+                            <img v-if="c.img" :src="imageUrl(c.img)" alt="" draggable="false" />
+                            <span v-else>{{ initialsOf(c.name) }}</span>
+                          </span>
+                          <span class="pv-bond-text">
+                            <span class="pv-bond-role">{{ c.glyph }} {{ c.role }}</span>
+                            <span class="pv-bond-name">{{ c.name }}</span>
+                          </span>
+                          <span v-if="c.endedYear" class="pv-bond-endtag"
+                            >ended {{ c.endedYear }}</span
+                          >
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+
+                  <!-- Gallery -->
+                  <section v-if="images.length" class="pv-section" style="--i: 5">
+                    <h2 class="pv-h">
+                      Gallery <span class="pv-h-sub">{{ images.length }}</span>
+                    </h2>
+                    <div class="pv-gallery">
+                      <button
+                        v-for="(img, i) in images"
+                        :key="img.id"
+                        class="pv-photo"
+                        :style="{ '--i': i }"
+                        @click="lightbox = i"
+                      >
+                        <img
+                          :src="imageUrl(img.file_path)"
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                        />
+                        <span v-if="img.role" class="pv-photo-role">{{ img.role }}</span>
+                        <span v-if="img.is_primary" class="pv-photo-star">★</span>
+                      </button>
+                    </div>
+                  </section>
+
+                  <!-- Blank slate -->
+                  <section v-if="isBlank" class="pv-section pv-empty" style="--i: 0">
+                    <div class="pv-empty-mark">✦</div>
+                    <div class="pv-empty-title">A story waiting to be written</div>
+                    <div class="pv-empty-text">
+                      No traits, bonds, or photos yet — open the editor to bring
+                      {{ person.name || 'them' }} to life.
+                    </div>
+                    <button class="pv-act pv-empty-cta" @click="store.openForm(person)">
+                      ✎ Start editing
+                    </button>
+                  </section>
+
+                  <div class="pv-content-tail"></div>
+                </section>
+              </main>
+            </Transition>
+          </div>
+        </div>
+        <ProfileScroll
+          v-else
+          key="scroll"
+          :profile="profile"
+          @navigate="navigateTo"
+          @lightbox="openLightbox"
+          @edit="store.openForm(person)"
+        />
+      </Transition>
 
       <!-- ── Chrome ── -->
       <header class="pv-chrome">
@@ -31,331 +418,42 @@
           <kbd class="pv-kbd">Esc</kbd>
         </button>
         <div class="pv-chrome-spacer"></div>
-        <button class="pv-act" @click="store.openForm(person)"><span>✎</span> Edit</button>
-        <button class="pv-act pv-act-danger" @click="handleDelete"><span>🗑</span> Delete</button>
+        <div
+          class="pv-style"
+          role="radiogroup"
+          aria-label="Profile style"
+          :style="{ '--n': PROFILE_STYLE_META.length, '--at': styleIndex }"
+        >
+          <i class="pv-style-thumb" aria-hidden="true"></i>
+          <button
+            v-for="s in PROFILE_STYLE_META"
+            :key="s.id"
+            class="pv-style-btn"
+            :class="{ 'pv-style-on': store.profileStyle === s.id }"
+            role="radio"
+            :aria-checked="store.profileStyle === s.id"
+            :title="s.title"
+            @click="store.setProfileStyle(s.id)"
+          >
+            <span class="pv-style-glyph">{{ s.glyph }}</span>
+            <span class="pv-style-label">{{ s.label }}</span>
+          </button>
+        </div>
+        <button class="pv-act" @click="store.openForm(person)">
+          <span>✎</span><span class="pv-act-label"> Edit</span>
+        </button>
+        <button class="pv-act pv-act-danger" title="Delete" @click="handleDelete">
+          <span>🗑</span><span class="pv-act-label"> Delete</span>
+        </button>
         <button class="pv-x" title="Close profile" @click="store.closeModal()">✕</button>
       </header>
-
-      <!-- ── Person content (keyed → animated person-to-person travel) ── -->
-      <div class="pv-stage">
-        <Transition :name="navDir < 0 ? 'pv-nav-b' : 'pv-nav-f'">
-          <main :key="person.id" class="pv-main">
-            <!-- Identity column -->
-            <aside class="pv-identity">
-              <div
-                ref="cardEl"
-                class="pv-card"
-                :class="{ 'pv-card-tilting': tilt.on, 'pv-card-dead': deceased }"
-                :style="cardStyle"
-                @pointermove="onCardMove"
-                @pointerleave="onCardLeave"
-                @click="portraitIndex >= 0 && (lightbox = portraitIndex)"
-              >
-                <div class="pv-card-float">
-                  <div class="pv-card-inner">
-                    <img
-                      v-if="portraitUrl"
-                      class="pv-card-img"
-                      :src="portraitUrl"
-                      alt=""
-                      draggable="false"
-                      decoding="async"
-                    />
-                    <div v-else class="pv-monogram">
-                      <div class="pv-monogram-halo"></div>
-                      <span class="pv-monogram-text">{{ initialsOf(person.name) }}</span>
-                    </div>
-                    <div class="pv-card-glare"></div>
-                    <div class="pv-card-rim"></div>
-                    <div v-if="deceased" class="pv-memoriam">🕊 In memoriam</div>
-                  </div>
-                </div>
-              </div>
-
-              <h1 class="pv-name">
-                <span
-                  v-for="(ch, i) in nameChars"
-                  :key="i + '-' + ch"
-                  class="pv-ch"
-                  :style="{ '--d': Math.min(i, 24) * 0.032 + 's' }"
-                  >{{ ch }}</span
-                >
-              </h1>
-              <div class="pv-name-rule"></div>
-
-              <div class="pv-lifespan">
-                <template v-if="person.birth?.year || person.death?.year">
-                  <span class="pv-year">{{ fmtDate(person.birth) || '?' }}</span>
-                  <span class="pv-life-line">
-                    <span class="pv-life-dot" :class="{ 'pv-alive': !deceased }"></span>
-                  </span>
-                  <span class="pv-year">{{
-                    deceased ? fmtDate(person.death) || '?' : 'present'
-                  }}</span>
-                  <span v-if="age !== null" class="pv-age">{{ age }} yrs</span>
-                </template>
-                <span v-else class="pv-dim">No dates recorded</span>
-              </div>
-
-              <div class="pv-chips">
-                <span v-if="person.gender && person.gender !== 'unknown'" class="pv-chip">
-                  {{ genderGlyph }} {{ person.gender }}
-                </span>
-                <span v-if="person.occupation" class="pv-chip">💼 {{ person.occupation }}</span>
-                <span v-if="person.location" class="pv-chip">📍 {{ person.location }}</span>
-              </div>
-
-              <div v-if="personTags.length" class="pv-tags">
-                <span
-                  v-for="tag in personTags"
-                  :key="tag.id"
-                  class="pv-tag"
-                  :style="{ '--tc': tag.color || 'var(--pa)' }"
-                >
-                  <span class="pv-tag-dot"></span>{{ tag.icon ? tag.icon + ' ' : ''
-                  }}{{ tag.label }}
-                </span>
-              </div>
-
-              <div class="pv-stats">
-                <div class="pv-stat" style="--i: 0">
-                  <span class="pv-stat-val">{{ statsShown.bonds }}</span>
-                  <span class="pv-stat-key">Bonds</span>
-                </div>
-                <div class="pv-stat" style="--i: 1">
-                  <span class="pv-stat-val">{{ statsShown.circle }}</span>
-                  <span class="pv-stat-key">Circle</span>
-                </div>
-                <div class="pv-stat" style="--i: 2">
-                  <span class="pv-stat-val">{{ statsShown.traits }}</span>
-                  <span class="pv-stat-key">Traits</span>
-                </div>
-                <div class="pv-stat" style="--i: 3">
-                  <span class="pv-stat-val">{{ statsShown.photos }}</span>
-                  <span class="pv-stat-key">Photos</span>
-                </div>
-              </div>
-            </aside>
-
-            <!-- Detail column -->
-            <section class="pv-content">
-              <!-- Constellation -->
-              <section v-if="ring1.length" class="pv-section" style="--i: 0">
-                <h2 class="pv-h">
-                  Constellation
-                  <span class="pv-h-sub">{{ circleCount }} within two bonds</span>
-                </h2>
-                <div class="pv-orbit" :class="{ 'pv-orbit-lg': ring2.length }">
-                  <div v-if="ring2.length" class="pv-ring pv-ring-2"></div>
-                  <div class="pv-ring pv-ring-1"></div>
-
-                  <div class="pv-orbit-center">
-                    <div class="pv-orbit-halo"></div>
-                    <div class="pv-orbit-me">
-                      <img v-if="portraitUrl" :src="portraitUrl" alt="" draggable="false" />
-                      <span v-else>{{ initialsOf(person.name) }}</span>
-                    </div>
-                  </div>
-
-                  <div class="pv-spinner pv-spin-1">
-                    <button
-                      v-for="(sat, i) in ring1"
-                      :key="sat.otherId"
-                      class="pv-sat pv-sat-1"
-                      :class="{ 'pv-sat-ended': sat.ended }"
-                      :style="satStyle(i, ring1.length, ring2.length ? 132 : 118)"
-                      :title="sat.roles + ' — ' + sat.name"
-                      @click="navigateTo(sat.otherId)"
-                    >
-                      <span class="pv-sat-inner pv-counter-1">
-                        <span class="pv-sat-avatar">
-                          <img v-if="sat.img" :src="imageUrl(sat.img)" alt="" draggable="false" />
-                          <span v-else>{{ initialsOf(sat.name) }}</span>
-                        </span>
-                        <span class="pv-sat-label">
-                          <b>{{ sat.roles }}</b
-                          >{{ sat.name }}
-                        </span>
-                      </span>
-                    </button>
-                  </div>
-
-                  <div v-if="ring2.length" class="pv-spinner pv-spin-2">
-                    <button
-                      v-for="(sat, i) in ring2"
-                      :key="sat.otherId"
-                      class="pv-sat pv-sat-2"
-                      :style="satStyle(i, ring2.length, 208, 14)"
-                      :title="sat.name"
-                      @click="navigateTo(sat.otherId)"
-                    >
-                      <span class="pv-sat-inner pv-counter-2">
-                        <span class="pv-sat-avatar">
-                          <img v-if="sat.img" :src="imageUrl(sat.img)" alt="" draggable="false" />
-                          <span v-else>{{ initialsOf(sat.name) }}</span>
-                        </span>
-                        <span class="pv-sat-label"><b>2 hops</b>{{ sat.name }}</span>
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </section>
-
-              <!-- Story -->
-              <section v-if="person.bio" class="pv-section" style="--i: 1">
-                <h2 class="pv-h">Story</h2>
-                <p class="pv-bio" :class="{ 'pv-bio-cap': person.bio.length > 140 }">
-                  {{ person.bio }}
-                </p>
-              </section>
-
-              <!-- Traits -->
-              <section v-if="traitRows.length" class="pv-section" style="--i: 2">
-                <h2 class="pv-h">
-                  Traits <span class="pv-h-sub">{{ traitRows.length }}</span>
-                </h2>
-                <div class="pv-traits">
-                  <div
-                    v-for="(t, i) in traitRows"
-                    :key="t.id"
-                    class="pv-trait"
-                    :class="{ 'pv-trait-wide': t.kind === 'para' }"
-                    :style="{ '--i': i }"
-                  >
-                    <div class="pv-trait-head">
-                      <span v-if="t.icon" class="pv-trait-icon">{{ t.icon }}</span>
-                      {{ t.label }}
-                    </div>
-                    <div v-if="t.kind === 'slider'" class="pv-trait-slider">
-                      <div class="pv-bar">
-                        <div class="pv-bar-fill" :style="{ width: t.pct + '%' }"></div>
-                        <div class="pv-bar-spark" :style="{ left: t.pct + '%' }"></div>
-                      </div>
-                      <div v-if="t.left || t.right" class="pv-bar-labels">
-                        <span>{{ t.left }}</span>
-                        <span>{{ t.right }}</span>
-                      </div>
-                    </div>
-                    <div v-else-if="t.kind === 'select'" class="pv-trait-value">
-                      <span
-                        v-if="t.color"
-                        class="pv-select-dot"
-                        :style="{ background: t.color }"
-                      ></span>
-                      {{ t.text }}
-                    </div>
-                    <div
-                      v-else-if="t.kind === 'bool'"
-                      class="pv-trait-value"
-                      :class="t.bool ? 'pv-bool-yes' : 'pv-bool-no'"
-                    >
-                      {{ t.bool ? '✓ Yes' : '✕ No' }}
-                    </div>
-                    <div v-else-if="t.kind === 'para'" class="pv-trait-para">{{ t.text }}</div>
-                    <div v-else class="pv-trait-value">{{ t.text }}</div>
-                  </div>
-                </div>
-              </section>
-
-              <!-- Chronicle -->
-              <section v-if="lifeEvents.length" class="pv-section" style="--i: 3">
-                <h2 class="pv-h">Chronicle</h2>
-                <div class="pv-chron">
-                  <div
-                    v-for="(ev, i) in lifeEvents"
-                    :key="i"
-                    class="pv-ev"
-                    :class="{ 'pv-ev-link': !!ev.personId }"
-                    :style="{ '--i': i }"
-                    @click="ev.personId && navigateTo(ev.personId)"
-                  >
-                    <div class="pv-ev-year">{{ ev.when }}</div>
-                    <div class="pv-ev-node">
-                      <span class="pv-ev-dot" :class="'pv-ev-' + ev.kind"></span>
-                    </div>
-                    <div class="pv-ev-body">
-                      <span v-if="ev.glyph" class="pv-ev-glyph">{{ ev.glyph }}</span>
-                      <span class="pv-ev-title">{{ ev.title }}</span>
-                      <span v-if="ev.sub" class="pv-ev-sub">{{ ev.sub }}</span>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <!-- Bonds -->
-              <section v-if="bondGroups.length" class="pv-section" style="--i: 4">
-                <h2 class="pv-h">
-                  Bonds <span class="pv-h-sub">{{ relationshipChips.length }}</span>
-                </h2>
-                <div v-for="g in bondGroups" :key="g.key" class="pv-band">
-                  <div class="pv-band-name">{{ g.label }}</div>
-                  <div class="pv-band-chips">
-                    <button
-                      v-for="(c, i) in g.chips"
-                      :key="c.id"
-                      class="pv-bond"
-                      :class="{ 'pv-bond-ended': c.ended }"
-                      :style="{ '--bc': c.color, '--i': i }"
-                      @click="navigateTo(c.otherId)"
-                    >
-                      <span class="pv-bond-avatar">
-                        <img v-if="c.img" :src="imageUrl(c.img)" alt="" draggable="false" />
-                        <span v-else>{{ initialsOf(c.name) }}</span>
-                      </span>
-                      <span class="pv-bond-text">
-                        <span class="pv-bond-role">{{ c.glyph }} {{ c.role }}</span>
-                        <span class="pv-bond-name">{{ c.name }}</span>
-                      </span>
-                      <span v-if="c.endedYear" class="pv-bond-endtag">ended {{ c.endedYear }}</span>
-                    </button>
-                  </div>
-                </div>
-              </section>
-
-              <!-- Gallery -->
-              <section v-if="images.length" class="pv-section" style="--i: 5">
-                <h2 class="pv-h">
-                  Gallery <span class="pv-h-sub">{{ images.length }}</span>
-                </h2>
-                <div class="pv-gallery">
-                  <button
-                    v-for="(img, i) in images"
-                    :key="img.id"
-                    class="pv-photo"
-                    :style="{ '--i': i }"
-                    @click="lightbox = i"
-                  >
-                    <img :src="imageUrl(img.file_path)" alt="" loading="lazy" decoding="async" />
-                    <span v-if="img.role" class="pv-photo-role">{{ img.role }}</span>
-                    <span v-if="img.is_primary" class="pv-photo-star">★</span>
-                  </button>
-                </div>
-              </section>
-
-              <!-- Blank slate -->
-              <section v-if="isBlank" class="pv-section pv-empty" style="--i: 0">
-                <div class="pv-empty-mark">✦</div>
-                <div class="pv-empty-title">A story waiting to be written</div>
-                <div class="pv-empty-text">
-                  No traits, bonds, or photos yet — open the editor to bring
-                  {{ person.name || 'them' }} to life.
-                </div>
-                <button class="pv-act pv-empty-cta" @click="store.openForm(person)">
-                  ✎ Start editing
-                </button>
-              </section>
-
-              <div class="pv-content-tail"></div>
-            </section>
-          </main>
-        </Transition>
-      </div>
 
       <!-- ── Lightbox ── -->
       <Transition name="pv-lb">
         <div
           v-if="lightbox !== null && images[lightbox]"
           class="pv-lightbox"
+          :class="{ 'pv-lb-ink': isScroll || store.isInk }"
           @click.self="lightbox = null"
         >
           <button v-if="images.length > 1" class="pv-lb-nav pv-lb-prev" @click="stepLightbox(-1)">
@@ -387,6 +485,15 @@ import { useMainStore } from '../store/index.js'
 import { api } from '../api'
 import { derivedSiblings, egoDistances } from './graph/graphInsights.js'
 import { ageOf } from './people/peopleLayout.js'
+import { confirmDialog } from '../lib/dialogs.js'
+import { undoToast } from '../lib/undoToast.js'
+import { translate as tr } from '../i18n'
+import KinshipSection from './kinship/KinshipSection.vue'
+import { eventsOf, eventKind, erasLivedThrough } from '../../../shared/chronicle'
+import KinLangPicker from './kinship/KinLangPicker.vue'
+import ProfileScroll from './profile/ProfileScroll.vue'
+import { fmtDate, dateOrd, initialsOf } from './profile/profileFormat'
+import { INK, inkBlotMaskUrl } from '../lib/inkArt'
 
 // The full-canvas person profile: takes over the whole workspace like a view
 // of its own (Esc / ← steps back through visited people, then closes back to
@@ -404,29 +511,21 @@ const reduceMotion =
   window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
+// ── Presentation style ──────────────────────────────────────────────────────
+// Both styles render the same state below; only the template differs.
+const PROFILE_STYLE_META = [
+  { id: 'cinematic', glyph: '✦', label: 'Cinematic', title: 'Cinematic profile' },
+  { id: 'scroll', glyph: '卷', label: 'Scroll', title: 'Handscroll — an ink-painting profile' }
+]
+const isScroll = computed(() => store.profileStyle === 'scroll')
+const styleIndex = computed(() =>
+  Math.max(
+    0,
+    PROFILE_STYLE_META.findIndex((s) => s.id === store.profileStyle)
+  )
+)
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-function fmtDate(dv) {
-  if (!dv || dv.year == null) return ''
-  const m = dv.month
-  if (dv.precision === 'day' && m && dv.day) return `${dv.day} ${MONTHS[m - 1]} ${dv.year}`
-  if ((dv.precision === 'day' || dv.precision === 'month') && m)
-    return `${MONTHS[m - 1]} ${dv.year}`
-  return String(dv.year)
-}
-
-function dateOrd(dv) {
-  if (!dv || dv.year == null) return null
-  return dv.year + ((dv.month || 1) - 1) / 12 + ((dv.day || 1) - 1) / 372
-}
-
-function initialsOf(name) {
-  const parts = (name || '?').trim().split(/\s+/).filter(Boolean)
-  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-  return (parts[0] || '?').substring(0, 2).toUpperCase()
-}
-
 function imageUrl(filePath) {
   return api.getImageUrl(filePath) || ''
 }
@@ -458,7 +557,14 @@ const personAccent = computed(() => {
   if (t == null) return g.unknownColor || '#5c6bc0'
   return hexMix(g.maleColor || '#3a7bd5', g.femaleColor || '#c95fa0', t)
 })
-const accentVars = computed(() => ({ '--pa': personAccent.value }))
+// In the ink theme the signature colour is ground into ink — a tinted wash,
+// never a neon. The blot is the mask the page dissolves through on a swap.
+const accentVars = computed(() => ({
+  '--pa': store.isInk
+    ? `color-mix(in srgb, ${personAccent.value} 52%, ${INK.ink2})`
+    : personAccent.value,
+  '--pv-blot': `url(${inkBlotMaskUrl()})`
+}))
 
 const personTags = computed(() => (person.value ? store.tagsOf.get(person.value.id) || [] : []))
 
@@ -542,9 +648,26 @@ const relationshipChips = computed(() => {
       role = r.label || def?.label || r.type
     }
 
+    // Which side of the family sketch this tie sits on (scroll profile).
+    const sym =
+      def?.symmetryRole ||
+      { parent_child: 'vertical', adopted: 'vertical', spouse: 'horizontal' }[r.type] ||
+      'none'
+    const side =
+      sym === 'vertical'
+        ? r.person_a_id === pid
+          ? 'child'
+          : 'parent'
+        : sym === 'horizontal'
+          ? 'spouse'
+          : r.type === 'sibling'
+            ? 'sibling'
+            : null
+
     chips.push({
       id: r.id,
       otherId,
+      side,
       name: other.name || 'Unnamed',
       img: other.primary_image || null,
       role,
@@ -577,6 +700,7 @@ const relationshipChips = computed(() => {
     chips.push({
       id: 'sib:' + otherId,
       otherId,
+      side: 'sibling',
       name: other.name || 'Unnamed',
       img: other.primary_image || null,
       role,
@@ -775,6 +899,44 @@ const lifeEvents = computed(() => {
     }
   }
 
+  // Story events they took part in (the chronicle) …
+  for (const ev of eventsOf(store.events, p.id)) {
+    const k = eventKind(ev.kind)
+    const others = ev.person_ids
+      .filter((id) => id !== p.id)
+      .map((id) => personById.value.get(id)?.name?.split(' ')[0])
+      .filter(Boolean)
+    push(ev.date, {
+      title: ev.title,
+      sub: [
+        ev.place,
+        others.length ? `with ${others.slice(0, 3).join(', ')}${others.length > 3 ? '…' : ''}` : ''
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      kind: 'story',
+      glyph: ev.icon || k.icon,
+      color: ev.color || k.color,
+      eventId: ev.id
+    })
+  }
+  // … and the eras that dawned during their life.
+  const born = dateOrd(p.birth)
+  const until = dateOrd(p.death) ?? refYear.value
+  for (const e of store.eras) {
+    const a = dateOrd(e.start)
+    if (a == null || born == null || a <= born || a > until) continue
+    const at = ageOf(p, Math.floor(a))
+    push(e.start, {
+      title: `${e.name} begins`,
+      sub: at != null ? `aged ${at}` : '',
+      kind: 'era',
+      glyph: e.icon || '◆',
+      color: e.color,
+      eraId: e.id
+    })
+  }
+
   if (deceased.value) {
     const at = ageOf(p, p.death.year)
     push(p.death, {
@@ -788,6 +950,22 @@ const lifeEvents = computed(() => {
   evs.sort((a, b) => a.ord - b.ord)
   return evs.slice(0, 40)
 })
+
+// Eras their life touched (birth → death, or → the present while alive).
+const livedEras = computed(() => {
+  const p = person.value
+  if (!p) return []
+  return erasLivedThrough(store.eras, p.birth, p.death, refYear.value)
+})
+
+function onChronicleClick(ev) {
+  if (ev.eventId) store.openEventEditor({ id: ev.eventId })
+  else if (ev.eraId) store.openEraEditor({ id: ev.eraId })
+  else if (ev.personId) navigateTo(ev.personId)
+}
+function addStoryEvent() {
+  if (person.value) store.openEventEditor({ person_ids: [person.value.id] })
+}
 
 const isBlank = computed(
   () =>
@@ -954,7 +1132,15 @@ const backLabel = computed(() => {
 function onKeydown(e) {
   if (!store.modalOpen || !person.value) return
   // Yield to overlays stacked above the profile.
-  if (store.formOpen || store.curtain.active || store.appSettingsOpen || store.userPageOpen) return
+  if (
+    store.formOpen ||
+    store.curtain.active ||
+    store.appSettingsOpen ||
+    store.userPageOpen ||
+    store.projectsPageOpen ||
+    store.browsePageOpen
+  )
+    return
   if (e.key === 'Escape') {
     e.preventDefault()
     if (lightbox.value !== null) lightbox.value = null
@@ -979,11 +1165,43 @@ onUnmounted(() => {
 // ── Delete ──────────────────────────────────────────────────────────────────
 async function handleDelete() {
   if (!person.value) return
-  const name = person.value.name || 'this person'
-  if (!confirm(`Delete ${name}? This cannot be undone.`)) return
-  await store.deletePerson(person.value.id)
+  const id = person.value.id
+  const name = person.value.name || tr('dialog.areYouSure')
+  const ok = await confirmDialog({
+    title: tr('confirm.deletePerson', { name }),
+    message: tr('confirm.deletePersonBody') + ' ' + tr('dialog.undoHint'),
+    tone: 'danger'
+  })
+  if (!ok) return
+  const res = await store.deletePerson(id)
   store.closeModal()
+  if (res?.success) undoToast(tr('toasts.deletedPerson', { name }), 'persons:delete')
 }
+
+function openLightbox(i) {
+  if (i >= 0 && images.value[i]) lightbox.value = i
+}
+
+// Everything an alternative presentation (ProfileScroll) needs, as one
+// reactive bundle — refs unwrap, so it reads like plain props.
+const profile = reactive({
+  person,
+  images,
+  portraitUrl,
+  portraitIndex,
+  deceased,
+  age,
+  personTags,
+  relationshipChips,
+  bondGroups,
+  traitRows,
+  lifeEvents,
+  isBlank,
+  statsShown,
+  circleCount,
+  navDir,
+  lightboxOpen: computed(() => lightbox.value !== null)
+})
 </script>
 
 <style scoped>
@@ -1135,13 +1353,172 @@ async function handleDelete() {
 
 /* ═══════════════════════════════ Chrome ═══════════════════════════════════ */
 .pv-chrome {
-  position: relative;
-  z-index: 3;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 6;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 14px 20px 6px;
+  pointer-events: none;
   animation: pv-chrome-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.08s backwards;
+}
+.pv-chrome > * {
+  pointer-events: auto;
+}
+.pv-chrome > .pv-chrome-spacer {
+  pointer-events: none;
+}
+
+/* The cinematic presentation fills the overlay; the chrome floats above it. */
+.pv-cine {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: 56px;
+  isolation: isolate;
+}
+
+/* ── Style switcher: a segmented control with a sliding thumb ── */
+.pv-style {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--n), 1fr);
+  padding: 3px;
+  margin-right: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(12px);
+}
+.pv-style-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--n));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--pa) 20%, var(--elevated));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--pa) 40%, transparent),
+    0 2px 8px -2px color-mix(in srgb, var(--pa) 40%, transparent);
+  transform: translateX(calc(var(--at) * 100%));
+  transition: transform 0.45s cubic-bezier(0.3, 1.3, 0.5, 1);
+}
+.pv-style-btn {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.25s;
+}
+.pv-style-btn:hover {
+  color: var(--t1);
+}
+.pv-style-on {
+  color: var(--t1);
+}
+.pv-style-glyph {
+  font-family: var(--font-brush);
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 0.4s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.pv-style-on .pv-style-glyph {
+  transform: scale(1.18) rotate(-6deg);
+}
+/* the scroll style's thumb is a cinnabar seal */
+.pv-is-scroll .pv-style-thumb {
+  background: color-mix(in srgb, var(--ink-cinnabar) 88%, var(--ink-black));
+  box-shadow:
+    inset 0 0 0 1px rgba(60, 10, 5, 0.3),
+    0 2px 8px -2px rgba(var(--ink-cinnabar-rgb), 0.5);
+  border-radius: 4px 7px 5px 8px / 7px 4px 8px 5px;
+}
+.pv-is-scroll .pv-style-on {
+  color: #fbf4e6;
+}
+
+/* ── Swapping styles ── */
+.pv-swap-leave-active {
+  z-index: 2;
+}
+/* the page dissolves into ink: a blot opens at the centre and spreads */
+.pv-cine.pv-swap-leave-active {
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(#000, #000), var(--pv-blot);
+  mask-image: linear-gradient(#000, #000), var(--pv-blot);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: pv-dissolve 0.9s cubic-bezier(0.55, 0, 0.6, 1) forwards;
+}
+@keyframes pv-dissolve {
+  from {
+    -webkit-mask-size:
+      100% 100%,
+      0 0;
+    mask-size:
+      100% 100%,
+      0 0;
+    filter: none;
+  }
+  45% {
+    filter: grayscale(1) contrast(1.1);
+  }
+  to {
+    -webkit-mask-size:
+      100% 100%,
+      280vmax 280vmax;
+    mask-size:
+      100% 100%,
+      280vmax 280vmax;
+    filter: grayscale(1);
+    opacity: 0.2;
+  }
+}
+.pv-cine.pv-swap-enter-active {
+  animation: pv-cine-in 0.9s ease 0.3s both;
+}
+@keyframes pv-cine-in {
+  from {
+    opacity: 0;
+    filter: grayscale(1) sepia(0.3);
+  }
+}
+
+/* ── Opening / closing in the scroll style: the overlay just fades; the
+   scroll itself unrolls (ProfileScroll) and rolls back up on leave ── */
+.pvs-enter-active {
+  transition: opacity 0.35s ease;
+}
+.pvs-leave-active {
+  transition: opacity 0.25s ease 0.65s;
+}
+.pvs-enter-from,
+.pvs-leave-to {
+  opacity: 0;
+}
+.pvs-leave-active .pv-chrome {
+  transition: opacity 0.3s ease;
+  opacity: 0;
 }
 @keyframes pv-chrome-in {
   from {
@@ -1227,9 +1604,9 @@ async function handleDelete() {
   transform: translateY(-1px);
 }
 .pv-act-danger:hover {
-  color: #ef5350;
-  border-color: rgba(239, 83, 80, 0.5);
-  box-shadow: 0 0 16px rgba(239, 83, 80, 0.2);
+  color: var(--danger);
+  border-color: rgba(var(--danger-rgb), 0.5);
+  box-shadow: 0 0 16px rgba(var(--danger-rgb), 0.2);
 }
 
 .pv-x {
@@ -1684,6 +2061,15 @@ async function handleDelete() {
   flex: 1;
   height: 1px;
   background: linear-gradient(90deg, color-mix(in srgb, var(--pa) 35%, transparent), transparent);
+}
+.pv-h-kin::after {
+  order: 1;
+}
+.pv-kin-lang {
+  order: 2;
+  align-self: center;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .pv-h-sub {
   font-size: 11px;
@@ -2478,7 +2864,195 @@ async function handleDelete() {
   transform: scale(0.985);
 }
 
+/* ═══════════════════ Ink theme: the cinematic page on paper ════════════════ */
+/* No neon aurora on rice paper — the same composition in ink washes. */
+.pv-ink .pv-aurora {
+  filter: blur(70px);
+  opacity: 0.09;
+}
+.pv-ink .pv-aurora-a,
+.pv-ink .pv-aurora-c {
+  background: radial-gradient(circle, var(--ink-black), transparent 62%);
+}
+.pv-ink .pv-aurora-b {
+  background: radial-gradient(circle, var(--ink-cinnabar), transparent 62%);
+  opacity: 0.06;
+}
+.pv-ink .pv-bg-photo {
+  filter: blur(60px) grayscale(1) sepia(0.4);
+  opacity: 0.16;
+}
+.pv-ink .pv-bg-word {
+  font-family: var(--font-cao);
+  font-weight: 400;
+  letter-spacing: 0;
+  color: rgba(28, 26, 23, 0.05);
+  -webkit-text-stroke: 0;
+  opacity: 1;
+}
+.pv-ink .pv-vignette {
+  background: radial-gradient(120% 90% at 50% 30%, transparent 55%, rgba(80, 55, 20, 0.14));
+}
+.pv-ink .pv-spotlight {
+  background: radial-gradient(closest-side, rgba(255, 250, 235, 0.35), transparent 70%);
+}
+.pv-ink .pv-card-inner {
+  border-radius: 4px;
+  background:
+    var(--ink-paper-light, none) 0 0 / 512px 512px,
+    var(--surface);
+  box-shadow:
+    0 0 0 6px rgba(214, 199, 166, 0.6),
+    0 0 0 7px rgba(48, 36, 20, 0.18),
+    0 26px 50px -22px rgba(60, 40, 15, 0.45);
+}
+.pv-ink .pv-card-rim,
+.pv-ink .pv-card-glare {
+  display: none;
+}
+.pv-ink .pv-card-img {
+  filter: sepia(0.18) contrast(1.04);
+}
+.pv-ink .pv-monogram-text {
+  font-family: var(--font-xing);
+  font-weight: 400;
+  font-size: 120px;
+  color: var(--t1);
+  text-shadow: none;
+}
+.pv-ink .pv-monogram-halo {
+  width: 240px;
+  height: 240px;
+  border: none;
+  border-radius: 0;
+  background-color: var(--t1);
+  -webkit-mask: var(--ink-enso, none) center / contain no-repeat;
+  mask: var(--ink-enso, none) center / contain no-repeat;
+  opacity: 0.55;
+  animation: none;
+}
+.pv-ink .pv-monogram-halo::after {
+  display: none;
+}
+.pv-ink .pv-name {
+  text-shadow: none;
+}
+.pv-ink .pv-name-rule {
+  height: 8px;
+  width: 140px;
+  border-radius: 0;
+  background: var(--t1);
+  -webkit-mask: var(--ink-underline, none) left center / 100% 100% no-repeat;
+  mask: var(--ink-underline, none) left center / 100% 100% no-repeat;
+  opacity: 0.7;
+}
+.pv-ink .pv-h {
+  font-family: var(--font-brush);
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--t1);
+}
+.pv-ink .pv-h::after {
+  height: 7px;
+  align-self: center;
+  background: var(--t1);
+  -webkit-mask: var(--ink-divider, none) left center / 100% 100% no-repeat;
+  mask: var(--ink-divider, none) left center / 100% 100% no-repeat;
+  opacity: 0.3;
+}
+.pv-ink .pv-h-sub {
+  font-family: var(--font-ink-serif);
+  font-style: italic;
+  font-size: 13px;
+}
+.pv-ink :is(.pv-stat, .pv-trait, .pv-photo, .pv-back, .pv-act, .pv-x, .pv-style) {
+  border-radius: var(--r-md);
+}
+.pv-ink :is(.pv-chip, .pv-tag, .pv-age, .pv-sat-label, .pv-bond) {
+  border-radius: 3px 6px 4px 7px / 6px 3px 7px 4px;
+}
+.pv-ink .pv-stat-val,
+.pv-ink .pv-ev-year {
+  font-family: var(--font-brush);
+  font-weight: 400;
+}
+.pv-ink .pv-stat-val {
+  font-size: 26px;
+}
+.pv-ink .pv-ring {
+  border-style: dotted;
+}
+.pv-ink .pv-orbit-halo {
+  border-width: 1.5px;
+}
+.pv-ink .pv-ev-dot,
+.pv-ink .pv-select-dot,
+.pv-ink .pv-bar-fill,
+.pv-ink .pv-bar-spark {
+  box-shadow: none;
+}
+
+/* ═══════════════ Lightbox for the scroll / ink: a mounted painting ═════════ */
+.pv-lb-ink {
+  background: color-mix(in srgb, var(--ink-black) 84%, transparent);
+  backdrop-filter: blur(10px) sepia(0.2);
+}
+.pv-lb-ink .pv-lb-frame img {
+  border-radius: 2px;
+  padding: 16px;
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.06) 0 2px, transparent 2px 6px),
+    color-mix(in srgb, var(--ink-indigo) 35%, #d6c7a6);
+  box-shadow:
+    inset 0 0 0 1px rgba(28, 26, 23, 0.3),
+    0 40px 90px -20px rgba(0, 0, 0, 0.8);
+}
+.pv-lb-ink .pv-lb-caption {
+  font-family: var(--font-brush);
+  font-weight: 400;
+  font-size: 18px;
+  color: rgba(246, 240, 226, 0.92);
+}
+.pv-lb-ink .pv-lb-role {
+  background: var(--ink-cinnabar);
+  border-radius: 3px;
+  font-family: var(--font-ink-serif);
+}
+.pv-lb-ink :is(.pv-lb-nav, .pv-lb-x) {
+  font-family: var(--font-ink-serif);
+  border-radius: 4px;
+}
+
 /* ═══════════════════════════ Responsive ═══════════════════════════════════ */
+@media (max-width: 760px) {
+  .pv-chrome {
+    gap: 6px;
+    padding: 10px 10px 6px;
+  }
+  .pv-back {
+    padding: 8px 10px;
+    min-width: 0;
+  }
+  .pv-back-label {
+    max-width: 22vw;
+  }
+  .pv-kbd,
+  .pv-act-label,
+  .pv-style-label {
+    display: none;
+  }
+  .pv-style-btn {
+    padding: 5px 10px;
+  }
+  .pv-act {
+    padding: 8px 11px;
+  }
+  .pv-cine {
+    padding-top: 52px;
+  }
+}
 @media (max-width: 1020px) {
   .pv-main {
     grid-template-columns: 1fr;
@@ -2526,8 +3100,94 @@ async function handleDelete() {
   .pv-bond,
   .pv-photo,
   .pv-bar-fill,
-  .pv-bar-spark {
+  .pv-bar-spark,
+  .pv-cine.pv-swap-leave-active,
+  .pv-cine.pv-swap-enter-active {
     animation: none;
   }
+  .pv-cine.pv-swap-leave-active {
+    opacity: 0;
+  }
+  .pv-style-thumb,
+  .pv-style-glyph {
+    transition: none;
+  }
+}
+
+/* ── Chronicle: story events + eras ── */
+.pv-h-chron::after {
+  order: 1;
+}
+.pv-chron-add {
+  order: 2;
+  align-self: center;
+  border: 1px dashed color-mix(in srgb, var(--pa) 50%, var(--border));
+  background: transparent;
+  color: var(--t2);
+  border-radius: var(--r-pill);
+  padding: 2px 10px;
+  font-family: var(--font);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+  transition:
+    color var(--dur) ease,
+    border-color var(--dur) ease;
+}
+.pv-chron-add:hover {
+  color: var(--t1);
+  border-color: var(--pa);
+}
+.pv-eras {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.pv-eras-k {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--t3);
+  margin-right: 2px;
+}
+.pv-era {
+  --ec: var(--pa);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 11px 3px 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--ec) 50%, transparent);
+  background: color-mix(in srgb, var(--ec) 14%, transparent);
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 650;
+  cursor: pointer;
+  animation: cp-row-in 0.45s var(--ease-out) backwards;
+  animation-delay: calc(0.2s + var(--i) * 0.05s);
+  transition:
+    transform 0.2s var(--ease-spring),
+    box-shadow 0.2s ease;
+}
+.pv-era:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--ec) 30%, transparent);
+}
+.pv-era-ic {
+  font-size: 13px;
+}
+.pv-ev-story {
+  background: var(--ec, var(--pa));
+  box-shadow: 0 0 10px var(--ec, var(--pa));
+}
+.pv-ev-era {
+  background: transparent;
+  border: 2px dashed var(--ec, var(--pa));
 }
 </style>

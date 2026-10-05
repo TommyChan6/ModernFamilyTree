@@ -350,14 +350,39 @@
                   :title="row.rel.type === 'spouse' ? 'Click to toggle married / divorced' : ''"
                   @click.stop="row.rel.type === 'spouse' ? toggleStatus(row) : startEdit(row.rel)"
                 >
-                  {{ connLabel(row.rel) }}
+                  <span v-if="relGlyph(row.rel.type)" class="rv-glyph" aria-hidden="true">{{
+                    relGlyph(row.rel.type)
+                  }}</span
+                  >{{ connLabel(row.rel) }}
                 </button>
                 <div
                   class="rv-track-wrap"
                   :class="[row.rel.type, { divorced: row.rel.status === 'divorced' }]"
                 >
-                  <span class="rv-dot rv-dot-left"></span>
-                  <template v-if="row.rel.type === 'spouse'">
+                  <!-- 红线: the red thread of fate, knotted (or cut, once ended) -->
+                  <svg
+                    v-if="inkThread(row.rel)"
+                    class="rv-thread"
+                    :class="{ oneway: isDirected(row.rel.type) }"
+                    viewBox="0 0 190 14"
+                    preserveAspectRatio="none"
+                    aria-hidden="true"
+                  >
+                    <template v-if="row.rel.status === 'divorced' || row.rel.ended">
+                      <path class="rv-thread-line" d="M3 7C25 3 50 11 82 7" />
+                      <path class="rv-thread-line" d="M108 7C140 3 165 11 187 7" />
+                      <path class="rv-thread-fray" d="M82 7l5-3M82 7l6 1M108 7l-5 3M108 7l-6-1" />
+                    </template>
+                    <template v-else>
+                      <path class="rv-thread-line" d="M3 7C35 2 62 12 95 7S155 2 187 7" />
+                      <path
+                        class="rv-thread-knot"
+                        d="M95 7c-5-7-12-3-7 1s7-1 7-1 1 5 7 1-2-8-7-1"
+                      />
+                    </template>
+                  </svg>
+                  <template v-else-if="row.rel.type === 'spouse'">
+                    <span class="rv-dot rv-dot-left"></span>
                     <template v-if="row.rel.status === 'divorced'">
                       <span class="rv-track rv-track-top rv-seg-left"></span>
                       <span class="rv-track rv-track-top rv-seg-right"></span>
@@ -373,6 +398,7 @@
                     <span class="rv-dot rv-dot-right"></span>
                   </template>
                   <template v-else>
+                    <span class="rv-dot rv-dot-left"></span>
                     <span class="rv-track" :class="{ dashed: isDashed(row.rel.type) }"></span>
                     <span v-if="isDirected(row.rel.type)" class="rv-arrow"></span>
                     <span v-else class="rv-dot rv-dot-right"></span>
@@ -574,6 +600,10 @@ import { yearDate } from '../../../shared/calendarMath'
 import PersonPicker from './personForm/PersonPicker.vue'
 import RelTypesPanel from './RelTypesPanel.vue'
 import { derivedSiblings } from './graph/graphInsights.js'
+import { confirmDialog } from '../lib/dialogs.js'
+import { undoToast } from '../lib/undoToast.js'
+import { translate as tr } from '../i18n'
+import { inkAvatarBg, inkRelColor, inkRelGlyph, isRomanticType } from './ui/inkChrome'
 
 const store = useMainStore()
 const typesOpen = ref(false)
@@ -667,6 +697,7 @@ function imageUrl(filename) {
   return api.getImageUrl(filename) || ''
 }
 function avatarGradient(gender) {
+  if (store.isInk) return inkAvatarBg(gender)
   if (gender === 'male') return 'linear-gradient(135deg, #3a7bd5, #2351a0)'
   if (gender === 'female') return 'linear-gradient(135deg, #c95fa0, #923075)'
   return 'linear-gradient(135deg, #5c6bc0, #3c4a9e)'
@@ -680,6 +711,10 @@ const personById = computed(() => {
   return m
 })
 function meta(type) {
+  const m = baseMeta(type)
+  return { ...m, color: inkRelColor(type, m.color, store.isInk) }
+}
+function baseMeta(type) {
   const gs = store.graphSettings
   // The legacy trio keeps following the Style panel's colors.
   if (type === 'spouse') return { label: 'Spouse', color: gs.spouseColor }
@@ -687,6 +722,14 @@ function meta(type) {
   if (type === 'parent_child') return { label: 'Parent of', color: gs.parentChildColor }
   const def = store.relTypeByKey.get(type)
   return { label: def?.label || type, color: def?.color || gs.parentChildColor }
+}
+// Ink theme: romantic bonds are drawn as the red thread of fate (红线), and
+// every pill is stamped with the type's brushed character.
+function inkThread(rel) {
+  return store.isInk && isRomanticType(rel.type)
+}
+function relGlyph(type) {
+  return store.isInk ? inkRelGlyph(type, defOf(type)?.label) : ''
 }
 function defOf(type) {
   return store.relTypeByKey.get(type)
@@ -1074,9 +1117,15 @@ async function removeRel(row) {
         : row.rel.type === 'parent_child'
           ? 'parent–child'
           : (meta(row.rel.type).label || 'this').toLowerCase()
-  if (!confirm(`Delete the ${kind} relationship between ${aName} and ${bName}?`)) return
+  const ok = await confirmDialog({
+    title: tr('confirm.deleteBond', { kind }),
+    message: tr('confirm.deleteBondBetween', { a: aName, b: bName }) + ' ' + tr('dialog.undoHint'),
+    tone: 'danger'
+  })
+  if (!ok) return
   if (editing.value?.id === row.rel.id) cancelEdit()
-  await store.deleteRelationship(row.rel.id)
+  const res = await store.deleteRelationship(row.rel.id)
+  if (res?.success) undoToast(tr('toasts.deletedBond'), 'relationships:delete')
 }
 async function swapRel(row) {
   await store.updateRelationship({
@@ -1178,7 +1227,7 @@ async function toggleStatus(row) {
 }
 .rv-filter-btn.active {
   color: var(--t1);
-  border-color: rgba(108, 142, 245, 0.45);
+  border-color: rgba(var(--accent-rgb), 0.45);
 }
 .rv-filter-icon {
   font-size: 13px;
@@ -1350,8 +1399,8 @@ async function toggleStatus(row) {
     background 0.15s;
 }
 .rv-clear:hover {
-  color: #ef5350;
-  background: rgba(239, 83, 80, 0.1);
+  color: var(--danger);
+  background: rgba(var(--danger-rgb), 0.1);
 }
 .rv-clear-enter-active,
 .rv-clear-leave-active {
@@ -1381,7 +1430,7 @@ async function toggleStatus(row) {
 }
 .rv-search:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(108, 142, 245, 0.15);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
 }
 .rv-search-icon {
   font-size: 13px;
@@ -1625,8 +1674,8 @@ async function toggleStatus(row) {
 .rv-editor-error {
   font-size: 12px;
   font-weight: 600;
-  color: #ef5350;
-  background: rgba(239, 83, 80, 0.12);
+  color: var(--danger);
+  background: rgba(var(--danger-rgb), 0.12);
   padding: 4px 10px;
   border-radius: 8px;
   white-space: nowrap;
@@ -1991,7 +2040,7 @@ async function toggleStatus(row) {
   width: 2px;
   height: 16px;
   border-radius: 2px;
-  background: #ef5350;
+  background: var(--danger);
 }
 .rv-cut-1 {
   transform: translateX(-9px) rotate(26deg);
@@ -2101,8 +2150,8 @@ async function toggleStatus(row) {
   color: var(--t1);
 }
 .rv-action-del:hover {
-  background: rgba(239, 83, 80, 0.14);
-  color: #ef5350;
+  background: rgba(var(--danger-rgb), 0.14);
+  color: var(--danger);
 }
 
 /* ── Empty state ─────────────────────────────────────────── */
@@ -2131,5 +2180,372 @@ async function toggleStatus(row) {
 }
 .rv-empty .btn {
   margin-top: 8px;
+}
+
+/* ── 水墨 ink theme ───────────────────────────────────────────────────────
+   The table is a mounted handscroll of bonds: rows on paper, each bond a
+   brush stroke in its pigment with the type's character stamped on its pill;
+   romantic bonds are the red thread of fate (红线), knotted — or cut. */
+:root[data-theme='ink'] .rv {
+  background: transparent;
+}
+:root[data-theme='ink'] .rv-toolbar {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: none;
+  border-bottom-color: transparent;
+  box-shadow: 0 1px 0 rgba(48, 36, 20, 0.14);
+}
+:root[data-theme='ink'] .rv-title {
+  position: relative;
+  font-family: var(--font-brush);
+  font-size: 25px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+:root[data-theme='ink'] .rv-title::after {
+  content: '';
+  position: absolute;
+  left: -3%;
+  right: -6%;
+  bottom: -5px;
+  height: 7px;
+  background-color: var(--accent);
+  opacity: 0.75;
+  -webkit-mask: var(--ink-underline) center / 100% 100% no-repeat;
+  mask: var(--ink-underline) center / 100% 100% no-repeat;
+  animation: rv-ink-write 0.9s 0.15s var(--ease-out) backwards;
+}
+@keyframes rv-ink-write {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+:root[data-theme='ink'] .rv-count {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(179, 53, 42, 0.6);
+  border-radius: 2px 3px 2px 4px;
+  font-family: var(--font-ink-label);
+  padding: 0 7px;
+}
+:root[data-theme='ink'] .rv-search,
+:root[data-theme='ink'] .rv-filter-btn,
+:root[data-theme='ink'] .rv-chip,
+:root[data-theme='ink'] .rv-fchip,
+:root[data-theme='ink'] .rv-clear {
+  border-radius: 3px 5px 4px 6px / 5px 3px 6px 4px;
+  font-family: var(--font-ink-label);
+}
+:root[data-theme='ink'] .rv-search {
+  background: rgba(255, 251, 240, 0.55);
+  border-color: rgba(48, 36, 20, 0.2);
+}
+:root[data-theme='ink'] .rv-search:focus-within {
+  border-color: rgba(179, 53, 42, 0.55);
+  box-shadow: 0 0 0 3px rgba(179, 53, 42, 0.1);
+}
+:root[data-theme='ink'] .rv-search-icon,
+:root[data-theme='ink'] .rv-filter-icon,
+:root[data-theme='ink'] .rv-fchip-emoji,
+:root[data-theme='ink'] .rv-empty-icon {
+  filter: grayscale(1) sepia(0.35) contrast(1.1);
+}
+:root[data-theme='ink'] .rv-filter-btn,
+:root[data-theme='ink'] .rv-chip {
+  background:
+    radial-gradient(closest-side, rgba(40, 30, 18, 0.1), transparent) center / 0% 0% no-repeat,
+    color-mix(in srgb, var(--surface) 70%, transparent);
+  transition:
+    background-size 0.5s var(--ease-out),
+    color 0.18s,
+    border-color 0.18s,
+    transform 0.18s;
+}
+:root[data-theme='ink'] .rv-filter-btn:hover,
+:root[data-theme='ink'] .rv-chip:hover {
+  background-size:
+    220% 220%,
+    auto;
+}
+:root[data-theme='ink'] .rv-chip.active {
+  background-color: color-mix(in srgb, var(--chip-c) 10%, var(--surface));
+}
+/* chip dots become little ink dabs */
+:root[data-theme='ink'] .rv-chip-dot,
+:root[data-theme='ink'] .rv-fchip-dot {
+  border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%;
+}
+:root[data-theme='ink'] .rv-filter-badge {
+  border-radius: 2px;
+  font-family: var(--font-ink-label);
+}
+:root[data-theme='ink'] .rv-filters {
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+:root[data-theme='ink'] .rv-seg.on {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* the table is mounted on silk */
+:root[data-theme='ink'] .rv-scroll {
+  padding: 22px 30px 34px;
+}
+:root[data-theme='ink'] .rv-table {
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  border-color: var(--ink-mount-line);
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 4px var(--ink-silk),
+    0 0 0 5px rgba(58, 42, 22, 0.2),
+    0 12px 30px rgba(60, 40, 15, 0.14);
+}
+:root[data-theme='ink'] .rv-head {
+  background: color-mix(in srgb, var(--ink-silk) 45%, var(--surface));
+  border-bottom-color: rgba(48, 36, 20, 0.25);
+}
+:root[data-theme='ink'] .rv-th {
+  font-family: var(--font-ink-label);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant: small-caps;
+  text-transform: lowercase;
+  letter-spacing: 0.14em;
+  color: var(--t2);
+}
+:root[data-theme='ink'] .rv-rowwrap {
+  background: transparent;
+  border-bottom-color: rgba(48, 36, 20, 0.1);
+}
+:root[data-theme='ink'] .rv-rowwrap.issue {
+  box-shadow: inset 3px 0 0 var(--ink-ochre);
+}
+:root[data-theme='ink'] .rv-rowwrap.expanded {
+  background: rgba(214, 199, 166, 0.28);
+}
+/* hover: a wash of ink blooms across the row */
+:root[data-theme='ink'] .rv-row {
+  background: radial-gradient(closest-side, rgba(40, 30, 18, 0.075), transparent) center / 0% 0%
+    no-repeat;
+  transition: background-size 0.6s var(--ease-out);
+}
+:root[data-theme='ink'] .rv-row:hover {
+  background-size: 130% 320%;
+}
+:root[data-theme='ink'] .rv-pname {
+  font-family: var(--font-brush);
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+:root[data-theme='ink'] .rv-avatar {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 3px rgba(48, 36, 20, 0.18);
+}
+:root[data-theme='ink'] .rv-avatar-icon {
+  fill: rgba(251, 244, 230, 0.88);
+}
+
+/* the pill: the type's character in a tiny seal, then its name */
+:root[data-theme='ink'] .rv-conn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  font-family: var(--font-ink-label);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant: small-caps;
+  text-transform: lowercase;
+  letter-spacing: 0.1em;
+  padding: 0 6px 0 0;
+  border-radius: 2px;
+}
+:root[data-theme='ink'] .rv-conn-pill.toggleable:hover {
+  background: color-mix(in srgb, var(--rel-c) 10%, transparent);
+}
+.rv-glyph {
+  display: inline-grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  font-family: var(--font-brush);
+  font-size: 13px;
+  font-variant: normal;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #fbf4e6;
+  background: var(--rel-c);
+  border-radius: 2px 3px 2px 4px;
+  box-shadow: inset 0 0 0 1px rgba(251, 244, 230, 0.35);
+  transform: rotate(-4deg);
+  transition: transform 0.4s var(--ease-spring);
+}
+.rv-row:hover .rv-glyph {
+  transform: rotate(0deg) scale(1.1);
+}
+
+/* bonds are brush strokes: tapered, dry at the tail */
+:root[data-theme='ink'] .rv-track {
+  top: 2px;
+  height: 8px;
+  border-radius: 0;
+  -webkit-mask: var(--ink-underline) center / 100% 100% no-repeat;
+  mask: var(--ink-underline) center / 100% 100% no-repeat;
+}
+:root[data-theme='ink'] .rv-track.dashed {
+  background: var(--rel-c);
+  -webkit-mask:
+    var(--ink-underline) center / 100% 100% no-repeat,
+    repeating-linear-gradient(90deg, #000 0 10px, transparent 10px 15px);
+  -webkit-mask-composite: source-in;
+  mask:
+    var(--ink-underline) center / 100% 100% no-repeat,
+    repeating-linear-gradient(90deg, #000 0 10px, transparent 10px 15px);
+  mask-composite: intersect;
+}
+:root[data-theme='ink'] .rv-row:hover .rv-track,
+:root[data-theme='ink'] .rv-row:hover .rv-track.dashed {
+  box-shadow: none;
+  animation: none;
+}
+:root[data-theme='ink'] .rv-rowwrap.rv-animate .rv-track {
+  animation: rv-ink-write 0.7s var(--ease-out) backwards;
+  animation-delay: calc(0.1s + min(var(--i, 0), 20) * 0.03s);
+}
+:root[data-theme='ink'] .rv-dot {
+  box-shadow: none;
+  border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%;
+}
+:root[data-theme='ink'] .rv-arrow {
+  border-left-width: 9px;
+}
+:root[data-theme='ink'] .rv-cut {
+  background: var(--accent);
+}
+
+/* 红线 — the red thread of fate */
+.rv-thread {
+  position: absolute;
+  inset: -1px 0 0;
+  width: 100%;
+  height: 14px;
+  overflow: visible;
+  fill: none;
+  stroke: var(--rel-c);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.rv-thread.oneway {
+  -webkit-mask: linear-gradient(90deg, #000 55%, rgba(0, 0, 0, 0.3));
+  mask: linear-gradient(90deg, #000 55%, rgba(0, 0, 0, 0.3));
+}
+.rv-thread-line {
+  stroke-width: 1.3px;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 260;
+  stroke-dashoffset: 0;
+  animation: rv-thread-draw 1.1s var(--ease-out) backwards;
+}
+.rv-thread-knot {
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: rv-thread-knot 0.6s 0.7s var(--ease-spring) backwards;
+}
+.rv-thread-fray {
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.8;
+}
+.rv-row:hover .rv-thread-knot {
+  animation: rv-thread-tug 0.7s var(--ease-spring);
+}
+@keyframes rv-thread-draw {
+  from {
+    stroke-dashoffset: 260;
+  }
+}
+@keyframes rv-thread-knot {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+@keyframes rv-thread-tug {
+  40% {
+    transform: scale(1.35) rotate(-10deg);
+  }
+}
+
+:root[data-theme='ink'] .rv-since-input {
+  font-family: var(--font-ink-label);
+  font-size: 13px;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+:root[data-theme='ink'] .rv-row:hover .rv-since-input {
+  background: rgba(255, 251, 240, 0.6);
+  border-color: rgba(48, 36, 20, 0.18);
+}
+:root[data-theme='ink'] .rv-warn {
+  color: var(--ink-ochre);
+}
+:root[data-theme='ink'] .rv-action-btn {
+  border-radius: 3px;
+}
+
+/* editors: a sheet of paper laid on the scroll */
+:root[data-theme='ink'] .rv-editor {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border-color: var(--ink-mount-line);
+}
+:root[data-theme='ink'] .rv-editor-label {
+  font-family: var(--font-brush);
+  font-size: 17px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  color: var(--t1);
+}
+
+/* empty state: the ensō, drawn in */
+:root[data-theme='ink'] .rv-empty-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 110px;
+  height: 110px;
+  font-size: 34px;
+  opacity: 0.85;
+}
+:root[data-theme='ink'] .rv-empty-icon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: var(--ink-black);
+  opacity: 0.8;
+  -webkit-mask: var(--ink-enso) center / contain no-repeat;
+  mask: var(--ink-enso) center / contain no-repeat;
+  animation: ink-enso-draw 1.4s var(--ease-out) both;
+}
+:root[data-theme='ink'] .rv-empty-title {
+  font-family: var(--font-brush);
+  font-size: 22px;
+  font-weight: 400;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rv-thread-line,
+  .rv-thread-knot,
+  .rv-row:hover .rv-thread-knot {
+    animation: none;
+  }
 }
 </style>

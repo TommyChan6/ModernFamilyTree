@@ -143,13 +143,15 @@ export class Graph3DRenderer {
     this.linkStylesDirty = true
   }
 
-  setTheme({ isLight, bg }) {
+  setTheme({ isLight, bg, ink = false }) {
     this._bg = bg || (isLight ? '#f0f2f8' : '#0f1117')
     this.nodeLayer.material.uniforms.uFogColor.value.set(this._bg)
     this.linkLayer.setFog(this._bg, this.fogNear, this.fogFar)
-    this.starMaterial.color.set(isLight ? 0x5a6488 : 0xdde4ff)
-    this.starMaterial.opacity = isLight ? 0.22 : 0.3
-    this.overlay.setTheme(isLight)
+    // 水墨: the starfield becomes a scatter of ink flecks in the paper.
+    this.starMaterial.color.set(ink ? 0x2a251e : isLight ? 0x5a6488 : 0xdde4ff)
+    this.starMaterial.opacity = ink ? 0.16 : isLight ? 0.22 : 0.3
+    this.overlay.setTheme(isLight, ink)
+    this.overlay.onFontsReady = () => this.requestRedraw()
     this.markAllDirty()
     this.requestRedraw()
   }

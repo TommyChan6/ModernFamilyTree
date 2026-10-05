@@ -32,6 +32,7 @@ export function cancelGuideTimers(ctx) {
     ctx.guideTimers.forEach((t) => t.stop())
     ctx.guideTimers = []
   }
+  landGenRows(ctx)
   if (ctx.currentYearTimer) {
     ctx.currentYearTimer.stop()
     ctx.currentYearTimer = null
@@ -281,6 +282,65 @@ export function resolveGenTarget(y, ctx) {
   return nearestGenRowY(y, ctx)
 }
 
+// Snap each node's y onto its generation row. `rows` are the saved row ys,
+// `snap` the saved positions (id → {x,y}); nodes missing from `snap` (added
+// since) keep their current spot. A healthy save has every node exactly on a
+// row and comes back untouched. An inconsistent one — rows re-spaced while the
+// people were saved mid-move (the old autosave race), or new people placed
+// between rows — is repaired: when the saved heights still form one cluster
+// per row they map onto the rows by rank (order is what the user arranged);
+// otherwise each node takes its nearest row. Missing rows are derived from
+// the saved heights. Pure: returns { targets, rows, healed }.
+export function reconcileGenRows(nodes, snap, rows, tolerance = 15) {
+  const pts = nodes.map((n) => {
+    const p = snap?.[n.id]
+    return { id: n.id, x: p ? p.x : n.x, y: p ? p.y : n.y, saved: !!p }
+  })
+  const clusters = []
+  for (const y of pts
+    .filter((p) => p.saved)
+    .map((p) => p.y)
+    .sort((a, b) => a - b)) {
+    const last = clusters[clusters.length - 1]
+    if (last && y - last.max <= tolerance) {
+      last.max = y
+      last.sum += y
+      last.n++
+    } else clusters.push({ min: y, max: y, sum: y, n: 1 })
+  }
+  const outRows = rows?.length ? [...rows].sort((a, b) => a - b) : clusters.map((c) => c.sum / c.n)
+  const targets = {}
+  if (!outRows.length) {
+    for (const p of pts) targets[p.id] = { x: p.x, y: p.y }
+    return { targets, rows: [], healed: false }
+  }
+  const onRow = (y) => outRows.some((r) => Math.abs(r - y) < 1)
+  const nearest = (y) =>
+    outRows.reduce((best, r) => (Math.abs(r - y) < Math.abs(best - y) ? r : best), outRows[0])
+  const byRank = clusters.length === outRows.length
+  const clusterOf = (y) => clusters.findIndex((c) => y >= c.min - 0.001 && y <= c.max + 0.001)
+  let healed = false
+  for (const p of pts) {
+    let y = p.y
+    if (!onRow(y)) {
+      const ci = p.saved && byRank ? clusterOf(y) : -1
+      y = ci >= 0 ? outRows[ci] : nearest(y)
+      healed = true
+    }
+    targets[p.id] = { x: p.x, y }
+  }
+  return { targets, rows: outRows, healed }
+}
+
+// A row re-spacing in flight: jump straight to where it is heading.
+function landGenRows(ctx) {
+  const r = ctx.rowMotion
+  if (!r) return
+  ctx.rowMotion = null
+  r.timer.stop()
+  r.land()
+}
+
 export function cleanupEmptyGenRows(ctx, snapshotFn, tickedFn) {
   const tolerance = 15
   ctx.genRowYValues = ctx.genRowYValues.filter((rowY) =>
@@ -330,9 +390,27 @@ export function redistributeGenRows(ctx, tickedFn) {
 
   ctx.genRowYValues = [...newYValues]
 
+  // While the rows glide, `ctx.rowTargets` says where every node is heading,
+  // so a snapshot taken mid-glide (the cleanup's own autosave, a mode switch,
+  // app close) records the settled arrangement — never the in-between one.
+  // The glide runs on its own timer: guide fades must not be able to kill it
+  // half-way (cancelGuideTimers lands it instead).
+  landGenRows(ctx)
+  ctx.rowTargets = nodeTargetY
+  const land = () => {
+    ctx.nodesData.forEach((n) => {
+      if (nodeTargetY[n.id] !== undefined) {
+        n.y = nodeTargetY[n.id]
+        n.fy = n.y
+      }
+    })
+    ov.guides = newYValues.map((y, i) => ({ y, label: `Gen ${i + 1}`, kind: 'gen', opacity: 1 }))
+    if (ctx.rowTargets === nodeTargetY) ctx.rowTargets = null
+    tickedFn()
+  }
   const duration = 350
   const ease = d3.easeCubicOut
-  runGuideTimer(ctx, (elapsed) => {
+  const timer = d3.timer((elapsed) => {
     const t = Math.min(1, ease(elapsed / duration))
     ctx.nodesData.forEach((n) => {
       const sy = nodeStartY[n.id],
@@ -349,16 +427,10 @@ export function redistributeGenRows(ctx, tickedFn) {
     }))
     tickedFn()
     if (t >= 1) {
-      ctx.nodesData.forEach((n) => {
-        if (nodeTargetY[n.id] !== undefined) {
-          n.y = nodeTargetY[n.id]
-          n.fy = n.y
-        }
-      })
-      ov.guides = newYValues.map((y, i) => ({ y, label: `Gen ${i + 1}`, kind: 'gen', opacity: 1 }))
-      tickedFn()
-      return true
+      timer.stop()
+      if (ctx.rowMotion?.timer === timer) ctx.rowMotion = null
+      land()
     }
-    return false
   })
+  ctx.rowMotion = { timer, land }
 }

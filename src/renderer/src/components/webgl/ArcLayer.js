@@ -1,9 +1,13 @@
 import * as THREE from 'three'
+import { INK_NOISE } from './inkGlsl.js'
 
 // Instanced ring segments — the faction-membership arcs around each person node.
 // Angles are in radians in atan2 space (0 = +x, increasing clockwise on a y-down
 // canvas); `spin` is an angular velocity (rad/s) applied via the uTime uniform so
 // multi-faction rings orbit without any per-frame buffer writes.
+// setInk(true) paints the same arcs as 水墨 brush arcs: pressed in at a0, dry
+// "flying white" toward a1, a lone full ring left open like an ensō (uInk
+// uniform — the classic branch is untouched).
 export class ArcLayer {
   constructor({ renderOrder = 1 } = {}) {
     this.capacity = 0
@@ -81,6 +85,10 @@ export class ArcLayer {
     this.material.uniforms.uTime.value = t
   }
 
+  setInk(on) {
+    this.material.uniforms.uInk.value = on ? 1 : 0
+  }
+
   dispose() {
     this.geometry?.dispose()
     this.material?.dispose()
@@ -94,7 +102,7 @@ function createArcMaterial() {
     depthTest: false,
     depthWrite: false,
     side: THREE.DoubleSide,
-    uniforms: { uTime: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uInk: { value: 0 } },
     vertexShader: /* glsl */ `
       in vec2 iCenter;
       in float iRadius;
@@ -128,6 +136,7 @@ function createArcMaterial() {
     fragmentShader: /* glsl */ `
       precision highp float;
       uniform float uTime;
+      uniform float uInk;
       in vec2 vCorner;
       in float vRadius;
       in float vA0;
@@ -139,6 +148,27 @@ function createArcMaterial() {
       out vec4 fragColor;
 
       const float TAU = 6.2831853;
+      ${INK_NOISE}
+
+      vec4 inkArc(float d, float rel, float aa) {
+        float span = vSpan > 6.0 ? vSpan * 0.9 : vSpan;
+        float u = clamp(rel / max(span, 0.001), 0.0, 1.0);
+        float seed = vA0 * 3.7 + vColor.r * 11.0;
+        float arcLen = rel * vRadius;
+        float prof = (0.5 + 0.5 * sqrt(min(u / 0.1, 1.0))) * (1.0 - 0.7 * smoothstep(0.62, 1.0, u));
+        prof *= 1.0 + 0.2 * (inkNoise(vec2(arcLen * 0.12 + seed, 1.0)) - 0.5);
+        float hw = vHalfW * 1.3 * prof;
+        float off = d - vRadius;
+        float body = 1.0 - smoothstep(hw - aa, hw + aa, abs(off));
+        float dryAmt = 0.7 * smoothstep(0.38, 1.0, u) + 0.08;
+        float streak = inkNoise(vec2(arcLen * 0.06 + seed, off / max(hw, 0.3) * 3.2 + seed));
+        float keep = smoothstep(dryAmt - 0.1, dryAmt + 0.1, streak);
+        float aaA = aa / max(vRadius, 0.001) + 0.015;
+        float ends = smoothstep(0.0, aaA, rel) * (1.0 - smoothstep(span, span + aaA, rel));
+        float lum = dot(vColor, vec3(0.299, 0.587, 0.114));
+        vec3 pig = mix(mix(vec3(lum), vColor, 0.55), vec3(0.11, 0.10, 0.09), 0.38);
+        return vec4(pig, body * keep * ends);
+      }
 
       void main() {
         float d = length(vCorner);
@@ -146,6 +176,13 @@ function createArcMaterial() {
         float ring = 1.0 - smoothstep(vHalfW - aa, vHalfW + aa, abs(d - vRadius));
         float ang = atan(vCorner.y, vCorner.x) - uTime * vSpin;
         float rel = mod(ang - vA0, TAU);
+        if (uInk > 0.5) {
+          vec4 ink = inkArc(d, rel, aa);
+          float ia = ink.a * vOpacity;
+          if (ia < 0.003) discard;
+          fragColor = vec4(ink.rgb, ia);
+          return;
+        }
         // soften the angular ends by roughly one pixel of arc
         float aaA = aa / max(vRadius, 0.001) + 0.015;
         float inArc = smoothstep(0.0, aaA, rel) * (1.0 - smoothstep(vSpan, vSpan + aaA, rel));

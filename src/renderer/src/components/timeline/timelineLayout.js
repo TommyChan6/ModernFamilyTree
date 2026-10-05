@@ -30,7 +30,8 @@ export function computeTimelineLayout(
   relationships,
   refYear,
   laneOrder = null,
-  typeRoles = null
+  typeRoles = null,
+  extraYears = [] // story-event years: the axis stretches to show them too
 ) {
   const birthOf = (p) => toOrdinal(p.birth)
   const dated = persons.filter((p) => birthOf(p) != null)
@@ -47,8 +48,12 @@ export function computeTimelineLayout(
     return birthOf(a) - birthOf(b) || (a.name || '').localeCompare(b.name || '')
   })
 
-  const minYear = dated.length ? Math.min(...dated.map(birthOf)) : refYear - 50
-  let maxYear = minYear + 10
+  const extra = extraYears.filter((y) => Number.isFinite(y))
+  const minYear = Math.min(
+    dated.length ? Math.min(...dated.map(birthOf)) : refYear - 50,
+    ...(extra.length ? [Math.floor(Math.min(...extra))] : [])
+  )
+  let maxYear = Math.max(minYear + 10, ...extra)
   dated.forEach((p) => {
     maxYear = Math.max(maxYear, lifeEnd(p, refYear))
   })

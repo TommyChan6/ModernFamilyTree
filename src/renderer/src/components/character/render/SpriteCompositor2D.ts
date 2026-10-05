@@ -1,11 +1,18 @@
 // The 2D sprite-compositor rendering backend: paints the pure model's resolved
-// layers onto a canvas. One composited frame is ~20–30 Path2D fills — cheap
-// enough to redraw per frame for the idle animation. Painterly future styles
-// slot in by adding image layers here without touching the model or the view.
+// layers onto a canvas. A composited frame is ~60–150 Path2D fills (a few
+// clipped, a few gradient-filled) — cheap enough to redraw per frame for the
+// idle animation. Path2D objects and CanvasGradients are cached, so a steady
+// frame allocates almost nothing.
 
 import type { StylePack } from '../styleTypes'
 import type { CharacterDoc } from '../../../../../shared/types'
-import { resolveLayers, type ResolvedLayer, type TransformOp } from '../characterModel'
+import {
+  resolveLayers,
+  type CharacterAnim,
+  type ResolvedGradient,
+  type ResolvedLayer,
+  type TransformOp
+} from '../characterModel'
 
 /** Where to point the camera, in character space. */
 export interface Region {
@@ -33,6 +40,36 @@ function pathOf(d: string): Path2D {
   return p
 }
 
+// Gradients are context-bound, so cache per context; keyed by their spec.
+const gradCaches = new WeakMap<CanvasRenderingContext2D, Map<string, CanvasGradient>>()
+function gradientOf(ctx: CanvasRenderingContext2D, g: ResolvedGradient): CanvasGradient {
+  let cache = gradCaches.get(ctx)
+  if (!cache) {
+    cache = new Map()
+    gradCaches.set(ctx, cache)
+  }
+  const key =
+    g.type === 'linear'
+      ? `l${g.x1},${g.y1},${g.x2},${g.y2}|${g.stops.join(';')}`
+      : `r${g.cx},${g.cy},${g.r},${g.fx},${g.fy}|${g.stops.join(';')}`
+  let grad = cache.get(key)
+  if (!grad) {
+    if (cache.size > 800) cache.clear() // palette scrubbing churns keys
+    grad =
+      g.type === 'linear'
+        ? ctx.createLinearGradient(g.x1, g.y1, g.x2, g.y2)
+        : ctx.createRadialGradient(g.fx, g.fy, 0, g.cx, g.cy, g.r)
+    for (const [o, color, a] of g.stops) grad.addColorStop(o, a < 1 ? withAlpha(color, a) : color)
+    cache.set(key, grad)
+  }
+  return grad
+}
+
+function withAlpha(hex: string, a: number): string {
+  const n = parseInt(hex.slice(1), 16)
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`
+}
+
 /** Fit a character-space region into a device-pixel box (contain + center). */
 export function fitRegion(region: Region, width: number, height: number, pad = 0): View {
   const k = Math.min((width - pad * 2) / region.span, (height - pad * 2) / region.span)
@@ -46,7 +83,11 @@ export function fitRegion(region: Region, width: number, height: number, pad = 0
 function applyOps(ctx: CanvasRenderingContext2D, ops: TransformOp[]): void {
   for (const op of ops) {
     if (op.type === 'translate') ctx.translate(op.x, op.y)
-    else {
+    else if (op.type === 'rotate') {
+      ctx.translate(op.cx, op.cy)
+      ctx.rotate(op.a)
+      ctx.translate(-op.cx, -op.cy)
+    } else {
       ctx.translate(op.cx, op.cy)
       ctx.scale(op.sx, op.sy)
       ctx.translate(-op.cx, -op.cy)
@@ -58,6 +99,8 @@ export interface DrawOptions {
   /** Slot to outline with a soft selection glow. */
   highlightSlot?: string | null
   highlightColor?: string
+  /** 0..1 glow strength (the stage pulses it). */
+  highlightAlpha?: number
 }
 
 /** Paint resolved layers under the given view transform. The caller owns
@@ -69,14 +112,25 @@ export function drawLayers(
   opts: DrawOptions = {}
 ): void {
   ctx.save()
-  ctx.setTransform(view.k, 0, 0, view.k, view.tx, view.ty)
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
   for (const layer of layers) {
     const path = pathOf(layer.d)
     ctx.save()
+    if (layer.clip) {
+      ctx.setTransform(view.k, 0, 0, view.k, view.tx, view.ty)
+      applyOps(ctx, layer.clip.ops)
+      ctx.clip(pathOf(layer.clip.d))
+    }
+    ctx.setTransform(view.k, 0, 0, view.k, view.tx, view.ty)
     applyOps(ctx, layer.ops)
-    if (layer.fill) {
+    if (layer.offset) ctx.translate(layer.offset.x, layer.offset.y)
+    if (layer.alpha < 1) ctx.globalAlpha = layer.alpha
+    if (layer.blend) ctx.globalCompositeOperation = layer.blend
+    if (layer.grad) {
+      ctx.fillStyle = gradientOf(ctx, layer.grad)
+      ctx.fill(path)
+    } else if (layer.fill) {
       ctx.fillStyle = layer.fill
       ctx.fill(path)
     }
@@ -87,26 +141,50 @@ export function drawLayers(
     }
     ctx.restore()
   }
-  // Selection glow: re-stroke the highlighted slot's silhouette on top.
+  ctx.restore()
   if (opts.highlightSlot) {
-    ctx.globalAlpha = 0.55
-    ctx.strokeStyle = opts.highlightColor || '#6c8ef5'
-    for (const layer of layers) {
-      if (layer.slot !== opts.highlightSlot) continue
-      ctx.save()
-      applyOps(ctx, layer.ops)
-      ctx.lineWidth = (layer.lineWidth || 4) + 4
-      ctx.stroke(pathOf(layer.d))
-      ctx.restore()
-    }
-    ctx.globalAlpha = 1
+    outlineSlot(
+      ctx,
+      layers,
+      view,
+      opts.highlightSlot,
+      opts.highlightColor || '#6c8ef5',
+      0.55 * (opts.highlightAlpha ?? 1)
+    )
+  }
+}
+
+/** Selection/hover glow: re-stroke one slot's silhouette on top. */
+export function outlineSlot(
+  ctx: CanvasRenderingContext2D,
+  layers: ResolvedLayer[],
+  view: View,
+  slot: string,
+  color: string,
+  alpha: number
+): void {
+  ctx.save()
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.globalAlpha = alpha
+  ctx.strokeStyle = color
+  for (const layer of layers) {
+    if (layer.slot !== slot || layer.clip || layer.alpha < 0.5) continue
+    if (!layer.fill && !layer.grad && !layer.stroke) continue
+    ctx.save()
+    ctx.setTransform(view.k, 0, 0, view.k, view.tx, view.ty)
+    applyOps(ctx, layer.ops)
+    if (layer.offset) ctx.translate(layer.offset.x, layer.offset.y)
+    ctx.lineWidth = (layer.lineWidth || 2) + 3.5
+    ctx.stroke(pathOf(layer.d))
+    ctx.restore()
   }
   ctx.restore()
 }
 
 /** Topmost slot under a device-pixel point (walks layers front to back).
  *  Strokes count via isPointInStroke so line-art parts (glasses, happy eyes)
- *  stay clickable. */
+ *  stay clickable; faint overlays (shadows, blush) don't block clicks. */
 export function hitTest(
   ctx: CanvasRenderingContext2D,
   layers: ResolvedLayer[],
@@ -116,12 +194,13 @@ export function hitTest(
 ): string | null {
   for (let i = layers.length - 1; i >= 0; i--) {
     const layer = layers[i]
+    if (layer.clip || layer.alpha < 0.4) continue
     const path = pathOf(layer.d)
     ctx.save()
     ctx.setTransform(view.k, 0, 0, view.k, view.tx, view.ty)
     applyOps(ctx, layer.ops)
     let hit = false
-    if (layer.fill) hit = ctx.isPointInPath(path, x, y)
+    if (layer.fill || layer.grad) hit = ctx.isPointInPath(path, x, y)
     if (!hit && layer.stroke && layer.lineWidth > 0) {
       ctx.lineWidth = Math.max(layer.lineWidth, 10)
       hit = ctx.isPointInStroke(path, x, y)
@@ -139,13 +218,19 @@ export interface RasterizeOptions {
   region?: Region
   /** CSS background; omit for transparency. */
   background?: string
+  /** Paints a backdrop first (device space, size × size). */
+  backdrop?: (ctx: CanvasRenderingContext2D, size: number) => void
+  anim?: CharacterAnim
   mimeType?: string
   quality?: number
 }
 
-/** Render a doc to a data URL (WebP by default) — the portrait hand-off into
- *  the regular images pipeline, and the filmstrip thumbnails. */
-export function rasterize(doc: CharacterDoc, pack: StylePack, opts: RasterizeOptions = {}): string {
+/** Render a doc to a canvas (the portrait hand-off, cards, thumbnails). */
+export function renderToCanvas(
+  doc: CharacterDoc,
+  pack: StylePack,
+  opts: RasterizeOptions = {}
+): HTMLCanvasElement {
   const size = opts.size ?? 512
   const canvas = document.createElement('canvas')
   canvas.width = size
@@ -156,16 +241,26 @@ export function rasterize(doc: CharacterDoc, pack: StylePack, opts: RasterizeOpt
     ctx.fillStyle = opts.background
     ctx.fillRect(0, 0, size, size)
   }
+  opts.backdrop?.(ctx, size)
   const region = opts.region ?? {
     cx: pack.width / 2,
     cy: pack.height / 2,
     span: Math.max(pack.width, pack.height) * 1.04
   }
-  drawLayers(ctx, resolveLayers(doc, pack), fitRegion(region, size, size))
-  return canvas.toDataURL(opts.mimeType ?? 'image/webp', opts.quality ?? 0.9)
+  drawLayers(ctx, resolveLayers(doc, pack, opts.anim), fitRegion(region, size, size))
+  return canvas
+}
+
+/** Render a doc to a data URL (WebP by default) — the portrait hand-off into
+ *  the regular images pipeline, and the filmstrip thumbnails. */
+export function rasterize(doc: CharacterDoc, pack: StylePack, opts: RasterizeOptions = {}): string {
+  return renderToCanvas(doc, pack, opts).toDataURL(
+    opts.mimeType ?? 'image/webp',
+    opts.quality ?? 0.9
+  )
 }
 
 /** Head-and-shoulders crop — what the avatar pipeline wants. */
 export function portraitRegion(pack: StylePack): Region {
-  return { cx: pack.width / 2, cy: pack.height * 0.34, span: pack.width * 0.92 }
+  return pack.portrait
 }

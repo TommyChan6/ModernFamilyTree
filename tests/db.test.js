@@ -1639,6 +1639,42 @@ describe('Characters (experimental Character view)', () => {
     expect(channelHandlers['characters:getAll'](db)).toHaveLength(1)
   })
 
+  it('characters:save sanitizes a 3D look (model3d) on create and patch', () => {
+    initDB()
+    const { db } = getDB()
+    const [personId] = Object.keys(db.persons)
+    const doc = makeDoc(db, personId, {
+      style_id: 'human3d',
+      model3d: {
+        body: { gender: 7, age: 400 },
+        shape: { 'nose-hump-decr-incr': 0.5, 'bad key!': 1, 'eye-scale-decr-incr@l': -3 },
+        hair: { style: 'long', color: 'red' },
+        evil: { script: '<x>' }
+      }
+    })
+    expect(doc.style_id).toBe('human3d')
+    expect(doc.model3d.body.gender).toBe(1)
+    expect(doc.model3d.body.age).toBe(90)
+    expect(doc.model3d.shape).toEqual({ 'nose-hump-decr-incr': 0.5, 'eye-scale-decr-incr@l': -1 })
+    expect(doc.model3d.hair.style).toBe('long')
+    expect(doc.model3d.hair.color).toMatch(/^#[0-9a-f]{6}$/) // invalid colour → default
+    expect(doc.model3d.evil).toBeUndefined()
+    // patch keeps the doc's other fields; null removes the 3D state
+    const patched = channelHandlers['characters:save'](
+      db,
+      { id: doc.id, model3d: { ...doc.model3d, pose: 'wave' } },
+      handlerEnv
+    )
+    expect(patched.model3d.pose).toBe('wave')
+    expect(patched.parts.hair.partId).toBe('hair-short')
+    const cleared = channelHandlers['characters:save'](
+      db,
+      { id: doc.id, model3d: null },
+      handlerEnv
+    )
+    expect(cleared.model3d).toBeUndefined()
+  })
+
   it('characters:save rejects an unknown person', () => {
     initDB()
     const { db } = getDB()
@@ -1660,6 +1696,31 @@ describe('Characters (experimental Character view)', () => {
     expect(updated.age_to).toBeNull()
     expect(updated.parts.hair.partId).toBe('hair-short') // untouched
     expect(updated.person_id).toBe(personId)
+  })
+
+  it('characters:save defaults and patches style, expression and backdrop', () => {
+    initDB()
+    const { db } = getDB()
+    const [personId] = Object.keys(db.persons)
+    const doc = makeDoc(db, personId)
+    expect(doc.expression).toBe('neutral')
+    expect(doc.backdrop).toBe('studio')
+    const updated = channelHandlers['characters:save'](
+      db,
+      {
+        id: doc.id,
+        style_id: 'anime',
+        expression: 'smug',
+        backdrop: 'sakura',
+        morph: { height: 0, build: 0, headSize: 0, age: -0.5 }
+      },
+      handlerEnv
+    )
+    expect(updated.style_id).toBe('anime')
+    expect(updated.expression).toBe('smug')
+    expect(updated.backdrop).toBe('sakura')
+    expect(updated.morph.age).toBe(-0.5)
+    expect(updated.label).toBe('Look 1') // untouched
   })
 
   it('characters:setPortrait is exclusive per person and can be cleared', () => {
@@ -1726,5 +1787,343 @@ describe('Characters (experimental Character view)', () => {
     const other = channelHandlers['projects:create'](db, { name: 'Other' }, handlerEnv)
     channelHandlers['projects:setActive'](db, { id: other.id }, handlerEnv)
     expect(channelHandlers['characters:getAll'](db)).toHaveLength(0)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Maps (the Map view)', () => {
+  const makeMap = (db, extra = {}) =>
+    channelHandlers['maps:save'](
+      db,
+      {
+        name: 'The Known World',
+        style: 'fantasy',
+        features: [
+          { id: 'land1', kind: 'land', pts: [0, 0, 100, 0, 100, 100, 0, 100] },
+          { id: 'city1', kind: 'place', icon: 'city', pts: [50, 50], name: 'Aldmar', from: 1200 }
+        ],
+        ...extra
+      },
+      handlerEnv
+    )
+
+  it('maps:save creates a doc scoped to the active project with sane defaults', () => {
+    initDB()
+    const { db, activeProjectId } = getDB()
+    const m = makeMap(db)
+    expect(m.project_id).toBe(activeProjectId)
+    expect(m.style).toBe('fantasy')
+    expect(m.base).toBe('sea')
+    expect(m.width).toBe(2400)
+    expect(m.features).toHaveLength(2)
+    expect(m.tokens).toEqual([])
+    expect(channelHandlers['maps:getAll'](db)).toHaveLength(1)
+  })
+
+  it('maps:save sanitizes features, tokens and settings', () => {
+    initDB()
+    const { db } = getDB()
+    const [personId] = Object.keys(db.persons)
+    const m = channelHandlers['maps:save'](
+      db,
+      {
+        style: 'nonsense',
+        base: 'land',
+        width: 5,
+        features: [
+          { kind: 'dragon', pts: [1, 2] }, // unknown kind → dropped
+          { kind: 'river', pts: [1] }, // not enough points → dropped
+          { kind: 'road', pts: [0.123, 1.987, 5, 5, 9] }, // odd tail trimmed, coords rounded
+          { kind: 'territory', pts: [0, 0, 1, 0, 1, 1], from: '1100', to: '' }
+        ],
+        tokens: [
+          {
+            person_id: personId,
+            keys: [
+              { t: 1210, x: 1, y: 1 },
+              { t: 1200, x: 5, y: 5 },
+              { t: 1210, x: 9, y: 9 }
+            ]
+          },
+          { person_id: personId, keys: [{ t: 1, x: 0, y: 0 }] }, // duplicate person → dropped
+          { person_id: 'x', keys: [] } // no keys → dropped
+        ]
+      },
+      handlerEnv
+    )
+    expect(m.style).toBe('parchment')
+    expect(m.base).toBe('land')
+    expect(m.width).toBe(200) // clamped to the minimum
+    expect(m.features.map((f) => f.kind)).toEqual(['road', 'territory'])
+    expect(m.features[0].pts).toEqual([0.1, 2, 5, 5])
+    expect(m.features[0].id).toBeTruthy()
+    expect(m.features[1].from).toBe(1100)
+    expect(m.features[1]).not.toHaveProperty('to')
+    expect(m.tokens).toHaveLength(1)
+    // keys sorted by year, one per year (later write wins)
+    expect(m.tokens[0].keys).toEqual([
+      { t: 1200, x: 5, y: 5 },
+      { t: 1210, x: 9, y: 9 }
+    ])
+  })
+
+  it('maps:save with an id patches only the given fields', () => {
+    initDB()
+    const { db } = getDB()
+    const m = makeMap(db)
+    const updated = channelHandlers['maps:save'](
+      db,
+      { id: m.id, view: { x: 10, y: 20, k: 2 }, year: 1234 },
+      handlerEnv
+    )
+    expect(updated.id).toBe(m.id)
+    expect(updated.name).toBe('The Known World')
+    expect(updated.features).toHaveLength(2)
+    expect(updated.view).toEqual({ x: 10, y: 20, k: 2 })
+    expect(updated.year).toBe(1234)
+    expect(Object.keys(db.maps)).toHaveLength(1)
+  })
+
+  it('maps are invisible (and unpatchable) from another project', () => {
+    initDB()
+    const { db } = getDB()
+    const m = makeMap(db)
+    const other = channelHandlers['projects:create'](db, { name: 'Other' }, handlerEnv)
+    channelHandlers['projects:setActive'](db, { id: other.id }, handlerEnv)
+    expect(channelHandlers['maps:getAll'](db)).toHaveLength(0)
+    expect(() =>
+      channelHandlers['maps:save'](db, { id: m.id, name: 'Hijack' }, handlerEnv)
+    ).toThrow('Map not found')
+    channelHandlers['maps:delete'](db, { id: m.id }, handlerEnv)
+    expect(db.maps[m.id]).toBeTruthy()
+  })
+
+  it('maps:delete removes the doc; deleting the project cascades its maps', () => {
+    initDB()
+    const { db, activeProjectId } = getDB()
+    const a = makeMap(db)
+    makeMap(db, { name: 'Second' })
+    channelHandlers['maps:delete'](db, { id: a.id }, handlerEnv)
+    expect(Object.keys(db.maps)).toHaveLength(1)
+    channelHandlers['projects:delete'](db, { id: activeProjectId }, handlerEnv)
+    expect(Object.keys(db.maps)).toHaveLength(0)
+  })
+
+  it('deleting a person keeps their token (so undo restores them on the map)', () => {
+    initDB()
+    const { db } = getDB()
+    const [personId] = Object.keys(db.persons)
+    const m = makeMap(db, { tokens: [{ person_id: personId, keys: [{ t: 1200, x: 1, y: 1 }] }] })
+    channelHandlers['persons:delete'](db, { id: personId }, handlerEnv)
+    expect(db.maps[m.id].tokens).toHaveLength(1)
+  })
+
+  it('projects:duplicate copies maps with people and group links remapped', () => {
+    initDB()
+    const { db, activeProjectId } = getDB()
+    const [p1, p2] = Object.keys(db.persons)
+    const tag = channelHandlers['tags:create'](db, { label: 'North', color: '#123456' }, handlerEnv)
+    makeMap(db, {
+      features: [{ kind: 'territory', pts: [0, 0, 10, 0, 10, 10], tag_id: tag.id }],
+      tokens: [
+        { person_id: p1, keys: [{ t: 1200, x: 1, y: 1 }] },
+        { person_id: p2, keys: [{ t: 1200, x: 2, y: 2 }] }
+      ]
+    })
+    channelHandlers['persons:delete'](db, { id: p2 }, handlerEnv) // orphan token
+    const copy = channelHandlers['projects:duplicate'](db, { id: activeProjectId }, handlerEnv)
+    const copied = Object.values(db.maps).filter((m) => m.project_id === copy.id)
+    expect(copied).toHaveLength(1)
+    const cm = copied[0]
+    expect(cm.tokens).toHaveLength(1) // the orphan isn't copied
+    const newPerson = db.persons[cm.tokens[0].person_id]
+    expect(newPerson.project_id).toBe(copy.id)
+    const newTag = db.tags[cm.features[0].tag_id]
+    expect(newTag.project_id).toBe(copy.id)
+    expect(newTag.label).toBe('North')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Projects page channels: projects:update + projects:duplicate', () => {
+  it('projects:update patches card metadata and validates input', () => {
+    initDB()
+    const { db, activeProjectId } = getDB()
+
+    const updated = channelHandlers['projects:update'](
+      db,
+      {
+        id: activeProjectId,
+        name: '  House Atreides  ',
+        description: 'The desert bloodline',
+        visibility: 'public',
+        hue: 205.6,
+        favorite: true
+      },
+      handlerEnv
+    )
+    expect(updated.name).toBe('House Atreides')
+    expect(updated.description).toBe('The desert bloodline')
+    expect(updated.visibility).toBe('public')
+    expect(updated.hue).toBe(206)
+    expect(updated.favorite).toBe(true)
+
+    // Clearing works (empty description → null, hue null → derived)
+    channelHandlers['projects:update'](
+      db,
+      { id: activeProjectId, description: '', hue: null },
+      handlerEnv
+    )
+    expect(db.projects[activeProjectId].description).toBeNull()
+    expect(db.projects[activeProjectId].hue).toBeNull()
+
+    expect(() =>
+      channelHandlers['projects:update'](db, { id: activeProjectId, name: '   ' }, handlerEnv)
+    ).toThrow(/name/i)
+    expect(() =>
+      channelHandlers['projects:update'](
+        db,
+        { id: activeProjectId, visibility: 'friends' },
+        handlerEnv
+      )
+    ).toThrow(/visibility/i)
+    expect(() =>
+      channelHandlers['projects:update'](db, { id: activeProjectId, hue: 400 }, handlerEnv)
+    ).toThrow(/colour/i)
+    expect(() => channelHandlers['projects:update'](db, { id: 'nope' }, handlerEnv)).toThrow(
+      /not found/i
+    )
+  })
+
+  it('projects:update bumps updated_at for edits but not for a favorite toggle', () => {
+    initDB()
+    const { db, activeProjectId } = getDB()
+    const before = db.projects[activeProjectId].updated_at
+    const laterEnv = { ...handlerEnv, nowStr: () => '2030-06-06 06:06:06' }
+
+    channelHandlers['projects:update'](db, { id: activeProjectId, favorite: true }, laterEnv)
+    expect(db.projects[activeProjectId].updated_at).toBe(before)
+
+    channelHandlers['projects:update'](db, { id: activeProjectId, name: 'Renamed' }, laterEnv)
+    expect(db.projects[activeProjectId].updated_at).toBe('2030-06-06 06:06:06')
+  })
+
+  it('projects:duplicate deep-copies rows onto fresh ids with references remapped', () => {
+    initDB()
+    const { db, activeProjectId } = getDB()
+
+    // Dress the seed project up: a tag + membership, a custom relationship
+    // type in use, a scene whose positions/styles are keyed by person ids,
+    // and a project-scoped setting.
+    const [p1, p2] = Object.keys(db.persons)
+    const tag = channelHandlers['tags:create'](db, { label: 'Nobles' }, handlerEnv)
+    channelHandlers['entity_tags:add'](db, { entity_id: p1, tag_id: tag.id }, handlerEnv)
+    const custom = channelHandlers['relTypes:create'](db, { label: 'Sworn to' }, handlerEnv)
+    const sworn = channelHandlers['relationships:create'](
+      db,
+      { person_a_id: p1, person_b_id: p2, type: custom.key },
+      handlerEnv
+    )
+    const scene = channelHandlers['scenes:create'](
+      db,
+      {
+        view: 'graph',
+        name: 'Main',
+        type: 'free',
+        positions: { [p1]: { x: 1, y: 2 } },
+        layouts: {
+          free: { positions: { [p1]: { x: 1, y: 2 } }, config: {}, styles: { [p1]: { size: 2 } } },
+          // Scene-wide maps the graph keeps beside the per-type arrangements
+          styles: { [p2]: { color: '#ff0000' } },
+          curves: { [sworn.id]: { a: [0.3, 0.2], b: [0.7, 0.2], s: p1 } }
+        }
+      },
+      handlerEnv
+    )
+    channelHandlers['settings:set'](db, { key: 'noun', value: 'Character' }, handlerEnv)
+    channelHandlers['settings:set'](db, { key: 'activeSceneId:graph', value: scene.id }, handlerEnv)
+    channelHandlers['settings:set'](db, { key: 'checkpoint', value: '{"x":1}' }, handlerEnv)
+
+    const srcCounts = {
+      persons: Object.values(db.persons).filter((p) => p.project_id === activeProjectId).length,
+      rels: Object.values(db.relationships).filter((r) => r.project_id === activeProjectId).length,
+      defs: Object.values(db.field_defs).filter((d) => d.project_id === activeProjectId).length,
+      values: Object.keys(db.field_values).length
+    }
+
+    const copy = channelHandlers['projects:duplicate'](db, { id: activeProjectId }, handlerEnv)
+    expect(copy.id).not.toBe(activeProjectId)
+    expect(copy.name).toMatch(/copy$/)
+
+    const of = (table, pid) => Object.values(table).filter((r) => r.project_id === pid)
+    expect(of(db.persons, copy.id)).toHaveLength(srcCounts.persons)
+    expect(of(db.relationships, copy.id)).toHaveLength(srcCounts.rels)
+    expect(of(db.field_defs, copy.id)).toHaveLength(srcCounts.defs)
+    expect(Object.keys(db.field_values).length).toBe(srcCounts.values * 2)
+
+    // Copied relationships point at copied people (never at the originals)
+    const srcPersonIds = new Set(
+      Object.values(db.persons)
+        .filter((p) => p.project_id === activeProjectId)
+        .map((p) => p.id)
+    )
+    for (const r of of(db.relationships, copy.id)) {
+      expect(srcPersonIds.has(r.person_a_id)).toBe(false)
+      expect(srcPersonIds.has(r.person_b_id)).toBe(false)
+    }
+
+    // The custom type got a new key, and the copied relationship uses it
+    const copiedCustom = of(db.rel_type_defs, copy.id).find((d) => d.label === 'Sworn to')
+    expect(copiedCustom).toBeDefined()
+    expect(copiedCustom.key).not.toBe(custom.key)
+    expect(of(db.relationships, copy.id).some((r) => r.type === copiedCustom.key)).toBe(true)
+
+    // Tag membership follows the copied person + copied tag
+    const copiedTag = of(db.tags, copy.id)[0]
+    const joins = Object.values(db.entity_tags).filter((et) => et.tag_id === copiedTag.id)
+    expect(joins).toHaveLength(1)
+    expect(db.persons[joins[0].entity_id].project_id).toBe(copy.id)
+
+    // Scene position/style keys were remapped onto the copied person ids
+    const copiedScene = of(db.scenes, copy.id)[0]
+    const posKeys = Object.keys(copiedScene.layouts.free.positions)
+    expect(posKeys).toHaveLength(1)
+    expect(db.persons[posKeys[0]].project_id).toBe(copy.id)
+    expect(Object.keys(copiedScene.layouts.free.styles)[0]).toBe(posKeys[0])
+    expect(copiedScene.layouts.free.positions[posKeys[0]]).toEqual({ x: 1, y: 2 })
+    const [styleKey] = Object.keys(copiedScene.layouts.styles)
+    expect(db.persons[styleKey].project_id).toBe(copy.id)
+    expect(copiedScene.layouts.styles[styleKey]).toEqual({ color: '#ff0000' })
+    // Bezier curves follow the copied relationship (and its shaping endpoint)
+    const [curveKey] = Object.keys(copiedScene.layouts.curves)
+    expect(db.relationships[curveKey].project_id).toBe(copy.id)
+    expect(copiedScene.layouts.curves[curveKey].a).toEqual([0.3, 0.2])
+    expect(copiedScene.layouts.curves[curveKey].s).toBe(db.relationships[curveKey].person_a_id)
+    expect(copiedScene.layouts.curves).not.toHaveProperty(sworn.id)
+
+    // Settings carried over (with scene ids remapped), except the checkpoint
+    expect(db.settings[`${copy.id}:noun`]).toBe('Character')
+    expect(db.settings[`${copy.id}:activeSceneId:graph`]).toBe(copiedScene.id)
+    expect(db.settings[`${copy.id}:checkpoint`]).toBeUndefined()
+
+    // The source project is untouched
+    expect(of(db.persons, activeProjectId)).toHaveLength(srcCounts.persons)
+    expect(db.settings[`${activeProjectId}:checkpoint`]).toBe('{"x":1}')
+  })
+
+  it('projects:duplicate never copies image rows (files belong to the source)', () => {
+    initDB()
+    const { db, activeProjectId } = getDB()
+    const [p1] = Object.keys(db.persons)
+    channelHandlers['images:add'](
+      db,
+      { personId: p1, srcPath: '/img/a.png', isPrimary: true },
+      handlerEnv
+    )
+
+    const copy = channelHandlers['projects:duplicate'](db, { id: activeProjectId }, handlerEnv)
+    const copyImages = Object.values(db.images).filter((img) => img.project_id === copy.id)
+    expect(copyImages).toHaveLength(0)
+    expect(Object.values(db.images)).toHaveLength(1)
   })
 })

@@ -19,6 +19,7 @@
     "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@types/three": "^0.169.0",
     "@vitejs/plugin-vue": "^5.0.4",
     "d3": "^7.9.0",
     "electron": "^31.1.0",

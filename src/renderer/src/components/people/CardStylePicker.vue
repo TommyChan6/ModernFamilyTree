@@ -62,6 +62,26 @@
                 <i class="ma-line w1"></i>
                 <i class="ma-star">✦</i>
               </template>
+              <template v-else-if="s.id === 'scroll'">
+                <i class="ms-cord"></i>
+                <i class="ms-stave"></i>
+                <i class="ms-silk"></i>
+                <i class="ms-paper"></i>
+                <i class="ms-hill"></i>
+                <i class="ms-enso"></i>
+                <i class="ms-name"></i>
+                <i class="ms-seal"></i>
+                <i class="ms-roller"></i>
+              </template>
+              <template v-else-if="s.id === 'moonfan'">
+                <i class="mf-leaf"></i>
+                <i class="mf-branch"></i>
+                <i class="mf-bloom b1"></i>
+                <i class="mf-bloom b2"></i>
+                <i class="mf-name"></i>
+                <i class="mf-handle"></i>
+                <i class="mf-tassel"></i>
+              </template>
               <span v-if="s.id === store.cardStyle" class="csp-check">✓</span>
             </span>
             <span class="csp-label">{{ s.label }}</span>
@@ -90,7 +110,17 @@ const STYLES = [
   { id: 'poster', label: 'Full Art', blurb: 'The photo fills the card; info floats in front.' },
   { id: 'holo', label: 'Holo', blurb: 'Gold-foil trading card with HP, attacks, and rarity.' },
   { id: 'neon', label: 'Neon', blurb: 'Cyberpunk dossier — scanlines, glitches, barcodes.' },
-  { id: 'arcana', label: 'Arcana', blurb: 'Tarot of the family — gilded frames and starlight.' }
+  { id: 'arcana', label: 'Arcana', blurb: 'Tarot of the family — gilded frames and starlight.' },
+  {
+    id: 'scroll',
+    label: 'Scroll',
+    blurb: '立轴 — hanging ink scrolls with calligraphy and seals.'
+  },
+  {
+    id: 'moonfan',
+    label: 'Moon Fan',
+    blurb: '团扇 — round silk fans painted with plum, bamboo and moon.'
+  }
 ]
 
 const current = computed(() => STYLES.find((s) => s.id === store.cardStyle) || STYLES[0])
@@ -152,8 +182,8 @@ onUnmounted(() => {
 }
 .csp-btn.open {
   color: var(--t1);
-  border-color: rgba(108, 142, 245, 0.5);
-  box-shadow: 0 0 14px rgba(108, 142, 245, 0.22);
+  border-color: rgba(var(--accent-rgb), 0.5);
+  box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.22);
 }
 .csp-btn-icon {
   font-size: 14px;
@@ -273,7 +303,7 @@ onUnmounted(() => {
   border-color: var(--accent);
   box-shadow:
     0 0 0 2px var(--accent),
-    0 0 18px -2px rgba(108, 142, 245, 0.5);
+    0 0 18px -2px rgba(var(--accent-rgb), 0.5);
   animation: csp-breathe 2.6s ease-in-out infinite;
 }
 @keyframes csp-breathe {
@@ -281,12 +311,12 @@ onUnmounted(() => {
   100% {
     box-shadow:
       0 0 0 2px var(--accent),
-      0 0 12px -2px rgba(108, 142, 245, 0.4);
+      0 0 12px -2px rgba(var(--accent-rgb), 0.4);
   }
   50% {
     box-shadow:
       0 0 0 2px var(--accent),
-      0 0 22px 0 rgba(108, 142, 245, 0.6);
+      0 0 22px 0 rgba(var(--accent-rgb), 0.6);
   }
 }
 .csp-mini i {
@@ -534,7 +564,202 @@ onUnmounted(() => {
   }
 }
 
+/* scroll mini — a hanging scroll on a paper wall */
+.m-scroll {
+  background: color-mix(in srgb, var(--surface) 70%, #e9dfc8);
+}
+.m-scroll .ms-cord {
+  top: 2px;
+  left: 50%;
+  width: 26px;
+  height: 8px;
+  margin-left: -13px;
+  border: 1px solid #6b5a44;
+  border-bottom: none;
+  border-radius: 13px 13px 0 0;
+}
+.m-scroll .ms-stave {
+  top: 8px;
+  left: 11px;
+  right: 11px;
+  height: 3px;
+  border-radius: 1px;
+  background: #3b2a1d;
+}
+.m-scroll .ms-silk {
+  top: 10px;
+  left: 13px;
+  right: 13px;
+  bottom: 12px;
+  background:
+    linear-gradient(
+        90deg,
+        transparent 32%,
+        #8c9a93 32% 38%,
+        transparent 38% 62%,
+        #8c9a93 62% 68%,
+        transparent 68%
+      )
+      0 0 / 100% 12px no-repeat,
+    #a9b4ad;
+  box-shadow: 0 4px 6px -3px rgba(0, 0, 0, 0.5);
+}
+.m-scroll .ms-paper {
+  top: 23px;
+  left: 16px;
+  right: 16px;
+  bottom: 18px;
+  background: #f6f0e2;
+  border-top: 1.5px solid #6d5a3e;
+  border-bottom: 1.5px solid #6d5a3e;
+}
+.m-scroll .ms-hill {
+  left: 16px;
+  bottom: 18px;
+  width: 18px;
+  height: 12px;
+  background: linear-gradient(180deg, rgba(28, 26, 23, 0.55), rgba(28, 26, 23, 0.05));
+  clip-path: polygon(0 100%, 0 40%, 30% 0, 55% 45%, 75% 25%, 100% 100%);
+}
+.m-scroll .ms-enso {
+  top: 30px;
+  left: 18px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1.6px solid #1c1a17;
+  border-right-color: transparent;
+  transform: rotate(-30deg);
+  opacity: 0.85;
+}
+.m-scroll .ms-name {
+  top: 27px;
+  right: 18px;
+  width: 2.6px;
+  height: 20px;
+  border-radius: 2px;
+  background: #1c1a17;
+}
+.m-scroll .ms-seal {
+  top: 50px;
+  right: 17px;
+  width: 5px;
+  height: 5px;
+  background: #b3352a;
+  border-radius: 1px;
+}
+.m-scroll .ms-roller {
+  bottom: 8px;
+  left: 9px;
+  right: 9px;
+  height: 4px;
+  border-radius: 2px;
+  background:
+    linear-gradient(
+      90deg,
+      #c9d3c2 0 3px,
+      transparent 3px calc(100% - 3px),
+      #c9d3c2 calc(100% - 3px)
+    ),
+    #3b2a1d;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.csp-item:hover .m-scroll .ms-roller {
+  transform: translateY(3px);
+}
+.csp-item:hover .m-scroll .ms-silk {
+  bottom: 9px;
+}
+.m-scroll .ms-silk {
+  transition: bottom 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* moon-fan mini */
+.m-moonfan {
+  background: color-mix(in srgb, var(--surface) 70%, #e9dfc8);
+  perspective: 160px;
+}
+.m-moonfan .mf-leaf {
+  top: 7px;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  margin-left: -22px;
+  border-radius: 50%;
+  background: #f3ead6;
+  box-shadow:
+    0 0 0 2px #6a4a2f,
+    0 4px 6px -2px rgba(0, 0, 0, 0.45);
+  transition: transform 0.5s cubic-bezier(0.34, 1.3, 0.5, 1);
+}
+.csp-item:hover .m-moonfan .mf-leaf {
+  transform: rotateY(24deg);
+}
+.m-moonfan .mf-branch {
+  top: 15px;
+  left: 30px;
+  width: 22px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: #1c1a17;
+  transform: rotate(18deg);
+}
+.m-moonfan .mf-bloom {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #b3352a;
+  opacity: 0.8;
+}
+.m-moonfan .mf-bloom.b1 {
+  top: 14px;
+  left: 33px;
+}
+.m-moonfan .mf-bloom.b2 {
+  top: 21px;
+  left: 42px;
+}
+.m-moonfan .mf-name {
+  top: 18px;
+  left: 17px;
+  width: 2.4px;
+  height: 18px;
+  border-radius: 2px;
+  background: #1c1a17;
+}
+.m-moonfan .mf-handle {
+  top: 52px;
+  left: 50%;
+  width: 3px;
+  height: 20px;
+  margin-left: -1.5px;
+  background: linear-gradient(90deg, #6b5232, #c9a96e, #5d4528);
+}
+.m-moonfan .mf-tassel {
+  top: 71px;
+  left: 50%;
+  width: 4px;
+  height: 8px;
+  margin-left: -2px;
+  background: #b3352a;
+  border-radius: 1px 1px 2px 2px;
+  transform-origin: 50% 0;
+}
+.csp-item:hover .m-moonfan .mf-tassel {
+  animation: mf-swing 1.4s ease-in-out infinite;
+}
+@keyframes mf-swing {
+  0%,
+  100% {
+    transform: rotate(-12deg);
+  }
+  50% {
+    transform: rotate(12deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .csp-item:hover .m-moonfan .mf-tassel,
   .csp-item,
   .csp-item.active .csp-mini,
   .csp-item:hover .m-holo .mh-shine,

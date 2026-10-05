@@ -1,11 +1,47 @@
 import * as d3 from 'd3'
 
+// While a layout animation runs, `ctx.motionTargets` (id → {x,y}) holds where
+// every node is heading, so snapshots taken mid-flight save the destination
+// instead of an in-between frame. `finishAnimation()` lands an in-flight
+// animation immediately (nodes on target, completion callback run).
 export function useGraphAnimation(ctx) {
+  let pendingDone = null
+
   function cancelAnimation() {
     if (ctx.animTimer) {
       ctx.animTimer.stop()
       ctx.animTimer = null
     }
+    ctx.motionTargets = null
+    pendingDone = null
+  }
+
+  function finishAnimation() {
+    if (!ctx.animTimer) return
+    const targets = ctx.motionTargets
+    const done = pendingDone
+    cancelAnimation()
+    if (targets) {
+      ctx.nodesData.forEach((n) => {
+        const e = targets[n.id]
+        if (!e) return
+        n.x = e.x
+        n.y = e.y
+        n.fx = n.x
+        n.fy = n.y
+      })
+      ctx.ticked()
+    }
+    if (done) done()
+  }
+
+  // Timer finished on its own: clear the in-flight state, then complete.
+  function complete(onDone) {
+    ctx.animTimer.stop()
+    ctx.animTimer = null
+    ctx.motionTargets = null
+    pendingDone = null
+    if (onDone) onDone()
   }
 
   function animateToPositions(targets, onDone) {
@@ -17,6 +53,8 @@ export function useGraphAnimation(ctx) {
       startPos[n.id] = { x: n.x, y: n.y }
     })
 
+    ctx.motionTargets = targets
+    pendingDone = onDone
     ctx.animTimer = d3.timer((elapsed) => {
       const t = Math.min(1, ease(elapsed / duration))
       ctx.nodesData.forEach((n) => {
@@ -29,11 +67,7 @@ export function useGraphAnimation(ctx) {
         n.fy = n.y
       })
       ctx.ticked()
-      if (t >= 1) {
-        ctx.animTimer.stop()
-        ctx.animTimer = null
-        if (onDone) onDone()
-      }
+      if (t >= 1) complete(onDone)
     })
   }
 
@@ -50,6 +84,13 @@ export function useGraphAnimation(ctx) {
   //               target Y for a top-down cascade, distance for a radial bloom)
   function animateToPositionsWithReset(targets, onDone, opts = {}) {
     cancelAnimation()
+    // An undo/redo restore (ctx.historyRestore, set by the caller for one
+    // transition) glides people back quickly and leaves the camera alone —
+    // the user is looking at the spot they just changed.
+    const restore = !!ctx.historyRestore
+    ctx.historyRestore = false
+    if (restore) opts = { duration: 420, ease: d3.easeCubicInOut }
+    const keepCamera = restore || !!opts.keepCamera
     const duration = opts.duration ?? 500
     const ease = opts.ease ?? d3.easeCubicOut
     const stagger = opts.stagger ?? 0
@@ -81,8 +122,10 @@ export function useGraphAnimation(ctx) {
     // End camera = fit ALL of the target arrangement inside the viewport, so
     // every node is on screen when the new layout lands (scale + translate).
     // Fit the undistorted layout — drop any directional stretch, like fitAll.
-    ctx.transform.sx = 1
-    ctx.transform.sy = 1
+    if (!keepCamera) {
+      ctx.transform.sx = 1
+      ctx.transform.sy = 1
+    }
     const pad = 60
     const tVals = Object.values(targets)
     const endXs = tVals.map((t) => t.x),
@@ -104,6 +147,8 @@ export function useGraphAnimation(ctx) {
       startTx = cur.x,
       startTy = cur.y
 
+    ctx.motionTargets = targets
+    pendingDone = onDone
     ctx.animTimer = d3.timer((elapsed) => {
       ctx.nodesData.forEach((n) => {
         const s = startPos[n.id],
@@ -119,11 +164,16 @@ export function useGraphAnimation(ctx) {
       ctx.ticked()
       // Camera glides (pan + zoom) over the whole span with a smooth in-out so
       // it never races ahead of a staggered swarm, landing on the fit view.
-      const ct = d3.easeCubicInOut(Math.min(1, elapsed / total))
-      const k = startK + (endK - startK) * ct
-      const tx = startTx + (endTx - startTx) * ct
-      const ty = startTy + (endTy - startTy) * ct
-      ctx.zoomSelection.call(ctx.zoomBehavior.transform, d3.zoomIdentity.translate(tx, ty).scale(k))
+      if (!keepCamera) {
+        const ct = d3.easeCubicInOut(Math.min(1, elapsed / total))
+        const k = startK + (endK - startK) * ct
+        const tx = startTx + (endTx - startTx) * ct
+        const ty = startTy + (endTy - startTy) * ct
+        ctx.zoomSelection.call(
+          ctx.zoomBehavior.transform,
+          d3.zoomIdentity.translate(tx, ty).scale(k)
+        )
+      }
       if (elapsed >= total) {
         // Land exactly on target (guards against easeBackOut overshoot residue).
         ctx.nodesData.forEach((n) => {
@@ -135,12 +185,10 @@ export function useGraphAnimation(ctx) {
           n.fy = n.y
         })
         ctx.ticked()
-        ctx.animTimer.stop()
-        ctx.animTimer = null
-        if (onDone) onDone()
+        complete(onDone)
       }
     })
   }
 
-  return { cancelAnimation, animateToPositions, animateToPositionsWithReset }
+  return { cancelAnimation, finishAnimation, animateToPositions, animateToPositionsWithReset }
 }

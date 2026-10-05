@@ -16,6 +16,12 @@ import { PUBLIC_CHANNELS, resolveSession, unwrapRequest } from '../shared/auth'
 const env = {
   uuid: randomUUID,
   nowStr,
+  // Simulated checkout only in unpackaged (dev) runs or with BILLING_SANDBOX=1;
+  // packaged builds refuse checkout until a real provider is wired
+  // (docs/MONETIZATION.md). Read lazily — `app` isn't ready at import time.
+  get billingSandbox() {
+    return !app.isPackaged || process.env.BILLING_SANDBOX === '1'
+  },
   // Persist an image into userData/images and return its stored path. Accepts
   // either a picked file's path (copied) or a data: URL (decoded and written —
   // how renderer-generated images like character portraits arrive).

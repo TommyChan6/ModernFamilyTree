@@ -1,3 +1,6 @@
+import type { BillingStore } from './billing'
+import type { Human3DState } from './character3d'
+
 // Data shapes shared by every backend (Electron main, browser-local, and the
 // future HTTP/Supabase implementation). These are the client↔server contract.
 
@@ -7,6 +10,18 @@ export interface Project {
   /** Owning account. null on projects created before accounts existed —
    *  the first registered user claims those. */
   user_id?: string | null
+  /** Short blurb shown on the Projects page card. */
+  description?: string | null
+  /** Sharing intent. Local builds store it only — nothing is actually
+   *  published until the hosted backend lands (ProjectShare below). */
+  visibility?: 'private' | 'public'
+  /** What visitors may do with a public project (Browse page modes). Unset
+   *  reads as 'glasshouse'; ignored while the project is private. */
+  access?: ShareAccess
+  /** Card accent hue (0–359) for the Projects page; null = derived from id. */
+  hue?: number | null
+  /** Starred on the Projects page (floats to the top of the grid). */
+  favorite?: boolean
   created_at: string
   updated_at: string
 }
@@ -68,6 +83,17 @@ export interface ProjectOverview extends Project {
 // backend lands, a `shares` table of these rows drives both "share a project"
 // and "share an image of a project"; the profile page becomes its manager.
 export type ShareVisibility = 'private' | 'link' | 'public'
+
+/** Visitor permissions on a shared project — a cumulative ladder:
+ *  glasshouse = look only · seedbank = + download the project file ·
+ *  graft = + fork a copy into your own projects · grove = + co-edit. */
+export type ShareAccess = 'glasshouse' | 'seedbank' | 'graft' | 'grove'
+export const SHARE_ACCESS_LEVELS: readonly ShareAccess[] = [
+  'glasshouse',
+  'seedbank',
+  'graft',
+  'grove'
+]
 
 export interface ProjectShare {
   id: string
@@ -408,8 +434,150 @@ export interface CharacterDoc {
   parts: Record<string, CharacterSlotState>
   /** palette channel (skin/hair/eyes/outfitA/outfitB/accent) → hex color. */
   palette: Record<string, string>
-  /** Body morphs, each −1..1 (0 = the style's default proportions). */
-  morph: { height: number; build: number; headSize: number }
+  /** Body morphs, each −1..1 (0 = the style's default proportions). `age`
+   *  runs child (−1) … adult (0) … elder (+1); absent = adult. */
+  morph: { height: number; build: number; headSize: number; age?: number }
+  /** Resting expression id (characterModel EXPRESSIONS); absent = neutral. */
+  expression?: string
+  /** Stage backdrop id (also framed into photo-mode cards); absent = studio. */
+  backdrop?: string
+  /** The 3D look (style_id 'human3d'): sliders, colours, catalogue ids —
+   *  sanitized by sanitizeModel3D. Kept when switching to a 2D style so
+   *  switching back restores it. */
+  model3d?: Human3DState
+  created_at: string
+  updated_at: string
+}
+
+// ── Maps (the Map view — user-drawn worlds with people placed over time) ──────
+/** What a map feature is. Areas are closed shapes, lines are open polylines,
+ *  places/events are single points (see MAP_KIND_GEOMETRY in mapKinds.ts). */
+export type MapFeatureKind =
+  // areas
+  | 'land'
+  | 'water'
+  | 'forest'
+  | 'mountains'
+  | 'hills'
+  | 'desert'
+  | 'grass'
+  | 'swamp'
+  | 'snow'
+  | 'territory'
+  | 'zone'
+  // lines
+  | 'river'
+  | 'road'
+  | 'rail'
+  | 'wall'
+  | 'border'
+  | 'searoute'
+  | 'arrow'
+  // points
+  | 'place'
+  | 'label'
+  | 'event'
+
+/** One drawn thing on a map. Geometry lives in `pts` as a flat [x0,y0,x1,y1…]
+ *  array in map world units (0..width × 0..height). */
+export interface MapFeature {
+  id: string
+  kind: MapFeatureKind
+  pts: number[]
+  name?: string
+  /** Hex override; '' / absent = the map style's color for the kind. */
+  color?: string
+  /** Line width / point size multiplier (1 = the style default). */
+  size?: number
+  /** Place glyph ('city', 'castle', 'port'…) or event glyph ('battle', 'star'…). */
+  icon?: string
+  /** Optional time window (inclusive years) — hidden outside it; null = always. */
+  from?: number | null
+  to?: number | null
+  /** Territories can stand for a project tag (a Group / faction / kingdom). */
+  tag_id?: string | null
+  /** Free-text notes shown in the inspector / hover card. */
+  note?: string
+  /** Label rotation in radians (labels only). */
+  rot?: number
+}
+
+/** One point on a person's journey: where they are in a given year. */
+export interface MapKey {
+  t: number
+  x: number
+  y: number
+  /** Optional note for this stop ("Exiled", "Crowned"…). */
+  note?: string
+}
+
+/** A person placed on a map. With one key they stand still; with several
+ *  they travel between keys as the map's timeline plays. */
+export interface MapToken {
+  id: string
+  person_id: string
+  keys: MapKey[]
+}
+
+export interface MapDoc {
+  id: string
+  project_id: string
+  name: string
+  /** Visual style id (mapStyles.ts: parchment / fantasy / ink / hightech / atlas). */
+  style: string
+  /** What unpainted ground is: open sea (paint land) or land (paint water). */
+  base: 'sea' | 'land'
+  width: number
+  height: number
+  features: MapFeature[]
+  tokens: MapToken[]
+  /** Last camera, restored when the map reopens. */
+  view?: { x: number; y: number; k: number } | null
+  /** The year the map's timeline was last left at (null = the project's present). */
+  year?: number | null
+  created_at: string
+  updated_at: string
+}
+
+// ── Chronicle: eras + story events on the shared date axis ────────────────────
+/** A named stretch of time ("The Regency", "World War II", "Age of Dragons").
+ *  Open ends (null) run to the edge of the project's time. */
+export interface Era {
+  id: string
+  project_id: string
+  name: string
+  start: DateValue | null
+  end: DateValue | null
+  /** Hex colour of its band. */
+  color: string
+  /** Emoji shown with its name. */
+  icon: string
+  description: string
+  created_at: string
+  updated_at: string
+}
+
+/** Something that happened — a battle, a coronation, a migration, a first
+ *  meeting — on a date (or over a span), with the people who took part. */
+export interface StoryEvent {
+  id: string
+  project_id: string
+  title: string
+  /** Catalog id (chronicle.ts EVENT_KINDS) or 'custom'. */
+  kind: string
+  /** Emoji; '' = the kind's own. */
+  icon: string
+  /** Hex; '' = the kind's own colour. */
+  color: string
+  date: DateValue | null
+  /** Optional end for events that last (a war, a voyage); null = a moment. */
+  end: DateValue | null
+  /** 1 minor · 2 notable · 3 major — drives marker size and zoom-out culling. */
+  importance: number
+  /** Participants (people in the same project). */
+  person_ids: string[]
+  place: string
+  description: string
   created_at: string
   updated_at: string
 }
@@ -431,10 +599,17 @@ export interface DB {
   scene_tags: Record<string, SceneTag>
   images: Record<string, ImageRecord>
   characters: Record<string, CharacterDoc>
+  maps: Record<string, MapDoc>
+  eras: Record<string, Era>
+  events: Record<string, StoryEvent>
   /** `${projectId}:key` → value for per-project settings */
   settings: Record<string, unknown>
   /** theme, etc. */
   globalSettings: Record<string, unknown>
+  /** Subscriptions, checkout sessions and invoices (src/shared/billing.ts).
+   *  Sandbox-only today — a hosted backend keeps these in sync from the
+   *  payment provider's webhooks. Created lazily. */
+  billing?: BillingStore
 }
 
 /** Uniform result envelope every channel returns across the process/network boundary. */
@@ -460,4 +635,7 @@ export interface Env {
   storeImageFile(srcPath: string): string
   /** Best-effort removal of a stored image file (no-op where nothing external exists). */
   removeImageFile(filePath: string): void
+  /** Let billing:* complete simulated checkouts (dev builds only). Off = the
+   *  checkout refuses with "payments aren't live yet". See billing.ts. */
+  billingSandbox?: boolean
 }

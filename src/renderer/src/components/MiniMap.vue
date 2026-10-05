@@ -2,7 +2,7 @@
   <div
     ref="rootEl"
     class="mini-map"
-    :class="{ dragging }"
+    :class="{ dragging, ink: store.isInk }"
     :style="{ width: width + 'px', height: height + 'px' }"
     title="Overview — drag to move the view"
     @pointerdown.stop.prevent="onDown"
@@ -118,6 +118,10 @@ function drawFrame(view, colors, W, H) {
     y -= (MIN - h) / 2
     h = MIN
   }
+  if (store.isInk) {
+    drawInkFrame(x, y, w, h, colors, W, H)
+    return
+  }
   g.save()
   g.beginPath()
   g.rect(0, 0, W, H)
@@ -132,6 +136,35 @@ function drawFrame(view, colors, W, H) {
   g.strokeStyle = withAlpha(colors.accent, 0.95)
   g.lineWidth = 1.4
   g.stroke()
+}
+
+// 水墨 viewport marker: the world outside dims under a paper veil, the frame is
+// a hand-brushed ink rectangle (two slightly offset passes, like a quick sketch)
+// with a tiny cinnabar seal on its corner.
+function drawInkFrame(x, y, w, h, colors, W, H) {
+  g.save()
+  g.beginPath()
+  g.rect(0, 0, W, H)
+  g.rect(x, y, w, h)
+  g.fillStyle = withAlpha(colors.bg, 0.42)
+  g.fill('evenodd')
+  g.lineJoin = 'round'
+  g.lineCap = 'round'
+  g.strokeStyle = withAlpha(colors.t1, 0.78)
+  g.lineWidth = 1.5
+  g.beginPath()
+  g.moveTo(x - 1.5, y + 0.4)
+  g.lineTo(x + w + 0.6, y - 0.3)
+  g.lineTo(x + w + 0.2, y + h + 0.8)
+  g.lineTo(x - 0.4, y + h)
+  g.closePath()
+  g.stroke()
+  g.strokeStyle = withAlpha(colors.t1, 0.3)
+  g.lineWidth = 0.8
+  g.strokeRect(x + 0.9, y + 0.8, w - 0.6, h - 1)
+  g.fillStyle = withAlpha(colors.accent, 0.92)
+  g.fillRect(x + w - 2.5, y - 2.5, 5, 5)
+  g.restore()
 }
 
 // ── Drag to pan ──────────────────────────────────────────────────────────────
@@ -198,13 +231,10 @@ onBeforeUnmount(() => {
   raf = 0
 })
 
-watch(
-  () => store.theme,
-  () => {
-    css.invalidate()
-    redraw()
-  }
-)
+watch([() => store.theme, () => store.accent], () => {
+  css.invalidate()
+  redraw()
+})
 
 defineExpose({ redraw })
 </script>
@@ -229,6 +259,17 @@ defineExpose({ redraw })
     opacity 0.18s ease,
     transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   animation: mini-map-in 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+/* 水墨: a sheet of rice paper with a hairline ink border */
+.mini-map.ink {
+  background-color: var(--surface);
+  background-image: var(--ink-paper-light, none);
+  background-size: 256px 256px;
+  border-color: rgba(31, 27, 22, 0.24);
+  border-radius: 3px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .mini-map:hover,

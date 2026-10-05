@@ -7,13 +7,13 @@
     </button>
 
     <Transition name="acct-menu">
-      <div v-if="open" class="account-menu">
+      <div v-if="open" class="account-menu ink-unroll">
         <div class="menu-head">
           <span class="account-avatar big" :style="avatarStyle">{{ initial }}</span>
           <div class="menu-head-text">
             <div class="menu-username">{{ shownName }}</div>
             <div class="menu-plan">
-              <span class="plan-badge">{{ planLabel }}</span>
+              <PlanBadge :plan="store.authUser.plan" />
             </div>
           </div>
         </div>
@@ -34,7 +34,19 @@
           </div>
         </div>
 
+        <button v-if="!store.isPaid && !store.isGuest" class="menu-upsell" @click="upgrade">
+          <span class="menu-upsell-spark">✦</span>
+          <span class="menu-upsell-text">
+            <b>{{ t('billing.menu.title') }}</b>
+            <span>{{ t('billing.menu.body') }}</span>
+          </span>
+          <span class="menu-upsell-arrow">→</span>
+        </button>
+
         <div class="menu-sep"></div>
+        <button v-if="!store.isGuest" class="menu-item" @click="openBilling">
+          💳 {{ t('billing.menu.billing') }}
+        </button>
         <button class="menu-item" @click="openProfile">👤 {{ t('account.myProfile') }}</button>
         <button class="menu-item" @click="openLegal">📄 Terms &amp; Privacy</button>
         <button class="menu-item danger" @click="signOut">↩ Sign out</button>
@@ -51,6 +63,7 @@ import { useMainStore } from '../store/index.js'
 import { useI18n } from '../i18n'
 import { avatarStyleFor } from '../lib/avatar.js'
 import LegalModal from './LegalModal.vue'
+import PlanBadge from './billing/PlanBadge.vue'
 
 const store = useMainStore()
 const { t } = useI18n()
@@ -60,13 +73,6 @@ const rootRef = ref(null)
 
 const shownName = computed(() => store.authUser?.display_name || store.authUser?.username || '')
 const initial = computed(() => (shownName.value[0] || '?').toUpperCase())
-const planLabel = computed(() => {
-  const plan = store.authUser?.plan
-  if (plan === 'free') return 'Free plan'
-  if (plan === 'guest') return 'Guest'
-  return plan
-})
-
 // Per-username hue, overridable from the profile page (lib/avatar.js)
 const avatarStyle = computed(() => avatarStyleFor(store.authUser))
 
@@ -88,6 +94,19 @@ function toggle() {
 function openProfile() {
   open.value = false
   store.openUserPage()
+}
+
+function upgrade() {
+  open.value = false
+  store.openPricing({ reason: 'menu' })
+}
+
+// Plan & billing lives on the profile page; paid accounts land there, free
+// ones go straight to the plans.
+function openBilling() {
+  open.value = false
+  if (store.isPaid) store.openUserPage()
+  else store.openPricing({ reason: 'menu' })
 }
 
 function openLegal() {
@@ -133,7 +152,7 @@ onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
 .account-chip.open {
   color: var(--t1);
   background: var(--hover);
-  border-color: rgba(108, 142, 245, 0.4);
+  border-color: rgba(var(--accent-rgb), 0.4);
 }
 
 .account-avatar {
@@ -206,18 +225,60 @@ onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
   white-space: nowrap;
 }
 
-.plan-badge {
-  display: inline-block;
+.menu-plan {
   margin-top: 3px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--adim);
-  border: 1px solid rgba(108, 142, 245, 0.35);
+}
+
+/* Upsell card: free accounts only */
+.menu-upsell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% - 16px);
+  margin: 4px 8px 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.16), rgba(var(--accent-rgb), 0.04));
+  color: var(--t1);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.menu-upsell:hover {
+  border-color: rgba(var(--accent-rgb), 0.7);
+  transform: translateY(-1px);
+}
+
+.menu-upsell-spark {
+  font-size: 18px;
   color: var(--accent);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
+}
+
+.menu-upsell-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--t2);
+}
+
+.menu-upsell-text b {
+  font-size: 12.5px;
+  color: var(--t1);
+}
+
+.menu-upsell-arrow {
+  color: var(--accent);
+  transition: transform 0.2s ease;
+}
+
+.menu-upsell:hover .menu-upsell-arrow {
+  transform: translateX(3px);
 }
 
 .menu-usage {
@@ -260,7 +321,7 @@ onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
 }
 
 .usage-fill.warn {
-  background: linear-gradient(90deg, var(--amber), #ef5350);
+  background: linear-gradient(90deg, var(--amber), var(--danger));
 }
 
 .menu-sep {
@@ -291,8 +352,8 @@ onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
 }
 
 .menu-item.danger:hover {
-  background: rgba(239, 83, 80, 0.12);
-  color: #ef5350;
+  background: rgba(var(--danger-rgb), 0.12);
+  color: var(--danger);
 }
 
 .acct-menu-enter-active {
@@ -311,5 +372,89 @@ onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
 .acct-menu-leave-to {
   opacity: 0;
   transform: translateY(-6px) scale(0.96);
+}
+
+/* ── 水墨 ink theme: the avatar is a name seal (名章) in the user's colour ── */
+:root[data-theme='ink'] .account-chip {
+  border-radius: 3px 5px 4px 6px / 5px 3px 6px 4px;
+  background: rgba(255, 251, 240, 0.5);
+  font-family: var(--font-ink-label);
+  font-size: 13px;
+}
+:root[data-theme='ink'] .account-avatar {
+  border-radius: 3px 4px 2px 5px / 4px 2px 5px 3px;
+  font-family: var(--font-brush);
+  font-weight: 400;
+  font-size: 14px;
+  color: #fbf4e6;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(251, 244, 230, 0.45),
+    0 1px 2px rgba(60, 30, 10, 0.3);
+  transform: rotate(-3deg);
+}
+:root[data-theme='ink'] .account-avatar.big {
+  font-size: 22px;
+}
+:root[data-theme='ink'] .account-menu {
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  border-color: var(--ink-mount-line);
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 3px var(--ink-silk),
+    0 0 0 4px rgba(58, 42, 22, 0.22),
+    var(--shadow-lg);
+}
+:root[data-theme='ink'] .acct-menu-enter-from,
+:root[data-theme='ink'] .acct-menu-leave-to {
+  transform: none;
+}
+:root[data-theme='ink'] .menu-username {
+  font-family: var(--font-brush);
+  font-size: 19px;
+  font-weight: 400;
+}
+:root[data-theme='ink'] .usage-label {
+  font-family: var(--font-ink-label);
+  font-variant: small-caps;
+  text-transform: lowercase;
+  letter-spacing: 0.08em;
+}
+:root[data-theme='ink'] .usage-track {
+  border-radius: 1px;
+  background: rgba(110, 88, 56, 0.12);
+}
+:root[data-theme='ink'] .usage-fill {
+  border-radius: 1px;
+  background: var(--ink-black);
+  opacity: 0.75;
+}
+:root[data-theme='ink'] .usage-fill.warn {
+  background: var(--accent);
+  opacity: 1;
+}
+:root[data-theme='ink'] .menu-upsell {
+  border-radius: 2px;
+  font-family: var(--font-ink-label);
+}
+:root[data-theme='ink'] .menu-sep {
+  height: 5px;
+  background: rgba(28, 26, 23, 0.3);
+  -webkit-mask: var(--ink-divider) center / 100% 100% no-repeat;
+  mask: var(--ink-divider) center / 100% 100% no-repeat;
+}
+:root[data-theme='ink'] .menu-item {
+  border-radius: 2px;
+  font-family: var(--font-ink-label);
+  font-size: 14px;
+  background: radial-gradient(closest-side, rgba(40, 30, 18, 0.1), transparent) 30% 50% / 0% 0%
+    no-repeat;
+  transition:
+    background-size 0.45s var(--ease-out),
+    color var(--dur-fast);
+}
+:root[data-theme='ink'] .menu-item:hover {
+  background-color: transparent;
+  background-size: 170% 300%;
 }
 </style>

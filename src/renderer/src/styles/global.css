@@ -1,4 +1,11 @@
 /* ── CSS Variables ────────────────────────────────────────────────────────── */
+/* Design tokens. Every component color/radius/motion value should come from
+   here so both themes (and the user's accent choice) stay consistent.
+
+   Accent: `--accent` is always a HEX string (the canvas/WebGL renderers parse
+   it), and `--accent-rgb` is the same color as "r, g, b" for alpha use in CSS:
+   `rgba(var(--accent-rgb), 0.3)`. The store's setAccent() rewrites the accent
+   family on <html> at runtime — never hard-code the default blue. */
 :root,
 [data-theme='dark'] {
   --bg: #0f1117;
@@ -8,17 +15,59 @@
   --elevated: #1f2437;
   --hover: #252c42;
   --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
   --accent: #6c8ef5;
-  --adim: rgba(108, 142, 245, 0.14);
+  --accent-rgb: 108, 142, 245;
+  --accent-hover: #5a7de8;
+  --accent-2: #b07cf5; /* gradient partner, derived from the accent at runtime */
+  --on-accent: #ffffff;
+  --adim: rgba(var(--accent-rgb), 0.14);
+
   --pink: #f06292;
   --amber: #f5a623;
   --green: #4caf72;
+  --danger: #ef5350;
+  --danger-rgb: 239, 83, 80;
+  /* Kinship classes (lens rings, labels, chips) — hex so canvases can read them */
+  --kin-blood: #f2b54a;
+  --kin-spouse: #f06292;
+  --kin-marriage: #4fc3c7;
+  --kin-step: #a98bff;
+  --kin-social: #6fcf97;
+  --kin-distant: #8a93a6;
+  --success: var(--green);
+  --warning: var(--amber);
+
   --t1: #e8eaf6;
   --t2: #9ea3b8;
   --t3: #4a5068;
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --glow: 0 0 16px rgba(var(--accent-rgb), 0.32);
+  --focus-ring: 0 0 0 3px rgba(var(--accent-rgb), 0.32);
+
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --radius: 12px;
+  --mono: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, monospace;
+
+  /* Radius scale */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-pill: 999px;
+  --radius: 12px; /* legacy alias */
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-std: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 0.12s;
+  --dur: 0.18s;
+  --dur-slow: 0.32s;
 }
 
 [data-theme='light'] {
@@ -29,10 +78,21 @@
   --elevated: #e8ecf5;
   --hover: #dde3f0;
   --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --danger: #e53935;
+  --danger-rgb: 229, 57, 53;
+  --kin-blood: #d18a12;
+  --kin-spouse: #d6457a;
+  --kin-marriage: #1f9aa0;
+  --kin-step: #7a5ae0;
+  --kin-social: #2f9e62;
+  --kin-distant: #7a8296;
   --t1: #1a1d2e;
   --t2: #4a5068;
   --t3: #9099b8;
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.08);
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 18px 48px rgba(20, 24, 40, 0.18);
 }
 
 /* ── Global Reset ─────────────────────────────────────────────────────────── */
@@ -61,41 +121,130 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+::selection {
+  background: rgba(var(--accent-rgb), 0.35);
+}
+
+/* ── Baseline for EVERY button ───────────────────────────────────────────── */
+/* Zero-specificity (:where) so component styles always win — this only fills
+   the gaps: inherited font, a tactile press, a disabled cursor, and one
+   keyboard focus ring everywhere (the ring is deliberately NOT :where'd, so a
+   component's `outline: none` can't silently remove keyboard focus). */
+:where(button) {
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+:where(button):not(:disabled):active {
+  scale: 0.97;
+}
+:where(button):disabled {
+  cursor: not-allowed;
+}
+button:focus-visible,
+a:focus-visible,
+[role='button']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
+/* .btn            neutral (elevated surface)
+   .btn-primary    accent fill with a hover sheen
+   .btn-soft       accent-tinted
+   .btn-ghost      transparent until hovered
+   .btn-outline    hairline border
+   .btn-danger     destructive (tinted) · .btn-danger-solid for the confirm step
+   sizes: .btn-xs · .btn-sm · (md) · .btn-lg      shapes: .btn-icon · .btn-block
+   state: :disabled · .is-loading · .is-active */
 .btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border: none;
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
   font-family: var(--font);
   font-size: 13px;
   font-weight: 500;
+  line-height: 1.2;
   cursor: pointer;
   padding: 7px 14px;
   transition:
-    background 0.13s,
-    color 0.13s,
-    box-shadow 0.13s;
+    background var(--dur) ease,
+    color var(--dur) ease,
+    border-color var(--dur) ease,
+    box-shadow var(--dur-slow) ease,
+    opacity var(--dur) ease;
   outline: none;
   white-space: nowrap;
   color: var(--t1);
   background: var(--elevated);
+  overflow: hidden;
+  isolation: isolate;
+  user-select: none;
 }
 
 .btn:hover {
   background: var(--hover);
 }
 
-.btn-primary {
-  background: var(--accent);
-  color: #fff;
+.btn:disabled,
+.btn.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
-.btn-primary:hover {
-  background: #5a7de8;
-  box-shadow: 0 2px 12px rgba(108, 142, 245, 0.35);
+.btn-primary {
+  background: linear-gradient(
+    135deg,
+    var(--accent),
+    color-mix(in srgb, var(--accent) 78%, var(--accent-2))
+  );
+  color: var(--on-accent);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 2px 8px rgba(var(--accent-rgb), 0.22);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(
+    135deg,
+    var(--accent-hover),
+    color-mix(in srgb, var(--accent-hover) 74%, var(--accent-2))
+  );
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 4px 16px rgba(var(--accent-rgb), 0.4);
+}
+
+/* The sheen: a light band that sweeps across a primary button on hover */
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.28) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.6s var(--ease-out);
+  pointer-events: none;
+}
+.btn-primary:hover:not(:disabled)::before {
+  transform: translateX(120%);
+}
+
+.btn-soft {
+  background: var(--adim);
+  color: var(--accent);
+}
+.btn-soft:hover:not(:disabled) {
+  background: rgba(var(--accent-rgb), 0.24);
 }
 
 .btn-ghost {
@@ -103,18 +252,45 @@ body {
   color: var(--t2);
 }
 
-.btn-ghost:hover {
+.btn-ghost:hover:not(:disabled),
+.btn-ghost.is-active {
   background: var(--hover);
   color: var(--t1);
 }
 
-.btn-danger {
-  background: rgba(239, 83, 80, 0.13);
-  color: #ef5350;
+.btn-outline {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--t1);
+}
+.btn-outline:hover:not(:disabled) {
+  border-color: rgba(var(--accent-rgb), 0.55);
+  background: var(--adim);
 }
 
-.btn-danger:hover {
-  background: rgba(239, 83, 80, 0.22);
+.btn-danger {
+  background: rgba(var(--danger-rgb), 0.13);
+  color: var(--danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(var(--danger-rgb), 0.22);
+}
+
+.btn-danger-solid {
+  background: var(--danger);
+  color: #fff;
+}
+.btn-danger-solid:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 86%, #000);
+  box-shadow: 0 4px 16px rgba(var(--danger-rgb), 0.4);
+}
+
+.btn-xs {
+  padding: 3px 8px;
+  font-size: 11px;
+  border-radius: var(--r-xs);
+  gap: 4px;
 }
 
 .btn-sm {
@@ -123,11 +299,73 @@ body {
   border-radius: 7px;
 }
 
+.btn-lg {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: var(--r-md);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-icon {
+  padding: 0;
+  width: 32px;
+  height: 32px;
+}
+.btn-icon.btn-sm {
+  width: 28px;
+  height: 28px;
+}
+
+/* Loading: the label fades and a spinner takes its place (width is kept) */
+.btn.is-loading {
+  color: transparent !important;
+  pointer-events: none;
+}
+.btn.is-loading::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-color: var(--t2) transparent var(--t2) transparent;
+  animation: ui-spin 0.7s linear infinite;
+}
+.btn-primary.is-loading::after {
+  border-color: #fff transparent #fff transparent;
+}
+
+/* Click ripple (see lib/ripple.js — attached to .btn and [data-ripple]) */
+.ui-ripple {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: currentColor;
+  opacity: 0.22;
+  transform: scale(0);
+  animation: ui-ripple 0.55s var(--ease-out) forwards;
+  z-index: 0;
+}
+.btn-primary .ui-ripple,
+.btn-danger-solid .ui-ripple {
+  background: #fff;
+}
+@keyframes ui-ripple {
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
 /* ── Icon Button ──────────────────────────────────────────────────────────── */
 .icon-btn {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   border: none;
   background: transparent;
   color: var(--t2);
@@ -136,17 +374,32 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   transition:
-    background 0.13s,
-    color 0.13s;
+    background var(--dur) ease,
+    color var(--dur) ease,
+    transform var(--dur-slow) var(--ease-spring);
 }
 
-.icon-btn:hover {
+.icon-btn:hover:not(:disabled) {
   background: var(--hover);
   color: var(--t1);
 }
 
-/* ── Badge ────────────────────────────────────────────────────────────────── */
+.icon-btn.is-active {
+  background: var(--adim);
+  color: var(--accent);
+}
+
+.icon-btn:disabled {
+  opacity: 0.3;
+}
+
+.icon-btn svg {
+  display: block;
+}
+
+/* ── Badge / Chip ─────────────────────────────────────────────────────────── */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -158,6 +411,200 @@ body {
   border-radius: 10px;
   padding: 1px 7px;
   min-width: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--dur) ease,
+    color var(--dur) ease,
+    border-color var(--dur) ease,
+    box-shadow var(--dur-slow) ease;
+}
+.chip:hover:not(:disabled) {
+  color: var(--t1);
+  border-color: var(--border-strong);
+}
+.chip.is-active,
+.chip.active {
+  background: var(--adim);
+  border-color: rgba(var(--accent-rgb), 0.45);
+  color: var(--accent);
+}
+
+/* ── Segmented control ────────────────────────────────────────────────────── */
+/* <div class="seg"><button class="seg-btn active">…</button>…</div> */
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-md);
+  background: var(--elevated);
+  border: 1px solid var(--border);
+}
+.seg-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--t2);
+  padding: 5px 12px;
+  border-radius: 7px;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--dur) ease,
+    color var(--dur) ease,
+    box-shadow var(--dur) ease;
+}
+.seg-btn:hover:not(:disabled) {
+  color: var(--t1);
+}
+.seg-btn.active,
+.seg-btn.is-active {
+  background: var(--surface);
+  color: var(--t1);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Switch (a styled checkbox) ───────────────────────────────────────────── */
+/* <input type="checkbox" class="switch" /> */
+input[type='checkbox'].switch {
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 20px;
+  padding: 0;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--elevated);
+  cursor: pointer;
+  transition:
+    background var(--dur) ease,
+    border-color var(--dur) ease;
+}
+input[type='checkbox'].switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--t2);
+  transition:
+    transform var(--dur-slow) var(--ease-spring),
+    background var(--dur) ease;
+}
+input[type='checkbox'].switch:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+input[type='checkbox'].switch:checked::after {
+  transform: translateX(14px);
+  background: #fff;
+}
+
+/* ── Keyboard key ─────────────────────────────────────────────────────────── */
+.kbd,
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  background: var(--elevated);
+  color: var(--t2);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+/* ── Card / glass surface ─────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+}
+.glass {
+  background: var(--glass-strong);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid var(--border);
+}
+
+/* Section label: small caps above a group of controls */
+.eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--t3);
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  border: none;
+  margin: 6px 0;
+}
+
+/* ── Loading helpers ──────────────────────────────────────────────────────── */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  animation: ui-spin 0.7s linear infinite;
+}
+@keyframes ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--elevated);
+  border-radius: var(--r-sm);
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(var(--accent-rgb), 0.08), transparent);
+  animation: ui-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes ui-shimmer {
+  to {
+    transform: translateX(100%);
+  }
 }
 
 /* ── Inputs ───────────────────────────────────────────────────────────────── */
@@ -169,7 +616,7 @@ textarea {
   color: var(--t1);
   background: var(--elevated);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   padding: 8px 11px;
   width: 100%;
   outline: none;
@@ -179,11 +626,24 @@ textarea {
   appearance: none;
 }
 
+input:hover:not(:focus):not(:disabled),
+select:hover:not(:focus):not(:disabled),
+textarea:hover:not(:focus):not(:disabled) {
+  border-color: var(--border-strong);
+}
+
 input:focus,
 select:focus,
 textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(108, 142, 245, 0.18);
+  box-shadow: var(--focus-ring);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 input::placeholder,
@@ -205,10 +665,28 @@ select {
   cursor: pointer;
 }
 
+/* Native checkboxes/radios pick up the accent (the reset above strips their
+   look via `appearance: none`, so restore it). Same specificity as `input`, so
+   any component class that custom-styles its checkboxes still wins. */
+input:where([type='checkbox']:not(.switch), [type='radio']) {
+  appearance: auto;
+  width: auto;
+  padding: 0;
+  accent-color: var(--accent);
+  box-shadow: none;
+}
+input:where([type='range']) {
+  accent-color: var(--accent);
+}
+input:where([type='color']) {
+  padding: 2px;
+  cursor: pointer;
+}
+
 /* ── Scrollbar ────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -216,12 +694,19 @@ select {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
+  background: var(--border-strong);
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--t3);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* ── Vue Transitions: modal ───────────────────────────────────────────────── */
@@ -233,7 +718,7 @@ select {
 .modal-enter-active .modal-box,
 .modal-leave-active .modal-box {
   transition:
-    transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.28s var(--ease-spring),
     opacity 0.22s ease;
 }
 
@@ -271,9 +756,39 @@ select {
   opacity: 0;
 }
 
+/* ── Vue Transitions: fade / pop ──────────────────────────────────────────── */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity var(--dur) ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.pop-enter-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.3s var(--ease-spring);
+}
+.pop-leave-active {
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+.pop-enter-from,
+.pop-leave-to {
+  opacity: 0;
+  transform: scale(0.92);
+}
+
 /* ── Utilities ────────────────────────────────────────────────────────────── */
 .text-muted {
   color: var(--t2);
+}
+
+.text-danger {
+  color: var(--danger);
 }
 
 .flex-row {
@@ -293,6 +808,14 @@ select {
 
 .gap-md {
   gap: 16px;
+}
+
+/* Accent → partner gradient text, for hero numbers and headings */
+.text-gradient {
+  background: linear-gradient(120deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* ── Canvas panes (shared by graph/timeline/groups right-side overlays) ────── */
@@ -355,9 +878,33 @@ select {
     opacity 0.3s ease;
 }
 
+/* ── Theme switch: circular reveal (View Transitions API) ─────────────────── */
+/* store.setTheme() snapshots the page and grows the new theme out of the
+   toggle as a circle — see lib/themeReveal.js. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  z-index: 2;
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .canvas-pane,
   .cp-stagger {
     animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  :where(button):not(:disabled):active {
+    scale: none;
   }
 }

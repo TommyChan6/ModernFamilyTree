@@ -321,7 +321,7 @@ function emitDateRange(side, raw) {
   line-height: 1;
 }
 .fi-clear:hover {
-  color: #ef5350;
+  color: var(--danger);
 }
 
 /* number + ranges */
@@ -456,5 +456,32 @@ function emitDateRange(side, raw) {
   color: var(--t3);
   font-style: italic;
   padding: 6px 0;
+}
+
+/* ── 水墨 ink theme: inputs are paper wells; toggles are little seals ────── */
+:root[data-theme='ink'] .fi {
+  border-radius: 3px;
+  background: rgba(255, 251, 240, 0.55);
+  border-color: rgba(48, 36, 20, 0.2);
+  font-size: 13.5px;
+  box-shadow: inset 0 1px 2px rgba(60, 40, 15, 0.06);
+}
+:root[data-theme='ink'] .fi:focus {
+  border-color: rgba(179, 53, 42, 0.6);
+  background: rgba(255, 252, 244, 0.85);
+  box-shadow:
+    inset 0 -1px 0 rgba(179, 53, 42, 0.5),
+    0 0 0 3px rgba(179, 53, 42, 0.12);
+}
+:root[data-theme='ink'] .fi-toggle-track,
+:root[data-theme='ink'] .fi-toggle-thumb {
+  border-radius: 2px;
+}
+:root[data-theme='ink'] .fi-chip {
+  border-radius: 3px 5px 4px 6px / 5px 3px 6px 4px;
+  font-family: var(--font-ink-label);
+}
+:root[data-theme='ink'] .fi-chip-dot {
+  border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%;
 }
 </style>

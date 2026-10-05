@@ -1,0 +1,866 @@
+/* ── 水墨 Ink theme ───────────────────────────────────────────────────────────
+   A third app theme beside dark/light: rice paper (宣纸), ink-black text,
+   cinnabar seal-red as the accent, calligraphy for headings. Selected with
+   store.setTheme('ink') — <html data-theme="ink">. It is a LIGHT theme for
+   every renderer that asks `isLight` (store.isLightTheme); views that paint
+   their own ink look check store.isInk.
+
+   The app is dressed as a mounted painting (装裱): the topbar is the scroll's
+   top roller (天杆), the icon rail a bundle of bamboo slips (竹简), panels and
+   modals sit in silk mounting bands and unroll from a roller, active things
+   are stamped with a cinnabar seal (印章), and hovers bloom like ink touching
+   wet paper (晕染).
+
+   Textures (--ink-paper, --ink-underline, --ink-enso, --ink-seal…) are
+   generated once at runtime by lib/inkArt.ts installInkAssets() and set on
+   <html> as url() custom properties, so nothing here ships a bitmap.
+
+   Fonts (assets/ink/fonts, all SIL OFL 1.1 — licences beside the files):
+     Ink Kai   Ma Shan Zheng 马善政楷书 — headings, names
+     Ink Xing  Zhi Mang Xing 志莽行书 — display flourishes, seals
+     Ink Cao   Liu Jian Mao Cao 刘建毛草 — wild cursive watermarks
+     Ink Serif EB Garamond — body text (CJK body falls back to system Song)
+   Each face is split latin/cjk by unicode-range, so the multi-MB CJK file
+   only downloads when Chinese text is actually on screen. The faces and the
+   --font-* stacks are global (not theme-gated) so a map style or card style
+   can use them in any theme.
+
+   Type rule of thumb: Ma Shan Zheng's LATIN glyphs are a lively brush hand
+   that reads well from ~16px up, but turns to scribble on small UI labels —
+   so headings use --font-brush, and small labels/buttons use --font-ink-label
+   (Garamond for Latin, the Kai brush for any CJK in the same string). */
+
+@font-face {
+  font-family: 'Ink Kai';
+  src: url('../assets/ink/fonts/MaShanZheng-Regular-latin.woff2') format('woff2');
+  unicode-range: U+0000-02FF, U+2000-27FF;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ink Kai';
+  src: url('../assets/ink/fonts/MaShanZheng-Regular-cjk.woff2') format('woff2');
+  unicode-range: U+3000-9FFF, U+F900-FAFF, U+FF00-FFEF;
+  font-display: swap;
+}
+/* The Kai brush for CJK only — the fallback face of --font-ink-label */
+@font-face {
+  font-family: 'Ink Kai CJK';
+  src: url('../assets/ink/fonts/MaShanZheng-Regular-cjk.woff2') format('woff2');
+  unicode-range: U+3000-9FFF, U+F900-FAFF, U+FF00-FFEF;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ink Xing';
+  src: url('../assets/ink/fonts/ZhiMangXing-Regular-latin.woff2') format('woff2');
+  unicode-range: U+0000-02FF, U+2000-27FF;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ink Xing';
+  src: url('../assets/ink/fonts/ZhiMangXing-Regular-cjk.woff2') format('woff2');
+  unicode-range: U+3000-9FFF, U+F900-FAFF, U+FF00-FFEF;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ink Cao';
+  src: url('../assets/ink/fonts/LiuJianMaoCao-Regular-latin.woff2') format('woff2');
+  unicode-range: U+0000-02FF, U+2000-27FF;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ink Cao';
+  src: url('../assets/ink/fonts/LiuJianMaoCao-Regular-cjk.woff2') format('woff2');
+  unicode-range: U+3000-9FFF, U+F900-FAFF, U+FF00-FFEF;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ink Serif';
+  src: url('../assets/ink/fonts/EBGaramond-latin.woff2') format('woff2');
+  font-weight: 400 800;
+  font-display: swap;
+}
+
+:root {
+  --font-brush: 'Ink Kai', 'STKaiti', 'KaiTi', 'Kaiti SC', 'BiauKai', serif;
+  --font-xing: 'Ink Xing', 'Ink Kai', 'STXingkai', 'STKaiti', 'KaiTi', serif;
+  --font-cao: 'Ink Cao', 'Ink Xing', 'STXingkai', 'KaiTi', serif;
+  --font-ink-serif:
+    'Ink Serif', 'Songti SC', 'STSong', 'SimSun', 'Noto Serif CJK SC', Georgia, serif;
+  /* small labels: Garamond Latin + Kai brush CJK in one string */
+  --font-ink-label: 'Ink Serif', 'Ink Kai CJK', 'STKaiti', 'KaiTi', Georgia, serif;
+  /* mineral pigments of a 青绿 painting — usable from any theme */
+  --ink-black: #1c1a17;
+  --ink-cinnabar: #b3352a;
+  --ink-cinnabar-rgb: 179, 53, 42;
+  --ink-indigo: #3d5a73;
+  --ink-malachite: #4c8a72;
+  --ink-azurite: #2f5f8a;
+  --ink-ochre: #b4884c;
+  /* mounting materials (装裱): the beige 隔水 band, the celadon outer silk,
+     and the dark-wood roller (天杆/地杆) with bone end caps (轴头) */
+  --ink-silk: #e2d5b3;
+  --ink-silk-deep: #b9bda9;
+  --ink-mount-line: rgba(58, 42, 22, 0.34);
+  --ink-wood: linear-gradient(180deg, #2a1b0e, #6b4a2b 34%, #93704a 52%, #553820 78%, #21150a);
+  --ink-bone: linear-gradient(180deg, #b9ab86, #f3ead2 42%, #d9cba6 70%, #9d8f6c);
+}
+
+/* ── Tokens ──────────────────────────────────────────────────────────────── */
+/* The accent family is !important: the user's accent is written inline on
+   <html> by store.setAccent(), and the ink theme is defined by its seal red. */
+:root[data-theme='ink'] {
+  --bg: #ece3cf;
+  --surface: #f5efe0;
+  --glass-strong: rgba(245, 239, 224, 0.74);
+  --glass-soft: rgba(245, 239, 224, 0.88);
+  --elevated: #e9dfc8;
+  --hover: #e0d4b8;
+  --border: rgba(48, 36, 20, 0.15);
+  --border-strong: rgba(48, 36, 20, 0.3);
+
+  --accent: #b3352a !important;
+  --accent-rgb: 179, 53, 42 !important;
+  --accent-hover: #962a21 !important;
+  --accent-2: #3d5a73 !important;
+  --on-accent: #fbf4e6 !important;
+  --adim: rgba(179, 53, 42, 0.12) !important;
+
+  --pink: #b5586c;
+  --amber: #b3842c;
+  --green: #4f7d5c;
+  --danger: #9e2a1f;
+  --danger-rgb: 158, 42, 31;
+  --kin-blood: #b3352a;
+  --kin-spouse: #a2496a;
+  --kin-marriage: #3f7f7a;
+  --kin-step: #6b5a8e;
+  --kin-social: #4f7d5c;
+  --kin-distant: #857a68;
+
+  --t1: #1f1b15;
+  --t2: #574e41;
+  --t3: #978b76;
+
+  --shadow-sm: 0 1px 3px rgba(60, 40, 15, 0.12);
+  --shadow: 0 6px 22px rgba(60, 40, 15, 0.14);
+  --shadow-lg: 0 20px 50px rgba(60, 40, 15, 0.2);
+  --glow: 0 0 14px rgba(179, 53, 42, 0.22);
+  --focus-ring: 0 0 0 3px rgba(179, 53, 42, 0.28);
+
+  --font: var(--font-ink-serif);
+
+  /* slightly tighter corners — paper is cut, not moulded */
+  --r-xs: 3px;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-xl: 12px;
+
+  /* ink settles more slowly than light */
+  --ease-out: cubic-bezier(0.25, 0.9, 0.3, 1);
+  --dur: 0.22s;
+  --dur-slow: 0.42s;
+
+  /* a clean sheet of paper: the light paper tile, veiled so its pulp clouds
+     stay a whisper. Use as `background: var(--ink-sheet), var(--surface)`
+     with `background-size: 512px 512px`. */
+  --ink-sheet:
+    linear-gradient(rgba(247, 242, 230, 0.55), rgba(247, 242, 230, 0.55)),
+    var(--ink-paper-light, none);
+
+  /* the mounting rings any panel can wear (see .ink-mount) */
+  --ink-mount-rings:
+    0 0 0 1px var(--ink-mount-line), 0 0 0 4px var(--ink-silk), 0 0 0 5px rgba(58, 42, 22, 0.2),
+    0 0 0 11px var(--ink-silk-deep), 0 0 0 12px rgba(40, 28, 14, 0.36);
+
+  color-scheme: light;
+}
+
+/* ── Paper everywhere ────────────────────────────────────────────────────── */
+/* The paper tile is veiled a little so its pulp clouds don't read as a
+   repeating pattern across a big screen; a faint vignette ages the edges. */
+:root[data-theme='ink'] body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 120% 90% at 50% 45%, transparent 55%, rgba(110, 80, 40, 0.1)),
+    linear-gradient(rgba(236, 227, 207, 0.35), rgba(236, 227, 207, 0.35)), var(--ink-paper, none);
+  background-size:
+    100% 100%,
+    100% 100%,
+    512px 512px;
+  font-size: 14px; /* Garamond reads small — a size up keeps it legible */
+}
+:root[data-theme='ink'] ::selection {
+  background: rgba(179, 53, 42, 0.22);
+  color: inherit;
+}
+
+/* Calligraphy for headings and section titles */
+:root[data-theme='ink'] :is(h1, h2, h3) {
+  font-family: var(--font-brush);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+:root[data-theme='ink'] .eyebrow {
+  font-family: var(--font-ink-label);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant: small-caps;
+  letter-spacing: 0.12em;
+  text-transform: lowercase;
+  color: var(--t2);
+}
+
+/* ── Primitives ──────────────────────────────────────────────────────────── */
+/* Every button blooms: an ink wash spreads from the centre on hover (a
+   background layer whose size transitions — no extra elements, no JS). */
+:where(:root[data-theme='ink']) .btn {
+  border-color: var(--border);
+  background:
+    radial-gradient(closest-side, rgba(40, 30, 18, 0.1), rgba(40, 30, 18, 0.05) 60%, transparent)
+      center / 0% 0% no-repeat,
+    color-mix(in srgb, var(--surface) 70%, transparent);
+  border-radius: 3px 5px 4px 6px / 5px 3px 6px 4px;
+  font-family: var(--font-ink-label);
+  transition:
+    background-size 0.55s var(--ease-out),
+    background-color var(--dur) ease,
+    color var(--dur) ease,
+    border-color var(--dur) ease,
+    box-shadow var(--dur-slow) ease,
+    opacity var(--dur) ease;
+}
+:where(:root[data-theme='ink']) .btn:hover:not(:disabled) {
+  background:
+    radial-gradient(closest-side, rgba(40, 30, 18, 0.1), rgba(40, 30, 18, 0.05) 60%, transparent)
+      center / 240% 240% no-repeat,
+    color-mix(in srgb, var(--surface) 70%, transparent);
+  border-color: var(--border-strong);
+}
+:where(:root[data-theme='ink']) :is(.btn-ghost, .btn-outline) {
+  background-color: transparent;
+}
+:where(:root[data-theme='ink']) .btn-ghost:not(:hover) {
+  border-color: transparent;
+}
+/* the primary button is a seal impression: cinnabar paste pressed into
+   paper (the paper grain shows through), chipped corners, Garamond caps */
+:where(:root[data-theme='ink']) .btn-primary,
+:where(:root[data-theme='ink']) .btn-primary:hover:not(:disabled) {
+  background:
+    radial-gradient(120% 140% at 30% 20%, rgba(255, 220, 200, 0.16), transparent 55%),
+    var(--ink-paper-light, none) center / 256px 256px,
+    var(--accent);
+  background-blend-mode: normal, multiply, normal;
+  color: var(--on-accent);
+  border-color: transparent;
+  border-radius: 2px 4px 3px 5px / 4px 2px 5px 3px;
+  box-shadow:
+    inset 0 0 0 1px rgba(90, 15, 10, 0.28),
+    inset 0 0 6px rgba(90, 15, 10, 0.25),
+    0 2px 6px rgba(140, 36, 28, 0.22);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+:where(:root[data-theme='ink']) .btn-primary:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+  box-shadow:
+    inset 0 0 0 1px rgba(90, 15, 10, 0.32),
+    inset 0 0 8px rgba(90, 15, 10, 0.3),
+    0 4px 14px rgba(140, 36, 28, 0.3);
+}
+:where(:root[data-theme='ink']) .btn-primary:active:not(:disabled) {
+  /* pressing the seal: it squashes into the paper */
+  box-shadow:
+    inset 0 0 0 1px rgba(90, 15, 10, 0.4),
+    inset 0 2px 10px rgba(70, 10, 5, 0.4);
+}
+/* the sheen becomes ink soaking across the paste */
+:where(:root[data-theme='ink']) .btn-primary::before {
+  background: linear-gradient(105deg, transparent 35%, rgba(60, 10, 5, 0.18) 50%, transparent 65%);
+}
+:where(:root[data-theme='ink']) .btn-soft {
+  background-color: rgba(179, 53, 42, 0.08);
+}
+:where(:root[data-theme='ink']) .btn-soft:hover:not(:disabled) {
+  background-color: rgba(179, 53, 42, 0.14);
+}
+:where(:root[data-theme='ink']) .btn-danger {
+  background-color: rgba(var(--danger-rgb), 0.08);
+  border-color: rgba(var(--danger-rgb), 0.3);
+}
+:where(:root[data-theme='ink']) .btn-danger:hover:not(:disabled) {
+  background-color: rgba(var(--danger-rgb), 0.15);
+  border-color: rgba(var(--danger-rgb), 0.5);
+}
+:where(:root[data-theme='ink']) .btn-danger-solid,
+:where(:root[data-theme='ink']) .btn-danger-solid:hover:not(:disabled) {
+  background:
+    var(--ink-paper-light, none) center / 256px 256px,
+    var(--danger);
+  background-blend-mode: multiply, normal;
+  color: var(--on-accent);
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1px rgba(70, 10, 5, 0.3);
+}
+:where(:root[data-theme='ink']) .btn-danger-solid:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--danger) 86%, #000);
+}
+
+:where(:root[data-theme='ink']) .icon-btn {
+  background: radial-gradient(closest-side, rgba(40, 30, 18, 0.12), transparent) center / 0% 0%
+    no-repeat;
+  transition:
+    background-size 0.5s var(--ease-out),
+    color var(--dur) ease,
+    transform var(--dur-slow) var(--ease-spring);
+}
+:where(:root[data-theme='ink']) .icon-btn:hover:not(:disabled) {
+  background: radial-gradient(closest-side, rgba(40, 30, 18, 0.12), transparent) center / 130% 130%
+    no-repeat;
+}
+:where(:root[data-theme='ink']) .icon-btn.is-active {
+  background: radial-gradient(closest-side, rgba(179, 53, 42, 0.16), transparent) center / 130% 130%
+    no-repeat;
+}
+
+/* counts read as small square seals */
+:where(:root[data-theme='ink']) .badge {
+  background: transparent;
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(179, 53, 42, 0.55);
+  border-radius: 2px 3px 2px 4px;
+  font-family: var(--font-ink-label);
+  font-weight: 600;
+}
+:where(:root[data-theme='ink']) .chip {
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  border-radius: 3px 6px 4px 7px / 6px 3px 7px 4px;
+  font-family: var(--font-ink-label);
+}
+:where(:root[data-theme='ink']) .chip.is-active,
+:where(:root[data-theme='ink']) .chip.active {
+  background: rgba(179, 53, 42, 0.1);
+}
+:where(:root[data-theme='ink']) .seg {
+  background: color-mix(in srgb, var(--elevated) 70%, transparent);
+  border-radius: 3px;
+}
+:where(:root[data-theme='ink']) .seg-btn {
+  font-family: var(--font-ink-label);
+  border-radius: 2px;
+}
+:where(:root[data-theme='ink']) .seg-btn.active,
+:where(:root[data-theme='ink']) .seg-btn.is-active {
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  box-shadow:
+    inset 0 0 0 1px rgba(48, 36, 20, 0.22),
+    0 1px 2px rgba(60, 40, 15, 0.15);
+}
+/* the switch: a seal slides into the red */
+:where(:root[data-theme='ink']) input[type='checkbox'].switch {
+  border-radius: 3px;
+  background: rgba(255, 250, 238, 0.6);
+}
+:where(:root[data-theme='ink']) input[type='checkbox'].switch::after {
+  border-radius: 2px;
+  background: var(--t3);
+}
+:where(:root[data-theme='ink']) input[type='checkbox'].switch:checked {
+  background: var(--accent);
+  border-color: rgba(90, 15, 10, 0.4);
+}
+:where(:root[data-theme='ink']) input[type='checkbox'].switch:checked::after {
+  background: #fbf4e6;
+}
+
+/* Cards and panels are mounted like a painting (装裱): a silk border band
+   between two hairlines of ink. */
+:where(:root[data-theme='ink']) .card {
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  border-color: rgba(48, 36, 20, 0.22);
+  box-shadow:
+    0 0 0 4px rgba(214, 199, 166, 0.55),
+    0 0 0 5px rgba(48, 36, 20, 0.14),
+    var(--shadow-sm);
+}
+:where(:root[data-theme='ink']) .glass {
+  background: var(--glass-strong);
+  backdrop-filter: blur(10px) sepia(0.1);
+}
+
+/* Inputs: paper wells with an ink rule; focus wets the rule with cinnabar */
+:where(:root[data-theme='ink'])
+  :is(
+    input[type='text'],
+    input[type='search'],
+    input[type='email'],
+    input[type='password'],
+    input[type='number'],
+    input:not([type]),
+    textarea,
+    select
+  ) {
+  font-family: var(--font);
+  font-size: 13.5px;
+  background-color: rgba(255, 251, 240, 0.55);
+  border-color: rgba(48, 36, 20, 0.2);
+  box-shadow: inset 0 1px 2px rgba(60, 40, 15, 0.06);
+}
+:where(:root[data-theme='ink'])
+  :is(
+    input[type='text'],
+    input[type='search'],
+    input[type='email'],
+    input[type='password'],
+    input[type='number'],
+    input:not([type]),
+    textarea,
+    select
+  ):focus {
+  border-color: rgba(179, 53, 42, 0.6);
+  background-color: rgba(255, 252, 244, 0.85);
+  box-shadow:
+    inset 0 -1px 0 rgba(179, 53, 42, 0.5),
+    0 0 0 3px rgba(179, 53, 42, 0.12);
+}
+:where(:root[data-theme='ink']) select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.2c1.8 1.6 3.2 3.4 5 4.8 1.6-1.6 3.2-3.2 5-4.6' stroke='%23574e41' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  background-size: 10px;
+  padding-right: 26px;
+}
+
+/* Section dividers become a dry brush stroke */
+:root[data-theme='ink'] .divider {
+  height: 7px;
+  background: none;
+  -webkit-mask: var(--ink-divider) center / 100% 100% no-repeat;
+  mask: var(--ink-divider) center / 100% 100% no-repeat;
+  background-color: rgba(28, 26, 23, 0.35);
+}
+
+/* Scrollbars: a thin ink line */
+:root[data-theme='ink'] ::-webkit-scrollbar-thumb {
+  background: rgba(40, 32, 22, 0.22);
+  border-radius: 3px;
+}
+:root[data-theme='ink'] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(40, 32, 22, 0.4);
+}
+
+:where(:root[data-theme='ink']) kbd {
+  font-family: var(--font-ink-label);
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+
+/* Loaders: the spinner is an ensō turning; skeletons breathe a pale wash */
+:where(:root[data-theme='ink']) .spinner,
+:where(:root[data-theme='ink']) .btn.is-loading::after {
+  border: none;
+  border-radius: 0;
+  background-color: rgba(28, 26, 23, 0.72);
+  -webkit-mask: var(--ink-enso) center / contain no-repeat;
+  mask: var(--ink-enso) center / contain no-repeat;
+  animation: ui-spin 1.6s linear infinite;
+}
+:where(:root[data-theme='ink']) .btn-primary.is-loading::after,
+:where(:root[data-theme='ink']) .btn-danger-solid.is-loading::after {
+  background-color: #fbf4e6;
+}
+:where(:root[data-theme='ink']) .skeleton {
+  background: rgba(110, 88, 56, 0.08);
+}
+:where(:root[data-theme='ink']) .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(60, 44, 24, 0.07), transparent);
+}
+
+/* Floating overlay panes over the canvas views (graph/timeline/groups):
+   a narrow silk mount instead of glass. Views may refine their own panes. */
+:root[data-theme='ink'] .canvas-pane {
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: var(--ink-mount-line);
+  border-radius: 3px;
+  box-shadow:
+    0 0 0 3px var(--ink-silk),
+    0 0 0 4px rgba(58, 42, 22, 0.22),
+    var(--shadow);
+}
+
+/* ── App shell: the scroll ───────────────────────────────────────────────── */
+/* The topbar is the top roller (天杆): a dark-wood rod with bone end caps
+   along its top edge, a light silk band beneath it, and a double mounting
+   line where the "painting" (the workspace) begins. */
+:root[data-theme='ink'] .topbar {
+  position: relative;
+  padding-top: 5px;
+  background:
+    linear-gradient(180deg, rgba(255, 250, 236, 0.55), rgba(255, 250, 236, 0) 70%),
+    var(--ink-paper-light, none) 0 0 / 512px 512px,
+    var(--ink-silk);
+  border-bottom-color: transparent;
+  box-shadow:
+    0 1px 0 rgba(48, 36, 20, 0.38),
+    0 3px 0 rgba(245, 239, 224, 0.9),
+    0 4px 0 rgba(48, 36, 20, 0.2),
+    0 10px 16px -8px rgba(60, 40, 15, 0.22);
+}
+:root[data-theme='ink'] .topbar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 6px;
+  pointer-events: none;
+  background:
+    var(--ink-bone) left / 18px 100% no-repeat,
+    var(--ink-bone) right / 18px 100% no-repeat,
+    var(--ink-wood);
+  box-shadow: 0 2px 3px rgba(40, 24, 10, 0.3);
+  z-index: 6;
+  animation: ink-roller-in 0.9s var(--ease-out) both;
+}
+@keyframes ink-roller-in {
+  from {
+    transform: scaleX(0.6);
+    opacity: 0;
+  }
+}
+
+/* The app mark becomes the family seal 家譜 */
+:root[data-theme='ink'] .home-btn {
+  border: none;
+  border-radius: 3px;
+  background: var(--ink-seal, var(--accent)) center / 30px 30px no-repeat;
+  mix-blend-mode: multiply;
+  box-shadow: none;
+  transition: transform 0.45s var(--ease-spring);
+}
+:root[data-theme='ink'] .home-btn:hover {
+  box-shadow: none;
+  transform: rotate(-5deg) scale(1.06);
+}
+:root[data-theme='ink'] .home-btn-mark {
+  opacity: 0;
+}
+
+/* The project button is the scroll's title slip (题签): a narrow paper strip
+   with a ruled double border, the project name written in Kai. */
+:root[data-theme='ink'] .projects-btn {
+  border-radius: 1px;
+  border-color: rgba(48, 36, 20, 0.32);
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  box-shadow:
+    inset 0 0 0 2px var(--surface),
+    inset 0 0 0 3px rgba(48, 36, 20, 0.14);
+  font-family: var(--font-ink-label);
+}
+:root[data-theme='ink'] .projects-btn:hover {
+  border-color: rgba(179, 53, 42, 0.5);
+  box-shadow:
+    inset 0 0 0 2px var(--surface),
+    inset 0 0 0 3px rgba(179, 53, 42, 0.2),
+    0 3px 10px rgba(60, 40, 15, 0.16);
+}
+:root[data-theme='ink'] .projects-btn-current {
+  font-family: var(--font-brush);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--t1);
+}
+:root[data-theme='ink'] .projects-btn-count {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(179, 53, 42, 0.55);
+  border-radius: 2px;
+}
+:root[data-theme='ink'] .browse-btn {
+  font-family: var(--font-ink-label);
+  border-radius: 2px 4px 3px 5px;
+}
+:root[data-theme='ink'] .upgrade-pill {
+  border-radius: 2px 4px 3px 5px;
+  background:
+    var(--ink-paper-light, none) center / 256px 256px,
+    var(--accent);
+  background-blend-mode: multiply, normal;
+  box-shadow: inset 0 0 0 1px rgba(90, 15, 10, 0.3);
+  font-family: var(--font-ink-label);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+:root[data-theme='ink'] .upgrade-pill-spark {
+  color: #e8c77a; /* a fleck of gold leaf */
+}
+:root[data-theme='ink'] .mode-picker-label {
+  font-family: var(--font-ink-label);
+  font-variant: small-caps;
+  text-transform: lowercase;
+  letter-spacing: 0.1em;
+  font-size: 12px;
+}
+:root[data-theme='ink'] .mode-picker,
+:root[data-theme='ink'] .labs-btn {
+  border-radius: 2px 4px 3px 5px;
+  font-family: var(--font-ink-label);
+  background-color: rgba(255, 251, 240, 0.5);
+}
+:root[data-theme='ink'] .history-btn:hover:not(:disabled) {
+  background: radial-gradient(closest-side, rgba(40, 30, 18, 0.12), transparent);
+}
+
+/* The workspace is the painting itself: a faint distant range rises at its
+   foot — visible behind the DOM views, covered by the canvas views (which
+   paint their own paper). */
+:root[data-theme='ink'] .workspace {
+  position: relative;
+  isolation: isolate;
+}
+:root[data-theme='ink'] .workspace::before {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 240px;
+  background: var(--ink-landscape, none) center bottom / 1400px 240px repeat-x;
+  opacity: 0.16;
+  pointer-events: none;
+  z-index: -1;
+  animation: ink-mist-rise 2.4s var(--ease-out) both;
+}
+@keyframes ink-mist-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+    filter: blur(6px);
+  }
+}
+:root[data-theme='ink'] .resize-handle:hover,
+:root[data-theme='ink'] .resize-handle:active {
+  background: var(--ink-wood);
+  opacity: 0.6;
+}
+
+/* ── Mounted panels & modals ─────────────────────────────────────────────── */
+/* .ink-mount — put it on a modal/panel box. In ink it wears silk mounting
+   rings, and (with .ink-unroll) opens by unrolling from its top roller: the
+   bottom roller (::after, when the box allows overflow) rides the reveal
+   edge down. Outside the ink theme both classes do nothing. */
+:root[data-theme='ink'] .ink-mount {
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  border-color: var(--ink-mount-line);
+  border-radius: 2px;
+  box-shadow:
+    var(--ink-mount-rings),
+    0 30px 70px rgba(45, 28, 10, 0.32);
+}
+/* The clip is generous (the rollers, the rings and the drop shadow all live
+   outside the box) and always present, so leaving can transition it back. */
+:root[data-theme='ink'] .ink-unroll {
+  clip-path: inset(-40px -110px -130px -110px);
+  animation: ink-unroll 0.38s cubic-bezier(0.3, 0.75, 0.3, 1) backwards;
+  transform-origin: 50% 0;
+}
+@keyframes ink-unroll {
+  from {
+    clip-path: inset(-40px -110px calc(100% - 4px) -110px);
+    transform: translateY(-6px);
+  }
+}
+/* Leaving: it rolls back up into the top roller. Matches any Vue transition
+   name, so a modal only needs the classes. Kept under the usual 0.22s leave
+   so the backdrop's own fade still decides when the element is removed. */
+:root[data-theme='ink'] [class*='-leave-active'] .ink-unroll,
+:root[data-theme='ink'] .ink-unroll[class*='-leave-active'] {
+  transition:
+    clip-path 0.19s cubic-bezier(0.4, 0, 0.3, 1),
+    opacity 0.2s ease-in;
+}
+:root[data-theme='ink'] [class*='-leave-to'] .ink-unroll,
+:root[data-theme='ink'] .ink-unroll[class*='-leave-to'] {
+  clip-path: inset(-40px -110px calc(100% - 4px) -110px);
+  transform: none;
+}
+/* The rollers themselves — used by boxes that don't clip their overflow */
+:root[data-theme='ink'] .ink-rollers::before,
+:root[data-theme='ink'] .ink-rollers::after {
+  content: '';
+  position: absolute;
+  left: -22px;
+  right: -22px;
+  height: 9px;
+  border-radius: 4px;
+  pointer-events: none;
+  background:
+    var(--ink-bone) left / 12px 100% no-repeat,
+    var(--ink-bone) right / 12px 100% no-repeat,
+    var(--ink-wood);
+  box-shadow: 0 3px 5px rgba(40, 24, 10, 0.3);
+  z-index: 3;
+}
+:root[data-theme='ink'] .ink-rollers::before {
+  top: -16px;
+}
+:root[data-theme='ink'] .ink-rollers::after {
+  top: calc(100% + 7px);
+}
+:root[data-theme='ink'] .ink-rollers.ink-unroll::after {
+  animation: ink-roller-drop 0.38s cubic-bezier(0.3, 0.75, 0.3, 1) backwards;
+}
+:root[data-theme='ink'] [class*='-leave-active'] .ink-rollers::after,
+:root[data-theme='ink'] .ink-rollers[class*='-leave-active']::after {
+  transition: top 0.2s cubic-bezier(0.4, 0, 0.3, 1);
+}
+:root[data-theme='ink'] [class*='-leave-to'] .ink-rollers::after,
+:root[data-theme='ink'] .ink-rollers[class*='-leave-to']::after {
+  top: -10px;
+}
+@keyframes ink-roller-drop {
+  from {
+    top: -10px;
+  }
+}
+
+/* Modal veils: a warm ink wash rather than a grey dim */
+:root[data-theme='ink'] .ink-veil {
+  background: radial-gradient(ellipse at 50% 40%, rgba(40, 30, 18, 0.22), rgba(28, 20, 10, 0.42));
+  backdrop-filter: blur(3px) sepia(0.25);
+  -webkit-backdrop-filter: blur(3px) sepia(0.25);
+}
+
+/* ── Shared ink ornaments any component may use ──────────────────────────── */
+/* .ink-underline — a brush underline that writes itself in on hover/active */
+.ink-underline {
+  position: relative;
+}
+.ink-underline::after {
+  content: '';
+  position: absolute;
+  left: -4%;
+  right: -4%;
+  bottom: -0.32em;
+  height: 0.5em;
+  background-color: currentColor;
+  -webkit-mask: var(--ink-underline) center / 100% 100% no-repeat;
+  mask: var(--ink-underline) center / 100% 100% no-repeat;
+  opacity: 0.7;
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.5s var(--ease-out);
+}
+.ink-underline:hover::after,
+.ink-underline.active::after,
+.ink-underline.is-active::after {
+  clip-path: inset(0 0 0 0);
+}
+/* .ink-seal — a small cinnabar seal stamped onto a corner */
+.ink-seal {
+  width: 34px;
+  height: 34px;
+  background: var(--ink-seal, none) center / contain no-repeat;
+  mix-blend-mode: multiply;
+  animation: ink-stamp 0.5s var(--ease-spring) both;
+}
+@keyframes ink-stamp {
+  from {
+    transform: scale(1.5) rotate(-6deg);
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+}
+/* .ink-enso — the zen circle, drawn in on mount (for empty states / loaders) */
+.ink-enso {
+  aspect-ratio: 1;
+  background-color: currentColor;
+  -webkit-mask: var(--ink-enso) center / contain no-repeat;
+  mask: var(--ink-enso) center / contain no-repeat;
+  animation: ink-enso-draw 1.4s var(--ease-out) both;
+}
+@keyframes ink-enso-draw {
+  from {
+    clip-path: polygon(50% 50%, 50% 0, 50% 0, 50% 0, 50% 0, 50% 0);
+    opacity: 0.2;
+  }
+  25% {
+    clip-path: polygon(50% 50%, 50% 0, 100% 0, 100% 0, 100% 0, 100% 0);
+  }
+  50% {
+    clip-path: polygon(50% 50%, 50% 0, 100% 0, 100% 100%, 100% 100%, 100% 100%);
+  }
+  75% {
+    clip-path: polygon(50% 50%, 50% 0, 100% 0, 100% 100%, 0 100%, 0 100%);
+  }
+  to {
+    clip-path: polygon(50% 50%, 50% 0, 100% 0, 100% 100%, 0 100%, 0 0);
+    opacity: 1;
+  }
+}
+/* .ink-rule — a brush divider line (a block element; set its colour) */
+.ink-rule {
+  display: block;
+  height: 7px;
+  background-color: currentColor;
+  -webkit-mask: var(--ink-divider) center / 100% 100% no-repeat;
+  mask: var(--ink-divider) center / 100% 100% no-repeat;
+  opacity: 0.35;
+  animation: ink-stroke-in 0.9s var(--ease-out) both;
+}
+@keyframes ink-stroke-in {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+/* .ink-bloom — an ink wash that blooms from the centre on hover */
+:root[data-theme='ink'] .ink-bloom {
+  background-image: radial-gradient(
+    closest-side,
+    rgba(40, 30, 18, 0.1),
+    rgba(40, 30, 18, 0.045) 62%,
+    transparent
+  );
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 0% 0%;
+  transition: background-size 0.6s var(--ease-out);
+}
+:root[data-theme='ink'] .ink-bloom:hover,
+:root[data-theme='ink'] .ink-bloom:focus-visible {
+  background-size: 220% 260%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='ink'] .topbar::before,
+  :root[data-theme='ink'] .workspace::before,
+  :root[data-theme='ink'] .ink-unroll,
+  :root[data-theme='ink'] .ink-rollers::after,
+  .ink-seal,
+  .ink-enso,
+  .ink-rule {
+    animation: none;
+  }
+  :root[data-theme='ink'] .spinner {
+    animation-duration: 3s;
+  }
+}
+
+/* ── Theme switch into / out of ink: the blot reveal (lib/themeReveal.js) ── */
+html.ink-reveal::view-transition-new(root) {
+  -webkit-mask-image: var(--ink-blot-mask);
+  mask-image: var(--ink-blot-mask);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  mask-size: 0 0;
+}

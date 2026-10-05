@@ -4,11 +4,40 @@ An experimental sixth view: a **character creator**. Build stylized portraits fo
 from swappable body parts, in a **chosen art style** (anime, cartoon, Chinese painting,
 realistic, renaissance…) — then use them everywhere the app already shows a face.
 
-> **Status: Phase 1 (MVP) is built** — the view, gating, data layer, the 2D sprite
-> compositor, the Cartoon style pack, multiple looks per person with age binding, and
-> explicit Set-as-portrait all ship under `src/renderer/src/components/character/`.
-> Phases 2–4 (genetics, more styles, timeline aging, 3D) remain proposals. Gated behind
-> **Advanced mode + 🧪 Labs**, exactly like the 3D Space layout (`caps.space3d`).
+> **Status: Phases 1–3 are largely built** (2026-09 overhaul) under
+> `src/renderer/src/components/character/`. Gated behind **Advanced mode + 🧪 Labs**,
+> exactly like the 3D Space layout (`caps.space3d`).
+>
+> - **Four styles** — Anime (cel-shaded), Realistic (painterly gradients), Simplistic (flat
+>   geometric), Cartoon — all honoring one cross-style contract (`styleTypes.ts`: shared
+>   `SLOT_IDS` + `CORE_PART_IDS`), so switching a look's style keeps its parts, and an
+>   iris-wipe transition plays. `tests/characterStyles.test.js` enforces the contract per pack.
+> - **Richer layers** — gradients, clip masks (cel shadows, irises inside eye whites), alpha,
+>   blend modes, eye `track`ing, idle `sway`; authored with `styles/pathKit.ts`.
+> - **Model** (`characterModel.ts`, pure): expressions (8, swap semantic part ids + blush /
+>   tears fx), an **age morph** (child → elder: proportions, greying, wrinkles), pop /
+>   look / sway animation inputs, `remapDoc`, lock-aware randomize, color harmony.
+> - **Genetics + DNA** (`characterGenes.ts`): `inheritDoc` (a child's face from its parents'
+>   looks, resemblance knob; adoption is skipped), gene-pool rolls, `FTC1.` share codes.
+> - **Stage** — animated backdrops (`render/backdrops.ts`, stateless particles), a tweened
+>   camera that glides to the edited slot, cursor-tracking eyes + idle glances, squash-and-
+>   stretch pops with sparkles, slot-machine shuffle, shutter flash; idles at ~30fps and
+>   honors reduced motion / the ✨ toggle.
+> - **Photo mode** (`PhotoStudio.vue` + `render/card.ts`) — a holographic, tilting character
+>   card (PNG download) and framed portraits; **SVG/PNG export** (`render/svgExport.ts`).
+>
+> - **🧊 Realistic 3D style (2026-10)** — Phase 4 shipped as its own creator rather than a
+>   mesh backend for the 2D packs: a sculptable MakeHuman (CC0) human with ~210 face/body
+>   sliders + macros (sex, age 11–90, height, weight, muscle, proportions, heritage
+>   blend), procedural strand hair (24 styles + fringes, brows, lashes, 10 beards),
+>   subsurface-style skin with pores/freckles/wrinkles/makeup, parallax eyes, clothing
+>   shells (13 tops, 8 bottoms, 5 shoes, 9 accessories, 7 patterns), 9 poses, 14
+>   expressions, 7 lighting presets, direct face sculpting by drag, genetics from parents'
+>   3D looks, PNG export and Set-as-portrait. Data: `CharacterDoc.model3d`; code:
+>   `components/character/human3d/`; asset build: `scripts/human3d/`.
+>
+> Still open: aging on the Timeline, portrait-studio group photos, trait-driven wardrobe,
+> 3D DNA share codes, arms-crossed / hands-on-hips poses (need IK).
 
 ---
 
@@ -367,7 +396,7 @@ undertaking.** The architecture supports N styles; ship them incrementally.
 | **1 — MVP** | view + gating + backend interface + `SpriteCompositor2D` + **one** style (cartoon or anime, vector — cheapest, most forgiving) + 7 core slots + palette + per-part scale + autosave + Randomize + explicit Set-as-portrait | the loop: build → save → see it everywhere |
 | **2 — Depth** | multiple portraits per person + age binding, morph sliders, undo/redo, mirror, gene-pool randomize, genetics + descendant preview | characters as *data* |
 | **3 — Styles & time** | 2–3 more StylePacks incl. a painterly one (proves the compositor handles raster), aging on the Timeline, expressions, portrait-studio export | styles + integration with the app's soul (time) |
-| **4 — 3D Labs²** | `MeshRenderer3D` over the same docs | the renderer-swap bet |
+| **4 — 3D Labs²** | ✅ the 🧊 3D style (`human3d/`, `CharacterDoc.model3d`) | a separate realistic creator |
 
 **Testing per convention:** `characterModel` / `characterGenes` / DNA serialization / style
 slot-remapping get Vitest coverage like the other pure math; `tests/db.test.js` gains

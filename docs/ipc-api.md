@@ -61,6 +61,13 @@ tagged with the current `activeProjectId`, and `getAll` handlers filter by it.
 | `persons:create` | person fields (`birth`/`death` are DateValues) | the new `Person` (`primary_image: null`) |
 | `persons:update` | `{ id, ...fields }` | the updated `Person` |
 | `persons:delete` | `{ id }` | `{ id }` — cascades the person's relationships, images and `entity_tags` rows |
+| `persons:createMany` | `{ rows: [{ values?, ...fields }] }` | `{ persons, values }` — one write + one undo step; the plan quota covers the whole batch (all or nothing) |
+| `persons:deleteMany` | `{ ids }` | `{ ids }` (deduped) — same cascade as `persons:delete`; any id outside the active project throws before anything is removed |
+
+`fields:setValuesBatch` `{ updates: [{ personId, values?, removals? }] }` → `{ persons, values }`
+is the multi-person form of `fields:setValues` (the Directory Sheet's paste / fill /
+clear path): every person is validated first, then all writes land as one atomic,
+single-undo-step change. `values` covers exactly the touched people.
 
 ### Relationships
 
@@ -126,6 +133,25 @@ tagged with the current `activeProjectId`, and `getAll` handlers filter by it.
 | `images:setPrimary` | `{ imageId, personId }` | `{ imageId }` |
 | `images:delete` | `{ imageId }` | `{ imageId }` — unlinks the file |
 
+### Maps (the Map view)
+
+| Channel | Payload | Returns |
+|---------|---------|---------|
+| `maps:getAll` | — | the active project's `MapDoc[]`, oldest first |
+| `maps:save` | a `MapDoc` (partial). Without `id`: create (defaults: parchment, sea, 2400×1600). With `id`: patch only the given fields | the saved `MapDoc` — every field is sanitized by `applyMapPatch` (`src/shared/maps.ts`); throws `Map not found` for another project's id |
+| `maps:delete` | `{ id }` | `{ id }` |
+| `eras:getAll` | — | the active project's `Era[]` |
+| `eras:save` | an `Era` (partial). Without `id`: create; with `id`: patch the given fields | the saved `Era` — sanitized by `applyEraPatch` (`src/shared/chronicle.ts`; a reversed span is put in order) |
+| `eras:saveMany` | `{ eras: Era[] }` (preset packs) | the saved `Era[]` — one write, one undo step |
+| `eras:delete` | `{ id }` | `{ id }` |
+| `events:getAll` | — | the active project's `StoryEvent[]` |
+| `events:save` | a `StoryEvent` (partial). Without `id`: create; with `id`: patch | the saved `StoryEvent` — sanitized by `applyEventPatch` (unknown kind → `custom`, importance clamped 1–3, cast filtered to the project's people) |
+| `events:delete` | `{ id }` | `{ id }` |
+
+Maps are not in the app-wide undo snapshot (the Map view keeps its own stack).
+Tokens of a deleted person are kept (and skipped by the renderer) so undoing the
+person's deletion puts them back on the map.
+
 ### Settings (per-project)
 
 | Channel | Payload | Returns |
@@ -139,6 +165,23 @@ tagged with the current `activeProjectId`, and `getAll` handlers filter by it.
 |---------|---------|---------|
 | `globalSettings:getAll` | — | the global settings map (e.g. `{ theme, programMode }`) |
 | `globalSettings:set` | `{ key, value }` | `{ key, value }` |
+
+### Billing (premium plans — sandbox provider only)
+
+Implemented in [`src/shared/billing.ts`](../src/shared/billing.ts). No real
+payments exist yet; checkout completes only through the sandbox, and only when the
+shell sets `env.billingSandbox` (dev builds). The hosted-backend work is listed in
+[`MONETIZATION.md`](./MONETIZATION.md).
+
+| Channel | Payload | Returns |
+|---------|---------|---------|
+| `billing:catalog` | — | `{ plans, limits, perks, provider: 'sandbox' \| 'none' }` |
+| `billing:status` | — | `{ plan, subscription \| null, invoices[] }` — settles a lapsed cancellation (write) |
+| `billing:quote` | `{ plan: 'plus' \| 'pro', interval: 'month' \| 'year', coupon? }` | `Quote` (`subtotal`, `discount`, `total`, `annualSavings`, `couponError`) |
+| `billing:createCheckout` | `{ plan, interval, coupon? }` | `CheckoutSession` — refused for guests, for a duplicate plan, for a bad code, and when the sandbox is off ("Payments aren't live yet") |
+| `billing:completeSandboxCheckout` | `{ id, outcome: 'success' \| 'fail' \| 'cancel' }` | `{ session, status }` — **sandbox only**; success sets `user.plan` and records a paid invoice, fail records a failed one |
+| `billing:cancel` | — | status — `cancel_at_period_end = true`; the plan stays until period end |
+| `billing:resume` | — | status — undoes a pending cancellation |
 
 ## The `appimg://` protocol
 

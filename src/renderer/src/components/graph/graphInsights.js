@@ -121,6 +121,58 @@ export function derivedSiblings(relationships, roleOfType) {
 }
 
 /**
+ * How many generations the project spans: the number of people on its longest
+ * parent → child chain over 'vertical' edges (1 = people but no lineage, 0 =
+ * nobody). Longest path by Kahn's topological order, so it's O(V+E) even for
+ * thousands of people; people caught in a (bad-data) cycle are simply not
+ * extended through it. `roleOfType` as for derivedSiblings.
+ */
+export function generationCount(personIds, relationships, roleOfType) {
+  const ids = new Set(personIds)
+  if (!ids.size) return 0
+  const roleOf =
+    roleOfType ||
+    ((t) =>
+      t === 'parent_child' || t === 'adopted' ? 'vertical' : t === 'spouse' ? 'horizontal' : 'none')
+  const children = new Map()
+  const indeg = new Map([...ids].map((id) => [id, 0]))
+  const seen = new Set()
+  for (const r of relationships) {
+    const a = r.person_a_id
+    const b = r.person_b_id
+    if (a === b || !ids.has(a) || !ids.has(b) || roleOf(r.type) !== 'vertical') continue
+    const key = a + '>' + b
+    if (seen.has(key)) continue // duplicate rows (parent_child + adopted) count once
+    seen.add(key)
+    if (children.has(a)) children.get(a).push(b)
+    else children.set(a, [b])
+    indeg.set(b, indeg.get(b) + 1)
+  }
+  const depth = new Map()
+  const queue = []
+  for (const [id, d] of indeg) {
+    if (d === 0) {
+      depth.set(id, 1)
+      queue.push(id)
+    }
+  }
+  let best = queue.length ? 1 : 0
+  for (let i = 0; i < queue.length; i++) {
+    const u = queue[i]
+    const du = depth.get(u)
+    for (const c of children.get(u) || []) {
+      if ((depth.get(c) || 0) < du + 1) depth.set(c, du + 1)
+      indeg.set(c, indeg.get(c) - 1)
+      if (indeg.get(c) === 0) {
+        queue.push(c)
+        if (depth.get(c) > best) best = depth.get(c)
+      }
+    }
+  }
+  return Math.max(best, 1)
+}
+
+/**
  * Romance analysis over directed `likes` edges (a admires b):
  *  - mutual:      [{ a, b }]           both directions exist (a < b for stability)
  *  - unrequited:  [{ from, to }]       one-way only

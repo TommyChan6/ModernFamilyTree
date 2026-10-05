@@ -19,6 +19,20 @@ import {
 } from '../src/renderer/src/components/people/peopleLayout.js'
 import { latestDataYear } from '../src/renderer/src/store/currentYear.js'
 import { yearDate } from '../src/shared/calendarMath'
+import {
+  inkPigment,
+  hexToRgb01,
+  rgbToHex,
+  writeEase,
+  writeEaseInv,
+  inkWriteSchedule,
+  writeArrival,
+  majorStep,
+  isMajorYear,
+  ganzhi,
+  parallaxOffset,
+  INK_RGB
+} from '../src/renderer/src/components/webgl/inkMath'
 
 const REF = 2026
 const yd = yearDate
@@ -268,5 +282,104 @@ describe('latestDataYear (temporary current year)', () => {
       }
     ]
     expect(latestDataYear(persons, rels)).toBe(1960)
+  })
+})
+
+describe('ink theme math (webgl/inkMath)', () => {
+  it('parses hex colours to raw sRGB and back', () => {
+    expect(hexToRgb01('#ff0000')).toEqual([1, 0, 0])
+    expect(hexToRgb01('#0f0')).toEqual([0, 1, 0])
+    expect(hexToRgb01('nonsense')).toEqual([0.53, 0.53, 0.53])
+    expect(rgbToHex([1, 0.5, 0])).toBe('#ff8000')
+    expect(rgbToHex([2, -1, 0])).toBe('#ff0000')
+  })
+
+  it('grinds colours into ink: less chroma, darker, identity at sat 1 / ink 0', () => {
+    const red = [0.9, 0.2, 0.2]
+    expect(inkPigment(red, { sat: 1, ink: 0 })).toEqual(red)
+    const p = inkPigment(red, { sat: 0.5, ink: 0.5 })
+    const chroma = (c) => Math.max(...c) - Math.min(...c)
+    expect(chroma(p)).toBeLessThan(chroma(red))
+    expect(p[0]).toBeLessThan(red[0])
+    const allInk = inkPigment(red, { sat: 0.5, ink: 1 })
+    allInk.forEach((v, i) => expect(v).toBeCloseTo(INK_RGB[i], 6))
+  })
+
+  it('brush ease is monotone with an exact inverse', () => {
+    expect(writeEase(0)).toBe(0)
+    expect(writeEase(1)).toBe(1)
+    expect(writeEase(-1)).toBe(0)
+    expect(writeEase(0.5)).toBeGreaterThan(0.5) // fast start, settling stop
+    for (const f of [0, 0.1, 0.37, 0.8, 1]) expect(writeEase(writeEaseInv(f))).toBeCloseTo(f, 9)
+  })
+
+  it('writes lanes left to right, bounded however many people', () => {
+    const people = Array.from({ length: 400 }, (_, i) => ({
+      id: 'p' + i,
+      laneX: (399 - i) * 150, // reverse order on purpose
+      birthYear: 1900,
+      endYear: 1900 + (i % 90)
+    }))
+    const s = inkWriteSchedule(people)
+    expect(s.size).toBe(400)
+    // the leftmost lane (p399) starts first, the rightmost (p0) last
+    expect(s.get('p399').start).toBe(0)
+    expect(s.get('p0').start).toBeGreaterThan(s.get('p200').start)
+    let maxEnd = 0
+    for (const v of s.values()) {
+      expect(v.dur).toBeGreaterThanOrEqual(0.55)
+      expect(v.dur).toBeLessThanOrEqual(1.25)
+      maxEnd = Math.max(maxEnd, v.start + v.dur)
+    }
+    expect(maxEnd).toBeLessThanOrEqual(1.5 + 1.25 + 1e-9)
+    // longer lives are longer strokes
+    expect(s.get('p89').dur).toBeGreaterThan(s.get('p0').dur)
+    expect(inkWriteSchedule([]).size).toBe(0)
+  })
+
+  it('times when a stroke tip reaches a year', () => {
+    const slot = { start: 2, dur: 1 }
+    expect(writeArrival(slot, 1900, 2000, 1900)).toBe(2)
+    expect(writeArrival(slot, 1900, 2000, 2000)).toBe(3)
+    const mid = writeArrival(slot, 1900, 2000, 1950)
+    expect(mid).toBeGreaterThan(2)
+    expect(mid).toBeLessThan(2.5) // the eased tip is past halfway before half the time
+    expect(writeArrival(slot, 1900, 1900, 1900)).toBe(3) // zero-length stroke
+  })
+
+  it('picks heavier decade / century rules for each tick step', () => {
+    expect(majorStep(1)).toBe(10)
+    expect(majorStep(2)).toBe(10)
+    expect(majorStep(5)).toBe(50)
+    expect(majorStep(10)).toBe(50)
+    expect(majorStep(20)).toBe(100)
+    expect(majorStep(25)).toBe(100)
+    expect(majorStep(100)).toBe(500)
+    for (const st of [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000, 2000, 5000])
+      expect(majorStep(st) % st).toBe(0)
+    expect(isMajorYear(1950, 1)).toBe(true)
+    expect(isMajorYear(1955, 5)).toBe(false)
+    expect(isMajorYear(-100, 20)).toBe(true)
+  })
+
+  it('names years in the sexagenary cycle', () => {
+    expect(ganzhi(1984)).toBe('甲子')
+    expect(ganzhi(2024)).toBe('甲辰')
+    expect(ganzhi(1949)).toBe('己丑')
+    expect(ganzhi(1911)).toBe('辛亥')
+    expect(ganzhi(1984 + 60)).toBe('甲子')
+    expect(ganzhi(4 - 60)).toBe('甲子') // proleptic, astronomical numbering
+    expect(ganzhi(1984.7)).toBe('甲子')
+  })
+
+  it('keeps parallax tiles covering the screen from the left edge', () => {
+    for (const tx of [-5000, -333, 0, 1, 777, 12345]) {
+      const o = parallaxOffset(tx, 0.16, 1700)
+      expect(o).toBeLessThanOrEqual(0)
+      expect(o).toBeGreaterThan(-1700)
+    }
+    expect(parallaxOffset(100, 0.5, 0)).toBe(0)
+    // panning right by one tile's worth of parallax lands on the same phase
+    expect(parallaxOffset(10, 0.2, 100)).toBeCloseTo(parallaxOffset(10 + 500, 0.2, 100), 9)
   })
 })

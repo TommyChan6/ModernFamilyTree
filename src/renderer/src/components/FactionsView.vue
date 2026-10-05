@@ -345,6 +345,8 @@ import { withAlpha } from './webgl/overlayUtils.js'
 import SceneTabs from './SceneTabs.vue'
 import MiniMap from './MiniMap.vue'
 import CanvasToggles from './CanvasToggles.vue'
+import { confirmDialog } from '../lib/dialogs.js'
+import { translate as tr } from '../i18n'
 
 const store = useMainStore()
 
@@ -590,6 +592,22 @@ const membershipKey = computed(
       .join(';')
 )
 watch(membershipKey, rebuildNodes)
+
+// Stored placements moved from outside the view (undo / redo of a ring move or
+// an auto-arrange): glide each ring to its new home instead of snapping.
+watch(
+  () => activeFactions.value.map((f) => `${f.id}:${f.x},${f.y}`).join(';'),
+  () => {
+    const tweens = []
+    for (const f of activeFactions.value) {
+      const cur = zonePos.get(f.id)
+      if (!cur || zoneDrag?.f.id === f.id || zoneTweens.has(f.id)) continue
+      if (Math.hypot(cur.x - f.x, cur.y - f.y) < 1.5) continue
+      tweens.push({ id: f.id, from: { ...cur }, to: { x: f.x, y: f.y } })
+    }
+    startZoneTweens(tweens)
+  }
+)
 
 // ── Scenario switching: zones of the SAME tag glide, everyone else pops ─────
 // Group identity is the tag id, shared across scenes, so matching placements
@@ -1131,7 +1149,10 @@ function onZoneUp(e) {
   suppressClick = true
   if (moved) {
     const p = zonePos.get(f.id)
-    if (p) store.moveGroup(f.id, Math.round(p.x), Math.round(p.y))
+    if (p) {
+      store.recordGroupMoves([f.id]) // Ctrl+Z glides the ring back
+      store.moveGroup(f.id, Math.round(p.x), Math.round(p.y))
+    }
   } else {
     openFactionEdit(f.id, e)
   }
@@ -1183,6 +1204,7 @@ function onNodeUp(e) {
     // Dropped into a new camp — join it (existing memberships are kept;
     // remove via the person popup)
     store.addPersonToGroup(n.id, z.id)
+    renderer?.inkRipple(w.x, w.y, z.color) // 水墨: ink spreading in water (no-op otherwise)
   } else if (!z && memberships.length === 1) {
     // Deliberately pulled out of their only faction — back to the tray
     store.removePersonFromGroup(n.id, memberships[0])
@@ -1239,6 +1261,7 @@ function onTrayUp(e) {
     const w = toWorld(e)
     pendingSpawn = { id: p.id, x: w.x, y: w.y }
     store.addPersonToGroup(p.id, target)
+    renderer?.inkRipple(w.x, w.y, factionById.value.get(target)?.color)
   }
 }
 
@@ -1284,6 +1307,7 @@ function onSidebarDrop(e) {
   const w = toWorld(e)
   if (!nodeById.has(pid)) pendingSpawn = { id: pid, x: w.x, y: w.y }
   store.addPersonToGroup(pid, target)
+  renderer?.inkRipple(w.x, w.y, f.color)
 }
 
 // Ghost/highlight must not outlive an aborted sidebar drag (Esc, drop outside)
@@ -1347,10 +1371,12 @@ async function handleDeleteFaction() {
   if (!fEdit.value) return
   const f = factionById.value.get(fEdit.value.id)
   const count = (f?.member_ids || []).length
-  const ok = confirm(
-    `Delete "${f?.name}"?${count ? ` Its ${count} member${count === 1 ? '' : 's'} stay in your project.` : ''}`
-  )
-  if (!ok) return
+  const ok = await confirmDialog({
+    title: tr('confirm.deleteGroup', { name: f?.name || '' }),
+    message: count ? tr('confirm.deleteGroupBody', { count }) : tr('dialog.undoHint'),
+    tone: 'danger'
+  })
+  if (!ok || !fEdit.value) return
   const id = fEdit.value.id
   fEdit.value = null
   await store.deleteGroup(id)
@@ -1365,6 +1391,10 @@ async function autoArrange() {
   const cx = (stageW.value / 2 - tx.value) / k.value
   const cy = (stageH.value / 2 - ty.value) / k.value
   const placed = arrangeInRing(visibleFactions.value, cx, cy)
+  store.recordGroupMoves(
+    placed.map((p) => p.id),
+    'layout'
+  )
   startZoneTweens(
     placed.map((p) => {
       const cur = zonePos.get(p.id) || { x: p.x, y: p.y }
@@ -1444,9 +1474,13 @@ async function addScenario(duplicate) {
 
 async function handleDeleteScenario(s) {
   const fCount = store.sceneTags.filter((st) => st.scene_id === s.id).length
-  const ok = confirm(
-    `Delete scene "${s.name}"${fCount ? ` and its ${fCount} group placement${fCount === 1 ? '' : 's'}` : ''}? People and groups stay.`
-  )
+  const ok = await confirmDialog({
+    title: tr('confirm.deleteScene', { name: s.name }),
+    message: fCount
+      ? tr('confirm.deleteSceneGroups', { count: fCount })
+      : tr('confirm.deleteSceneBody'),
+    tone: 'danger'
+  })
   if (ok) await store.deleteScene(s.id)
 }
 
@@ -1472,7 +1506,9 @@ onMounted(() => {
       zoneVisual
     }
   })
-  renderer.setTheme(store.theme === 'light')
+  renderer.setTheme(store.isLightTheme)
+  renderer.setInk(store.isInk)
+  renderer.setHidden(!props.active)
   measure()
   // Ignore size reports while hidden (display:none reports 0×0, which would
   // corrupt the pan/zoom state); re-measure only when actually laid out.
@@ -1502,6 +1538,11 @@ onMounted(() => {
       hasFitted = true
     }
   })
+
+  watch(
+    () => props.active,
+    (on) => renderer?.setHidden(!on)
+  )
 
   // Coming back into view: fit once (first reveal), otherwise keep the user's
   // pan/zoom and just re-sync to the current stage size.
@@ -1541,10 +1582,11 @@ watch(nodeMeta, () => {
   renderer?.markAllDirty()
   renderer?.requestRedraw()
 })
-watch(
-  () => store.theme,
-  () => renderer?.setTheme(store.theme === 'light')
-)
+function syncTheme() {
+  renderer?.setTheme(store.isLightTheme)
+  renderer?.setInk(store.isInk)
+}
+watch([() => store.theme, () => store.accent], syncTheme)
 
 onBeforeUnmount(() => {
   sim?.stop()
@@ -1578,7 +1620,8 @@ onBeforeUnmount(() => {
   height: 100%;
   width: 100%;
   background:
-    radial-gradient(1100px 560px at 80% -10%, rgba(108, 142, 245, 0.07), transparent 60%), var(--bg);
+    radial-gradient(1100px 560px at 80% -10%, rgba(var(--accent-rgb), 0.07), transparent 60%),
+    var(--bg);
   min-height: 0;
 }
 
@@ -1635,6 +1678,20 @@ onBeforeUnmount(() => {
   overflow: hidden;
   cursor: grab;
   touch-action: none;
+}
+/* 水墨: the stage is a sheet of rice paper (the canvases are transparent) */
+:root[data-theme='ink'] .fx-view {
+  background: var(--bg);
+}
+:root[data-theme='ink'] .fx-stage {
+  background-color: var(--bg);
+  background-image: var(--ink-paper, none);
+  background-size: 512px 512px;
+}
+:root[data-theme='ink'] .fx-title {
+  font-family: var(--font-brush);
+  font-weight: 400;
+  font-size: 22px;
 }
 .fx-stage.panning,
 .fx-stage.grabbing {
@@ -2082,11 +2139,11 @@ onBeforeUnmount(() => {
   filter: brightness(1.1);
 }
 .fx-pbtn.danger {
-  border-color: rgba(239, 83, 80, 0.35);
-  color: #ef5350;
+  border-color: rgba(var(--danger-rgb), 0.35);
+  color: var(--danger);
 }
 .fx-pbtn.danger:hover {
-  background: rgba(239, 83, 80, 0.12);
+  background: rgba(var(--danger-rgb), 0.12);
 }
 
 .fx-chips {
@@ -2117,7 +2174,7 @@ onBeforeUnmount(() => {
   transition: color 0.12s;
 }
 .fx-fchip-x:hover {
-  color: #ef5350;
+  color: var(--danger);
 }
 .fx-nochips {
   font-size: 11px;

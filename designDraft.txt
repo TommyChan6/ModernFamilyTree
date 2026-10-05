@@ -1,22 +1,136 @@
+---------------
+there are a few things that needs to be fixed.
+- the controls for the display of the shortest connection between two people needs to a button somewhere. currently its just holding ctrl and selecting 2 persons.
+- keep the design cool, consistent, modern, simple and clean. add cool and smooth animation.
+-----------------
+
+- create a commit message for the staged changes, do not commit, do not add coauthor
+
+------ Graph view ----------------
+- add the ability to set era for the birth type graph.
+- a main character type graph that allow the user to set a main character. the persons will be arranged around the main character according to proximity. guidelines that circles the main character.
+	- refresh the positions based on the main character.
+		- center the main character to the center of the graph.
+		- titles of other characters in accordance to the main character.
+		- align the characters according to the closeness to the main character.
+		- special effect on the main character.
+- click a person and reveal the people around it with relationship names. in different languages.
+- special effect on a specific tag?
+- editable line, add breaking points so that the lines can curve and have angle.
+- graph style/theme? the characters are like gravestones, the ground in which they touches represents the birth year.
+- 3d viewing mode for 2d graphs
+- the right menu directory can toggle between showing all persons or showing all current persons in the graph/view
+
+------ Directory view ------------
+
+------ Relationships view --------
+
+------ Timeline view -------------
+- add the ability to set era for timeline. similar to the graph view
+
+------ Groups view ---------------
+
+------ Character view ------------
+
+------ New ideas -----------------
+- mobile version
+	- make the program compatible for mobile phones. take a deep look at the whole program, make changes to the components the placements, the icons, the menus etc.
+- potentially add map view?
+- suggestions for new view?
+- is sound effects going to cost the performance of the website? is adding music and sfx great for this program. if so, how and what to add sfx and music is best in the program in terms of design, coolness, and performance? give me a plan.
+
+------ Big fixes -----------------
+- a guide or tutorial for the whole program
+- add more styles settings
+- features to handle time travel, rebirth, physical age and birth age
+- different themes or backgrounds for the different view
+	- mostly just cosmetics, being cool
+	- example, nodes are rectangular plates on water surface with ripple effect, the water reflects, connections are stone slabs or waterflow etc, placing a node sticks the plate into the water with effect
+- ai chat bot, asking questions, edit family tree, fetch data.
+- generate family, generate family base on a few user criteria
+- select random person
+- right click
+
+------ Small fixes ---------------
+- make the title bar of the views smaller vertically.
+- add undo and redo does not work on movements (positions) of nodes.
+- go through the whole program and look for all places with my email, and change it to 'my new email'. i need to create a new email.
+- change the default affinity of the relationship types.
+- improve the refresh algorithm for the positions of the nodes in each of the graph type. follow the logic of each graph types. keep some of the ideas from before, like how its more align to the father side, that children generally positions below the parents, the nodes generally keep the distance the same between each other. keep the line not as cluttered as possible. also take into account of the affinity of the relationship types, and whether they are generational of non generational.
+
+------ Styles --------------------
+- completely redoing the design for the whole program.
+- when the window is too small and the elements/components of canvas gets cluttered, for example the bottom bar and the time slider, then make the buttons of the bottom bar into icons so it become smaller. find and fix all similar problems in the program.
+- font styles, a couple default ones, and allow the user to import their own font styles, font size, color etc.
+
+
+
+
+
+logo
+new page for projects
+
+help me reimagine all the logos in the program. 
+i think all of the logos in the program are including logos for homepage, the views, the types of graphs, the tools, and the toogles, all of them doesnt really look that great.
+they need to be more consistent, having similar styles, which is simple, modern and cool.
+they also need to be self explanatory, currently, the users wont be able to understand what the icons represent.
+the use of colors in the logos are also too random and doesnt synchronize well together.
+give me a plan of how you think is best to solve this issue.
+the goal is to create the most beautiful, consistent, cool, with smooth animation, modern and simplisitc icons.
+
+
+
+i want to rework how a user's projects are organized. 
+currently every projects a user has are displayed on top of the program as tabs. this is weird because its unusual for a user to work on multiple family tree projects at the same time.
+this is why i want to create a new page that holds all the projects and allow the users to manage the projects more efficiently.
+i want the tabs of the project to turn into a single "projects" button.
+going into the projects page, the user will see a grid/list of projects (similar to how it looks in the browser for projects in the homepage) as cards.
+the user can select to open the projects, edit the projects, choose to make it public or private etc, delete the project, or other common functions for such a feature.
+add filters and sort to the projects, also add other fuctions that may be useful for the user.
+as for the design, use as much creativity as possible. the goal is to be cool, unique, special, great, impressive, out of the box, attractive, beautiful, mind blowing, never thought of, and anything that makes the users say wow. use all you can think of in terms of design and animation. use as much animation as possible. go overboard. dont be hesitant. whatever you can think of, as long as it is cool and beautiful. it needs to wow the user. attractive, amazing, unbelievable, engaging. think out of the box. use as much animation as possible. smooth and cool animation, use shadow, shine, lightning, particle effects, optical illusion, visual trickery, 3d effect, 2d effect, color. basically anything you can think of.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 possible future
-	- 3d mode?
-	- a feature that play the tree in a time scale, the tree evolves as time passes, people only appear when time reaches their birth, links between marriages
+x	- 3d mode?
+x	- a feature that play the tree in a time scale, the tree evolves as time passes, people only appear when time reaches their birth, links between marriages
 	- reveal info: future feature, click a person, reveals the relationships of other people to the person, different languages
 	- mobile version
-	- three levels of complexity for the user, simple, default, advanced
-		- simple: the hide certain features to make the family tree program as easy as possible for the user to user
-		- default: the normal version, with most of the most important features, hide only the once that are extremely rarily used
-		- advanced: all features are present in this mode no matter how complex it is.
+x	- three levels of complexity for the user, simple, default, advanced
+x		- simple: the hide certain features to make the family tree program as easy as possible for the user to user
+x		- default: the normal version, with most of the most important features, hide only the once that are extremely rarily used
+x		- advanced: all features are present in this mode no matter how complex it is.
 
 must later
-	- the state of the graph is saved to database
-	- all people tab in the left menu
-	- relationships tab in the left menu
-	- timeline tab in the left menu
-	- update settings
-		- general update
-		- add language options
-		- more style settings
+x	- the state of the graph is saved to database
+x	- all people tab in the left menu
+x	- relationships tab in the left menu
+x	- timeline tab in the left menu
+x	- update settings
+x		- general update
+x		- add language options
+x		- more style settings
 	- share buttons?
 	- allow edits on the line design, for example drag it so that it has a curve in the direction the user want, to set up the line so it doesn't interfere with the other nodes
 
@@ -24,28 +138,28 @@ big feature
 	- toggle for tagged persons, family cluster, tags can have type, for example family type or elemental power type, types options will appear somewhere on screen allowing user to change
 		- clicking tags in the auto mode can realign the persons according to tags
 x	- maternal or paternal toggles, that focuses on maternal relationship vs paternal
-	- log in?
-	- a mini map on the upper right corner for showing the current viewport in the whole family tree
+x	- log in?
+x	- a mini map on the upper right corner for showing the current viewport in the whole family tree
 	- tutorial
 
 small feature
-	- allow export image, placement of the tree and name of the tree and add styling
-	- different styles to the family tree?
+x	- allow export image, placement of the tree and name of the tree and add styling
+x	- different styles to the family tree?
 	- sliders for auto mode, control the strength of gravity, stretchiness of lines, generational top to bottom alignment
 		- add explainers to these sliders in a question mark next to the sliders
-	- allow age, name and gender to be unknown
-	- allow user to make multiple trees
-	- self defined relationships
-	- allow edits in the graph, for instance, click one node, then ctrl click another node to create a new relationship...
-	- multiselect the people and move them together
+x	- allow age, name and gender to be unknown
+x	- allow user to make multiple trees
+x	- self defined relationships
+x	- allow edits in the graph, for instance, click one node, then ctrl click another node to create a new relationship...
+x	- multiselect the people and move them together
 	- allow import image as background, maps or household, school maps etc
 	- reveal info: show genetic inheritance
 
 visuals
 	- different color for mother or father relationship
-	- toggle for highlighting married couples
-	- toggle for highlighting maternal / paternal relationships
-	- dead people is highlighted by being darker or some symbol?
+x	- toggle for highlighting married couples
+x	- toggle for highlighting maternal / paternal relationships
+x	- dead people is highlighted by being darker or some symbol?
 	- divorced relationship
-	- name the tree
-	- fix light mode
+x	- name the tree
+x	- fix light mode

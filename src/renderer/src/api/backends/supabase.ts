@@ -557,6 +557,23 @@ const handlers: Record<string, (data: Payload) => Promise<unknown>> = {
     return { id: data.id }
   },
 
+  // persons:createMany → the shared handler on the trait slice, like
+  // persons:create (plan limits are enforced by the DB triggers).
+  'persons:createMany': (data) =>
+    runEngine('persons:createMany', data, TRAIT_SPECS, { seedFields: true }),
+
+  // persons:deleteMany → the single-person delete per id (each cascades its
+  // storage objects + faction scrubbing the same way).
+  async 'persons:deleteMany'(data) {
+    const ids = [...new Set((Array.isArray(data?.ids) ? data.ids : []).map(String))]
+    const relationshipIds = [
+      ...new Set((Array.isArray(data?.relationshipIds) ? data.relationshipIds : []).map(String))
+    ]
+    for (const id of relationshipIds) await handlers['relationships:delete']({ id })
+    for (const id of ids) await handlers['persons:delete']({ id })
+    return { ids, relationshipIds }
+  },
+
   // ── fields (the trait system) ───────────────────────────────────────────────
   // Every fields:* channel runs its shared handler on the trait slice. seedFields
   // guarantees the tree has its default locked defs first (self-healing older
@@ -580,6 +597,13 @@ const handlers: Record<string, (data: Payload) => Promise<unknown>> = {
     runEngine('fields:setValues', data, TRAIT_SPECS, { seedFields: true }).then((r) =>
       signPersonResult(r as Record<string, any>)
     ),
+  // (returns every touched person's snapshot — sign each primary_image)
+  'fields:setValuesBatch': (data) =>
+    runEngine('fields:setValuesBatch', data, TRAIT_SPECS, { seedFields: true }).then(async (r) => {
+      const out = r as { persons: Record<string, any>[] }
+      await Promise.all(out.persons.map((p) => signPersonResult(p)))
+      return out
+    }),
   'fields:removeValue': (data) =>
     runEngine('fields:removeValue', data, TRAIT_SPECS, { seedFields: true }).then((r) =>
       signPersonResult(r as Record<string, any>)

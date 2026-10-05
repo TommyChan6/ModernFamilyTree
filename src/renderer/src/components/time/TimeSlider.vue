@@ -20,6 +20,19 @@
       <div v-if="active && startYear != null" class="ts-readout-span">
         from {{ Math.floor(startYear) }}
       </div>
+      <!-- The era this moment belongs to (the chronicle) -->
+      <Transition name="ts-era" mode="out-in">
+        <div
+          v-if="currentEra"
+          :key="currentEra.id"
+          class="ts-era"
+          :style="{ '--ec': currentEra.color }"
+          :title="currentEra.name"
+        >
+          <span class="ts-era-ic">{{ currentEra.icon || '◆' }}</span>
+          <span class="ts-era-name">{{ currentEra.name }}</span>
+        </div>
+      </Transition>
     </div>
 
     <!-- Vertical track: past at the top, present at the bottom. Two nubs frame a
@@ -33,6 +46,14 @@
         @pointerdown="onTrackDown"
       >
         <div class="ts-rail"></div>
+        <!-- Era stripes alongside the rail -->
+        <div
+          v-for="e in eraStripes"
+          :key="e.id"
+          class="ts-era-stripe"
+          :style="{ top: e.top + '%', height: e.h + '%', '--ec': e.color, '--lane': e.lane }"
+          :title="e.name"
+        ></div>
         <div class="ts-density">
           <div
             v-for="(d, i) in density"
@@ -143,6 +164,8 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useMainStore } from '../../store/index.js'
 import { useTimeTravel, TIME_SPEEDS } from './useTimeTravel'
 import { bucketizeEvents, eventsCrossed } from './timeMath'
+import { erasAt, eraLanes } from '../../../../shared/chronicle'
+import { toOrdinal } from '../../../../shared/calendarMath'
 
 const store = useMainStore()
 const tt = useTimeTravel()
@@ -178,6 +201,35 @@ watch(visible, (isVisible) => {
 const range = computed(() => rangeRef.value || { minYear: 0, maxYear: 1 })
 const pct = computed(() => tt.progress.value * 100) // end/playhead nub
 const startPct = computed(() => tt.startProgress.value * 100) // start nub
+// The chronicle: which era the readout year sits in, and era stripes along
+// the track (same year → % mapping as the thumbs).
+const currentEra = computed(() => {
+  const y = active.value ? year.value : range.value.maxYear
+  const hits = erasAt(store.eras, y)
+  return (
+    hits.sort((a, b) => (toOrdinal(b.start) ?? -Infinity) - (toOrdinal(a.start) ?? -Infinity))[0] ||
+    null
+  )
+})
+const eraStripes = computed(() => {
+  const { minYear, maxYear } = range.value
+  const span = Math.max(1e-6, maxYear - minYear)
+  const { lane } = eraLanes(store.eras)
+  return store.eras
+    .map((e) => {
+      const a = Math.max(minYear, toOrdinal(e.start) ?? minYear)
+      const b = Math.min(maxYear, toOrdinal(e.end) ?? maxYear)
+      return {
+        id: e.id,
+        name: e.name,
+        color: e.color,
+        lane: lane.get(e.id) || 0,
+        top: ((a - minYear) / span) * 100,
+        h: ((b - a) / span) * 100
+      }
+    })
+    .filter((x) => x.h > 0)
+})
 const readoutYear = computed(() => (active.value ? Math.floor(year.value) : range.value.maxYear))
 const speedLabel = computed(() => TIME_SPEEDS[speedIdx.value].label)
 
@@ -295,7 +347,7 @@ onBeforeUnmount(() => {
     border-color 0.25s ease;
 }
 .time-slider.ts-on {
-  border-color: rgba(108, 142, 245, 0.45);
+  border-color: rgba(var(--accent-rgb), 0.45);
 }
 /* Timeline view: sit past the year gutter and below its minimap */
 .time-slider.ts-timeline {
@@ -344,7 +396,7 @@ onBeforeUnmount(() => {
 }
 @keyframes ts-tick {
   50% {
-    text-shadow: 0 0 12px rgba(108, 142, 245, 0.75);
+    text-shadow: 0 0 12px rgba(var(--accent-rgb), 0.75);
   }
 }
 
@@ -409,7 +461,7 @@ onBeforeUnmount(() => {
   width: 4px;
   transform: translateX(-50%);
   border-radius: 2px;
-  background: linear-gradient(180deg, rgba(108, 142, 245, 0.25), var(--accent));
+  background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.25), var(--accent));
   pointer-events: none;
 }
 .ts-thumb {
@@ -443,14 +495,14 @@ onBeforeUnmount(() => {
 }
 .ts-on .ts-thumb-core {
   box-shadow:
-    0 0 0 3px rgba(108, 142, 245, 0.22),
+    0 0 0 3px rgba(var(--accent-rgb), 0.22),
     0 2px 10px rgba(0, 0, 0, 0.5);
 }
 /* Grabbed nub swells for tactile feedback */
 .ts-thumb-grabbed .ts-thumb-core {
   transform: scale(1.3);
   box-shadow:
-    0 0 0 5px rgba(108, 142, 245, 0.2),
+    0 0 0 5px rgba(var(--accent-rgb), 0.2),
     0 3px 12px rgba(0, 0, 0, 0.55);
 }
 .ts-playing .ts-thumb-end .ts-thumb-core {
@@ -459,8 +511,8 @@ onBeforeUnmount(() => {
 @keyframes ts-pulse {
   50% {
     box-shadow:
-      0 0 0 7px rgba(108, 142, 245, 0.16),
-      0 0 14px rgba(108, 142, 245, 0.6);
+      0 0 0 7px rgba(var(--accent-rgb), 0.16),
+      0 0 14px rgba(var(--accent-rgb), 0.6);
   }
 }
 
@@ -508,7 +560,7 @@ onBeforeUnmount(() => {
   height: 30px;
   font-size: 12px;
   background: var(--adim);
-  border-color: rgba(108, 142, 245, 0.4);
+  border-color: rgba(var(--accent-rgb), 0.4);
   color: var(--accent);
 }
 .ts-btn-play:hover {
@@ -534,7 +586,7 @@ onBeforeUnmount(() => {
 }
 .ts-btn-active {
   background: var(--adim);
-  border-color: rgba(108, 142, 245, 0.5);
+  border-color: rgba(var(--accent-rgb), 0.5);
   color: var(--accent);
 }
 .ts-ctrl-sep {
@@ -609,5 +661,168 @@ onBeforeUnmount(() => {
 .ts-toast-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+/* ── 水墨 ink theme: the time slider is a narrow hanging scroll — a paper
+   strip in a silk mount with a roller at each end; the rail is a stroke of
+   ink, the years are brushed and the nubs are little seals ───────────── */
+:root[data-theme='ink'] .time-slider {
+  border-radius: 2px;
+  border-color: var(--ink-mount-line);
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow:
+    0 0 0 3px var(--ink-silk),
+    0 0 0 4px rgba(58, 42, 22, 0.22),
+    var(--shadow);
+}
+:root[data-theme='ink'] .time-slider::before,
+:root[data-theme='ink'] .time-slider::after {
+  content: '';
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  height: 7px;
+  border-radius: 3px;
+  background:
+    var(--ink-bone) left / 7px 100% no-repeat,
+    var(--ink-bone) right / 7px 100% no-repeat,
+    var(--ink-wood);
+  box-shadow: 0 2px 3px rgba(40, 24, 10, 0.3);
+  pointer-events: none;
+}
+:root[data-theme='ink'] .time-slider::before {
+  top: -9px;
+}
+:root[data-theme='ink'] .time-slider::after {
+  bottom: -9px;
+}
+:root[data-theme='ink'] .time-slider.ts-on {
+  border-color: rgba(179, 53, 42, 0.45);
+}
+:root[data-theme='ink'] .ts-readout-cap {
+  font-family: var(--font-ink-label);
+  font-size: 10px;
+  font-variant: small-caps;
+  letter-spacing: 0.16em;
+}
+:root[data-theme='ink'] .ts-readout-year {
+  font-family: var(--font-brush);
+  font-size: 18px;
+  font-weight: 400;
+}
+:root[data-theme='ink'] .ts-endcap,
+:root[data-theme='ink'] .ts-readout-span {
+  font-family: var(--font-ink-label);
+  font-size: 10px;
+  font-style: italic;
+}
+:root[data-theme='ink'] .ts-rail {
+  width: 5px;
+  border: none;
+  border-radius: 2px 3px 2px 3px;
+  background: linear-gradient(
+    90deg,
+    rgba(28, 26, 23, 0.25),
+    rgba(28, 26, 23, 0.5),
+    rgba(28, 26, 23, 0.2)
+  );
+}
+:root[data-theme='ink'] .ts-density-cell {
+  background: var(--ink-black);
+  border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%;
+}
+:root[data-theme='ink'] .ts-fill {
+  width: 5px;
+  background: linear-gradient(180deg, rgba(179, 53, 42, 0.2), var(--accent));
+}
+:root[data-theme='ink'] .ts-thumb-core {
+  border-radius: 2px 3px 2px 4px;
+  border: 1.5px solid #fbf4e6;
+  box-shadow:
+    0 0 0 1px rgba(90, 15, 10, 0.4),
+    0 2px 5px rgba(60, 30, 10, 0.35);
+  transform: rotate(-5deg);
+}
+:root[data-theme='ink'] .ts-thumb-start .ts-thumb-core {
+  background: var(--surface);
+  border-color: var(--accent);
+}
+:root[data-theme='ink'] .ts-btn {
+  border-radius: 3px;
+}
+:root[data-theme='ink'] .ts-btn-play {
+  border-radius: 2px 4px 3px 5px / 4px 2px 5px 3px;
+  background: rgba(179, 53, 42, 0.08);
+}
+:root[data-theme='ink'] .ts-btn-play:hover {
+  background:
+    var(--ink-paper-light, none) center / 200px 200px,
+    var(--accent);
+  background-blend-mode: multiply, normal;
+  color: var(--on-accent);
+}
+:root[data-theme='ink'] .ts-toast {
+  border-radius: 2px;
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  font-family: var(--font-ink-label);
+}
+:root[data-theme='ink'] .ts-toast-year {
+  font-family: var(--font-brush);
+  font-weight: 400;
+}
+
+/* ── Chronicle: the current era + era stripes on the track ── */
+.ts-era {
+  --ec: var(--accent);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 64px;
+  padding: 1px 5px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--ec) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ec) 55%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ec) 30%, transparent);
+}
+.ts-era-ic {
+  font-size: 9px;
+}
+.ts-era-name {
+  font-size: 8.5px;
+  font-weight: 750;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ts-era-stripe {
+  --ec: var(--accent);
+  position: absolute;
+  left: calc(50% + 7px + var(--lane) * 4px);
+  width: 3px;
+  border-radius: 2px;
+  background: var(--ec);
+  opacity: 0.75;
+  pointer-events: none;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--ec) 60%, transparent);
+}
+.ts-era-enter-active,
+.ts-era-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.28s var(--ease-spring);
+}
+.ts-era-enter-from {
+  opacity: 0;
+  transform: translateY(5px) scale(0.85);
+}
+.ts-era-leave-to {
+  opacity: 0;
+  transform: translateY(-5px) scale(0.85);
 }
 </style>

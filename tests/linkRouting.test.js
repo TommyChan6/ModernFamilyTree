@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
   stampFamilyContext,
-  routePoints
+  routePoints,
+  bezierControls,
+  toCurveFrame,
+  fromCurveFrame,
+  cubicAt,
+  nearestCurveT,
+  bendCurveAt
 } from '../src/renderer/src/components/graph/linkRouting.js'
 
 // Minimal wired-link factory: source/target are node objects (as after d3's
@@ -89,7 +95,16 @@ describe('routePoints', () => {
   it('every route returns segments+1 points anchored on both endpoints', () => {
     const { links } = family()
     stampFamilyContext(links, ROLES)
-    for (const route of ['organic', 'straight', 'arc', 'elbow', 'trident', 'circuit', 'wave']) {
+    for (const route of [
+      'organic',
+      'straight',
+      'arc',
+      'elbow',
+      'trident',
+      'circuit',
+      'wave',
+      'bezier'
+    ]) {
       for (const d of links) {
         const res = routePoints(d, { linkRoute: route, lineCurvature: 0.04 }, SEG)
         expect(res.points).toHaveLength(SEG + 1)
@@ -174,6 +189,50 @@ describe('routePoints', () => {
     expect(off).toBe(true)
   })
 
+  it('trident: corners are rounded, never sharp kinks', () => {
+    const { links } = family()
+    stampFamilyContext(links, ROLES)
+    const gs = { linkRoute: 'trident', lineCurvature: 0 }
+    for (const id of ['d1', 'm1', 'd2', 'm2']) {
+      const res = routePoints(
+        links.find((l) => l.id === id),
+        gs,
+        18
+      )
+      let maxTurn = 0
+      for (let i = 1; i < res.points.length - 1; i++) {
+        const a = res.points[i - 1],
+          b = res.points[i],
+          c = res.points[i + 1]
+        const ux = b.x - a.x,
+          uy = b.y - a.y,
+          vx = c.x - b.x,
+          vy = c.y - b.y
+        const cos = (ux * vx + uy * vy) / (Math.hypot(ux, uy) * Math.hypot(vx, vy))
+        maxTurn = Math.max(maxTurn, Math.acos(Math.max(-1, Math.min(1, cos))))
+      }
+      // Each 90° bend is spread over several samples (< 35° per step).
+      expect(maxTurn).toBeLessThan((35 * Math.PI) / 180)
+    }
+  })
+
+  it('trident: a short sibling rail becomes one smooth S-sweep', () => {
+    const dad = node('dad', 0, 0)
+    const mum = node('mum', 100, 0)
+    const kid = node('kid', 58, 200) // 8px off the junction → tiny rail
+    const links = [
+      link('m', 'spouse', dad, mum),
+      link('d', 'parent_child', dad, kid),
+      link('u', 'parent_child', mum, kid)
+    ]
+    stampFamilyContext(links, ROLES)
+    const res = routePoints(links[1], { linkRoute: 'trident', lineCurvature: 0 }, 18)
+    // The lateral jog is spread vertically well beyond the 8px rail itself.
+    const jog = res.points.filter((p) => p.x > 50.5 && p.x < 57.5)
+    const span = Math.max(...jog.map((p) => p.y)) - Math.min(...jog.map((p) => p.y))
+    expect(span).toBeGreaterThan(20)
+  })
+
   it('elbow: vertical edges run through the mid-height shelf', () => {
     const { links } = family()
     stampFamilyContext(links, ROLES)
@@ -202,9 +261,79 @@ describe('routePoints', () => {
     const a = node('a', 0, 0)
     const b = node('b', 50, 50)
     const d = link('x', 'parent_child', a, b)
-    for (const route of ['trident', 'elbow', 'circuit', 'wave']) {
+    for (const route of ['trident', 'elbow', 'circuit', 'wave', 'bezier']) {
       const res = routePoints(d, { linkRoute: route, lineCurvature: 0.04 }, SEG)
       expect(res.points).toHaveLength(SEG + 1)
     }
+  })
+})
+
+describe('bezier route', () => {
+  const gs = { linkRoute: 'bezier', lineCurvature: 0 }
+
+  it('chord-frame coords round-trip', () => {
+    const S = { x: 10, y: 20 },
+      T = { x: 130, y: -40 }
+    for (const p of [
+      { x: 0, y: 0 },
+      { x: 55, y: 80 },
+      { x: -30, y: 12 }
+    ]) {
+      const back = fromCurveFrame(S, T, toCurveFrame(S, T, p))
+      expect(back.x).toBeCloseTo(p.x, 6)
+      expect(back.y).toBeCloseTo(p.y, 6)
+    }
+  })
+
+  it('parent → child defaults to the vertical tree swoop', () => {
+    const { links } = family()
+    stampFamilyContext(links, ROLES)
+    const d = links.find((l) => l.id === 'd1') // dad(100,0) → kid1(80,200)
+    const { c1, c2 } = bezierControls(d)
+    expect(c1.x).toBeCloseTo(100) // leaves straight down…
+    expect(c2.x).toBeCloseTo(80) // …arrives straight down
+    expect(c1.y).toBeGreaterThan(0)
+    expect(c2.y).toBeLessThan(200)
+  })
+
+  it('a hand-shaped curve rides along when its people move', () => {
+    const a = node('a', 0, 0)
+    const b = node('b', 100, 0)
+    const d = { ...link('x', 'friends', a, b), _curve: { a: [0.25, 0.5], b: [0.75, 0.5] } }
+    const before = bezierControls(d)
+    expect(before.c1).toEqual({ x: 25, y: 50 })
+    // Move the whole pair and double the distance: the curve scales along.
+    a.x = 100
+    b.x = 300
+    const after = bezierControls(d)
+    expect(after.c1.x).toBeCloseTo(150)
+    expect(after.c1.y).toBeCloseTo(100)
+    const res = routePoints(d, gs, 18)
+    expect(res.points[0]).toEqual({ x: 100, y: 0 })
+    expect(res.points[18].x).toBeCloseTo(300)
+  })
+
+  it('bending at t moves exactly that point of the curve by the drag', () => {
+    const a = node('a', 0, 0)
+    const b = node('b', 200, 50)
+    const d = link('x', 'friends', a, b)
+    const from = bezierControls(d)
+    const t = 0.4
+    const p0 = cubicAt(a, from.c1, from.c2, b, t)
+    const next = bendCurveAt(d, t, { x: 12, y: -30 }, from)
+    d._curve = next
+    const { c1, c2 } = bezierControls(d)
+    const p1 = cubicAt(a, c1, c2, b, t)
+    expect(p1.x).toBeCloseTo(p0.x + 12, 6)
+    expect(p1.y).toBeCloseTo(p0.y - 30, 6)
+  })
+
+  it('nearestCurveT finds the grabbed spot', () => {
+    const a = node('a', 0, 0)
+    const b = node('b', 300, 0)
+    const d = link('x', 'friends', a, b)
+    const { c1, c2 } = bezierControls(d)
+    const p = cubicAt(a, c1, c2, b, 0.7)
+    expect(nearestCurveT(d, p)).toBeCloseTo(0.7, 2)
   })
 })

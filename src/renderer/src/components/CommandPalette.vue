@@ -1,7 +1,7 @@
 <template>
   <Transition name="cp">
-    <div v-if="open" class="cp-backdrop" @click.self="close">
-      <div class="cp-panel">
+    <div v-if="open" class="cp-backdrop ink-veil" @click.self="close">
+      <div class="cp-panel ink-mount ink-unroll ink-rollers">
         <div class="cp-search-row">
           <span class="cp-icon">🔍</span>
           <input
@@ -238,5 +238,79 @@ defineExpose({ show })
 .cp-enter-from,
 .cp-leave-to {
   opacity: 0;
+}
+
+/* ── 水墨 ink theme: a small hanging scroll unrolls to search on; the row
+   under the cursor is marked by a cinnabar stroke and a soft wash ─────── */
+:root[data-theme='ink'] .cp-panel {
+  position: relative;
+  overflow: visible;
+}
+:root[data-theme='ink'] .cp-search-row {
+  border-bottom: none;
+  background: linear-gradient(rgba(28, 26, 23, 0.28), rgba(28, 26, 23, 0.28)) 14px 100% /
+    calc(100% - 28px) 1px no-repeat;
+  padding: 14px 16px;
+}
+:root[data-theme='ink'] .cp-icon {
+  filter: grayscale(1) sepia(0.4);
+}
+:root[data-theme='ink'] .cp-input {
+  font-family: var(--font);
+  font-size: 17px;
+  background: none;
+  box-shadow: none;
+}
+:root[data-theme='ink'] .cp-input::placeholder {
+  font-style: italic;
+}
+:root[data-theme='ink'] .cp-kbd {
+  font-family: var(--font-ink-label);
+  font-variant: small-caps;
+  border-radius: 2px;
+  border-color: rgba(48, 36, 20, 0.25);
+}
+:root[data-theme='ink'] .cp-item {
+  position: relative;
+  border-radius: 2px;
+  background: radial-gradient(closest-side, rgba(40, 30, 18, 0.09), transparent) 30% 50% / 0% 0%
+    no-repeat;
+  transition: background-size 0.45s var(--ease-out);
+}
+:root[data-theme='ink'] .cp-item.active {
+  background-color: transparent;
+  background-size: 160% 300%;
+}
+:root[data-theme='ink'] .cp-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 2px 1px 3px 1px;
+  transform: scaleY(0);
+  transition: transform 0.3s var(--ease-out);
+}
+:root[data-theme='ink'] .cp-item.active::before {
+  transform: scaleY(1);
+}
+:root[data-theme='ink'] .cp-dot {
+  border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%;
+}
+:root[data-theme='ink'] .cp-name {
+  font-family: var(--font-brush);
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+:root[data-theme='ink'] .cp-meta {
+  font-size: 12px;
+  font-style: italic;
+}
+:root[data-theme='ink'] .cp-empty {
+  font-family: var(--font-brush);
+  font-size: 16px;
 }
 </style>

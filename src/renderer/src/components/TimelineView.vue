@@ -15,14 +15,27 @@
 
       <div class="tl-actions">
         <span class="tl-hint"
-          >Drag to pan · Scroll to zoom · Ctrl: time only · Shift: width only</span
+          >Drag to pan · Scroll to zoom · Hold Z / X: one axis · 1–6: edit tools</span
         >
         <CanvasToggles
           show-focus
+          show-chronicle
+          show-style
+          show-kinship
           :focus="focusOpen"
           :legend="legendOpen"
+          :chronicle="chronicleOpen"
+          :style-pane="styleOpen"
+          :kinship="kinOpen"
+          :modes="TIMELINE_TOOLS"
+          :active-mode-id="tool"
+          :mode-gear="false"
           @update:focus="focusOpen = $event"
           @update:legend="legendOpen = $event"
+          @update:chronicle="chronicleOpen = $event"
+          @update:style-pane="styleOpen = $event"
+          @update:kinship="kinOpen = $event"
+          @pick-mode="pickTool"
         />
       </div>
     </div>
@@ -31,16 +44,26 @@
     <div
       ref="stageEl"
       class="tl-stage"
-      :class="{ dragging: panning, hoverable: !!hoverId || !!hoverBadge }"
+      :class="[
+        tool ? 'tool-' + tool : '',
+        {
+          dragging: panning,
+          hoverable: !!hoverId || !!hoverBadge,
+          'tool-grab': retimeHover,
+          'tool-grabbing': handleDragging
+        }
+      ]"
       @pointerdown="onPointerDown"
       @wheel.prevent="onWheel"
       @pointermove="onStageMove"
       @pointerleave="onStageLeave"
       @click="onStageClick"
+      @dblclick="onStageDblClick"
     >
       <canvas ref="bgEl" class="tl-canvas"></canvas>
       <canvas ref="glEl" class="tl-canvas"></canvas>
       <canvas ref="fgEl" class="tl-canvas"></canvas>
+      <canvas ref="fxEl" class="tl-canvas tl-fx"></canvas>
 
       <!-- Empty state -->
       <div v-if="!placedCount" class="tl-empty">
@@ -114,6 +137,29 @@
         :class="{ 'clean-hidden': store.cleanView }"
       >
         <Transition name="pane">
+          <TimelineStylePane v-if="styleOpen" />
+        </Transition>
+        <Transition name="pane">
+          <KinshipPane
+            v-if="kinOpen"
+            v-model:anchor-id="kinAnchor"
+            v-model:lens-on="kinLensOn"
+            v-model:filter="kinFilter"
+            :selected-id="store.selectedPersonId"
+            @highlight="kinWalkSet = $event"
+            @focus-person="kinFocus"
+            @trace-pair="tracePair"
+            @quiz="quizOpen = true"
+          />
+        </Transition>
+        <Transition name="pane">
+          <ChroniclePane
+            v-if="chronicleOpen"
+            @jump="jumpToYear"
+            @hover="(id) => (paneHoverId = id)"
+          />
+        </Transition>
+        <Transition name="pane">
           <div
             v-if="focusOpen"
             class="canvas-pane tl-focus-pane"
@@ -161,31 +207,33 @@
             <div class="tl-leg-section">
               <div class="tl-leg-label">People</div>
               <div class="tl-leg-row">
-                <span class="tl-leg-dot" :style="{ background: colors.male }"></span>Male
+                <span class="tl-leg-dot" :style="{ background: legendColors.male }"></span>Male
               </div>
               <div class="tl-leg-row">
-                <span class="tl-leg-dot" :style="{ background: colors.female }"></span>Female
+                <span class="tl-leg-dot" :style="{ background: legendColors.female }"></span>Female
               </div>
             </div>
             <div class="tl-leg-section">
               <div class="tl-leg-label">Lines</div>
               <div class="tl-leg-row">
-                <span class="tl-leg-line" :style="{ background: colors.spouse }"></span>Marriage
+                <span class="tl-leg-line" :style="{ background: legendColors.spouse }"></span
+                >Marriage
               </div>
               <div class="tl-leg-row">
                 <span
                   class="tl-leg-line tl-leg-dashed"
-                  :style="{ borderColor: colors.spouse }"
+                  :style="{ borderColor: legendColors.spouse }"
                 ></span
                 >Divorced
               </div>
               <div class="tl-leg-row">
-                <span class="tl-leg-line" :style="{ background: colors.parentChild }"></span>Birth
+                <span class="tl-leg-line" :style="{ background: legendColors.parentChild }"></span
+                >Birth
               </div>
               <div class="tl-leg-row">
                 <span
                   class="tl-leg-line tl-leg-dashed"
-                  :style="{ borderColor: colors.parentChild }"
+                  :style="{ borderColor: legendColors.parentChild }"
                 ></span
                 >Adopted
               </div>
@@ -193,6 +241,27 @@
           </div>
         </Transition>
       </div>
+
+      <!-- Chronicle hover card: an era or an event under the cursor -->
+      <Transition name="chtip">
+        <div
+          v-if="chronTip"
+          :key="chronTip.key"
+          class="tl-chtip"
+          :style="{ left: chronTip.x + 'px', top: chronTip.y + 'px', '--c': chronTip.color }"
+        >
+          <div class="tl-chtip-head">
+            <span class="tl-chtip-ic">{{ chronTip.icon }}</span>
+            <b>{{ chronTip.title }}</b>
+          </div>
+          <div class="tl-chtip-when">{{ chronTip.when }}</div>
+          <div v-if="chronTip.cast" class="tl-chtip-cast">👥 {{ chronTip.cast }}</div>
+          <div v-if="chronTip.text" class="tl-chtip-text">{{ chronTip.text }}</div>
+          <div class="tl-chtip-hint">
+            {{ tool === 'retime' ? 'Drag to move' : 'Click to edit' }}
+          </div>
+        </div>
+      </Transition>
 
       <!-- Marriage year edit popup -->
       <Transition name="medit">
@@ -228,7 +297,133 @@
           </div>
         </div>
       </Transition>
+
+      <!-- Selection: the same action pane the graph uses (details, edit, focus,
+           trace, kin lens, link two, delete) — graph-only verbs hidden. -->
+      <GraphActionPane
+        v-if="!tool"
+        :spotlight="false"
+        :node-style="false"
+        @focus-person="focusPerson"
+        @trace="traceFrom"
+        @trace-pair="tracePair"
+        @kin-lens="openKinLens"
+      />
+
+      <!-- The traced chain's meaning: kinship headline, arch, DNA + hops -->
+      <TraceCard
+        :anchor-id="pathAnchor"
+        :info="pathInfo"
+        armed-hint="ctrl-click another life to trace the connection"
+        @close="clearPath"
+        @pick="kinFocus"
+      />
+
+      <!-- Edit-tool HUD: which tool is live and its next step -->
+      <Transition name="tlhud">
+        <div
+          v-if="toolDef"
+          :key="toolDef.id"
+          class="tl-hud"
+          :style="{ '--mc': toolDef.color }"
+          @pointerdown.stop
+          @click.stop
+        >
+          <span class="tl-hud-badge">
+            <span class="tl-hud-ring"></span>
+            <span class="tl-hud-ic">{{ toolDef.icon }}</span>
+          </span>
+          <div class="tl-hud-text">
+            <div class="tl-hud-label">
+              {{ toolDef.label }} <kbd>{{ toolDef.key }}</kbd>
+            </div>
+            <div class="tl-hud-hint">{{ hudHint }}</div>
+          </div>
+          <button class="tl-hud-btn" title="Exit the tool (Esc)" @click="setTool(null)">✕</button>
+        </div>
+      </Transition>
+
+      <!-- Add / Child: name the life you just placed -->
+      <div
+        v-if="nameBubble"
+        class="tl-bubble"
+        :style="{ left: nameBubble.x + 'px', top: nameBubble.y + 'px', '--mc': nameBubble.color }"
+        @pointerdown.stop
+        @click.stop
+        @dblclick.stop
+        @wheel.stop
+      >
+        <div class="tl-bubble-head">{{ nameBubble.title }}</div>
+        <input
+          ref="bubbleInputEl"
+          v-model="nameBubble.value"
+          class="tl-bubble-input"
+          :placeholder="`Name this ${store.noun.toLowerCase()}…`"
+          @keydown.enter.prevent="commitBubble(true)"
+        />
+        <div v-if="nameBubble.coParents.length" class="tl-bubble-co">
+          <span class="tl-bubble-co-label">with</span>
+          <button
+            v-for="c in nameBubble.coParents"
+            :key="c.id"
+            class="tl-co-chip"
+            :class="{ on: nameBubble.coParentId === c.id }"
+            :style="{ '--pc': c.color }"
+            @click="toggleCoParent(c.id)"
+          >
+            {{ c.name }}
+          </button>
+        </div>
+        <div class="tl-bubble-actions">
+          <button class="btn btn-xs btn-ghost" @click="commitBubble(false)">Cancel</button>
+          <button class="btn btn-xs btn-primary" @click="commitBubble(true)">Create ↵</button>
+        </div>
+      </div>
+
+      <!-- Link: what binds the two lives? -->
+      <div
+        v-if="linkPick"
+        class="tl-linkpick"
+        :class="{ up: linkPick.up }"
+        :style="{ left: linkPick.x + 'px', top: linkPick.y + 'px' }"
+        @pointerdown.stop
+        @click.stop
+        @dblclick.stop
+        @wheel.stop
+      >
+        <div class="tl-lp-head">
+          <b :style="{ color: genderColor(personById.get(linkPick.a)?.gender) }">{{
+            shortName(linkPick.a)
+          }}</b>
+          <button class="tl-lp-swap" title="Swap direction (parent → child…)" @click="swapLink">
+            ⇄
+          </button>
+          <b :style="{ color: genderColor(personById.get(linkPick.b)?.gender) }">{{
+            shortName(linkPick.b)
+          }}</b>
+          <span class="tl-lp-year">{{ linkPick.year }}</span>
+        </div>
+        <div class="tl-lp-chips">
+          <button
+            v-for="(d, i) in linkTypes"
+            :key="d.key"
+            class="tl-lp-chip"
+            :style="{ '--rc': relColor(d), '--i': i }"
+            :title="
+              d.directed
+                ? `${shortName(linkPick.a)} is ${d.role_a} of ${shortName(linkPick.b)}`
+                : d.label
+            "
+            @click="commitLink(d)"
+          >
+            <span class="tl-lp-glyph">{{ d.glyph }}</span
+            >{{ d.label }}
+          </button>
+        </div>
+      </div>
     </div>
+
+    <KinshipQuiz :open="quizOpen" @close="quizOpen = false" />
 
     <!-- Scene tab strip (a single default scene for now — manual positions
          and per-scene arrangements come later) -->
@@ -261,11 +456,36 @@ import {
   Y_PAD
 } from './timeline/timelineLayout.js'
 import { TimelineRenderer } from './timeline/TimelineRenderer.js'
+import ChroniclePane from './chronicle/ChroniclePane.vue'
+import { chronicleViewModel } from './chronicle/chronicleModel.js'
+import { toOrdinal, format as fmtDate } from '../../../shared/calendarMath'
+import { erasAt } from '../../../shared/chronicle'
 import { useTimeTravel } from './time/useTimeTravel'
 import { withAlpha } from './webgl/overlayUtils.js'
+import { inkPigment, rgbToHex, hexToRgb01 } from './webgl/inkMath'
 import SceneTabs from './SceneTabs.vue'
 import MiniMap from './MiniMap.vue'
 import CanvasToggles from './CanvasToggles.vue'
+import { confirmDialog, toast } from '../lib/dialogs.js'
+import { undoToast } from '../lib/undoToast.js'
+import { translate as tr } from '../i18n'
+import TimelineStylePane from './timeline/TimelineStylePane.vue'
+import { TimelineFx } from './timeline/TimelineFx.js'
+import {
+  TIMELINE_TOOLS,
+  timelineTool,
+  insertLane,
+  retimeSlotValue,
+  clampRetime,
+  spanFromDrag,
+  traceSegments
+} from './timeline/timelineEdit.js'
+import GraphActionPane from './graph/GraphActionPane.vue'
+import KinshipPane from './kinship/KinshipPane.vue'
+import KinshipQuiz from './kinship/KinshipQuiz.vue'
+import TraceCard from './kinship/TraceCard.vue'
+import { useKinship, kinClass, kinPalette } from './kinship/useKinship'
+import { shortestPath } from './graph/graphInsights.js'
 
 const store = useMainStore()
 const tt = useTimeTravel()
@@ -285,8 +505,12 @@ async function duplicateTimelineScene() {
 
 async function removeTimelineScene(scene) {
   if (store.timelineScenes.length <= 1) return
-  if (!confirm(`Delete scene "${scene.name}"?`)) return
-  await store.deleteScene(scene.id)
+  const ok = await confirmDialog({
+    title: tr('confirm.deleteScene', { name: scene.name }),
+    message: tr('confirm.deleteSceneBody'),
+    tone: 'danger'
+  })
+  if (ok) await store.deleteScene(scene.id)
 }
 
 // Make sure the project has its default timeline scene once data is in.
@@ -315,6 +539,7 @@ const stageEl = ref(null)
 const bgEl = ref(null)
 const glEl = ref(null)
 const fgEl = ref(null)
+const fxEl = ref(null)
 const stageW = ref(0)
 const stageH = ref(0)
 const pxPerYear = ref(BASE_PX)
@@ -349,6 +574,7 @@ const searchSet = computed(() => {
 // ── Overlay panes (shared header toggle cluster) ────────────────────────────
 const focusOpen = ref(false)
 const legendOpen = ref(true)
+const styleOpen = ref(false) // 🎨 Style pane (lifeline looks, canvas, atmosphere)
 // Focus emphasis: dim the people who don't match. Applied through the same
 // dimming path the renderer already tweens (no renderer changes needed).
 const focusGender = ref('all') // 'all' | 'male' | 'female' | 'unknown'
@@ -386,12 +612,19 @@ function focusDimmed(id) {
 }
 
 function isDimmed(id) {
+  if (pathActive.value) return !pathIdSet.value.has(id)
+  if (kinWalkSet.value) return !kinWalkSet.value.has(id)
+  if (kinLensMap.value && !hoverId.value) return !kinIncluded(kinLensMap.value.get(id))
   if (hoverId.value) return !relatedSet.value.has(id)
   if (searchOn.value) return !searchSet.value.has(id)
   if (focusActive.value) return focusDimmed(id)
   return false
 }
 function connDimmed(ids) {
+  if (pathActive.value) return !ids.every((id) => pathIdSet.value.has(id))
+  if (kinWalkSet.value) return !ids.every((id) => kinWalkSet.value.has(id))
+  if (kinLensMap.value && !hoverId.value)
+    return !ids.every((id) => kinIncluded(kinLensMap.value.get(id)))
   if (hoverId.value) return !ids.includes(hoverId.value)
   if (searchOn.value) return !ids.some((id) => searchSet.value.has(id))
   if (focusActive.value) return ids.every((id) => focusDimmed(id))
@@ -414,6 +647,20 @@ const colors = computed(() => ({
   parentChild: store.graphSettings.parentChildColor
 }))
 
+// The legend speaks the renderer's language: in ink the lifelines are pigment
+// ground into ink and marriages are the cinnabar red thread.
+const legendColors = computed(() => {
+  if (!store.isInk) return colors.value
+  const pig = (hex) => rgbToHex(inkPigment(hexToRgb01(hex), { sat: 0.55, ink: 0.58 }))
+  return {
+    male: pig(colors.value.male),
+    female: pig(colors.value.female),
+    unknown: pig(colors.value.unknown),
+    spouse: 'var(--ink-cinnabar)',
+    parentChild: '#5c5750'
+  }
+})
+
 function genderColor(g) {
   if (g === 'male') return colors.value.male
   if (g === 'female') return colors.value.female
@@ -426,6 +673,9 @@ function genderColor(g) {
 // family-tree layout algorithm on demand and the lanes glide into place.
 const refYear = computed(() => store.currentDate?.year ?? new Date().getFullYear())
 const laneOrder = ref(null)
+// A life created from the canvas claims the lane it was placed in (instead of
+// appending on the far right): { before: Set<id>, opts } until it arrives.
+let pendingLane = null
 watch(
   () => store.activeProjectId,
   () => {
@@ -437,6 +687,18 @@ watch(
   () => {
     if (store.persons.length && !laneOrder.value)
       laneOrder.value = computeLaneOrder(store.persons, store.relationships, store.relTypeRoles)
+    if (pendingLane && laneOrder.value) {
+      const fresh = store.persons.filter((p) => !pendingLane.before.has(p.id))
+      if (fresh.length === 1) {
+        laneOrder.value = insertLane(
+          laneOrder.value,
+          layout.value.people,
+          fresh[0].id,
+          pendingLane.opts
+        )
+        pendingLane = null
+      }
+    }
   },
   { immediate: true, deep: true }
 )
@@ -453,9 +715,114 @@ function refreshLayout() {
   }, 700)
 }
 
-const layout = computed(() =>
-  computeTimelineLayout(store.persons, store.relationships, refYear.value, laneOrder.value)
+// Dated story events stretch the axis so none falls off either end.
+const eventYears = computed(() =>
+  store.events.flatMap((ev) => [toOrdinal(ev.date), toOrdinal(ev.end)]).filter((y) => y != null)
 )
+const layout = computed(() =>
+  computeTimelineLayout(
+    store.persons,
+    store.relationships,
+    refYear.value,
+    laneOrder.value,
+    null,
+    eventYears.value
+  )
+)
+
+// ── Chronicle (eras + story events) ─────────────────────────────────────────
+const chronicleOpen = ref(false)
+const hoverChron = ref(null) // { kind: 'era' | 'event', id } under the cursor
+const paneHoverId = ref(null) // an event hovered in the Chronicle pane
+const chronTip = ref(null)
+const chronModel = computed(() => chronicleViewModel(store.eras, store.events))
+const chronHover = computed(() =>
+  paneHoverId.value ? { kind: 'event', id: paneHoverId.value } : hoverChron.value
+)
+// Open the pane by default once the project has a chronicle to show.
+let chronicleSeen = false
+watch(
+  () => store.eras.length + store.events.length > 0,
+  (has) => {
+    if (has && !chronicleSeen) chronicleOpen.value = true
+    chronicleSeen = chronicleSeen || has
+  },
+  { immediate: true }
+)
+watch([chronModel, chronHover], () => renderer?.refreshChronicle())
+
+function chronTipFor(hit, p) {
+  if (!hit) return null
+  if (hit.kind === 'era') {
+    const e = store.eras.find((x) => x.id === hit.id)
+    if (!e) return null
+    return {
+      key: 'era:' + e.id,
+      icon: e.icon || '◆',
+      title: e.name,
+      color: e.color,
+      when: `${fmtDate(e.start) || '…'} – ${fmtDate(e.end) || 'now'}`,
+      cast: '',
+      text: e.description,
+      x: Math.min(p.x + 14, stageW.value - 260),
+      y: p.y + 16
+    }
+  }
+  const ev = store.events.find((x) => x.id === hit.id)
+  if (!ev) return null
+  const m = chronModel.value.events.find((x) => x.id === ev.id)
+  const names = ev.person_ids.map((id) => personById.value.get(id)?.name).filter(Boolean)
+  const when = fmtDate(ev.date)
+    ? fmtDate(ev.end)
+      ? `${fmtDate(ev.date)} – ${fmtDate(ev.end)}`
+      : fmtDate(ev.date)
+    : 'undated'
+  const era = erasAt(store.eras, toOrdinal(ev.date))[0]
+  return {
+    key: 'ev:' + ev.id,
+    icon: m?.icon || '✦',
+    title: ev.title,
+    color: m?.color || 'var(--accent)',
+    when: `${when}${ev.place ? ' · ' + ev.place : ''}${era ? ' · ' + era.name : ''}`,
+    cast:
+      names.length > 4 ? `${names.slice(0, 3).join(', ')} +${names.length - 3}` : names.join(', '),
+    text: ev.description,
+    x: Math.min(p.x + 14, stageW.value - 260),
+    y: p.y + 16
+  }
+}
+
+/** Glide the camera so a year sits mid-stage (keeps the current zoom). */
+function jumpToYear(year) {
+  if (year == null || !Number.isFinite(year)) return
+  const px = pxPerYear.value
+  const nty = stageH.value / 2 - ((year - layout.value.minYear) * px + Y_PAD)
+  tweenTo(px, laneScale.value, tx.value, nty, 420)
+}
+
+/** The year under a screen y. */
+function yearAtY(y) {
+  return (y - ty.value - Y_PAD) / pxPerYear.value + layout.value.minYear
+}
+
+// Double-click empty timeline: a new event at that year (the person under
+// the cursor, if any, joins its cast).
+function onStageDblClick(e) {
+  if (!stageEl.value || !renderer || tool.value) return
+  const p = stagePoint(e)
+  if (p.x < GUTTER || renderer.chronicleAt(p.x, p.y)) return
+  const person = renderer.personAt(p.x, p.y)
+  // Double-click a life → its profile card.
+  if (person && livePersonAt(p)) {
+    store.selectPerson(person.id)
+    return
+  }
+  const year = Math.round(yearAtY(p.y))
+  store.openEventEditor({
+    date: { year, month: null, day: null, precision: 'year', calendar: 'gregorian' },
+    person_ids: person ? [person.id] : []
+  })
+}
 const placedCount = computed(() => layout.value.people.length)
 const undatedCount = computed(() => layout.value.undatedCount)
 
@@ -478,14 +845,22 @@ const relatedSet = computed(() => {
 function personVisual(p) {
   const hovered = hoverId.value === p.id
   const lit = searchOn.value && searchSet.value.has(p.id)
-  const selected = store.selectedPersonId === p.id
+  const selected = selectedSet.value.has(p.id)
+  const onPath = pathIdSet.value.has(p.id)
+  const anchored = linkAnchor.value?.id === p.id || pathAnchor.value === p.id
   const notYet = p.birthYear > tt.gateYear.value || p.birthYear < tt.gateStartYear.value
+  // Kinship lens: every relative rings in their kin colour.
+  const k = kinLensMap.value ? kinLensMap.value.get(p.id) : null
+  const ring = k && kinIncluded(k) ? kinColors.value[kinClass(k)] : null
+  const strong = hovered || lit || selected || onPath || anchored
   return {
     opacity: notYet ? 0 : isDimmed(p.id) ? 0.22 : 1,
-    lineWidth: hovered || lit || selected ? 9 : 6,
-    avatarScale: notYet ? 0.6 : hovered ? 1.15 : 1,
+    lineWidth: strong ? 9 : 6,
+    avatarScale: notYet ? 0.6 : hovered || anchored ? 1.15 : k?.kind === 'self' ? 1.12 : 1,
     glow: hovered ? 0.5 : 0,
     selected,
+    halo: selected || onPath || anchored ? 1 : hovered ? 0.55 : 0,
+    ring,
     color: genderColor(p.gender),
     imageUrl: p.image ? api.getImageUrl(p.image) || null : null
   }
@@ -612,6 +987,15 @@ function clampPan() {
 // transition the DOM (and its listeners) outlives the component.
 function onPointerDown(e) {
   if (e.button !== 0 || !stageEl.value) return
+  if (tool.value && renderer && !nameBubble.value && !linkPick.value) {
+    const p = stagePoint(e)
+    if (tool.value === 'retime') {
+      const h = retimeTarget(p)
+      if (h) return startDrag('retime', p, { h }, e)
+    } else if (tool.value === 'event' && p.x > GUTTER && !renderer.chronicleAt(p.x, p.y)) {
+      return startDrag('span', p, {}, e)
+    }
+  }
   panning.value = true
   moved = false
   cancelTween()
@@ -707,7 +1091,30 @@ function onStageMove(e) {
   if (!stageEl.value || !renderer) return
   const p = stagePoint(e)
   renderer?.setMouseY(panning.value ? null : p.y)
-  if (panning.value) return
+  if (panning.value) {
+    chronTip.value = null
+    return
+  }
+  if (tool.value) {
+    toolGhost(p)
+    if (tool.value !== 'retime') {
+      chronTip.value = null
+      hoverChron.value = null
+    }
+  }
+  // Chronicle items (event pills, era headers) sit above people.
+  const ch = renderer.chronicleAt(p.x, p.y)
+  const chKey = ch ? ch.kind + ':' + ch.id : null
+  const curKey = hoverChron.value ? hoverChron.value.kind + ':' + hoverChron.value.id : null
+  if (chKey !== curKey) hoverChron.value = ch ? { kind: ch.kind, id: ch.id } : null
+  chronTip.value = tool.value && tool.value !== 'retime' ? null : chronTipFor(ch, p)
+  if (ch) {
+    if (hoverId.value) {
+      hoverId.value = null
+      renderer.markStylesDirty()
+    }
+    return
+  }
   const badge = renderer?.badgeAt(p.x, p.y) || null
   hoverBadge.value = badge ? badge.id : null
   renderer?.setHoverBadge(hoverBadge.value)
@@ -724,6 +1131,8 @@ function onStageMove(e) {
 
 function onStageLeave() {
   renderer?.setMouseY(null)
+  hoverChron.value = null
+  chronTip.value = null
   if (hoverId.value) {
     hoverId.value = null
     renderer?.markStylesDirty()
@@ -739,22 +1148,36 @@ function onStageClick(e) {
   }
   if (!stageEl.value || !renderer) return
   const p = stagePoint(e)
+  if (tool.value) {
+    onToolClick(p)
+    return
+  }
+  const ch = renderer.chronicleAt(p.x, p.y)
+  if (ch) {
+    chronTip.value = null
+    if (ch.kind === 'era') store.openEraEditor({ id: ch.id })
+    else store.openEventEditor({ id: ch.id })
+    return
+  }
   const badge = renderer?.badgeAt(p.x, p.y)
   if (badge) {
     openMarriageEdit(badge.m, e)
     return
   }
-  const person = renderer?.personAt(p.x, p.y)
-  if (
-    person &&
-    person.birthYear <= tt.gateYear.value &&
-    person.birthYear >= tt.gateStartYear.value
-  ) {
-    mEdit.value = null
-    store.selectPerson(person.id)
+  mEdit.value = null
+  const person = livePersonAt(p)
+  if (person) {
+    // ctrl-click (or an armed trace) → trace; shift → multi-select; plain →
+    // select (the action pane); double-click opens the profile.
+    if (e.ctrlKey || e.metaKey || pathAnchor.value) handlePathClick(person.id)
+    else if (e.shiftKey) store.toggleSelectPerson(person.id)
+    else store.selectPerson(person.id, { modal: false })
     return
   }
-  mEdit.value = null
+  if (!e.shiftKey) {
+    store.relPopup = null
+    if (store.selectedPersonIds.length) store.selectPerson(null, { modal: false })
+  }
 }
 
 // ── Smooth tween for zoom buttons / fit ─────────────────────────────────────
@@ -867,6 +1290,920 @@ async function saveMarriageEdit() {
   mEdit.value = null
 }
 
+// ── Selection ───────────────────────────────────────────────────────────────
+// The store's selection is shared with the graph: a click selects (the action
+// pane rises), shift-click builds a set, ctrl-click traces.
+const selectedSet = computed(() => {
+  const ids = store.selectedPersonIds
+  if (ids.length) return new Set(ids)
+  return new Set(store.selectedPersonId ? [store.selectedPersonId] : [])
+})
+
+/** The person under a screen point, unless time travel hides them. */
+function livePersonAt(p) {
+  const person = renderer?.personAt(p.x, p.y)
+  if (!person) return null
+  if (person.birthYear > tt.gateYear.value || person.birthYear < tt.gateStartYear.value) return null
+  return person
+}
+function shortName(id) {
+  return (personById.value.get(id)?.name || 'Unnamed').split(/\s+/)[0]
+}
+function cssVar(name, fallback = '#6c8ef5') {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return v || fallback
+}
+
+/** Glide the camera so a life's first years sit in the upper middle. */
+function focusPerson(id) {
+  const p = layout.value.people.find((x) => x.id === id)
+  if (!p) return
+  const px = pxPerYear.value,
+    ls = laneScale.value
+  const ntx = (stageW.value + GUTTER) / 2 - p.laneX * ls
+  const nty = stageH.value * 0.32 - ((p.birthYear - layout.value.minYear) * px + Y_PAD)
+  tweenTo(px, ls, ntx, nty, 520)
+}
+
+// ── Kinship lens (see the family through one person's eyes) ─────────────────
+// Same lens as the graph: each relative's portrait rings in their kin colour
+// and a pill names what they are to the viewpoint ("second cousin", 表姐,
+// farmor…), revealed nearest-kin first with a ripple; outsiders recede.
+const kinship = useKinship()
+const kinOpen = ref(false)
+const kinAnchor = ref(null)
+const kinLensOn = ref(false)
+const kinFilter = ref('all') // all | blood | marriage | ancestors | descendants
+const kinWalkSet = ref(null)
+const quizOpen = ref(false)
+const KIN_REDUCED = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+const KIN_STEP_MS = 115
+
+const kinLensMap = computed(() =>
+  kinLensOn.value && kinAnchor.value ? kinship.lensOf(kinAnchor.value) : null
+)
+const kinColors = computed(() => {
+  void store.theme
+  void store.accent
+  return kinPalette()
+})
+function kinIncluded(k) {
+  if (!k) return false
+  if (k.kind === 'self') return true
+  switch (kinFilter.value) {
+    case 'blood':
+      return k.kind === 'blood'
+    case 'marriage':
+      return ['spouse', 'inlaw', 'affine', 'coparent', 'step'].includes(k.kind)
+    case 'ancestors':
+      return k.kind === 'blood' && k.down === 0
+    case 'descendants':
+      return k.kind === 'blood' && k.up === 0
+    default:
+      return true
+  }
+}
+function kinRank(k) {
+  if (!k) return 12
+  switch (k.kind) {
+    case 'self':
+      return 0
+    case 'blood':
+      return k.up + k.down
+    case 'spouse':
+      return 1
+    case 'social':
+      return 3
+    case 'distant':
+      return 6 + Math.min(4, k.hops || 0)
+    default:
+      return k.up + k.down + 1
+  }
+}
+let kinRevealT0 = 0
+let kinNow = 0
+function kinRevealP(k) {
+  if (!kinRevealT0) return 1
+  const t = (kinNow - kinRevealT0 - Math.min(kinRank(k), 10) * KIN_STEP_MS) / 380
+  return t <= 0 ? 0 : t >= 1 ? 1 : 1 - Math.pow(1 - t, 3)
+}
+function startKinReveal() {
+  if (KIN_REDUCED) return
+  kinRevealT0 = performance.now()
+  kinNow = kinRevealT0
+  const total = 10 * KIN_STEP_MS + 1500
+  const loop = () => {
+    kinNow = performance.now()
+    renderer?.markUiDirty()
+    if (kinNow - kinRevealT0 < total && kinLensMap.value) requestAnimationFrame(loop)
+    else {
+      kinRevealT0 = 0
+      renderer?.markUiDirty()
+    }
+  }
+  requestAnimationFrame(loop)
+}
+const kinLabels = computed(() => {
+  const L = kinLensMap.value
+  if (!L) return null
+  void kinship.kinLang.value
+  const out = new Map()
+  for (const [id, k] of L) {
+    if (k.kind === 'self' || k.kind === 'distant' || !kinIncluded(k)) continue
+    out.set(id, {
+      text: kinship.nameOf(k, kinAnchor.value, id),
+      color: kinColors.value[kinClass(k)]
+    })
+  }
+  return out
+})
+function kinOverlay() {
+  const L = kinLensMap.value
+  if (!L || pathActive.value) return null
+  let wave = null
+  if (kinRevealT0) {
+    const e = kinNow - kinRevealT0
+    if (e < 1500)
+      wave = {
+        id: kinAnchor.value,
+        r: 18 + e * 0.5,
+        alpha: 1 - e / 1500,
+        color: kinColors.value.self
+      }
+  }
+  return { labels: kinLabels.value, reveal: (id) => kinRevealP(L.get(id)), wave }
+}
+let kinPrevKey = ''
+watch([kinLensMap, kinFilter], () => {
+  const key = kinLensMap.value ? kinAnchor.value + ':' + kinFilter.value : ''
+  if (key && key !== kinPrevKey) startKinReveal()
+  kinPrevKey = key
+  renderer?.markStylesDirty()
+})
+watch([() => kinship.kinLang.value, kinWalkSet, kinColors], () => renderer?.markStylesDirty())
+watch(kinOpen, (open) => {
+  if (open && !kinAnchor.value) kinAnchor.value = store.selectedPersonId
+  if (!open) {
+    kinLensOn.value = false
+    kinWalkSet.value = null
+  }
+})
+watch(
+  () => store.persons.length,
+  () => {
+    if (kinAnchor.value && !personById.value.has(kinAnchor.value)) {
+      kinAnchor.value = null
+      kinLensOn.value = false
+    }
+  }
+)
+/** Action pane's 🧬 Kin: look through this person's eyes. */
+function openKinLens(id) {
+  kinAnchor.value = id
+  kinOpen.value = true
+  kinLensOn.value = true
+}
+/** Select + glide to a person named in a kinship surface. */
+function kinFocus(id) {
+  if (!id) return
+  store.selectPerson(id, { modal: false })
+  focusPerson(id)
+}
+
+// ── Connection trace ────────────────────────────────────────────────────────
+// ctrl-click two lives (or the pane's Trace) → the shortest chain lights up:
+// glowing bonds flow hop by hop between the lifelines at the years that made
+// them, everyone else recedes, and the trace card names the relation.
+const pathAnchor = ref(null)
+const pathInfo = ref(null)
+const pathActive = computed(() => !!pathInfo.value && !pathInfo.value.none)
+const pathIdSet = computed(() => new Set(pathActive.value ? pathInfo.value.ids : []))
+function handlePathClick(id) {
+  store.relPopup = null
+  if (!pathAnchor.value || pathInfo.value) {
+    pathInfo.value = null
+    pathAnchor.value = id
+  } else if (pathAnchor.value === id) {
+    pathAnchor.value = null
+  } else {
+    tracePair([pathAnchor.value, id])
+  }
+}
+function traceFrom(id) {
+  pathInfo.value = null
+  pathAnchor.value = id
+}
+function tracePair([a, b]) {
+  pathAnchor.value = null
+  pathInfo.value = shortestPath(a, b, store.relationships) || { none: true, fromId: a, toId: b }
+}
+function clearPath() {
+  pathInfo.value = null
+  pathAnchor.value = null
+}
+function syncTrace() {
+  if (!fx) return
+  if (!pathActive.value) {
+    fx.setTrace(null)
+    return
+  }
+  const people = new Map(layout.value.people.map((p) => [p.id, p]))
+  const segs = traceSegments(pathInfo.value, people, (t) => store.relTypeRoles.get(t))
+  fx.setTrace(segs, cssVar('--accent'))
+}
+watch(pathInfo, () => {
+  syncTrace()
+  renderer?.markStylesDirty()
+})
+watch(
+  () => store.relationships.length + ':' + store.persons.length,
+  () => {
+    if (pathInfo.value || pathAnchor.value) clearPath()
+    if (linkAnchor.value && !personById.value.has(linkAnchor.value.id)) linkAnchor.value = null
+  }
+)
+
+// ── Edit tools (the "Edit" rail + keys 1–6) ─────────────────────────────────
+const tool = ref(null)
+const toolDef = computed(() => timelineTool(tool.value))
+const nameBubble = ref(null) // { mode, x, y, year, title, value, color, … }
+const bubbleInputEl = ref(null)
+const linkAnchor = ref(null) // { id, year } — link tool's first life
+const linkPick = ref(null) // { a, ay, b, year, x, y } — choosing the bond
+const retimeHover = ref(false)
+const handleDragging = ref(false)
+let fx = null
+
+function pickTool(m) {
+  setTool(tool.value === m.id ? null : m.id)
+}
+function setTool(id) {
+  tool.value = id
+  nameBubble.value = null
+  linkAnchor.value = null
+  linkPick.value = null
+  retimeHover.value = false
+  fx?.setGhost(null)
+  if (id) {
+    chronTip.value = null
+    mEdit.value = null
+  }
+}
+const hudHint = computed(() => {
+  const t = toolDef.value
+  if (!t) return ''
+  if (t.id === 'link' && linkPick.value) return 'Pick what binds them (⇄ flips the direction)'
+  if (t.id === 'link' && linkAnchor.value)
+    return `Now click the life ${shortName(linkAnchor.value.id)} is bound to — at the year it began`
+  return t.hint
+})
+const yearY = (y) => (renderer ? renderer.sy(y) : 0)
+
+// Ghost previews under the cursor for the live tool (drawn on the FX layer).
+function toolGhost(p) {
+  if (!fx || !renderer) return
+  const t = toolDef.value
+  if (!t || drag || nameBubble.value || linkPick.value) return
+  if (p.x < GUTTER) {
+    fx.setGhost(null)
+    retimeHover.value = false
+    return
+  }
+  const c = t.color
+  const year = Math.round(yearAtY(p.y))
+  const person = livePersonAt(p)
+  const g = []
+  switch (t.id) {
+    case 'add':
+      g.push({ kind: 'yearline', y: yearY(year), label: `✚ born ${year}`, color: c, x0: GUTTER })
+      g.push({ kind: 'ring', x: p.x, y: yearY(year), r: 15, color: c })
+      break
+    case 'child': {
+      if (person) {
+        const s = renderer.personScreen(person.id)
+        const y = Math.max(year, Math.ceil(person.birthYear))
+        g.push({ kind: 'yearline', y: yearY(y), label: `👶 born ${y}`, color: c, x0: GUTTER })
+        if (s) g.push({ kind: 'ring', x: s.x, y: yearY(y), r: 11, color: c })
+      }
+      break
+    }
+    case 'link': {
+      if (linkAnchor.value) {
+        const a = renderer.personScreen(linkAnchor.value.id)
+        const b = person ? renderer.personScreen(person.id) : null
+        if (a) {
+          g.push({
+            kind: 'line',
+            x1: a.x,
+            y1: yearY(linkAnchor.value.year),
+            x2: b ? b.x : p.x,
+            y2: p.y,
+            color: c
+          })
+        }
+      }
+      if (person) {
+        const s = renderer.personScreen(person.id)
+        if (s) g.push({ kind: 'ring', x: s.x, y: p.y, r: 10, color: c })
+        g.push({ kind: 'yearline', y: yearY(year), label: String(year), color: c, x0: GUTTER })
+      }
+      break
+    }
+    case 'event':
+      g.push({ kind: 'yearline', y: yearY(year), label: `✦ ${year}`, color: c, x0: GUTTER })
+      break
+    case 'retime': {
+      const h = retimeTarget(p)
+      retimeHover.value = !!h
+      if (h) {
+        g.push({ kind: 'handle', x: h.x, y: h.y, color: c })
+        g.push({ kind: 'bubble', x: h.x, y: h.y - 16, text: h.label, color: c })
+      }
+      break
+    }
+    case 'delete': {
+      const d = deleteTarget(p)
+      if (d) g.push(d.ghost)
+      break
+    }
+  }
+  fx.setGhost(g)
+}
+
+function onToolClick(p) {
+  if (nameBubble.value) {
+    commitBubble(!!nameBubble.value.value.trim())
+    return
+  }
+  if (linkPick.value) {
+    linkPick.value = null
+    return
+  }
+  if (p.x < GUTTER) return
+  const t = toolDef.value
+  const year = Math.round(yearAtY(p.y))
+  const person = livePersonAt(p)
+  switch (t?.id) {
+    case 'add':
+      openBubble({
+        mode: 'add',
+        x: p.x,
+        y: yearY(year),
+        year,
+        worldX: (p.x - tx.value) / laneScale.value,
+        title: `✚ A new life · born ${year}`,
+        color: t.color,
+        coParents: []
+      })
+      break
+    case 'child': {
+      if (!person) {
+        fx?.ripple(p.x, p.y, cssVar('--danger', '#ef5350'))
+        return
+      }
+      const y = Math.max(year, Math.ceil(person.birthYear))
+      const s = renderer.personScreen(person.id)
+      const coParents = partnersOf(person.id, y)
+      openBubble({
+        mode: 'child',
+        parentId: person.id,
+        x: s ? s.x : p.x,
+        y: yearY(y),
+        year: y,
+        title: `👶 ${shortName(person.id)}'s child · born ${y}`,
+        color: t.color,
+        coParents,
+        coParentId: coParents.find((c) => c.likely)?.id || null
+      })
+      break
+    }
+    case 'link':
+      if (!person) {
+        linkAnchor.value = null
+        return
+      }
+      if (!linkAnchor.value) {
+        linkAnchor.value = { id: person.id, year }
+        fx?.ripple(renderer.personScreen(person.id)?.x ?? p.x, yearY(year), t.color)
+      } else if (linkAnchor.value.id === person.id) {
+        linkAnchor.value = null
+      } else {
+        linkPick.value = {
+          a: linkAnchor.value.id,
+          ay: linkAnchor.value.year,
+          b: person.id,
+          year,
+          x: Math.min(Math.max(160, p.x), stageW.value - 170),
+          // Open upward in the lower half so it never covers the tool HUD.
+          y: p.y > stageH.value * 0.5 ? p.y - 18 : p.y + 18,
+          up: p.y > stageH.value * 0.5
+        }
+        fx?.setGhost(null)
+      }
+      break
+    case 'delete': {
+      const d = deleteTarget(p)
+      if (d) d.run()
+      break
+    }
+  }
+}
+
+// ── Add / Child: the christening bubble ─────────────────────────────────────
+function openBubble(b) {
+  nameBubble.value = { value: '', ...b }
+  fx?.setGhost([
+    { kind: 'yearline', y: b.y, label: String(b.year), color: b.color, x0: GUTTER },
+    { kind: 'ring', x: b.x, y: b.y, r: 15, color: b.color }
+  ])
+  nextTick(() => bubbleInputEl.value?.focus())
+}
+/** Spouses/partners of a parent, the one married at that year flagged likely. */
+function partnersOf(id, year) {
+  const out = []
+  for (const r of store.relationships) {
+    if (store.relTypeRoles.get(r.type) !== 'horizontal') continue
+    const other = r.person_a_id === id ? r.person_b_id : r.person_b_id === id ? r.person_a_id : null
+    if (!other || out.some((o) => o.id === other)) continue
+    const p = personById.value.get(other)
+    if (!p) continue
+    const from = toOrdinal(r.formed)
+    const ended = toOrdinal(r.ended)
+    const likely =
+      r.status !== 'divorced' && (from == null || from <= year) && (ended == null || ended >= year)
+    out.push({
+      id: other,
+      name: (p.name || 'Unnamed').split(/\s+/)[0],
+      color: genderColor(p.gender),
+      likely
+    })
+  }
+  return out.sort((a, b) => b.likely - a.likely).slice(0, 4)
+}
+function toggleCoParent(id) {
+  const b = nameBubble.value
+  if (b) b.coParentId = b.coParentId === id ? null : id
+}
+async function commitBubble(ok) {
+  const b = nameBubble.value
+  nameBubble.value = null
+  fx?.setGhost(null)
+  if (!ok || !b) return
+  pendingLane = {
+    before: new Set(store.persons.map((p) => p.id)),
+    opts: b.mode === 'child' ? { afterId: b.parentId } : { worldX: b.worldX }
+  }
+  const res = await store.createPerson({ name: b.value.trim(), birth: yearDate(b.year) })
+  pendingLane = null
+  if (!res?.success) return
+  const id = res.data.id
+  fx?.birth(id, b.color)
+  if (b.mode === 'child') {
+    for (const pid of [b.parentId, b.coParentId].filter(Boolean)) {
+      const r = await store.createRelationship({
+        person_a_id: pid,
+        person_b_id: id,
+        type: 'parent_child'
+      })
+      if (r?.success) fx?.spark({ id: pid, year: b.year }, { id }, b.color)
+    }
+  }
+  store.selectPerson(id, { modal: false })
+}
+
+// ── Link: choose the bond ───────────────────────────────────────────────────
+const linkTypes = computed(() =>
+  store.caps.relTypePicker ? store.relTypes : store.relTypes.filter((d) => d.band === 'family')
+)
+function relColor(d) {
+  const gs = store.graphSettings
+  if (d.color) return d.color
+  if (d.key === 'spouse') return gs.spouseColor
+  if (d.key === 'parent_child') return gs.parentChildColor
+  if (d.key === 'adopted') return gs.adoptedColor || gs.parentChildColor
+  return cssVar('--accent')
+}
+function swapLink() {
+  const L = linkPick.value
+  if (L) linkPick.value = { ...L, a: L.b, b: L.a, ay: L.year, year: L.ay }
+}
+async function commitLink(d) {
+  const L = linkPick.value
+  linkPick.value = null
+  linkAnchor.value = null
+  if (!L) return
+  const data = { person_a_id: L.a, person_b_id: L.b, type: d.key }
+  if (d.symmetryRole === 'horizontal') data.formed = yearDate(L.year)
+  const res = await store.createRelationship(data)
+  if (!res?.success) {
+    toast(res?.error || 'Could not link them', { tone: 'warning' })
+    return
+  }
+  fx?.spark({ id: L.a, year: L.ay }, { id: L.b, year: L.year }, relColor(d))
+  undoToast(`${d.glyph} ${shortName(L.a)} & ${shortName(L.b)} — ${d.label}`, 'relationships:create')
+}
+
+// ── Delete: lives, marriages, events ────────────────────────────────────────
+function deleteTarget(p) {
+  const danger = cssVar('--danger', '#ef5350')
+  const badge = renderer.badgeAt(p.x, p.y)
+  if (badge) {
+    return {
+      ghost: { kind: 'glowRect', x: badge.x, y: badge.y, w: badge.w, h: badge.h, color: danger },
+      run: () => deleteMarriage(badge.m, badge)
+    }
+  }
+  const ch = renderer.chronicleAt(p.x, p.y)
+  if (ch?.kind === 'event') {
+    return {
+      ghost: { kind: 'glowRect', x: ch.x, y: ch.y, w: ch.w, h: ch.h, color: danger },
+      run: () => deleteEventItem(ch.id, ch)
+    }
+  }
+  const person = livePersonAt(p)
+  if (person) {
+    const s = renderer.personScreen(person.id)
+    if (!s) return null
+    return {
+      ghost: { kind: 'glowLife', x: s.x, y0: s.y0, y1: s.y1, color: danger },
+      run: () => deleteLife(person.id)
+    }
+  }
+  return null
+}
+async function deleteLife(id) {
+  const rec = personById.value.get(id)
+  const name = rec?.name || 'Unnamed'
+  const ok = await confirmDialog({
+    title: tr('confirm.deletePerson', { name }),
+    message: tr('confirm.deletePersonBody') + ' ' + tr('dialog.undoHint'),
+    tone: 'danger'
+  })
+  if (!ok) return
+  const s = renderer?.personScreen(id)
+  const res = await store.deletePerson(id)
+  if (!res?.success) return
+  fx?.setGhost(null)
+  if (s) fx?.dissolve(s.x, s.y0, s.y1, genderColor(rec?.gender))
+  undoToast(tr('toasts.deletedPerson', { name }), 'persons:delete')
+}
+async function deleteMarriage(m, rect) {
+  const ok = await confirmDialog({
+    title: `Remove the marriage of ${m.names}?`,
+    message: 'Both lives stay — only the bond goes. ' + tr('dialog.undoHint'),
+    tone: 'danger'
+  })
+  if (!ok) return
+  const res = await store.deleteRelationship(m.id)
+  if (!res?.success) return
+  fx?.setGhost(null)
+  fx?.ripple(rect.x + rect.w / 2, rect.y + rect.h / 2, cssVar('--danger', '#ef5350'))
+  undoToast('Marriage removed', 'relationships:delete')
+}
+async function deleteEventItem(id, rect) {
+  const ev = store.events.find((e) => e.id === id)
+  if (!ev) return
+  const ok = await confirmDialog({
+    title: `Delete “${ev.title}”?`,
+    message: tr('dialog.undoHint'),
+    tone: 'danger'
+  })
+  if (!ok) return
+  const res = await store.deleteEvent(id)
+  if (!res?.success) return
+  fx?.setGhost(null)
+  fx?.ripple(rect.x + 10, rect.y + rect.h / 2, cssVar('--danger', '#ef5350'))
+  undoToast(`Deleted “${ev.title}”`, 'events:delete')
+}
+
+// ── Retime: drag births, deaths, whole lives, marriages and events ──────────
+function retimeTarget(p) {
+  const badge = renderer.badgeAt(p.x, p.y)
+  if (badge) {
+    const m = badge.m
+    return {
+      kind: 'marriage',
+      m,
+      x: badge.x + badge.w / 2,
+      y: badge.y + badge.h / 2,
+      year: m.year,
+      label: m.realYear ? `⚭ ${m.realYear}` : '⚭ drag to date it'
+    }
+  }
+  const ch = renderer.chronicleAt(p.x, p.y)
+  if (ch?.kind === 'event') {
+    const ev = store.events.find((e) => e.id === ch.id)
+    const y0 = toOrdinal(ev?.date)
+    if (ev && y0 != null) {
+      return {
+        kind: 'event',
+        ev,
+        x: ch.x + ch.h / 2,
+        y: ch.y + ch.h / 2,
+        year: y0,
+        label: `✦ ${fmtDate(ev.date)}`
+      }
+    }
+  }
+  const person = livePersonAt(p)
+  if (!person) return null
+  const s = renderer.personScreen(person.id)
+  if (!s) return null
+  if (Math.abs(p.y - s.y0) <= 16)
+    return {
+      kind: 'birth',
+      person,
+      x: s.x,
+      y: s.y0,
+      year: person.birthYear,
+      label: `born ${Math.floor(person.birthYear)}`
+    }
+  if (Math.abs(p.y - s.y1) <= 12)
+    return {
+      kind: 'death',
+      person,
+      x: s.x,
+      y: s.y1,
+      year: person.endYear,
+      label: person.dead ? `died ${Math.floor(person.endYear)}` : 'drag up to end this life'
+    }
+  return {
+    kind: 'life',
+    person,
+    x: s.x,
+    y: p.y,
+    year: yearAtY(p.y),
+    label: '⇕ shift the whole life'
+  }
+}
+
+let drag = null // { kind: 'retime' | 'span', start, last, moved, h? }
+function startDrag(kind, p, data, e) {
+  e?.preventDefault() // no text selection while dragging a handle / span
+  drag = { kind, start: p, last: p, moved: false, ...data }
+  handleDragging.value = kind === 'retime'
+  cancelTween()
+  chronTip.value = null
+  window.addEventListener('pointermove', onDragMove)
+  window.addEventListener('pointerup', onDragUp)
+  if (kind === 'span') spanGhost()
+  else retimeGhost()
+}
+function onDragMove(e) {
+  if (!drag || !stageEl.value) return
+  const p = stagePoint(e)
+  drag.last = p
+  if (!drag.moved && Math.hypot(p.x - drag.start.x, p.y - drag.start.y) > 4) drag.moved = true
+  if (drag.kind === 'span') spanGhost()
+  else retimeGhost()
+}
+function onDragUp() {
+  window.removeEventListener('pointermove', onDragMove)
+  window.removeEventListener('pointerup', onDragUp)
+  const d = drag
+  drag = null
+  handleDragging.value = false
+  // The click that follows this pointerup belongs to the drag.
+  suppressClick = true
+  setTimeout(() => (suppressClick = false), 0)
+  if (!d) return
+  if (d.kind === 'span') finishSpan(d)
+  else finishRetime(d)
+}
+function cancelDrag() {
+  window.removeEventListener('pointermove', onDragMove)
+  window.removeEventListener('pointerup', onDragUp)
+  drag = null
+  handleDragging.value = false
+  fx?.setGhost(null)
+}
+
+/** Years the drag has moved (rounded) and the retimed values it implies. */
+function retimeResult(d) {
+  const h = d.h
+  const delta = Math.round((d.last.y - d.start.y) / pxPerYear.value)
+  const rec = h.person ? personById.value.get(h.person.id) : null
+  const b0 = rec?.birth?.year ?? null
+  const d0 = rec?.death?.year ?? null
+  switch (h.kind) {
+    case 'birth': {
+      const end = d0 ?? refYear.value
+      const year = clampRetime('birth', (b0 ?? Math.round(h.year)) + delta, { end })
+      return { year, changes: { birth: year }, changed: year !== b0 }
+    }
+    case 'death': {
+      const base = d0 ?? refYear.value
+      const year = clampRetime('death', base + delta, { birth: b0 })
+      const living = d0 == null && year >= refYear.value
+      return { year, living, changes: { death: year }, changed: !living && year !== d0 }
+    }
+    case 'life':
+      return {
+        delta,
+        changes: { birth: b0 + delta, death: d0 == null ? undefined : d0 + delta },
+        changed: delta !== 0 && b0 != null
+      }
+    case 'marriage': {
+      const year = Math.round(h.year) + delta
+      return { year, changed: year !== h.m.realYear }
+    }
+    case 'event':
+      return { delta, year: Math.floor(h.year) + delta, changed: delta !== 0 }
+  }
+  return { changed: false }
+}
+function retimeGhost() {
+  const d = drag
+  if (!d || !fx) return
+  const h = d.h
+  const c = toolDef.value?.color || cssVar('--accent')
+  const r = retimeResult(d)
+  const sign = (n) => (n > 0 ? `+${n}` : String(n))
+  const g = []
+  if (h.person) {
+    const s = renderer.personScreen(h.person.id)
+    if (!s) return
+    const dy = (r.delta ?? 0) * pxPerYear.value
+    let y0 = s.y0,
+      y1 = s.y1,
+      hy = d.last.y,
+      text = ''
+    if (h.kind === 'birth') {
+      y0 = yearY(r.year)
+      hy = y0
+      text = `born ${r.year}`
+    } else if (h.kind === 'death') {
+      y1 = r.living ? yearY(refYear.value) : yearY(r.year)
+      hy = y1
+      text = r.living ? 'still living' : `died ${r.year}`
+    } else {
+      y0 += dy
+      y1 += dy
+      const b = personById.value.get(h.person.id)
+      text = `${(b?.birth?.year ?? 0) + r.delta}–${b?.death?.year != null ? b.death.year + r.delta : 'now'} (${sign(r.delta)})`
+    }
+    g.push({ kind: 'life', x: s.x, y0, y1, color: c })
+    g.push({ kind: 'yearline', y: hy, label: text, color: c, x0: GUTTER })
+    g.push({ kind: 'handle', x: s.x, y: hy, color: c, active: true })
+  } else if (h.kind === 'marriage') {
+    const y = yearY(r.year)
+    g.push({ kind: 'yearline', y, label: `⚭ ${r.year}`, color: c, x0: GUTTER })
+    g.push({ kind: 'handle', x: h.x, y, color: c, active: true })
+  } else if (h.kind === 'event') {
+    const y = yearY(r.year)
+    const end = toOrdinal(h.ev.end)
+    if (end != null) {
+      g.push({
+        kind: 'span',
+        x: h.x - 14,
+        y0: y,
+        y1: yearY(Math.floor(end) + r.delta),
+        color: c,
+        a: String(r.year),
+        b: String(Math.floor(end) + r.delta),
+        x0: GUTTER
+      })
+    } else g.push({ kind: 'yearline', y, label: `✦ ${r.year}`, color: c, x0: GUTTER })
+    g.push({ kind: 'handle', x: h.x, y, color: c, active: true })
+  }
+  fx.setGhost(g)
+}
+async function finishRetime(d) {
+  fx?.setGhost(null)
+  if (!d.moved) return
+  const r = retimeResult(d)
+  if (!r.changed) return
+  const h = d.h
+  const c = toolDef.value?.color || cssVar('--accent')
+  let res = null,
+    channel = '',
+    msg = ''
+  if (h.person) {
+    res = await retimePerson(h.person.id, r.changes)
+    channel = 'fields:setValues'
+    const name = shortName(h.person.id)
+    msg =
+      h.kind === 'birth'
+        ? `${name} is now born in ${r.year}`
+        : h.kind === 'death'
+          ? `${name} now dies in ${r.year}`
+          : `${name}'s life moved ${r.delta > 0 ? 'later' : 'earlier'} by ${Math.abs(r.delta)} yr`
+  } else if (h.kind === 'marriage') {
+    const rel = store.relationships.find((x) => x.id === h.m.id)
+    const formed = rel?.formed ? { ...rel.formed, year: r.year } : yearDate(r.year)
+    res = await store.updateRelationship({ id: h.m.id, formed })
+    channel = 'relationships:update'
+    msg = `Married in ${r.year}`
+  } else if (h.kind === 'event') {
+    const shift = (v) => (v ? { ...v, year: v.year + r.delta } : null)
+    res = await store.saveEvent({ id: h.ev.id, date: shift(h.ev.date), end: shift(h.ev.end) })
+    channel = 'events:save'
+    msg = `“${h.ev.title}” moved to ${r.year}`
+  }
+  if (!res?.success) return
+  fx?.ripple(d.last.x, d.last.y, c)
+  undoToast(msg, channel)
+}
+/** Write birth/death years through whichever traits fill those slots. */
+async function retimePerson(id, changes) {
+  const values = []
+  for (const [slot, year] of Object.entries(changes)) {
+    if (year === undefined || year === null) continue
+    const def = store.fieldDefs.find((x) => x.slot === slot)
+    if (!def) continue
+    const cur = store.fieldValuesOf.get(id)?.get(def.id)?.value ?? null
+    const value = retimeSlotValue(def, cur, year)
+    if (value === undefined) {
+      toast('That date uses a calendar the timeline can’t move yet', { tone: 'warning' })
+      return null
+    }
+    values.push({ field_id: def.id, value })
+  }
+  if (!values.length) return null
+  return store.setFieldValues(id, JSON.parse(JSON.stringify(values)))
+}
+
+// ── Event: click = a moment, drag = a span ──────────────────────────────────
+function spanGhost() {
+  const d = drag
+  if (!d || !fx) return
+  const c = toolDef.value?.color || cssVar('--accent')
+  const sp = spanFromDrag(yearAtY(d.start.y), yearAtY(d.last.y))
+  if (!d.moved || sp.end == null) {
+    fx.setGhost([
+      { kind: 'yearline', y: yearY(sp.start), label: `✦ ${sp.start}`, color: c, x0: GUTTER }
+    ])
+  } else {
+    fx.setGhost([
+      {
+        kind: 'span',
+        x: d.start.x,
+        y0: yearY(sp.start),
+        y1: yearY(sp.end),
+        color: c,
+        a: `✦ ${sp.start}`,
+        b: String(sp.end),
+        x0: GUTTER
+      }
+    ])
+  }
+}
+function finishSpan(d) {
+  fx?.setGhost(null)
+  const sp = d.moved
+    ? spanFromDrag(yearAtY(d.start.y), yearAtY(d.last.y))
+    : spanFromDrag(yearAtY(d.start.y), yearAtY(d.start.y))
+  const person = livePersonAt(d.start)
+  fx?.ripple(d.start.x, yearY(sp.start), toolDef.value?.color || cssVar('--accent'))
+  store.openEventEditor({
+    date: yearDate(sp.start),
+    end: sp.end != null ? yearDate(sp.end) : null,
+    person_ids: person ? [person.id] : []
+  })
+}
+
+// ── Keys: Esc peels one layer at a time; 1–6 pick tools ─────────────────────
+// Capture phase, so a consumed Esc never also reaches the global handlers.
+function onToolKeydown(e) {
+  if (!props.active || store.activeView !== 'timeline') return
+  if (store.modalOpen || store.formOpen || store.chronicleEditor) return
+  if (document.querySelector('.dh-backdrop')) return // a confirm dialog owns the keys
+  if (e.key === 'Escape') {
+    let consumed = true
+    if (quizOpen.value) quizOpen.value = false
+    else if (mEdit.value) mEdit.value = null
+    else if (nameBubble.value) commitBubble(false)
+    else if (drag) cancelDrag()
+    else if (linkPick.value) linkPick.value = null
+    else if (linkAnchor.value) linkAnchor.value = null
+    else if (tool.value) setTool(null)
+    else if (pathInfo.value || pathAnchor.value) clearPath()
+    else if (kinLensOn.value) kinLensOn.value = false
+    else if (store.relPopup) store.relPopup = null
+    else if (store.selectedPersonIds.length) store.selectPerson(null, { modal: false })
+    else consumed = false
+    if (consumed) {
+      e.preventDefault()
+      e.stopImmediatePropagation()
+    }
+    return
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return
+  if (isTypingTarget(e.target) || isTypingTarget(document.activeElement)) return
+  const t = TIMELINE_TOOLS.find((x) => x.key === e.key)
+  if (t) {
+    e.preventDefault()
+    setTool(tool.value === t.id ? null : t.id)
+  }
+}
+
+function syncFxTheme() {
+  fx?.setTheme(store.isLightTheme, {
+    surface: cssVar('--surface', '#181c27'),
+    text: cssVar('--t1', '#e8eaf6')
+  })
+}
+
 // ── Lifecycle ───────────────────────────────────────────────────────────────
 let ro = null
 let hasFitted = false
@@ -875,6 +2212,7 @@ onMounted(() => {
     stageW.value = stageEl.value?.clientWidth || 0
     stageH.value = stageEl.value?.clientHeight || 0
     renderer?.resize(stageW.value, stageH.value)
+    fx?.resize(stageW.value, stageH.value)
   }
   renderer = new TimelineRenderer({
     bgCanvas: bgEl.value,
@@ -885,10 +2223,25 @@ onMounted(() => {
       marriageVisual,
       birthVisual,
       getRefYear: () => refYear.value,
-      getTimeYear: () => tt.year.value // null = time travel off
+      getTimeYear: () => tt.year.value, // null = time travel off
+      getChronicle: () => ({
+        ...chronModel.value,
+        hover: chronHover.value,
+        eraIntensity: store.timelineSettings.eraIntensity,
+        markers: store.timelineSettings.eventMarkers
+      }),
+      getStyle: () => store.timelineSettings,
+      getOverlay: () => ({ kin: kinOverlay() })
     }
   })
-  renderer.setTheme(store.theme === 'light')
+  fx = new TimelineFx(fxEl.value, {
+    person: (id) => renderer?.personScreen(id) || null,
+    yearY: (y) => (renderer ? renderer.sy(y) : 0)
+  })
+  syncFxTheme()
+  renderer.setTheme(store.isLightTheme)
+  renderer.setInk(store.isInk)
+  renderer.setHidden(!props.active)
   renderer.setData(layout.value)
   measure()
   nextTick(() => {
@@ -911,6 +2264,12 @@ onMounted(() => {
   window.addEventListener('keydown', onStretchKeyDown)
   window.addEventListener('keyup', onStretchKeyUp)
   window.addEventListener('blur', clearStretchKeys)
+  window.addEventListener('keydown', onToolKeydown, true)
+
+  watch(
+    () => props.active,
+    (on) => renderer?.setHidden(!on)
+  )
 
   // Coming back into view: fit once (first reveal), otherwise keep the user's
   // pan/zoom and just re-sync to the current stage size.
@@ -928,6 +2287,8 @@ onMounted(() => {
           clampPan()
           syncCamera()
         }
+        // 水墨: the sheet is brushed in afresh each time the view is entered
+        if (store.isInk) renderer?.inkWrite()
       })
     }
   )
@@ -942,18 +2303,40 @@ watch(layout, (L) => {
     syncCamera()
   })
 })
-watch([hoverId, searchSet, () => store.selectedPersonId, colors, focusGender, focusLife], () =>
-  renderer?.markStylesDirty()
+watch(
+  [
+    hoverId,
+    searchSet,
+    () => store.selectedPersonId,
+    selectedSet,
+    colors,
+    focusGender,
+    focusLife,
+    linkAnchor,
+    pathAnchor
+  ],
+  () => renderer?.markStylesDirty()
+)
+// Style pane edits: every look/canvas option re-renders (one shallow watch —
+// updateTimelineSetting replaces the object).
+watch(
+  () => store.timelineSettings,
+  () => {
+    renderer?.markAllDirty()
+    renderer?.requestRedraw()
+  }
 )
 // Time travel: re-sync per scrub/playback step while on screen; switching back
 // in re-syncs too (the view stays mounted, hidden, and time may have moved).
 watch([() => tt.year.value, () => tt.startYear.value, () => props.active], ([, , on]) => {
   if (on) renderer?.markStylesDirty()
 })
-watch(
-  () => store.theme,
-  () => renderer?.setTheme(store.theme === 'light')
-)
+function syncTheme() {
+  renderer?.setTheme(store.isLightTheme)
+  renderer?.setInk(store.isInk)
+  syncFxTheme()
+}
+watch([() => store.theme, () => store.accent], syncTheme)
 
 onBeforeUnmount(() => {
   if (ro) ro.disconnect()
@@ -964,6 +2347,11 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onStretchKeyDown)
   window.removeEventListener('keyup', onStretchKeyUp)
   window.removeEventListener('blur', clearStretchKeys)
+  window.removeEventListener('keydown', onToolKeydown, true)
+  window.removeEventListener('pointermove', onDragMove)
+  window.removeEventListener('pointerup', onDragUp)
+  fx?.dispose()
+  fx = null
   renderer?.dispose()
   renderer = null
 })
@@ -1056,6 +2444,20 @@ onBeforeUnmount(() => {
 .tl-stage.dragging {
   cursor: grabbing;
 }
+/* 水墨: the timeline is a sheet of rice paper (the canvases are transparent) */
+:root[data-theme='ink'] .timeline-view {
+  background: var(--bg);
+}
+:root[data-theme='ink'] .tl-stage {
+  background-color: var(--bg);
+  background-image: var(--ink-paper, none);
+  background-size: 512px 512px;
+}
+:root[data-theme='ink'] .tl-title {
+  font-family: var(--font-brush);
+  font-weight: 400;
+  font-size: 22px;
+}
 .tl-stage.hoverable:not(.dragging) {
   cursor: pointer;
 }
@@ -1065,6 +2467,366 @@ onBeforeUnmount(() => {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* Interaction effects (ghosts, bursts, traced chains) ride above the labels. */
+.tl-fx {
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Edit tools: each one has its own cursor. */
+.tl-stage.tool-add,
+.tl-stage.tool-child,
+.tl-stage.tool-link,
+.tl-stage.tool-event {
+  cursor: crosshair;
+}
+.tl-stage.tool-delete {
+  cursor: not-allowed;
+}
+.tl-stage.tool-delete.hoverable {
+  cursor: pointer;
+}
+.tl-stage.tool-retime.tool-grab {
+  cursor: ns-resize;
+}
+.tl-stage.tool-grabbing,
+.tl-stage.tool-grabbing * {
+  cursor: grabbing !important;
+}
+
+/* Tool HUD: the floating chip naming the live tool (matches the graph's). */
+.tl-hud {
+  --mc: var(--accent);
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px 7px 8px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid color-mix(in srgb, var(--mc) 35%, var(--border));
+  border-radius: 999px;
+  box-shadow:
+    var(--shadow),
+    0 0 18px color-mix(in srgb, var(--mc) 16%, transparent);
+}
+.tl-hud-badge {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--mc) 16%, transparent);
+  flex-shrink: 0;
+}
+.tl-hud-ic {
+  font-size: 14px;
+  line-height: 1;
+}
+/* A comet orbiting the badge — "this tool is live". */
+.tl-hud-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0 68%,
+    color-mix(in srgb, var(--mc) 90%, transparent) 90%,
+    transparent 100%
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 2.5px),
+    #000 calc(100% - 2px)
+  );
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+  animation: tl-hud-orbit 2.4s linear infinite;
+}
+@keyframes tl-hud-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.tl-hud-text {
+  min-width: 0;
+  padding-right: 2px;
+}
+.tl-hud-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--t1);
+  white-space: nowrap;
+}
+.tl-hud-label kbd {
+  font-size: 9.5px;
+  padding: 0 5px;
+}
+.tl-hud-hint {
+  font-size: 10.5px;
+  color: var(--t3);
+  white-space: nowrap;
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tl-hud-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--t3);
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background var(--dur) ease,
+    color var(--dur) ease,
+    transform 0.18s var(--ease-spring);
+}
+.tl-hud-btn:hover {
+  background: var(--hover);
+  color: var(--t1);
+  transform: scale(1.08);
+}
+.tlhud-enter-active {
+  transition:
+    opacity 0.24s ease,
+    transform 0.38s cubic-bezier(0.22, 1.3, 0.36, 1),
+    filter 0.24s ease;
+}
+.tlhud-leave-active {
+  transition:
+    opacity 0.16s ease,
+    transform 0.18s ease;
+}
+.tlhud-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(14px) scale(0.9);
+  filter: blur(4px);
+}
+.tlhud-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px) scale(0.95);
+}
+
+/* Christening bubble: name the life you just placed. */
+.tl-bubble {
+  --mc: var(--accent);
+  position: absolute;
+  z-index: 21;
+  width: 236px;
+  transform: translate(-50%, calc(-100% - 30px));
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px 10px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid color-mix(in srgb, var(--mc) 50%, var(--border));
+  border-radius: 14px;
+  box-shadow:
+    var(--shadow),
+    0 0 26px color-mix(in srgb, var(--mc) 22%, transparent);
+  animation: tl-bubble-in 0.36s cubic-bezier(0.34, 1.4, 0.5, 1) backwards;
+}
+.tl-bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 10px;
+  height: 10px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--glass-strong);
+  border-right: 1px solid color-mix(in srgb, var(--mc) 50%, var(--border));
+  border-bottom: 1px solid color-mix(in srgb, var(--mc) 50%, var(--border));
+}
+@keyframes tl-bubble-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 16px)) scale(0.82);
+  }
+}
+.tl-bubble-head {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--mc);
+}
+.tl-bubble-input {
+  width: 100%;
+  height: 30px;
+  padding: 0 9px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 650;
+  outline: none;
+  transition:
+    border-color var(--dur) ease,
+    box-shadow var(--dur) ease;
+}
+.tl-bubble-input:focus {
+  border-color: var(--mc);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mc) 22%, transparent);
+}
+.tl-bubble-co {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tl-bubble-co-label {
+  font-size: 10.5px;
+  color: var(--t3);
+  margin-right: 2px;
+}
+.tl-co-chip {
+  --pc: var(--accent);
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--pc) 40%, var(--border));
+  background: transparent;
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    background var(--dur) ease,
+    color var(--dur) ease;
+}
+.tl-co-chip.on {
+  background: color-mix(in srgb, var(--pc) 22%, transparent);
+  color: var(--t1);
+  border-color: var(--pc);
+}
+.tl-bubble-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* Link chooser: what binds the two lives. */
+.tl-linkpick {
+  position: absolute;
+  z-index: 21;
+  width: 300px;
+  transform: translateX(-50%);
+  padding: 10px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  animation: tl-lp-in 0.32s cubic-bezier(0.34, 1.4, 0.5, 1) backwards;
+}
+.tl-linkpick.up {
+  transform: translate(-50%, -100%);
+  animation-name: tl-lp-in-up;
+}
+@keyframes tl-lp-in-up {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -100%) translateY(8px) scale(0.9);
+  }
+}
+@keyframes tl-lp-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.9);
+  }
+}
+.tl-lp-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  margin-bottom: 8px;
+}
+.tl-lp-swap {
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--t2);
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: transform 0.3s var(--ease-spring);
+}
+.tl-lp-swap:hover {
+  transform: rotate(180deg);
+  color: var(--t1);
+}
+.tl-lp-year {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--t3);
+}
+.tl-lp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.tl-lp-chip {
+  --rc: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 7px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--rc) 45%, var(--border));
+  background: color-mix(in srgb, var(--rc) 10%, transparent);
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 650;
+  cursor: pointer;
+  animation: cp-row-in 0.36s var(--ease-out) backwards;
+  animation-delay: calc(var(--i) * 0.025s);
+  transition:
+    transform 0.18s var(--ease-spring),
+    box-shadow var(--dur) ease,
+    background var(--dur) ease;
+}
+.tl-lp-chip:hover {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--rc) 22%, transparent);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--rc) 30%, transparent);
+}
+.tl-lp-glyph {
+  font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-hud-ring,
+  .tl-bubble,
+  .tl-linkpick,
+  .tl-lp-chip {
+    animation: none;
+  }
 }
 
 /* ── Floating search (tree-view style) ───────────────────── */
@@ -1096,7 +2858,7 @@ onBeforeUnmount(() => {
 }
 .tl-search:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(108, 142, 245, 0.15);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
 }
 .tl-search-icon {
   font-size: 13px;
@@ -1361,7 +3123,7 @@ onBeforeUnmount(() => {
 }
 .tl-medit-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(108, 142, 245, 0.15);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.15);
 }
 .tl-medit-select {
   flex: 1;
@@ -1448,5 +3210,82 @@ onBeforeUnmount(() => {
 .tl-empty-text {
   font-size: 13px;
   max-width: 300px;
+}
+
+/* ── Chronicle hover card ─────────────────────────────────────────────── */
+.tl-chtip {
+  --c: var(--accent);
+  position: absolute;
+  z-index: 9;
+  width: 250px;
+  padding: 9px 11px;
+  border-radius: var(--r-md);
+  background: var(--glass-soft);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid color-mix(in srgb, var(--c) 60%, var(--border));
+  box-shadow:
+    var(--shadow),
+    0 0 24px color-mix(in srgb, var(--c) 22%, transparent);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.tl-chtip-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--t1);
+}
+.tl-chtip-ic {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--c) 25%, transparent);
+  flex-shrink: 0;
+}
+.tl-chtip-when {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--c);
+}
+.tl-chtip-cast {
+  font-size: 11px;
+  color: var(--t2);
+}
+.tl-chtip-text {
+  font-size: 11.5px;
+  color: var(--t2);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tl-chtip-hint {
+  font-size: 9.5px;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 2px;
+}
+.chtip-enter-active {
+  transition:
+    opacity 0.16s ease,
+    transform 0.22s var(--ease-out);
+}
+.chtip-leave-active {
+  transition: opacity 0.1s ease;
+}
+.chtip-enter-from {
+  opacity: 0;
+  transform: translateY(4px) scale(0.97);
+}
+.chtip-leave-to {
+  opacity: 0;
 }
 </style>

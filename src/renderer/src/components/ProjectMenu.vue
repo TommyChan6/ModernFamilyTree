@@ -1,50 +1,76 @@
 <template>
   <div class="pmenu-wrap">
-    <button class="btn btn-ghost btn-sm pmenu-btn" :class="{ open }" @click.stop="open = !open">
-      Project ▾
-      <span v-if="store.hasUnsavedChanges" class="pmenu-dot" title="Unsaved changes"></span>
+    <button
+      class="btn btn-ghost btn-sm pmenu-btn"
+      :class="{ 'is-active': open }"
+      aria-haspopup="menu"
+      :aria-expanded="open"
+      @click.stop="open = !open"
+    >
+      {{ t('projectMenu.button') }}
+      <span class="pmenu-caret" :class="{ open }" aria-hidden="true">▾</span>
+      <span
+        v-if="store.hasUnsavedChanges"
+        class="pmenu-dot"
+        :title="t('projectMenu.unsavedDot')"
+      ></span>
     </button>
 
     <Transition name="pmenu">
-      <div v-if="open" class="pmenu" @click.stop>
+      <div v-if="open" class="pmenu ink-unroll" role="menu" @click.stop>
         <!-- Save model -->
         <button
           class="pmenu-item"
-          title="Commit a checkpoint you can revert to (Ctrl+S)"
+          role="menuitem"
+          :title="t('projectMenu.saveHint')"
           @click="emitAnd('save')"
         >
-          <span class="pmenu-icon">💾</span> Save
-          <span v-if="store.hasUnsavedChanges" class="pmenu-badge">unsaved</span>
+          <span class="pmenu-icon">💾</span> {{ t('projectMenu.save') }}
+          <span v-if="store.hasUnsavedChanges" class="pmenu-badge">{{
+            t('projectMenu.unsaved')
+          }}</span>
+          <kbd v-else class="pmenu-kbd">Ctrl S</kbd>
         </button>
         <button
           class="pmenu-item"
+          role="menuitem"
           :disabled="!store.hasUnsavedChanges"
-          title="Restore the arrangement saved by the last checkpoint"
+          :title="t('projectMenu.revertHint')"
           @click="emitAnd('revert')"
         >
-          <span class="pmenu-icon">↩</span> Revert to saved
+          <span class="pmenu-icon">↩</span> {{ t('projectMenu.revert') }}
         </button>
 
         <div class="pmenu-sep"></div>
 
-        <button class="pmenu-item" @click="emitAnd('export')">
-          <span class="pmenu-icon">⬆</span> Export JSON
+        <button
+          class="pmenu-item"
+          role="menuitem"
+          :title="t('projectMenu.exportHint')"
+          @click="emitAnd('export')"
+        >
+          <span class="pmenu-icon">⬆</span> {{ t('projectMenu.exportJson') }}
         </button>
-        <button class="pmenu-item" @click="emitAnd('import')">
-          <span class="pmenu-icon">⬇</span> Import JSON
+        <button
+          class="pmenu-item"
+          role="menuitem"
+          :title="t('projectMenu.importHint')"
+          @click="emitAnd('import')"
+        >
+          <span class="pmenu-icon">⬇</span> {{ t('projectMenu.importJson') }}
         </button>
 
         <div class="pmenu-sep"></div>
 
         <!-- Present (reference "now" date) -->
         <div class="pmenu-section">
-          <div class="pmenu-label">Present</div>
+          <div class="eyebrow pmenu-label">{{ t('projectMenu.present') }}</div>
           <div class="pmenu-date-row">
             <input
               type="number"
               class="pmenu-date-input"
               :value="store.currentDate?.year || ''"
-              placeholder="Enter year…"
+              :placeholder="t('projectMenu.presentPh')"
               min="1"
               max="2200"
               @change="store.setCurrentYear($event.target.value)"
@@ -52,14 +78,14 @@
             <button
               v-if="store.userCurrentYear"
               class="pmenu-date-clear"
-              title="Reset to latest year in data"
+              :title="t('projectMenu.presentReset')"
               @click="store.setCurrentYear('')"
             >
               ✕
             </button>
           </div>
           <div v-if="!store.userCurrentYear && store.currentDate" class="pmenu-hint">
-            Auto · latest year in data
+            {{ t('projectMenu.presentAuto') }}
           </div>
         </div>
 
@@ -67,18 +93,18 @@
 
         <!-- Statistics -->
         <div class="pmenu-section">
-          <div class="pmenu-label">Statistics</div>
-          <div class="pmenu-stat">
-            <span>Members</span><b>{{ store.personCount }}</b>
-          </div>
-          <div class="pmenu-stat">
-            <span>Relationships</span><b>{{ store.relationships.length }}</b>
-          </div>
-          <div class="pmenu-stat">
-            <span>Couples</span><b>{{ store.coupleCount }}</b>
-          </div>
-          <div class="pmenu-stat">
-            <span>Generations</span><b>{{ generationCount }}</b>
+          <div class="eyebrow pmenu-label">{{ t('projectMenu.stats') }}</div>
+          <div class="pmenu-stats">
+            <div
+              v-for="(s, i) in stats"
+              :key="s.key"
+              class="pmenu-stat"
+              :style="{ '--i': i }"
+              :title="s.hint || ''"
+            >
+              <b class="text-gradient">{{ s.value }}</b>
+              <span>{{ t('projectMenu.' + s.key) }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -89,11 +115,13 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMainStore } from '../store/index.js'
+import { useI18n } from '../i18n'
+import { generationCount } from './graph/graphInsights.js'
 
-// The Project ▾ dropdown in the top bar: Save/Revert, Export/Import, the
-// Current Date (Present) input and the project statistics — everything the
-// old left sidebar held besides navigation.
+// The Project ▾ dropdown in the top bar: Save/Revert, project file
+// Export/Import, the Current Date (Present) input and the project statistics.
 const store = useMainStore()
+const { t } = useI18n()
 const emit = defineEmits(['save', 'revert', 'export', 'import'])
 
 const open = ref(false)
@@ -103,17 +131,44 @@ function emitAnd(evt) {
   emit(evt)
 }
 
-const generationCount = computed(() => {
-  // Simple heuristic: number of distinct birth decade groups
-  const years = store.persons.filter((p) => p.birth?.year).map((p) => Math.floor(p.birth.year / 20))
-  return new Set(years).size || 0
+// Couples = every 'horizontal' (couple-role) bond, not just the builtin
+// 'spouse' type; generations = the longest vertical chain. Only evaluated
+// while the menu is open (the template reads them inside v-if).
+const stats = computed(() => {
+  const roleOf = (type) => store.relTypeRoles.get(type) ?? 'none'
+  return [
+    { key: 'members', value: store.personCount },
+    { key: 'relationships', value: store.relationships.length },
+    {
+      key: 'couples',
+      value: store.relationships.filter((r) => roleOf(r.type) === 'horizontal').length
+    },
+    {
+      key: 'generations',
+      value: generationCount(
+        store.persons.map((p) => p.id),
+        store.relationships,
+        roleOf
+      ),
+      hint: t('projectMenu.generationsHint')
+    }
+  ]
 })
 
 function onDocClick() {
   open.value = false
 }
-onMounted(() => document.addEventListener('click', onDocClick))
-onUnmounted(() => document.removeEventListener('click', onDocClick))
+function onKey(e) {
+  if (open.value && e.key === 'Escape') open.value = false
+}
+onMounted(() => {
+  document.addEventListener('click', onDocClick)
+  window.addEventListener('keydown', onKey)
+})
+onUnmounted(() => {
+  document.removeEventListener('click', onDocClick)
+  window.removeEventListener('keydown', onKey)
+})
 </script>
 
 <style scoped>
@@ -124,24 +179,33 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 .pmenu-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+}
+
+.pmenu-caret {
+  font-size: 10px;
+  opacity: 0.7;
+  transition: transform var(--dur-slow) var(--ease-spring);
+}
+.pmenu-caret.open {
+  transform: rotate(180deg);
 }
 
 .pmenu-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #f5a623;
+  background: var(--warning);
   animation: pmenu-pulse 2s ease-in-out infinite;
 }
 
 @keyframes pmenu-pulse {
   0%,
   100% {
-    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(245, 166, 35, 0.55);
   }
-  50% {
-    opacity: 0.4;
+  60% {
+    box-shadow: 0 0 0 5px rgba(245, 166, 35, 0);
   }
 }
 
@@ -149,13 +213,16 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  width: 240px;
-  background: var(--surface);
+  width: 256px;
+  background: var(--glass-soft);
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
   padding: 6px;
   z-index: 60;
+  transform-origin: top left;
 }
 
 .pmenu-item {
@@ -165,7 +232,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
   width: 100%;
   padding: 8px 10px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--t2);
   font-size: 13px;
@@ -174,18 +241,19 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
   cursor: pointer;
   text-align: left;
   transition:
-    background 0.12s,
-    color 0.12s;
+    background var(--dur-fast),
+    color var(--dur-fast),
+    padding var(--dur) var(--ease-out);
 }
 
 .pmenu-item:hover:not(:disabled) {
   background: var(--hover);
   color: var(--t1);
+  padding-left: 13px;
 }
 
 .pmenu-item:disabled {
   opacity: 0.45;
-  cursor: default;
 }
 
 .pmenu-icon {
@@ -200,10 +268,16 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  color: #f5a623;
+  color: var(--warning);
   background: rgba(245, 166, 35, 0.12);
   padding: 2px 6px;
   border-radius: 6px;
+}
+
+.pmenu-kbd {
+  margin-left: auto;
+  font-size: 9.5px;
+  padding: 0 5px;
 }
 
 .pmenu-sep {
@@ -217,26 +291,41 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 }
 
 .pmenu-label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: var(--t3);
   padding-bottom: 6px;
+}
+
+.pmenu-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
 
 .pmenu-stat {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 3px 0;
-  font-size: 12px;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px;
+  border-radius: var(--r-md);
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  font-size: 10.5px;
   color: var(--t2);
+  animation: pmenu-stat-in 0.4s var(--ease-out) backwards;
+  animation-delay: calc(0.05s + var(--i, 0) * 0.05s);
 }
 
 .pmenu-stat b {
-  color: var(--accent);
-  font-size: 13px;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes pmenu-stat-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
 }
 
 .pmenu-date-row {
@@ -249,18 +338,8 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
   flex: 1;
   min-width: 0;
   padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--elevated);
-  color: var(--t1);
-  font-family: var(--font);
   font-size: 12px;
   font-weight: 500;
-  outline: none;
-}
-
-.pmenu-date-input:focus {
-  border-color: var(--accent);
 }
 
 .pmenu-date-clear {
@@ -276,8 +355,8 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 }
 
 .pmenu-date-clear:hover {
-  background: rgba(239, 83, 80, 0.12);
-  color: #ef5350;
+  background: rgba(var(--danger-rgb), 0.12);
+  color: var(--danger);
 }
 
 .pmenu-hint {
@@ -286,16 +365,84 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
   color: var(--t3);
 }
 
-.pmenu-enter-active,
+.pmenu-enter-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.28s var(--ease-spring);
+}
 .pmenu-leave-active {
   transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
+    opacity 0.12s ease,
+    transform 0.12s ease;
 }
 
 .pmenu-enter-from,
 .pmenu-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(-6px) scale(0.96);
+}
+
+/* ── 水墨 ink theme: the menu is a paper slip that unrolls down from the
+   button (.ink-unroll); rows bloom, the stats are brushed numerals ─────── */
+:root[data-theme='ink'] .pmenu {
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: var(--ink-mount-line);
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 3px var(--ink-silk),
+    0 0 0 4px rgba(58, 42, 22, 0.22),
+    var(--shadow-lg);
+}
+:root[data-theme='ink'] .pmenu-enter-from,
+:root[data-theme='ink'] .pmenu-leave-to {
+  transform: none;
+}
+:root[data-theme='ink'] .pmenu-item {
+  border-radius: 2px;
+  font-family: var(--font-ink-label);
+  font-size: 14px;
+  background: radial-gradient(closest-side, rgba(40, 30, 18, 0.1), transparent) 30% 50% / 0% 0%
+    no-repeat;
+  transition:
+    background-size 0.45s var(--ease-out),
+    color var(--dur-fast),
+    padding var(--dur) var(--ease-out);
+}
+:root[data-theme='ink'] .pmenu-item:hover:not(:disabled) {
+  background-color: transparent;
+  background-size: 170% 300%;
+}
+:root[data-theme='ink'] .pmenu-icon {
+  filter: grayscale(1) sepia(0.4) contrast(1.1);
+}
+:root[data-theme='ink'] .pmenu-badge {
+  border-radius: 2px;
+  color: var(--accent);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(179, 53, 42, 0.5);
+}
+:root[data-theme='ink'] .pmenu-dot {
+  background: var(--accent);
+  border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%;
+  animation: none;
+}
+:root[data-theme='ink'] .pmenu-sep {
+  height: 5px;
+  background: rgba(28, 26, 23, 0.3);
+  -webkit-mask: var(--ink-divider) center / 100% 100% no-repeat;
+  mask: var(--ink-divider) center / 100% 100% no-repeat;
+}
+:root[data-theme='ink'] .pmenu-stat {
+  border-radius: 2px;
+  background: rgba(255, 251, 240, 0.55);
+  border-color: rgba(48, 36, 20, 0.16);
+}
+:root[data-theme='ink'] .pmenu-stat b {
+  font-family: var(--font-brush);
+  font-size: 22px;
+  font-weight: 400;
 }
 </style>

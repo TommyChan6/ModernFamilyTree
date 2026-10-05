@@ -357,6 +357,25 @@ describe('plan limits', () => {
     )
   })
 
+  it('persons:createMany checks the whole batch against the cap (all or nothing)', async () => {
+    const { token } = await register(db, 'alice')
+    const ctx = ctxFor(db, token)
+    const pid = db.activeProjectId
+    const owned = () => Object.values(db.persons).filter((p) => p.project_id === pid).length
+    const room = PLAN_LIMITS.free.maxPersons - owned() - 1
+    for (let i = 0; i < room; i++) {
+      const id = `filler-${i}`
+      db.persons[id] = { id, project_id: pid, name: `P${i}`, created_at: NOW, updated_at: NOW }
+    }
+    const before = owned()
+    expect(() => channelHandlers['persons:createMany'](db, { rows: [{}, {}] }, env, ctx)).toThrow(
+      /limit reached/
+    )
+    expect(owned()).toBe(before)
+    channelHandlers['persons:createMany'](db, { rows: [{}] }, env, ctx)
+    expect(owned()).toBe(before + 1)
+  })
+
   it('blocks projects:create at the projects cap', async () => {
     const { token, user } = await register(db, 'alice')
     const ctx = ctxFor(db, token)
@@ -444,11 +463,12 @@ describe('plan features (the free/paid switchboard)', () => {
     expect(planHasFeature(undefined, 'labs')).toBe(true)
   })
 
-  it('the plus placeholder exists and grants no exclusive flags yet', () => {
-    expect(PLAN_FEATURES.plus).toEqual([])
-    // No one is on plus; when it launches its flags get listed. Until then a
-    // hypothetical plus user would grant nothing extra — and that's explicit.
-    expect(planHasFeature('plus', 'space3d')).toBe(false)
+  it('paid tiers are a superset of free — paying never removes a feature', () => {
+    for (const plan of ['plus', 'pro']) {
+      expect(planHasFeature(plan, 'advanced')).toBe(true)
+      expect(planHasFeature(plan, 'space3d')).toBe(true)
+      expect(planHasFeature(plan, 'character')).toBe(true)
+    }
   })
 
   it('every plan in PLAN_LIMITS has a features entry (no half-defined tiers)', () => {

@@ -234,6 +234,26 @@
       <div class="ar-years">{{ lifeText }}</div>
       <div class="ar-glyph">{{ deceased ? '☾' : '☀' }}</div>
     </template>
+
+    <!-- ═══════ Scroll — a 水墨 hanging scroll (立轴), see ScrollCardFace ═══════ -->
+    <ScrollCardFace
+      v-else-if="cardStyle === 'scroll'"
+      :person="person"
+      :avatar-src="avatarSrc || ''"
+      :deceased="deceased"
+      :life-text="lifeText === 'Dates unknown' ? '' : lifeText"
+      :kin="kin"
+      :children="children"
+    />
+
+    <!-- ═══════ Moon fan — a 团扇 round silk fan, see FanCardFace ═══════ -->
+    <FanCardFace
+      v-else-if="cardStyle === 'moonfan'"
+      :person="person"
+      :avatar-src="avatarSrc || ''"
+      :deceased="deceased"
+      :life-text="lifeText === 'Dates unknown' ? '' : lifeText"
+    />
   </button>
 </template>
 
@@ -241,6 +261,8 @@
 import { computed, reactive, ref, onBeforeUnmount } from 'vue'
 import { ageOf, isDeceased, genderLabel } from './peopleLayout.js'
 import { useThumbnail } from './useThumbnail.js'
+import ScrollCardFace from './ScrollCardFace.vue'
+import FanCardFace from './FanCardFace.vue'
 
 const PERSON_ICON_PATH =
   'M12 12.5c2.49 0 4.5-2.01 4.5-4.5S14.49 3.5 12 3.5 7.5 5.51 7.5 8s2.01 4.5 4.5 4.5zm0 2.25c-3 0-9 1.51-9 4.5V22h18v-2.75c0-2.99-6-4.5-9-4.5z'
@@ -253,7 +275,7 @@ const props = defineProps({
   refYear: { type: Number, required: true },
   /** The person's tags ([{ id, label, color }]) — full-art shows the first two. */
   tags: { type: Array, default: () => [] },
-  /** Which card face to render: classic | poster | holo | neon | arcana. */
+  /** Which card face to render: classic | poster | holo | neon | arcana | scroll | moonfan. */
   cardStyle: { type: String, default: 'classic' },
   // Entrance animation: driven by the view during the short window after a
   // search/sort/style change, so cards scrolled into view later just appear.
@@ -318,7 +340,7 @@ const deceased = computed(() => isDeceased(props.person, props.refYear))
 const hasPhoto = computed(() => !!props.person.primary_image)
 
 // Downscaled, cached art — bigger for the styles that paint it large.
-const ART_SIZES = { poster: 384, holo: 384, arcana: 288 }
+const ART_SIZES = { poster: 384, holo: 384, arcana: 288, scroll: 256, moonfan: 192 }
 const { src: avatarSrc, loading: avatarLoading } = useThumbnail(
   () => props.person.primary_image || '',
   () => ART_SIZES[props.cardStyle] || 144
@@ -1943,6 +1965,47 @@ const numeral = computed(() => roman(age.value ?? props.kin))
 }
 .st-arcana:hover .ar-glyph {
   transform: scale(1.2) rotate(-12deg);
+}
+
+/* ════════════════════════════ Scroll face ═════════════════════════════════ */
+/* A hanging scroll (and the moon fan) is an object, not a card: no box, no
+   tilt — the face (ScrollCardFace / FanCardFace) draws the whole thing, and
+   the scroll's cord hangs a little past the card's top edge. */
+.st-scroll,
+.st-moonfan {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  overflow: visible;
+  transform: translate3d(0, var(--pc-lift, 0px), 0);
+}
+.st-scroll:hover,
+.st-moonfan:hover {
+  --pc-lift: -3px;
+  box-shadow: none;
+}
+.st-scroll.selected,
+.st-moonfan.selected {
+  box-shadow: none;
+}
+.st-scroll .pcard-edge,
+.st-scroll .pcard-spot,
+.st-moonfan .pcard-edge,
+.st-moonfan .pcard-spot {
+  display: none;
+}
+.pcard.st-scroll.pcard-enter,
+.pcard.st-moonfan.pcard-enter {
+  animation-name: pcard-in-scroll;
+  animation-duration: 0.3s;
+  animation-timing-function: ease-out;
+}
+@keyframes pcard-in-scroll {
+  from {
+    opacity: 0;
+  }
 }
 
 /* ═══════════════════════ Reduced motion ═══════════════════════════════════ */

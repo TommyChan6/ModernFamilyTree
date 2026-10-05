@@ -8,11 +8,17 @@
         :focus="focusOpen"
         :legend="legendOpen"
         :rel-types="relTypesOpen"
+        :show-kinship="!spaceActive"
+        :kinship="kinOpen"
+        :show-chronicle="!spaceActive"
+        :chronicle="chronOpen"
         :modes="spaceActive ? null : pillModes"
         :active-mode-id="editMode?.id || null"
         @update:focus="focusOpen = $event"
         @update:legend="legendOpen = $event"
         @update:rel-types="relTypesOpen = $event"
+        @update:kinship="kinOpen = $event"
+        @update:chronicle="chronOpen = $event"
         @pick-mode="pickPillMode"
         @config-modes="openWheelConfig()"
       />
@@ -24,6 +30,9 @@
       @dragover.prevent="onDirectoryDragOver"
       @drop.prevent="onDirectoryDrop"
     >
+      <!-- 水墨 backdrop (rice paper + distant mountains, parallax) — painted by
+         graph/InkBackdrop.js behind the transparent WebGL canvas -->
+      <div v-show="!spaceActive" ref="inkBackdropEl" class="ink-backdrop" aria-hidden="true"></div>
       <canvas v-show="!spaceActive" ref="glCanvasEl" class="graph-gl"></canvas>
       <canvas v-show="!spaceActive" ref="overlayEl" class="graph-overlay"></canvas>
       <!-- Marquee (box / lasso) selection region — screen-space, drawn over the
@@ -59,6 +68,51 @@
           @input="highlightSearch"
         />
       </div>
+      <!-- Spotlight: who holds the stage, and the switch to recast it -->
+      <Transition name="spothud">
+        <div
+          v-if="spotlightActive && spotlightMain"
+          class="spot-hud"
+          :class="{ 'clean-hide-up': store.cleanView }"
+        >
+          <span class="spot-star">🌟</span>
+          <span class="spot-k">Spotlight on</span>
+          <button
+            class="spot-name"
+            :style="{ '--pc': kinship.personColor(spotlightMain) }"
+            title="Choose who takes the spotlight"
+            @click="spotPickerOpen = !spotPickerOpen"
+          >
+            <span class="spot-dot"></span>{{ kinship.personName(spotlightMain) }}
+            <span class="spot-caret">▾</span>
+          </button>
+          <button
+            v-if="store.selectedPersonId && store.selectedPersonId !== spotlightMain"
+            class="spot-btn"
+            :title="`Put ${kinship.personName(store.selectedPersonId)} in the spotlight`"
+            @click="setMainCharacter(store.selectedPersonId)"
+          >
+            ⤓ {{ kinship.personName(store.selectedPersonId).split(' ')[0] }}
+          </button>
+          <button
+            class="spot-btn"
+            :class="{ on: spotlightTitles }"
+            title="Titles — what everyone is to the main character"
+            @click="spotlightTitles = !spotlightTitles"
+          >
+            🏷
+          </button>
+          <div v-if="spotPickerOpen" class="spot-picker" @pointerdown.stop>
+            <PersonPicker
+              :exclude="[spotlightMain]"
+              :allow-create="false"
+              placeholder="Who takes the spotlight?"
+              @pick="onSpotPick"
+              @cancel="spotPickerOpen = false"
+            />
+          </div>
+        </div>
+      </Transition>
       <MiniMap
         v-if="!spaceActive && store.persons.length"
         ref="minimapRef"
@@ -220,6 +274,8 @@
         @focus-person="focusOnPerson"
         @trace="traceFrom"
         @trace-pair="tracePair"
+        @kin-lens="openKinLens"
+        @spotlight="setMainCharacter"
         @toggle-pin="togglePinSelected"
         @set-size="(v) => setSelectedStyle({ size: v })"
         @set-color="(c) => setSelectedStyle({ color: c })"
@@ -314,6 +370,8 @@
         </div>
       </Transition>
 
+      <KinshipQuiz :open="quizOpen" @close="quizOpen = false" />
+
       <WheelConfigModal
         :open="wheelConfigOpen"
         :initial-slot="wheelConfigSlot"
@@ -336,30 +394,39 @@
           </span>
           <button class="path-close" title="Dismiss (Esc)" @click="clearPath">✕</button>
         </div>
-        <div v-else-if="pathActive" key="path" class="path-card">
-          <div class="path-title">
-            <span class="path-title-icon">🧭</span>
-            Connection
-            <span class="path-count">
-              {{ pathHops.length - 1 }} hop{{ pathHops.length > 2 ? 's' : '' }}
-            </span>
-          </div>
-          <div class="path-chain">
-            <template v-for="(hop, i) in pathHops" :key="hop.id">
-              <div v-if="hop.via" class="path-via" :style="{ '--i': i * 2 - 1 }">
-                <span class="path-via-label">{{ hop.via.glyph }} {{ hop.via.text }}</span>
-                <span class="path-via-line"></span>
-              </div>
-              <button
-                class="path-person"
-                :style="{ '--i': i * 2, '--pc': hop.color }"
-                :title="'View ' + hop.name"
-                @click="store.selectPerson(hop.id)"
-              >
-                <span class="path-person-dot"></span>
-                {{ hop.name }}
-              </button>
-            </template>
+        <div v-else-if="pathActive" key="path" class="path-card path-card-kin">
+          <!-- What the chain MEANS: the kinship name, arch, DNA & bloodline -->
+          <KinshipCard
+            :key="pathInfo.ids[0] + '>' + pathInfo.ids[pathInfo.ids.length - 1]"
+            :a="pathInfo.ids[0]"
+            :b="pathInfo.ids[pathInfo.ids.length - 1]"
+            @pick="kinFocus"
+          />
+          <div class="path-row">
+            <div class="path-title">
+              <span class="path-title-icon">🧭</span>
+              Connection
+              <span class="path-count">
+                {{ pathHops.length - 1 }} hop{{ pathHops.length > 2 ? 's' : '' }}
+              </span>
+            </div>
+            <div class="path-chain">
+              <template v-for="(hop, i) in pathHops" :key="hop.id">
+                <div v-if="hop.via" class="path-via" :style="{ '--i': i * 2 - 1 }">
+                  <span class="path-via-label">{{ hop.via.glyph }} {{ hop.via.text }}</span>
+                  <span class="path-via-line"></span>
+                </div>
+                <button
+                  class="path-person"
+                  :style="{ '--i': i * 2, '--pc': hop.color }"
+                  :title="'View ' + hop.name"
+                  @click="store.selectPerson(hop.id)"
+                >
+                  <span class="path-person-dot"></span>
+                  {{ hop.name }}
+                </button>
+              </template>
+            </div>
           </div>
           <button class="path-close" title="Clear (Esc)" @click="clearPath">✕</button>
         </div>
@@ -367,6 +434,24 @@
       <!-- Right-docked overlay panes: Focus, Relationships, Legend. They stack and
          spring in from the header toggle cluster; Clean view sweeps them away. -->
       <div class="canvas-pane-stack" :class="{ 'clean-hidden': store.cleanView }">
+        <!-- Chronicle: eras & story events (they band the Birth layout) -->
+        <Transition name="pane">
+          <ChroniclePane v-if="chronOpen && !spaceActive" @jump="graphJumpToYear" />
+        </Transition>
+        <!-- Kinship: the lens, the kin walker & the family's structure -->
+        <Transition name="pane">
+          <KinshipPane
+            v-if="kinOpen && !spaceActive"
+            v-model:anchor-id="kinAnchor"
+            v-model:lens-on="kinLensOn"
+            v-model:filter="kinFilter"
+            :selected-id="store.selectedPersonId"
+            @highlight="kinWalkSet = $event"
+            @focus-person="kinFocus"
+            @trace-pair="tracePair"
+            @quiz="quizOpen = true"
+          />
+        </Transition>
         <!-- Highlights (Focus) -->
         <Transition name="pane">
           <div
@@ -592,34 +677,31 @@
             <div class="leg-section">
               <div class="leg-section-label">Nodes</div>
               <div class="leg-row cp-stagger" :style="{ '--i': 0 }">
-                <div class="leg-dot" :style="{ background: store.graphSettings.maleColor }"></div>
+                <div class="leg-dot" :style="{ background: legendColors.male }"></div>
                 Male
               </div>
               <div class="leg-row cp-stagger" :style="{ '--i': 1 }">
-                <div class="leg-dot" :style="{ background: store.graphSettings.femaleColor }"></div>
+                <div class="leg-dot" :style="{ background: legendColors.female }"></div>
                 Female
               </div>
             </div>
             <div class="leg-section">
               <div class="leg-section-label">Lines</div>
               <div class="leg-row cp-stagger" :style="{ '--i': 2 }">
-                <div
-                  class="leg-line"
-                  :style="{ background: store.graphSettings.parentChildColor }"
-                ></div>
+                <div class="leg-line" :style="{ background: legendColors.parentChild }"></div>
                 Parent / Child
               </div>
               <div class="leg-row cp-stagger" :style="{ '--i': 3 }">
                 <div
                   class="leg-line leg-dashed"
-                  :style="{ borderColor: store.graphSettings.spouseColor }"
+                  :style="{ borderColor: legendColors.spouse }"
                 ></div>
                 Spouse
               </div>
               <div class="leg-row cp-stagger" :style="{ '--i': 4 }">
                 <div
                   class="leg-line leg-dashed"
-                  :style="{ borderColor: store.graphSettings.adoptedColor }"
+                  :style="{ borderColor: legendColors.adopted }"
                 ></div>
                 Adopted
               </div>
@@ -642,7 +724,8 @@ import {
   getLinkWidth,
   getLinkEmphOpacity,
   getLinkMarker,
-  getDashArray
+  getDashArray,
+  ENDED_STATUSES
 } from './graph/linkHelpers.js'
 import { computeAgeYPositions } from './graph/layoutAge.js'
 import { computeGenLayout } from './graph/familyTreeLayout'
@@ -661,6 +744,7 @@ import {
   removeGenPreview,
   resolveGenTarget,
   cleanupEmptyGenRows,
+  reconcileGenRows,
   drawCurrentYearLine,
   removeCurrentYearLine,
   cancelGuideTimers
@@ -669,7 +753,14 @@ import { useGraphAnimation } from './graph/useGraphAnimation.js'
 import { useTimeTravel } from './time/useTimeTravel'
 import { toOrdinal } from '../../../shared/calendarMath'
 import { WebGLGraphRenderer } from './graph/webgl/WebGLGraphRenderer.js'
-import { stampFamilyContext } from './graph/linkRouting.js'
+import { inkLook, inkLinkColor, inkNodeFill } from './graph/inkStyle.js'
+import {
+  stampFamilyContext,
+  bezierControls,
+  nearestCurveT,
+  bendCurveAt,
+  toCurveFrame
+} from './graph/linkRouting.js'
 import { screenToWorld, worldToScreen, nodesExtent, fitExtent } from './graph/webgl/coords.js'
 import { viewRectXYK } from './webgl/minimapMath'
 import { withAlpha } from './webgl/overlayUtils.js'
@@ -684,16 +775,42 @@ import { Graph3DView } from '../paid'
 import MiniMap from './MiniMap.vue'
 import ViewHeader from './ViewHeader.vue'
 import CanvasToggles from './CanvasToggles.vue'
+import { lineFxSpec, lineFxApplies } from './graph/webgl/lineFx.js'
+import { computeSpotlightLayout, defaultMainCharacter } from './graph/spotlightLayout'
+import { chronicleViewModel } from './chronicle/chronicleModel.js'
+import ChroniclePane from './chronicle/ChroniclePane.vue'
+import PersonPicker from './personForm/PersonPicker.vue'
+import KinshipPane from './kinship/KinshipPane.vue'
+import KinshipCard from './kinship/KinshipCard.vue'
+import KinshipQuiz from './kinship/KinshipQuiz.vue'
+import { useKinship, kinClass, kinPalette } from './kinship/useKinship'
+import { confirmDialog } from '../lib/dialogs.js'
+import { translate as tr } from '../i18n'
 
 const store = useMainStore()
 const tt = useTimeTravel()
 const glCanvasEl = ref(null)
+const inkBackdropEl = ref(null)
 const overlayEl = ref(null)
 const containerEl = ref(null)
 const searchQuery = ref('')
 const activeEmphasis = ref('neutral')
 const focusOpen = ref(false) // Highlights pane (from the header toggle cluster)
 const legendOpen = ref(true) // Legend pane toggle
+// Legend swatches follow what the canvas actually paints (水墨 tones in ink).
+const legendColors = computed(() => {
+  const gs = store.graphSettings
+  const look = inkLook(gs, store.theme)
+  const node = (hex) => (look.nodes ? inkNodeFill(hex, look.mode) : hex)
+  const line = (hex, role) => (look.links ? inkLinkColor(hex, role, look.mode) : hex)
+  return {
+    male: node(gs.maleColor),
+    female: node(gs.femaleColor),
+    parentChild: line(gs.parentChildColor, 'vertical'),
+    spouse: line(gs.spouseColor, 'horizontal'),
+    adopted: line(gs.adoptedColor, 'vertical')
+  }
+})
 const relTypesOpen = ref(false) // Relationships pane toggle
 const soloType = ref(null) // when set, only this relationship type stays lit
 const pathAnchor = ref(null) // first ctrl-clicked person (armed, waiting for the second)
@@ -706,6 +823,11 @@ const modes = [
   { id: 'auto', label: '⚡ Organic', title: 'Organic — force-directed layout' },
   { id: 'age', label: '📅 Birth', title: 'Birth — vertical position by birth date' },
   { id: 'generation', label: '🏛 Generations', title: 'Generations — top-down hierarchy' },
+  {
+    id: 'spotlight',
+    label: '🌟 Spotlight',
+    title: 'Spotlight — a main character at centre stage, everyone else in rings by closeness'
+  },
   { id: 'space', label: '🪐 Space', title: 'Space — experimental 3D layout (Labs)' }
 ]
 
@@ -726,6 +848,7 @@ const MODE_TO_TYPE = {
   auto: 'organic',
   age: 'birth',
   generation: 'generations',
+  spotlight: 'spotlight',
   space: 'space'
 }
 const TYPE_TO_MODE = {
@@ -733,6 +856,7 @@ const TYPE_TO_MODE = {
   organic: 'auto',
   birth: 'age',
   generations: 'generation',
+  spotlight: 'spotlight',
   space: 'space'
 }
 
@@ -818,7 +942,7 @@ let hoverId = null // node currently hovered (for glow)
 let hoverLinkId = null // bond currently hovered (halo preview + pointer cursor)
 let couplesHiSet = null // ids highlighted by the Marriage filter, or null
 
-const { cancelAnimation, animateToPositionsWithReset } = useGraphAnimation(ctx)
+const { cancelAnimation, finishAnimation, animateToPositionsWithReset } = useGraphAnimation(ctx)
 
 // Each layout type gets a signature transition, so switching type reads as a
 // deliberate rearrangement rather than a jump:
@@ -857,7 +981,20 @@ const MOTION = {
     duration: 320,
     stagger: 160,
     staggerBy: (n, t) => t?.y ?? n.y
-  })
+  }),
+  // Spotlight: the cast blooms outward ring by ring from the lead.
+  spotlight: () => {
+    const lead = ctx.motionTargets?.[spotlightMain.value]
+    return {
+      ease: d3.easeBackOut.overshoot(1.2),
+      duration: 300,
+      stagger: 190,
+      staggerBy: (n, t) => {
+        const c = lead || centerOf(ctx.nodesData)
+        return Math.hypot((t?.x ?? n.x) - c.x, (t?.y ?? n.y) - c.y)
+      }
+    }
+  }
 }
 
 // ── Minimap (top-left) ──────────────────────────────────────────────────────
@@ -884,8 +1021,32 @@ const minimapAdapter = {
     const gsx = ctx.transform.sx ?? 1,
       gsy = ctx.transform.sy ?? 1
     let selNode = null
-    g.fillStyle = withAlpha(colors.t2, 0.55)
-    for (const n of ctx.nodesData) {
+    if (store.isInk) {
+      // 水墨: a tiny ink sketch — hairline bonds under soft ink dots.
+      g.strokeStyle = withAlpha(colors.t1, 0.22)
+      g.lineWidth = 0.7
+      g.beginPath()
+      for (const d of ctx.linksData) {
+        const a = d.source,
+          b = d.target
+        if (typeof a !== 'object' || typeof b !== 'object') continue
+        g.moveTo(a.x * gsx * proj.sx + proj.ox, a.y * gsy * proj.sy + proj.oy)
+        g.lineTo(b.x * gsx * proj.sx + proj.ox, b.y * gsy * proj.sy + proj.oy)
+      }
+      g.stroke()
+      g.fillStyle = withAlpha(colors.t1, 0.62)
+      for (const n of ctx.nodesData) {
+        if (n.id === sel) {
+          selNode = n
+          continue
+        }
+        g.beginPath()
+        g.arc(n.x * gsx * proj.sx + proj.ox, n.y * gsy * proj.sy + proj.oy, 1.7, 0, Math.PI * 2)
+        g.fill()
+      }
+    }
+    if (!store.isInk) g.fillStyle = withAlpha(colors.t2, 0.55)
+    for (const n of store.isInk ? [] : ctx.nodesData) {
       if (n.id === sel) {
         selNode = n
         continue
@@ -1089,6 +1250,190 @@ watch([egoDepth, egoMap], () => {
   markLinkStyles()
 })
 
+// ── Kinship lens (see the family through one person's eyes) ─────────────────
+// With the lens on, every node rings in its kin colour and carries a floating
+// label naming what it is to the viewpoint person ("second cousin", 表姐,
+// farmor…); outsiders recede. Switching it on ripples outward from the
+// viewpoint — closest kin first — like a stone dropped in water.
+const kinship = useKinship()
+const kinOpen = ref(false) // Kinship pane (header toggle)
+const kinAnchor = ref(null) // the viewpoint person
+const kinLensOn = ref(false)
+const kinFilter = ref('all') // all | blood | marriage | ancestors | descendants
+const kinWalkSet = ref(null) // Kin walker matches (Set incl. the anchor) | null
+const quizOpen = ref(false)
+
+const kinLensMap = computed(() =>
+  kinLensOn.value && kinAnchor.value && !spaceActive.value ? kinship.lensOf(kinAnchor.value) : null
+)
+const kinColors = computed(() => {
+  void store.theme
+  void store.accent
+  return kinPalette()
+})
+
+function kinIncluded(k) {
+  if (!k) return false
+  if (k.kind === 'self') return true
+  switch (kinFilter.value) {
+    case 'blood':
+      return k.kind === 'blood'
+    case 'marriage':
+      return ['spouse', 'inlaw', 'affine', 'coparent', 'step'].includes(k.kind)
+    case 'ancestors':
+      return k.kind === 'blood' && k.down === 0
+    case 'descendants':
+      return k.kind === 'blood' && k.up === 0
+    default:
+      return true
+  }
+}
+
+// Reveal timing: a plain clock the rAF loop advances (outside reactivity, like
+// the rest of the hot path). 0 = no reveal running → everything fully shown.
+let kinRevealT0 = 0
+let kinNow = 0
+const KIN_STEP_MS = 115
+const KIN_REDUCED =
+  typeof window !== 'undefined' &&
+  window.matchMedia &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches
+function kinRank(k) {
+  if (!k) return 12
+  switch (k.kind) {
+    case 'self':
+      return 0
+    case 'blood':
+      return k.up + k.down
+    case 'spouse':
+      return 1
+    case 'social':
+      return 3
+    case 'distant':
+      return 6 + Math.min(4, k.hops || 0)
+    default:
+      return k.up + k.down + 1
+  }
+}
+function kinRevealP(k) {
+  if (!kinRevealT0) return 1
+  const t = (kinNow - kinRevealT0 - Math.min(kinRank(k), 10) * KIN_STEP_MS) / 380
+  return t <= 0 ? 0 : t >= 1 ? 1 : 1 - Math.pow(1 - t, 3)
+}
+function startKinReveal() {
+  if (KIN_REDUCED) return
+  kinRevealT0 = performance.now()
+  kinNow = kinRevealT0
+  const total = 10 * KIN_STEP_MS + 1500
+  const loop = () => {
+    kinNow = performance.now()
+    markNodeStyles()
+    markLinkStyles()
+    if (kinNow - kinRevealT0 < total && kinLabelLens.value) requestAnimationFrame(loop)
+    else {
+      kinRevealT0 = 0
+      markNodeStyles()
+      markLinkStyles()
+    }
+  }
+  requestAnimationFrame(loop)
+}
+
+// The floating labels, rebuilt only when the lens, filter or language changes
+// (never per frame): id → { text, color, rank }.
+// Titles come from the lens when it's on, else from the Spotlight lead.
+const kinLabelLens = computed(
+  () =>
+    kinLensMap.value ||
+    (spotlightActive.value && spotlightTitles.value && spotlightMain.value
+      ? kinship.lensOf(spotlightMain.value)
+      : null)
+)
+const kinLabelAnchor = computed(() => (kinLensMap.value ? kinAnchor.value : spotlightMain.value))
+const kinLabels = computed(() => {
+  const L = kinLabelLens.value
+  if (!L) return null
+  void kinship.kinLang.value
+  const out = new Map()
+  for (const [id, k] of L) {
+    if (k.kind === 'self' || k.kind === 'distant') continue
+    if (kinLensMap.value && !kinIncluded(k)) continue
+    out.set(id, {
+      text: kinship.nameOf(k, kinLabelAnchor.value, id),
+      color: kinColors.value[kinClass(k)],
+      rank: kinRank(k)
+    })
+  }
+  return out
+})
+
+function kinOverlay() {
+  const L = kinLabelLens.value
+  // A connection trace / orbit owns the canvas while it's up.
+  if (!L || pathActive.value || egoMap.value) return null
+  let wave = null
+  if (kinRevealT0) {
+    const e = kinNow - kinRevealT0
+    const a = ctx.nodesData.find((n) => n.id === kinLabelAnchor.value)
+    if (a && e < 1500) {
+      wave = { x: a.x, y: a.y, r: e * 0.7, alpha: 1 - e / 1500, color: kinColors.value.self }
+    }
+  }
+  return {
+    labels: kinLabels.value,
+    reveal: (id) => kinRevealP(L.get(id)),
+    hidden: (n) => nodeTimeHidden(n),
+    wave,
+    light: store.isLightTheme
+  }
+}
+
+let kinPrevKey = ''
+watch([kinLensMap, kinFilter], () => {
+  const key = kinLensMap.value ? kinAnchor.value + ':' + kinFilter.value : ''
+  if (key && key !== kinPrevKey) startKinReveal()
+  kinPrevKey = key
+  markNodeStyles()
+  markLinkStyles()
+})
+watch([() => kinship.kinLang.value, kinWalkSet], () => {
+  markNodeStyles()
+  markLinkStyles()
+})
+watch(kinOpen, (open) => {
+  // Default viewpoint: the selection, else the Spotlight lead.
+  if (open && !kinAnchor.value) {
+    kinAnchor.value = store.selectedPersonId || (spotlightActive.value ? spotlightMain.value : null)
+  }
+  if (!open) {
+    kinLensOn.value = false
+    kinWalkSet.value = null
+  }
+})
+// The viewpoint person was deleted → the lens has nothing to look through.
+watch(
+  () => store.persons.length,
+  () => {
+    if (kinAnchor.value && !store.persons.some((p) => p.id === kinAnchor.value)) {
+      kinAnchor.value = null
+      kinLensOn.value = false
+    }
+  }
+)
+
+/** Action pane's 🧬 Kin: look through this person's eyes. */
+function openKinLens(id) {
+  kinAnchor.value = id
+  kinOpen.value = true
+  kinLensOn.value = true
+}
+/** Select + glide to a person named in a kinship surface. */
+function kinFocus(id) {
+  if (!id) return
+  store.selectPerson(id, { modal: false })
+  focusOnPerson(id)
+}
+
 // The set of currently-selected people (multi-select aware). linkVisual() reads
 // this to light up the bonds touching the selection; null when nothing is picked.
 const selectionSet = computed(() => {
@@ -1229,10 +1574,172 @@ function refreshActiveStyles() {
   if (bag) {
     if (!bag.styles) bag.styles = {}
     activeStyles = bag.styles
+    if (!bag.curves) bag.curves = {}
+    activeCurves = bag.curves
   } else {
     activeStyles = {}
+    activeCurves = {}
   }
+  applyCurves()
   uiTick.value++
+}
+
+// ── Bezier line style: hand-shaped curves ───────────────────────────────────
+// Under the `bezier` route each link is a cubic curve. Reshaped links store
+// their two control points in the scene bag's `curves` map (by relationship
+// id) in the link's own chord frame — { a:[u,v], b:[u,v], s: person_a_id } —
+// so a curve follows its people as they move. applyCurves() stamps them onto
+// the live link objects as d._curve, which routePoints() reads at draw time.
+let activeCurves = {}
+
+function applyCurves() {
+  for (const d of ctx.linksData) {
+    const rec = activeCurves[d.id]
+    if (!rec?.a || !rec?.b) {
+      d._curve = null
+      continue
+    }
+    // Endpoints swapped since it was shaped (swap mode): mirror the frame so
+    // the curve keeps its on-screen shape.
+    d._curve =
+      rec.s && rec.s !== d.person_a_id
+        ? { a: [1 - rec.b[0], -rec.b[1]], b: [1 - rec.a[0], -rec.a[1]] }
+        : { a: rec.a, b: rec.b }
+  }
+}
+
+// The one link whose curve is editable right now: the selected bond, while
+// the bezier route is on, lines aren't locked and no edit mode owns clicks.
+function curveEditLink() {
+  if (store.graphSettings.linkRoute !== 'bezier') return null
+  if (store.lockLines || editMode.value || spaceActive.value) return null
+  const id = store.relPopup?.rel?.id
+  if (!id) return null
+  const d = ctx.linksData.find((l) => l.id === id)
+  if (!d || typeof d.source !== 'object' || linkTimeHidden(d)) return null
+  return d
+}
+
+let curveDrag = null // { d, kind:'a'|'b'|'body', t, from, downW, downX, downY, moved }
+let curveHot = null // 'a' | 'b' — handle under the cursor (drawn larger)
+
+/** Which handle of the editable curve sits under this client point (≤ 11px). */
+function pickCurveHandle(d, clientX, clientY) {
+  const rect = overlayEl.value.getBoundingClientRect()
+  const px = clientX - rect.left,
+    py = clientY - rect.top
+  const { c1, c2 } = bezierControls(d)
+  let best = null,
+    bestD = 11
+  for (const [c, key] of [
+    [c1, 'a'],
+    [c2, 'b']
+  ]) {
+    const s = worldToScreen(c.x, c.y, ctx.transform)
+    const dist = Math.hypot(s.x - px, s.y - py)
+    if (dist < bestD) {
+      bestD = dist
+      best = key
+    }
+  }
+  return best
+}
+
+/** Is this world point on the editable curve's line (within pick tolerance)? */
+function onCurveBody(d, w) {
+  return ctx.renderer?.pickLink(w.x, w.y, store.graphSettings, linkPickTol())?.id === d.id
+}
+
+/** Press on a handle or on the selected curve → start reshaping it. */
+function beginCurveDrag(e, w) {
+  const d = curveEditLink()
+  if (!d) return false
+  const handle = pickCurveHandle(d, e.clientX, e.clientY)
+  let kind = handle
+  if (!kind) {
+    if (pickVisibleNode(w.x, w.y) || !onCurveBody(d, w)) return false
+    kind = 'body'
+  }
+  curveDrag = {
+    d,
+    kind,
+    before: captureLayoutState(), // undo memento, recorded if it actually moves
+    t: kind === 'body' ? nearestCurveT(d, w) : 0,
+    from: bezierControls(d),
+    downW: w,
+    downX: e.clientX,
+    downY: e.clientY,
+    moved: false
+  }
+  curveHot = handle
+  try {
+    overlayEl.value.setPointerCapture(e.pointerId)
+  } catch {}
+  return true
+}
+
+function moveCurveDrag(e) {
+  const cd = curveDrag
+  if (!cd.moved && Math.hypot(e.clientX - cd.downX, e.clientY - cd.downY) > 2) cd.moved = true
+  if (!cd.moved) return
+  const w = clientToWorld(e.clientX, e.clientY)
+  const S = cd.d.source,
+    T = cd.d.target
+  let next
+  if (cd.kind === 'body') {
+    next = bendCurveAt(cd.d, cd.t, { x: w.x - cd.downW.x, y: w.y - cd.downW.y }, cd.from)
+  } else {
+    // Handles follow the cursor, keeping the grab offset from the press.
+    const base = cd.kind === 'a' ? cd.from.c1 : cd.from.c2
+    const p = { x: base.x + w.x - cd.downW.x, y: base.y + w.y - cd.downW.y }
+    const other = cd.kind === 'a' ? cd.from.c2 : cd.from.c1
+    const uvP = toCurveFrame(S, T, p),
+      uvO = toCurveFrame(S, T, other)
+    next = cd.kind === 'a' ? { a: uvP, b: uvO } : { a: uvO, b: uvP }
+  }
+  activeCurves[cd.d.id] = { a: next.a, b: next.b, s: cd.d.person_a_id }
+  cd.d._curve = { a: next.a, b: next.b }
+  ticked()
+}
+
+function endCurveDrag() {
+  const cd = curveDrag
+  curveDrag = null
+  if (cd?.moved) {
+    store.recordLayoutStep(cd.before, 'curve')
+    schedulePersist(activeSceneId.value)
+  }
+  ctx.renderer?.requestRedraw()
+}
+
+/** Double-click on the editable curve (or a handle) → back to the default. */
+function resetCurveAt(e, w) {
+  const d = curveEditLink()
+  if (!d) return false
+  if (!pickCurveHandle(d, e.clientX, e.clientY) && !onCurveBody(d, w)) return false
+  if (activeCurves[d.id]) {
+    store.recordLayoutStep(captureLayoutState(), 'curve')
+    delete activeCurves[d.id]
+    d._curve = null
+    schedulePersist(activeSceneId.value)
+    ticked()
+    showWheelFlash('↺', 'Curve reset')
+  }
+  return true
+}
+
+// What the overlay draws for the editable curve: tangent arms + two handles.
+function curveHandlesOpts() {
+  const d = curveEditLink()
+  if (!d) return null
+  const { c1, c2 } = bezierControls(d)
+  return {
+    s: { x: d.source.x, y: d.source.y },
+    t: { x: d.target.x, y: d.target.y },
+    c1,
+    c2,
+    hot: curveDrag && curveDrag.kind !== 'body' ? curveDrag.kind : curveHot
+  }
 }
 
 /** Apply a style patch ({size} and/or {color}; 1 / null clear back to default)
@@ -1240,6 +1747,7 @@ function refreshActiveStyles() {
 function setSelectedStyle(patch) {
   const bag = layoutsOf(activeSceneId.value)
   if (!bag || !store.selectedPersonIds.length) return
+  store.recordLayoutStep(captureLayoutState(), 'style')
   if (!bag.styles) bag.styles = {}
   activeStyles = bag.styles
   for (const id of store.selectedPersonIds) {
@@ -1397,7 +1905,14 @@ function onWheelKeyDown(e) {
   if (spaceActive.value) return // the 3D stage owns its own controls (for now)
   // Full-screen overlays (landing page, auth, curtain, profile) own the stage —
   // the graph is merely mounted beneath them.
-  if (!store.authUser || store.curtain.active || store.userPageOpen) return
+  if (
+    !store.authUser ||
+    store.curtain.active ||
+    store.userPageOpen ||
+    store.projectsPageOpen ||
+    store.browsePageOpen
+  )
+    return
   if (document.querySelector('.home')) return
   if (isTypingTarget(e.target) || isTypingTarget(document.activeElement)) return
   e.preventDefault() // Tab must not cycle focus while it drives the wheel
@@ -1636,6 +2151,7 @@ function pinClick(node) {
 function paintClick(node, m) {
   const bag = layoutsOf(activeSceneId.value)
   if (!bag) return
+  store.recordLayoutStep(captureLayoutState(), 'style')
   if (!bag.styles) bag.styles = {}
   activeStyles = bag.styles
   const next = { ...(activeStyles[node.id] || {}) }
@@ -1707,9 +2223,12 @@ async function addPersonAt(w) {
     } else if (m !== 'age') {
       node.fy = w.y
     }
-    ticked()
     ctx.renderer?.invalidatePicker()
-    saveCurrentState()
+    if (m === 'generation') settleOntoGenRow(node)
+    else {
+      ticked()
+      saveCurrentState()
+    }
   }
   const s = worldToScreen(node ? node.x : w.x, node ? node.y : w.y, ctx.transform)
   nameBubble.value = { id: res.data.id, x: s.x, y: s.y, value: '' }
@@ -1735,9 +2254,15 @@ function snapshotActiveScene() {
   if (currentMode.value === 'space') return
   const w = workingOf(activeSceneId.value)
   if (!w) return
+  // Save where each node is HEADING: mid-animation (a layout transition, a
+  // generation-row glide) the live x/y are an in-between frame, and saving
+  // those would restore people off their rows / out of their arrangement.
+  const motion = ctx.motionTargets,
+    rowY = ctx.rowTargets
   const snap = {}
   ctx.nodesData.forEach((n) => {
-    snap[n.id] = { x: n.x, y: n.y }
+    const m = motion?.[n.id]
+    snap[n.id] = { x: m ? m.x : n.x, y: rowY?.[n.id] ?? (m ? m.y : n.y) }
   })
   w.positions = snap
   if (currentMode.value === 'generation') {
@@ -1749,6 +2274,98 @@ function snapshotActiveScene() {
   schedulePersist(activeSceneId.value)
 }
 const snapshotMode = snapshotActiveScene
+
+// ── Arrangement undo (moves, curves, node styles, layout refreshes) ─────────
+// Arrangement lives in the scene working copies, outside the data history.
+// Every user-driven change captures a memento of the active scene's layout
+// BEFORE it happens and records it on the store's unified undo timeline, so
+// Ctrl+Z reverts a drag exactly like it reverts a data edit. Restoring a
+// memento hands back the inverse one (what it replaced) for redo.
+const cloneJSON = (v) => JSON.parse(JSON.stringify(v ?? {}))
+
+function captureLayoutState() {
+  const scene = activeScene.value
+  if (!scene || currentMode.value === 'space' || !ctx.nodesData.length) return null
+  // Where each node is HEADING (mid-transition the live x/y are a passing frame).
+  const motion = ctx.motionTargets,
+    rowY = ctx.rowTargets
+  const positions = {}
+  for (const n of ctx.nodesData) {
+    const m = motion?.[n.id]
+    positions[n.id] = { x: m ? m.x : n.x, y: rowY?.[n.id] ?? (m ? m.y : n.y) }
+  }
+  return {
+    sceneId: scene.id,
+    type: scene.type || 'organic',
+    positions,
+    genRows: currentMode.value === 'generation' ? [...ctx.genRowYValues] : null,
+    genSpacing: ctx.genRowSpacing,
+    curves: cloneJSON(activeCurves),
+    styles: cloneJSON(activeStyles),
+    mainId: currentMode.value === 'spotlight' ? spotlightMain.value : null
+  }
+}
+
+/** Put a memento back (switching to its scene / the graph view if needed);
+ *  returns the inverse memento, or null when its scene no longer exists. */
+function restoreLayoutState(state) {
+  if (!state) return null
+  const scene = store.scenes.find((sc) => sc.id === state.sceneId)
+  if (!scene) return null
+  if (store.activeView !== 'graph') store.activeView = 'graph'
+  const live =
+    state.sceneId === activeSceneId.value &&
+    (scene.type || 'organic') === state.type &&
+    currentMode.value !== 'space'
+  // Fold the live arrangement into the working copy so the inverse is exact.
+  if (live) {
+    finishAnimation()
+    snapshotActiveScene()
+  }
+  const bag = layoutsOf(state.sceneId)
+  if (!bag) return null
+  const slot = bag[state.type] || (bag[state.type] = { positions: {}, config: {} })
+  const inverse = {
+    sceneId: state.sceneId,
+    type: state.type,
+    positions: cloneJSON(slot.positions),
+    genRows: slot.config?.genRowYValues ? [...slot.config.genRowYValues] : null,
+    genSpacing: slot.config?.genRowSpacing ?? state.genSpacing,
+    curves: cloneJSON(bag.curves),
+    styles: cloneJSON(bag.styles),
+    mainId: slot.config?.mainId ?? null
+  }
+  slot.positions = cloneJSON(state.positions)
+  if (state.mainId) slot.config = { ...(slot.config || {}), mainId: state.mainId }
+  if (state.genRows) {
+    slot.config = {
+      ...(slot.config || {}),
+      genRowYValues: [...state.genRows],
+      genRowSpacing: state.genSpacing
+    }
+  }
+  bag.curves = cloneJSON(state.curves)
+  bag.styles = cloneJSON(state.styles)
+
+  if (state.sceneId !== activeSceneId.value) {
+    // Another scene: switching enters it with the restored arrangement.
+    switchScene(state.sceneId)
+  } else if (live) {
+    cancelAnimation()
+    ctx.historyRestore = true // a quick glide back, camera stays put
+    enterActiveScene()
+    ctx.historyRestore = false
+    markLinkStyles()
+  } else {
+    // Same scene, but it shows another layout type now: the restore lands in
+    // that type's own arrangement (visible when the user switches back).
+    refreshActiveStyles()
+    markNodeStyles()
+    showWheelFlash('↺', `Restored the ${state.type} arrangement`)
+  }
+  schedulePersist(state.sceneId)
+  return inverse
+}
 const snapshotGenMode = snapshotActiveScene
 const saveCurrentState = snapshotActiveScene
 
@@ -1796,15 +2413,18 @@ function enterActiveScene() {
   else if (mode === 'custom') enterCustomMode()
   else if (mode === 'age') enterAgeMode()
   else if (mode === 'generation') enterGenerationMode()
+  else if (mode === 'spotlight') enterSpotlightMode()
   applyEmphasis()
 }
 
 // ── Scene tab operations ────────────────────────────────────────────────────
 function switchScene(id) {
   if (id === activeSceneId.value) return
-  cancelAnimation()
   graph3dRef.value?.writeBack?.() // fold in a live 3D arrangement first
+  // Save BEFORE cancelling: the snapshot reads any in-flight animation's
+  // destination, which cancelling would forget.
   if (ctx.nodesData.length) saveCurrentState()
+  cancelAnimation()
   store.setActiveScene('graph', id)
   enterActiveScene()
 }
@@ -1842,7 +2462,12 @@ async function duplicateActiveScene() {
 
 async function removeScene(scene) {
   if (graphScenes.value.length <= 1) return
-  if (!confirm(`Delete scene "${scene.name}"?`)) return
+  const ok = await confirmDialog({
+    title: tr('confirm.deleteScene', { name: scene.name }),
+    message: tr('confirm.deleteSceneBody'),
+    tone: 'danger'
+  })
+  if (!ok) return
   const wasActive = scene.id === activeSceneId.value
   working.delete(scene.id)
   await store.deleteScene(scene.id) // re-activates the view's first scene
@@ -1923,9 +2548,13 @@ function nodeVisual(n) {
   const selected = store.selectedPersonId === n.id || store.selectedPersonIds.includes(n.id)
   // Per-node overrides from the action pane (scene-scoped): custom fill + size.
   const ov = activeStyles[n.id]
-  const baseFill = ov?.color || nodeColor(n.gender, gs, n.gender_t)
+  // 水墨: on rice paper the fill becomes a pale tinted wash (inkStyle).
+  const look = inkLook(gs, store.theme)
+  const rawFill = ov?.color || nodeColor(n.gender, gs, n.gender_t)
+  const baseFill = look.nodes ? inkNodeFill(rawFill, look.mode) : rawFill
   // A gentle lift, not a wash-out — the accent halo now carries the emphasis.
-  const fill = selected ? d3.color(baseFill)?.brighter(0.18)?.toString() || baseFill : baseFill
+  const fill =
+    selected && !look.nodes ? d3.color(baseFill)?.brighter(0.18)?.toString() || baseFill : baseFill
 
   let opacityMul = 1,
     radiusMul = 1
@@ -1976,6 +2605,41 @@ function nodeVisual(n) {
       opacityMul *= Math.max(0.45, 1 - dist * 0.16)
     }
   }
+  // Kinship lens: kin ring in their class colour and ripple in; outsiders
+  // recede. The Kin walker's matches glow instead while its tab is up.
+  let kinRing = null
+  if (!pathActive.value && !egoMap.value && kinLensMap.value) {
+    const k = kinLensMap.value.get(n.id)
+    if (k?.kind === 'self') {
+      radiusMul = Math.max(radiusMul, 1.3)
+      pathGlow = true
+      kinRing = kinColors.value.self
+    } else if (k && kinIncluded(k)) {
+      const cls = kinClass(k)
+      kinRing = kinColors.value[cls]
+      opacityMul *= (cls === 'distant' ? 0.35 : 1) * (0.08 + 0.92 * kinRevealP(k))
+      if (cls === 'blood' && k.up + k.down <= 2) radiusMul = Math.max(radiusMul, 1.08)
+    } else {
+      opacityMul *= 0.07
+    }
+  } else if (!pathActive.value && kinWalkSet.value) {
+    if (kinWalkSet.value.has(n.id)) {
+      pathGlow = true
+      radiusMul = Math.max(radiusMul, n.id === kinAnchor.value ? 1.25 : 1.15)
+      kinRing = n.id === kinAnchor.value ? kinColors.value.self : kinColors.value.blood
+    } else opacityMul *= 0.1
+  }
+
+  // Spotlight: the lead swells under a golden rim; the unconnected wait in
+  // the wings, dimmer.
+  if (spotlightActive.value && !pathActive.value && !kinLensMap.value) {
+    if (n.id === spotlightMain.value) {
+      radiusMul = Math.max(radiusMul, 1.5)
+      pathGlow = true
+      kinRing = '#f5c542'
+    } else if (spotlightRingOf[n.id] === -1) opacityMul *= 0.42
+  }
+
   // Armed trace anchor: a beacon while waiting for the second ctrl-click.
   if (pathAnchor.value === n.id && !pathInfo.value) {
     pathGlow = true
@@ -2015,9 +2679,9 @@ function nodeVisual(n) {
     fill,
     // A crisp white rim for selection; the accent halo/ring rides just outside it
     // (drawn in the shader) so the blue reads as focus without a doubled rim.
-    border: selected ? '#ffffff' : wheelRing || hl || '#ffffff',
-    borderPx: selected ? 2.4 : wheelRing ? 2.8 : hl ? 2.6 : 1.5,
-    borderA: selected ? 1 : wheelRing ? 1 : hl ? 0.92 : 0.18,
+    border: selected ? '#ffffff' : wheelRing || kinRing || hl || '#ffffff',
+    borderPx: selected ? 2.4 : wheelRing || kinRing ? 2.8 : hl ? 2.6 : 1.5,
+    borderA: selected ? 1 : wheelRing || kinRing ? 1 : hl ? 0.92 : 0.18,
     opacity: gs.nodeOpacity * opacityMul,
     selected,
     glow: selected || timeGlow || pathGlow || (hoverId === n.id && gs.glowOnHover) ? 1 : 0,
@@ -2045,6 +2709,15 @@ function linkVisual(d) {
   const def = store.relTypeByKey.get(d.type)
   let colorHex = getLinkStroke(d, emph, gs, persons, def)
   let width = getLinkWidth(d, emph, gs, persons)
+  // 水墨 brush strokes: ink-toned colours (couples become the cinnabar red
+  // thread 红线), bolder strokes so the bristle texture reads.
+  const look = inkLook(gs, store.theme)
+  const inkRole = look.links ? store.relTypeRoles.get(d.type) || 'none' : null
+  const inkEnded = ENDED_STATUSES.has(d.status)
+  if (look.links) {
+    colorHex = inkLinkColor(colorHex, inkRole, look.mode, inkEnded)
+    width *= inkRole === 'horizontal' ? 1.9 : inkRole === 'vertical' ? 3 : 2.3
+  }
   let opacity = getLinkEmphOpacity(d, emph, gs, persons)
 
   // Marriage highlight overrides opacity/width for spouse vs non-spouse (mirrors SVG).
@@ -2077,6 +2750,8 @@ function linkVisual(d) {
   const tY = tt.gateYear.value
   let timeHidden = false
   let timeDissolved = false
+  let arrowHide = false // a lens faded this bond out: drop its arrowhead too
+  let lensDash = false // a lens drew its own dash flow on this bond (no line effect)
   if (tY !== Infinity) {
     if (linkTimeHidden(d)) {
       opacity = 0
@@ -2103,6 +2778,13 @@ function linkVisual(d) {
   if (timeDissolved) {
     dashLen = 3
     dashGap = 4
+  }
+  if (look.links) {
+    // The red thread runs unbroken; other dashed bonds become runs of brush
+    // dabs (点), which need longer marks to read as strokes.
+    if (inkRole === 'horizontal' && !inkEnded && !timeDissolved) dashLen = dashGap = 0
+    dashLen *= 2.4
+    dashGap *= 2.2
   }
 
   // Solo lens (Relationships pane): the chosen type stays lit, the rest fade.
@@ -2138,6 +2820,37 @@ function linkVisual(d) {
   // The solo lens brings its isolated type to life.
   if (soloType.value === d.type && dashLen > 0 && !flow) flow = 24
 
+  // Kinship lens: bonds between two people in view stay (fading in with the
+  // ripple); the rest recede. On Ancestors / Descendants the direct line
+  // streams like ink down the generations.
+  if (!pathActive.value && !egoMap.value && kinLensMap.value) {
+    const ka = kinLensMap.value.get(d.person_a_id)
+    const kb = kinLensMap.value.get(d.person_b_id)
+    if (!kinIncluded(ka) || !kinIncluded(kb)) {
+      opacity *= 0.06
+      arrowHide = true // arrowheads don't fade with opacity — shrink them away
+    } else {
+      opacity *= 0.2 + 0.8 * Math.min(kinRevealP(ka), kinRevealP(kb))
+      const f = kinFilter.value
+      if (
+        (f === 'ancestors' || f === 'descendants') &&
+        store.relTypeRoles.get(d.type) === 'vertical'
+      ) {
+        dashLen = 8
+        dashGap = 5
+        flow = 26
+        width = Math.max(width * 1.3, 2.6)
+        fadeTo = 1
+        lensDash = true
+      }
+    }
+  } else if (!pathActive.value && kinWalkSet.value) {
+    if (!(kinWalkSet.value.has(d.person_a_id) && kinWalkSet.value.has(d.person_b_id))) {
+      opacity *= 0.08
+      arrowHide = true
+    }
+  }
+
   // ── Selection emphasis ──────────────────────────────────────────────────────
   // Selected bonds — and bonds touching a selected person — get a soft halo
   // underlay (`halo`, drawn by the renderer beneath the links: white on dark,
@@ -2151,6 +2864,7 @@ function linkVisual(d) {
     (selRels || selNodes) &&
     !pathActive.value &&
     !egoMap.value &&
+    !kinLensMap.value &&
     !soloType.value &&
     activeCouples.value === 'normal'
   ) {
@@ -2195,6 +2909,7 @@ function linkVisual(d) {
     } else {
       opacity *= 0.05
       flow = 0
+      arrowHide = true
     }
   }
 
@@ -2210,8 +2925,38 @@ function linkVisual(d) {
     halo = 1
   }
 
+  // ── Line effects (Style panel → Line Effects) ───────────────────────────────
+  // In-scope bonds render as an animated shader effect (bloodstream, river,
+  // neon…). Lenses that draw the line themselves (the trace chain, the kin
+  // bloodline flow, the delete arm) and time-travel ghosts keep their plain
+  // dashed look; the 水墨 brush look owns the links when it's on.
+  let fx = 0
+  let fxPad = 1
+  const fxSpec = lineFxSpec(gs.lineFx)
+  if (
+    fxSpec.n &&
+    !look.links &&
+    !timeHidden &&
+    !timeDissolved &&
+    !lensDash &&
+    lineFxApplies(gs.lineFxScope, store.relTypeRoles.get(d.type) || 'none') &&
+    !(pathActive.value && pathRelIdSet.value.has(d.id)) &&
+    !(deleteArm.value?.isRel && deleteArm.value.id === d.id)
+  ) {
+    fx = fxSpec.n
+    fxPad = fxSpec.pad
+    // Effects need body to read (cells, strands, ripples): at least the
+    // effect's own width, and still a touch wider than the plain line.
+    width = Math.max(width * 1.35, fxSpec.body)
+  }
+
   const marker = getLinkMarker(d, emph, persons, def)
   const isPatMat = marker && (marker.includes('pat') || marker.includes('mat'))
+  // A brush stroke already says which way it runs (pressed at the parent,
+  // trailing off into the child) — plain lineage arrowheads would only clutter.
+  const inkNoArrow = look.links && inkRole === 'vertical' && !isPatMat
+  let arrowColor = marker && !inkNoArrow ? markerColor(marker, gs, def) : null
+  if (arrowColor && look.links) arrowColor = inkLinkColor(arrowColor, inkRole, look.mode)
   return {
     colorHex,
     width,
@@ -2221,8 +2966,12 @@ function linkVisual(d) {
     flow,
     fadeTo,
     halo,
-    arrowColor: marker ? markerColor(marker, gs, def) : null,
-    arrowSize: timeHidden ? 0 : isPatMat ? 14 : 9
+    arrowColor,
+    // An effect already flows parent → child; lineage arrowheads would clutter it.
+    arrowSize:
+      timeHidden || arrowHide || (fx && !isPatMat) ? 0 : isPatMat ? 14 : look.links ? 8 : 9,
+    fx,
+    fxPad
   }
 }
 
@@ -2249,16 +2998,21 @@ function initGraph() {
       showAge: store.graphSettings.showAge,
       selectedId: store.selectedPersonId,
       labelOpacityOf: (n) => Math.min(1, nodeVisual(n).opacity),
-      ageOf
+      ageOf,
+      curveHandles: curveHandlesOpts(),
+      kinLens: kinOverlay(),
+      spotlight: spotlightOverlay(),
+      chronicle: birthChronicle()
     })
   }
   ctx.renderer = new WebGLGraphRenderer({
     glCanvas: glCanvasEl.value,
     overlayCanvas: overlayEl.value,
+    backdropEl: inkBackdropEl.value,
     hooks
   })
   ctx.renderer.resize(width, height)
-  ctx.renderer.setTheme(store.theme === 'light')
+  ctx.renderer.setTheme(store.isLightTheme, store.theme)
 
   // d3.zoom on the (topmost) overlay canvas drives the shared camera transform.
   ctx.zoomBehavior = d3
@@ -2449,6 +3203,8 @@ function updateGraph() {
   // family context (couple junctions + sibling groups) the routed line styles
   // (trident/elbow) read at draw time.
   stampFamilyContext(ctx.linksData, store.relTypeRoles)
+  applyCurves() // hand-shaped bezier curves ride on the fresh link objects
+  if (curveDrag && !ctx.linksData.includes(curveDrag.d)) curveDrag = null
   if (currentMode.value === 'auto') ctx.simulation.alpha(hadNew ? 0.3 : 0.1).restart()
   recomputeCouplesSet()
   ctx.renderer.setData(ctx.nodesData, ctx.linksData)
@@ -2495,6 +3251,9 @@ function zoomFilter(event) {
   // Shift-drag is reserved for marquee select — never let d3 pan with it.
   if (event.shiftKey) return false
   const w = clientToWorld(event.clientX, event.clientY)
+  // Pressing a bezier handle or the selected curve reshapes it — no pan.
+  const cd = curveEditLink()
+  if (cd && (pickCurveHandle(cd, event.clientX, event.clientY) || onCurveBody(cd, w))) return false
   const hit = pickVisibleNode(w.x, w.y)
   if (hit && !store.lockNodes) return false // grabbing a node -> no pan
   return true
@@ -2717,6 +3476,9 @@ function onPointerDown(e) {
     window.getSelection?.()?.removeAllRanges?.()
   }
   const w = clientToWorld(e.clientX, e.clientY)
+  // Bezier route: grabbing a handle / the selected curve reshapes it (handles
+  // win over nodes so one sitting on a person stays reachable).
+  if (!e.shiftKey && !e.ctrlKey && !e.metaKey && beginCurveDrag(e, w)) return
   const node = pickVisibleNode(w.x, w.y)
   // Ctrl/Cmd-click = connection trace (arm an anchor / trace to the second person)
   // — intercepted before dragging so the node never budges.
@@ -2742,6 +3504,9 @@ function onPointerDown(e) {
     return
   }
   if (node && !store.lockNodes) {
+    // A layout transition still animating would keep dragging the node back
+    // (and its end-of-drag save would catch everyone mid-flight): land it.
+    finishAnimation()
     // Grabbing a node that's part of the multi-selection moves the whole
     // selection together (bonds follow their endpoints automatically).
     let group = null
@@ -2752,7 +3517,14 @@ function onPointerDown(e) {
         .filter((n) => n !== node && sel.has(n.id))
         .map((n) => ({ n, dx: n.x - node.x, dy: n.y - node.y }))
     }
-    drag = { node, group, moved: false, downX: e.clientX, downY: e.clientY }
+    drag = {
+      node,
+      group,
+      moved: false,
+      downX: e.clientX,
+      downY: e.clientY,
+      before: captureLayoutState() // undo memento, recorded on a real move
+    }
     grab = { dx: w.x - node.x, dy: w.y - node.y }
     try {
       overlayEl.value.setPointerCapture(e.pointerId)
@@ -2793,6 +3565,10 @@ function onPointerMove(e) {
     moveMarquee(e)
     return
   }
+  if (curveDrag) {
+    moveCurveDrag(e)
+    return
+  }
   if (drag) {
     if (!drag.moved && Math.hypot(e.clientX - drag.downX, e.clientY - drag.downY) > 3)
       drag.moved = true
@@ -2818,6 +3594,10 @@ function onPointerUp(e) {
     if (mr.moved) commitMarquee(mr)
     return
   }
+  if (curveDrag) {
+    endCurveDrag()
+    return
+  }
   if (drag) {
     const d = drag.node,
       m = currentMode.value
@@ -2828,7 +3608,7 @@ function onPointerUp(e) {
         n.fx = null
         n.fy = null
       }
-    } else if (m === 'custom') {
+    } else if (m === 'custom' || m === 'spotlight') {
       snapshotMode('custom')
     } else if (m === 'age') {
       snapshotMode('age')
@@ -2844,6 +3624,7 @@ function onPointerUp(e) {
       cleanupEmptyGenRows(ctx, snapshotGenMode, ticked)
     }
     ctx.renderer.invalidatePicker()
+    if (drag.moved) store.recordLayoutStep(drag.before, 'move')
     // A press that never moved is a plain click → select the person (the
     // action pane appears; Details / double-click opens the profile card).
     if (!drag.moved) {
@@ -2885,6 +3666,7 @@ function onPointerUp(e) {
 function onDblClick(e) {
   if (editMode.value) return // mode clicks are deliberate — never pop the card
   const w = clientToWorld(e.clientX, e.clientY)
+  if (resetCurveAt(e, w)) return // double-click a shaped curve → default shape
   const node = pickVisibleNode(w.x, w.y)
   if (node && !store.lockNodes) {
     store.relPopup = null
@@ -2904,6 +3686,7 @@ function onDirectoryDrop(e) {
   if (!pid) return
   const node = ctx.nodesData.find((n) => n.id === pid)
   if (!node) return
+  store.recordLayoutStep(captureLayoutState(), 'move')
   const w = clientToWorld(e.clientX, e.clientY)
   const m = currentMode.value
   node.x = w.x
@@ -2919,17 +3702,42 @@ function onDirectoryDrop(e) {
   } else if (m !== 'age') {
     node.fy = w.y
   }
-  ticked()
   ctx.renderer?.invalidatePicker()
-  saveCurrentState()
+  if (m === 'generation') settleOntoGenRow(node)
+  else {
+    ticked()
+    saveCurrentState()
+  }
+}
+
+// Generations: a person placed by hand (Add mode, Directory drop) lands on
+// the nearest row — or opens a new one — exactly like a dragged node, so the
+// saved arrangement never has anyone floating between generations.
+function settleOntoGenRow(node) {
+  const ty = resolveGenTarget(node.y, ctx)
+  node.y = ty
+  node.fy = ty
+  ticked()
+  cleanupEmptyGenRows(ctx, snapshotGenMode, ticked)
 }
 
 // Hover glow (only meaningful when not dragging).
 function onHoverMove(e) {
   lastMouse = containerXY(e) // remembered so the action wheel opens under the cursor
   if (editMode.value?.kind === 'link' && linkAnchorId.value) ghostMouse.value = lastMouse
-  if (drag) return
+  if (drag || curveDrag) return
   const w = clientToWorld(e.clientX, e.clientY)
+  // Bezier handles light up under the cursor.
+  const cd = curveEditLink()
+  const hot = cd ? pickCurveHandle(cd, e.clientX, e.clientY) : null
+  if (hot !== curveHot) {
+    curveHot = hot
+    ctx.renderer?.requestRedraw()
+  }
+  if (hot) {
+    if (overlayEl.value) overlayEl.value.style.cursor = 'grab'
+    return
+  }
   const node = pickVisibleNode(w.x, w.y)
   const id = node ? node.id : null
   if (id !== hoverId) {
@@ -2952,7 +3760,13 @@ function onHoverMove(e) {
     markLinkStyles()
   }
   if (overlayEl.value) {
-    overlayEl.value.style.cursor = node ? 'grab' : overLink ? 'pointer' : ''
+    overlayEl.value.style.cursor = node
+      ? 'grab'
+      : overLink
+        ? overLink === cd
+          ? 'move' // the selected bezier curve: drag to bend it
+          : 'pointer'
+        : ''
   }
 }
 
@@ -2982,11 +3796,13 @@ function switchMode(newMode) {
   if (newMode === currentMode.value) return
   const scene = activeScene.value
   if (!scene) return
-  cancelAnimation()
   // Leaving the 3D stage: fold its live arrangement into the working copy
   // BEFORE the mode flips (the 2D entry below animates to these positions).
   if (currentMode.value === 'space') graph3dRef.value?.writeBack?.()
+  // Save before cancelling so a transition still in flight is saved at its
+  // destination (see snapshotActiveScene).
   if (ctx.nodesData.length) saveCurrentState()
+  cancelAnimation()
   removeGuides(ctx)
 
   const type = MODE_TO_TYPE[newMode]
@@ -3010,6 +3826,7 @@ function switchMode(newMode) {
   else if (newMode === 'custom') enterCustomMode()
   else if (newMode === 'age') enterAgeMode()
   else if (newMode === 'generation') enterGenerationMode()
+  else if (newMode === 'spotlight') enterSpotlightMode()
 
   applyEmphasis()
 }
@@ -3169,16 +3986,20 @@ function enterGenerationMode() {
   const { width, height } = container.getBoundingClientRect()
 
   const w = workingOf(activeSceneId.value)
-  if (hasSnapshot() && w?.config?.genRowYValues) {
-    // Restore saved positions and saved row state exactly as they were
-    const snap = ctx.activeSnapshot
-    ctx.genRowYValues = [...w.config.genRowYValues]
-    if (w.config.genRowSpacing) ctx.genRowSpacing = w.config.genRowSpacing
-
-    const targets = {}
-    ctx.nodesData.forEach((n) => {
-      targets[n.id] = snap[n.id] ? { x: snap[n.id].x, y: snap[n.id].y } : { x: n.x, y: n.y }
-    })
+  if (hasSnapshot()) {
+    // Restore the saved arrangement and its rows. reconcileGenRows keeps a
+    // healthy save exactly as it was, and repairs one whose people ended up
+    // between rows (saves from before the row-glide fix, people added since)
+    // — every person in Generations sits on a row.
+    const { targets, rows, healed } = reconcileGenRows(
+      ctx.nodesData,
+      ctx.activeSnapshot,
+      w?.config?.genRowYValues
+    )
+    ctx.genRowYValues = rows
+    if (w?.config?.genRowSpacing) ctx.genRowSpacing = w.config.genRowSpacing
+    else if (rows.length > 1)
+      ctx.genRowSpacing = (rows[rows.length - 1] - rows[0]) / (rows.length - 1)
 
     // Build genInfo-like object for drawing guides from saved rows
     const savedGenInfo = {
@@ -3192,6 +4013,7 @@ function enterGenerationMode() {
           n.fy = n.y
         })
         drawGenGuides(ctx, savedGenInfo)
+        if (healed || !w?.config?.genRowYValues) snapshotGenMode()
         reapplyDrag()
       },
       MOTION.generation()
@@ -3205,7 +4027,8 @@ function enterGenerationMode() {
     store.relationships,
     width,
     height,
-    store.relTypeRoles
+    store.relTypeRoles,
+    { nodeRadius: store.graphSettings.nodeRadius }
   )
 
   // If no nodes or no generations computed, create default guide lines
@@ -3243,6 +4066,182 @@ function enterGenerationMode() {
   }
 }
 
+// ── Spotlight (the main-character layout) ───────────────────────────────────
+// One person takes centre stage; everyone else stands on concentric rings by
+// how close they are to them — inner circle, close family, extended family,
+// distant kin, the unconnected outside (math: graph/spotlightLayout.ts). The
+// lead is remembered per scene in the spotlight arrangement's config, so each
+// scene can feature its own main character. Every node carries its title as
+// seen from the lead ("aunt", 表姐, farmor…), via the kinship engine.
+const spotlightMain = ref(null)
+const spotlightTitles = ref(true) // kin titles above every node
+const spotPickerOpen = ref(false)
+const spotlightActive = computed(() => currentMode.value === 'spotlight')
+let spotlightRings = [] // [{ ring, r, label, count }] — the overlay's guide circles
+let spotlightRingOf = {} // person id → ring (−1 = not connected)
+
+function spotlightAlive(id) {
+  return !!id && store.persons.some((p) => p.id === id)
+}
+
+/** The scene's lead: its saved choice, else the selection, else the most
+ *  connected person. Written back so the choice sticks. */
+function resolveSpotlightMain() {
+  const w = workingOf(activeSceneId.value, 'spotlight')
+  let id = w?.config?.mainId
+  if (!spotlightAlive(id)) {
+    id = spotlightAlive(store.selectedPersonId)
+      ? store.selectedPersonId
+      : defaultMainCharacter(
+          kinship.index.value,
+          store.persons.map((p) => p.id)
+        )
+  }
+  if (w && id) w.config.mainId = id
+  spotlightMain.value = id || null
+  return spotlightMain.value
+}
+
+/** Fresh ring targets around `mainId`, centred in the viewport. */
+function spotlightTargets(mainId) {
+  const { width, height } = ctx.containerRef.getBoundingClientRect()
+  const R = store.graphSettings.nodeRadius || 22
+  const res = computeSpotlightLayout(
+    ctx.nodesData.map((n) => n.id),
+    mainId,
+    kinship.index.value,
+    kinship.lensOf(mainId),
+    { cx: width / 2, cy: height / 2, base: R * 7.6, ringGap: R * 5.6, spacing: R * 4.4 }
+  )
+  spotlightRings = res.rings
+  spotlightRingOf = res.ringOf
+  return res.targets
+}
+
+function landSpotlight() {
+  ctx.nodesData.forEach((n) => {
+    n.fx = n.x
+    n.fy = n.y
+  })
+  snapshotMode()
+  reapplyDrag()
+  startSpotlightTitles()
+}
+
+function enterSpotlightMode() {
+  ctx.simulation.stop()
+  removeCurrentYearLine(ctx)
+  const mainId = resolveSpotlightMain()
+  if (!mainId || !ctx.containerRef) return
+  // Rings always come from a fresh pass (radii, ring membership); a saved
+  // arrangement keeps everyone where they were left, newcomers take a slot.
+  const fresh = spotlightTargets(mainId)
+  const targets = hasSnapshot() ? { ...fresh, ...ctx.activeSnapshot } : fresh
+  animateToPositionsWithReset(targets, landSpotlight, MOTION.spotlight())
+  markNodeStyles()
+}
+
+/** Re-run the rings from scratch (refresh button, a new lead). */
+function layoutSpotlight() {
+  const mainId = resolveSpotlightMain()
+  if (!mainId || !ctx.containerRef) return
+  cancelAnimation()
+  ctx.simulation.stop()
+  animateToPositionsWithReset(spotlightTargets(mainId), landSpotlight, MOTION.spotlight())
+  markNodeStyles()
+}
+
+/** Put someone in the spotlight (switching the scene to Spotlight if needed). */
+function setMainCharacter(id) {
+  if (!spotlightAlive(id) || !activeScene.value) return
+  spotPickerOpen.value = false
+  store.recordLayoutStep(captureLayoutState(), 'layout')
+  const w = workingOf(activeSceneId.value, 'spotlight')
+  w.config.mainId = id
+  w.positions = {} // a new lead → a fresh arrangement around them
+  if (!spotlightActive.value) switchMode('spotlight')
+  else layoutSpotlight()
+  showWheelFlash('🌟', `${kinship.personName(id)} takes the spotlight`)
+}
+function onSpotPick(p) {
+  if (p?.id) setMainCharacter(p.id)
+}
+
+// Titles fade in by closeness after each arrangement lands (the kinship
+// reveal clock), the lead first, the outer rings last.
+function startSpotlightTitles() {
+  if (spotlightTitles.value && !kinLensMap.value) startKinReveal()
+}
+
+// The lead was deleted → hand the stage to someone else.
+watch(
+  () => store.persons.length,
+  () => {
+    if (spotlightActive.value && spotlightMain.value && !spotlightAlive(spotlightMain.value)) {
+      layoutSpotlight()
+    }
+  }
+)
+watch(spotlightTitles, () => ctx.renderer?.requestRedraw())
+
+/** What the overlay draws for Spotlight (null when it's not the layout). */
+function spotlightOverlay() {
+  if (!spotlightActive.value || !spotlightMain.value || pathActive.value) return null
+  const n = ctx.nodesData.find((x) => x.id === spotlightMain.value)
+  if (!n) return null
+  return {
+    x: n.x,
+    y: n.y,
+    rings: spotlightRings,
+    color: '#f5c542',
+    light: store.isLightTheme,
+    radius: store.graphSettings.nodeRadius
+  }
+}
+
+// ── The chronicle on the Birth layout ───────────────────────────────────────
+// Birth's vertical axis is time, so eras band it and events mark it — mapped
+// through the same year→y the year guides use (guideLines yearGuideCtx).
+const graphChronicle = computed(() => chronicleViewModel(store.eras, store.events))
+watch(graphChronicle, () => ctx.requestRedraw?.())
+const chronOpen = ref(false)
+
+/** Centre a year on screen — via the Birth layout, whose y axis is time. */
+function graphJumpToYear(year) {
+  if (year == null || !Number.isFinite(year)) return
+  if (currentMode.value !== 'age') {
+    switchMode('age')
+    setTimeout(() => graphJumpToYear(year), 700) // after the type transition lands
+    return
+  }
+  const info = ctx.yearGuideCtx
+  const el = ctx.containerRef
+  if (!info || !el || !ctx.zoomBehavior) return
+  const span = info.maxYear - info.minYear || 1
+  const wy = info.padding + ((year - info.minYear) / span) * info.usableHeight
+  const k = ctx.transform.k
+  const sy = ctx.transform.sy ?? 1
+  const next = d3.zoomIdentity
+    .translate(ctx.transform.x, el.clientHeight / 2 - wy * sy * k)
+    .scale(k)
+  ctx.zoomSelection
+    .transition()
+    .duration(480)
+    .ease(d3.easeCubicInOut)
+    .call(ctx.zoomBehavior.transform, next)
+}
+function birthChronicle() {
+  const info = ctx.yearGuideCtx
+  if (currentMode.value !== 'age' || !info) return null
+  if (!store.eras.length && !store.events.length) return null
+  const span = info.maxYear - info.minYear || 1
+  return {
+    ...graphChronicle.value,
+    light: store.isLightTheme,
+    yOf: (year) => info.padding + ((year - info.minYear) / span) * info.usableHeight
+  }
+}
+
 // ── Refresh layout ──────────────────────────────────────────────────────────
 // Re-runs the family-tree layout algorithm on the current data and animates the
 // nodes into the fresh arrangement. Mode-aware: Generation rebuilds its rows,
@@ -3253,6 +4252,7 @@ let refreshSpinTimer = null
 
 function refreshLayout() {
   if (!ctx.nodesData.length || !ctx.containerRef) return
+  store.recordLayoutStep(captureLayoutState(), 'layout')
   cancelAnimation()
   ctx.simulation.stop()
   refreshSpinning.value = true
@@ -3264,12 +4264,17 @@ function refreshLayout() {
 
   const { width, height } = ctx.containerRef.getBoundingClientRect()
   const mode = currentMode.value
+  if (mode === 'spotlight') {
+    layoutSpotlight()
+    return
+  }
   const genInfo = computeGenLayout(
     ctx.nodesData,
     store.relationships,
     width,
     height,
-    store.relTypeRoles
+    store.relTypeRoles,
+    { nodeRadius: store.graphSettings.nodeRadius }
   )
 
   if (mode === 'age') {
@@ -3498,7 +4503,8 @@ function exportImage({ width, height, light = null }) {
     height,
     transform: t,
     light,
-    overlayOpts: ctx.renderer.hooks.overlayOpts()
+    // Edit handles are UI, never part of the picture.
+    overlayOpts: { ...ctx.renderer.hooks.overlayOpts(), curveHandles: null }
   })
 }
 
@@ -3510,7 +4516,12 @@ let scenesInitialized = false
 // selected people. Overlays (modal/form) own Esc while they're up.
 function onGlobalKeydown(e) {
   if (e.key !== 'Escape') return
+  if (store.activeView !== 'graph') return // other views peel their own layers
   if (store.modalOpen || store.formOpen) return
+  if (quizOpen.value) {
+    quizOpen.value = false
+    return
+  }
   if (wheelConfigOpen.value) {
     wheelConfigOpen.value = false
   } else if (wheelOpen.value) {
@@ -3528,12 +4539,15 @@ function onGlobalKeydown(e) {
     marqueeRaw = null
     marquee.value = null
   } else if (pathInfo.value || pathAnchor.value) clearPath()
+  else if (kinLensOn.value) kinLensOn.value = false
   else if (store.relPopup) store.relPopup = null
   else if (store.marqueeActive || store.selectedRelationshipIds.length) store.clearGraphSelection()
   else if (store.selectedPersonIds.length) store.selectPerson(null, { modal: false })
 }
 
+let unregisterLayoutHistory = null
 onMounted(() => {
+  unregisterLayoutHistory = store.registerLayoutHistory(restoreLayoutState)
   initGraph()
   updateGraph()
   window.addEventListener('keydown', onGlobalKeydown)
@@ -3545,6 +4559,7 @@ onMounted(() => {
   window.addEventListener('blur', cancelWheel)
 })
 onUnmounted(() => {
+  unregisterLayoutHistory?.()
   window.removeEventListener('keydown', onGlobalKeydown)
   window.removeEventListener('keydown', onStretchKeyDown)
   window.removeEventListener('keyup', onStretchKeyUp)
@@ -3600,6 +4615,16 @@ watch(
 )
 // A clicked / marquee-selected bond lights up the line itself.
 watch([() => store.relPopup, () => store.selectedRelationshipIds], () => markLinkStyles())
+// Bezier route: selecting a bond reveals its handles — say how to use them.
+watch(
+  () => store.relPopup?.rel?.id,
+  (id) => {
+    curveHot = null
+    if (id && curveEditLink()) {
+      showWheelFlash('〰', 'Drag the line or its handles · double-click to reset')
+    }
+  }
+)
 // Time travel: re-sync styles per scrub/playback step, but only while this view
 // is actually on screen (it stays mounted, hidden, behind the other views);
 // watching activeView too re-syncs on the way back in if time moved meanwhile.
@@ -3634,20 +4659,23 @@ watch(
     refreshCurrentYearLine(true)
   }
 )
-watch(
-  () => store.theme,
-  () => {
-    if (!ctx.renderer) return
-    ctx.renderer.setTheme(store.theme === 'light') // marks node+link dirty + redraws; overlay recolours
-    refreshCurrentYearLine(false)
-  }
-)
+watch([() => store.theme, () => store.accent], () => {
+  if (!ctx.renderer) return
+  ctx.renderer.setTheme(store.isLightTheme, store.theme) // marks node+link dirty + redraws; overlay recolours
+  refreshCurrentYearLine(false)
+})
+let lastForceKey = ''
 watch(
   () => store.graphSettings,
   () => {
     if (!ctx.renderer || !ctx.simulation) return
     const gs = store.graphSettings
-    if (currentMode.value === 'auto') {
+    // Only force-related knobs re-heat the simulation — dragging a cosmetic
+    // slider (line effect speed, glow, colours) must not jiggle the layout.
+    const forceKey = `${gs.linkDistance}|${gs.chargeStrength}|${gs.nodeRadius}`
+    const forcesChanged = forceKey !== lastForceKey
+    lastForceKey = forceKey
+    if (currentMode.value === 'auto' && forcesChanged) {
       applyLinkForceParams()
       ctx.simulation.force('charge').strength(gs.chargeStrength)
       ctx.simulation.force('collide').radius(gs.nodeRadius + 30)
@@ -3697,6 +4725,12 @@ watch(
 .graph-area textarea {
   user-select: text;
   -webkit-user-select: text;
+}
+.ink-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 .graph-gl {
   position: absolute;
@@ -3830,7 +4864,7 @@ watch(
 .ctrl-btn-active {
   background: var(--adim);
   color: var(--accent);
-  border: 1px solid rgba(108, 142, 245, 0.3);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
 }
 .ctrl-sep {
   width: 1px;
@@ -3928,8 +4962,8 @@ watch(
   background: none !important;
 }
 .ctrl-btn-lock {
-  background: rgba(239, 83, 80, 0.15);
-  color: #ef5350;
+  background: rgba(var(--danger-rgb), 0.15);
+  color: var(--danger);
 }
 /* Scene tab strip inside the floating bottom bar: restyle the shared banner
    component into the old states-bar pill */
@@ -4107,7 +5141,7 @@ watch(
   animation-delay: calc(0.12s + var(--i, 0) * 0.045s);
 }
 .rtl-meter-fill.neg {
-  background: #ef5350;
+  background: var(--danger);
 }
 @keyframes rtl-meter-grow {
   from {
@@ -4370,6 +5404,24 @@ watch(
   box-shadow:
     var(--shadow),
     0 0 34px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+/* The trace card grows a kinship headline + arch above the hop chain. */
+.path-card-kin {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: min(760px, calc(100% - 48px));
+  max-height: calc(100% - 130px);
+  overflow-y: auto;
+  padding: 14px 40px 12px 18px;
+}
+.path-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 9px;
+  border-top: 1px solid var(--border);
 }
 .path-title {
   display: flex;
@@ -4689,7 +5741,7 @@ watch(
 }
 .seg-thumb-couples.seg-pos-2 {
   left: calc(200% / 4);
-  background: #ef5350;
+  background: var(--danger);
 }
 .seg-thumb-couples.seg-pos-3 {
   left: calc(300% / 4);
@@ -5050,5 +6102,123 @@ watch(
   .wheel-hud-ring {
     animation: none;
   }
+}
+
+/* ── Spotlight HUD ─────────────────────────────────────────────────────── */
+.spot-hud {
+  position: absolute;
+  top: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 7px 5px 12px;
+  border-radius: var(--r-pill);
+  background: var(--glass-strong);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid rgba(245, 197, 66, 0.45);
+  box-shadow:
+    var(--shadow-sm),
+    0 0 26px rgba(245, 197, 66, 0.18);
+  transition:
+    transform 0.4s var(--ease-std),
+    opacity 0.3s ease;
+}
+.spot-star {
+  display: inline-block;
+  animation: spot-twinkle 2.6s ease-in-out infinite;
+}
+@keyframes spot-twinkle {
+  50% {
+    transform: rotate(18deg) scale(1.18);
+    filter: drop-shadow(0 0 6px rgba(245, 197, 66, 0.9));
+  }
+}
+.spot-k {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--t3);
+}
+.spot-name {
+  --pc: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: rgba(245, 197, 66, 0.14);
+  color: var(--t1);
+  border-radius: var(--r-pill);
+  padding: 3px 10px 3px 6px;
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background var(--dur) ease;
+}
+.spot-name:hover {
+  background: rgba(245, 197, 66, 0.26);
+}
+.spot-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--pc);
+  box-shadow:
+    0 0 0 2px rgba(245, 197, 66, 0.85),
+    0 0 10px rgba(245, 197, 66, 0.6);
+}
+.spot-caret {
+  font-size: 9px;
+  color: var(--t3);
+}
+.spot-btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--t2);
+  border-radius: var(--r-pill);
+  padding: 2px 9px;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    background var(--dur) ease,
+    color var(--dur) ease;
+}
+.spot-btn.on {
+  background: rgba(245, 197, 66, 0.18);
+  color: var(--t1);
+}
+.spot-picker {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 280px;
+  padding: 8px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  animation: canvas-pane-in 0.3s var(--ease-out);
+}
+.spot-hud.clean-hide-up {
+  transform: translateX(-50%) translateY(calc(-100% - 80px));
+}
+.spothud-enter-active,
+.spothud-leave-active {
+  transition:
+    opacity 0.3s ease,
+    transform 0.45s var(--ease-spring);
+}
+.spothud-enter-from,
+.spothud-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-14px) scale(0.9);
 }
 </style>

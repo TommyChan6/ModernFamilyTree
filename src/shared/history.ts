@@ -18,6 +18,8 @@
 import type {
   AuthCtx,
   CharacterDoc,
+  Era,
+  StoryEvent,
   DB,
   EntityTag,
   Env,
@@ -40,8 +42,10 @@ type Handler = (db: DB, data: any, env: Env, ctx?: AuthCtx) => unknown
  *  often to be meaningful undo steps and are covered by the checkpoint. */
 export const UNDOABLE_CHANNELS = new Set([
   'persons:create',
+  'persons:createMany',
   'persons:update',
   'persons:delete',
+  'persons:deleteMany',
   'fields:createDef',
   'fields:updateDef',
   'fields:deleteDef',
@@ -49,6 +53,7 @@ export const UNDOABLE_CHANNELS = new Set([
   'fields:setSlot',
   'fields:setValue',
   'fields:setValues',
+  'fields:setValuesBatch',
   'fields:removeValue',
   'fields:applyDisplayAll',
   'relationships:create',
@@ -70,7 +75,12 @@ export const UNDOABLE_CHANNELS = new Set([
   'images:delete',
   'characters:save',
   'characters:delete',
-  'characters:setPortrait'
+  'characters:setPortrait',
+  'eras:save',
+  'eras:saveMany',
+  'eras:delete',
+  'events:save',
+  'events:delete'
 ])
 
 /** Undo steps kept per project. Snapshots are full copies of the project's
@@ -89,6 +99,8 @@ interface HistorySnapshot {
   scene_tags: Record<string, SceneTag>
   images: Record<string, ImageRecord>
   characters: Record<string, CharacterDoc>
+  eras: Record<string, Era>
+  events: Record<string, StoryEvent>
 }
 
 interface HistoryEntry {
@@ -169,7 +181,9 @@ function captureSnapshot(db: DB, pid: string): HistorySnapshot {
       (r) => r.project_id === pid,
       (r) => ({ ...r })
     ),
-    characters: pick(db.characters || {}, (r) => r.project_id === pid)
+    characters: pick(db.characters || {}, (r) => r.project_id === pid),
+    eras: pick(db.eras || {}, (r) => r.project_id === pid),
+    events: pick(db.events || {}, (r) => r.project_id === pid)
   }
 }
 
@@ -208,6 +222,11 @@ function restoreSnapshot(db: DB, pid: string, snap: HistorySnapshot): void {
   )
   db.characters = db.characters || {}
   swap(db.characters, (r) => r.project_id === pid, snap.characters)
+  db.eras = db.eras || {}
+  db.events = db.events || {}
+  // Snapshots taken before the chronicle existed carry no eras/events.
+  swap(db.eras, (r) => r.project_id === pid, snap.eras || {})
+  swap(db.events, (r) => r.project_id === pid, snap.events || {})
 }
 
 // ── Deferred image-file GC ───────────────────────────────────────────────────

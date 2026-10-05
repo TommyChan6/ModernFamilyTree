@@ -93,6 +93,7 @@ import { useMainStore } from '../store/index.js'
 import { api } from '../api'
 import RightSidebar from './RightSidebar.vue'
 import TagChipsEditor from './TagChipsEditor.vue'
+import { inkAvatarBg } from './ui/inkChrome'
 
 // The tabbed, collapsible right dock: Inspector (selection details + quick
 // edit) and Directory (the draggable member roster, dragged onto a canvas to
@@ -119,6 +120,7 @@ function initials(name) {
 }
 
 function avatarGradient(gender) {
+  if (store.isInk) return inkAvatarBg(gender)
   if (gender === 'male') return 'linear-gradient(135deg, #3a7bd5, #2351a0)'
   if (gender === 'female') return 'linear-gradient(135deg, #c95fa0, #923075)'
   return 'linear-gradient(135deg, #5c6bc0, #3c4a9e)'
@@ -304,5 +306,101 @@ function avatarGradient(gender) {
   color: var(--t3);
   line-height: 1.6;
   max-width: 200px;
+}
+
+/* ── 水墨 ink theme: the dock is a side panel of the mount — paper with a
+   silk band along its inner edge; the active tab is underlined by a brush ── */
+:root[data-theme='ink'] .right-dock {
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  border-left-color: var(--ink-mount-line);
+  box-shadow:
+    inset 4px 0 0 var(--ink-silk),
+    inset 5px 0 0 rgba(58, 42, 22, 0.18);
+}
+:root[data-theme='ink'] .dock-tabs {
+  border-bottom-color: rgba(48, 36, 20, 0.14);
+  padding-left: 12px;
+}
+:root[data-theme='ink'] .dock-tab {
+  position: relative;
+  border-bottom: none;
+  font-family: var(--font-ink-label);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+:root[data-theme='ink'] .dock-tab::after {
+  content: '';
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: 1px;
+  height: 6px;
+  background-color: var(--accent);
+  -webkit-mask: var(--ink-underline) center / 100% 100% no-repeat;
+  mask: var(--ink-underline) center / 100% 100% no-repeat;
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.5s var(--ease-out);
+}
+:root[data-theme='ink'] .dock-tab.active::after {
+  clip-path: inset(0 0 0 0);
+}
+:root[data-theme='ink'] .dock-tab:hover:not(.active)::after {
+  background-color: rgba(28, 26, 23, 0.3);
+  clip-path: inset(0 0 0 0);
+}
+:root[data-theme='ink'] .dock-collapse {
+  border-radius: 3px;
+}
+:root[data-theme='ink'] .insp-avatar {
+  box-shadow:
+    0 0 0 3px var(--surface),
+    0 0 0 4px rgba(48, 36, 20, 0.2);
+}
+:root[data-theme='ink'] .insp-initials {
+  font-family: var(--font-brush);
+  font-weight: 400;
+  font-size: 24px;
+  color: #fbf4e6;
+}
+:root[data-theme='ink'] .insp-name {
+  font-family: var(--font-brush);
+  font-size: 22px;
+  font-weight: 400;
+}
+:root[data-theme='ink'] .insp-label {
+  font-family: var(--font-ink-label);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant: small-caps;
+  text-transform: lowercase;
+  letter-spacing: 0.12em;
+}
+:root[data-theme='ink'] .insp-field {
+  font-size: 13.5px;
+}
+:root[data-theme='ink'] .insp-empty-icon {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-brush);
+  font-size: 26px;
+  color: var(--accent);
+  opacity: 0.85;
+}
+:root[data-theme='ink'] .insp-empty-icon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: var(--ink-black);
+  -webkit-mask: var(--ink-enso) center / contain no-repeat;
+  mask: var(--ink-enso) center / contain no-repeat;
+  animation: ink-enso-draw 1.4s var(--ease-out) both;
+}
+:root[data-theme='ink'] .insp-empty-text {
+  font-size: 13px;
 }
 </style>

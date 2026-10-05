@@ -1,10 +1,39 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { api, onUndoableMutation } from '../api'
 import { planHasFeature } from '../../../shared/auth'
+import { isPaidPlan, planHasPerk } from '../../../shared/billing'
 import { setSessionToken, clearSessionToken, getSessionToken } from '../api/session'
 import { latestDataYear } from './currentYear.js'
 import { locale, setLocale, isSupportedLocale } from '../i18n'
+import { accentVars, normalizeHex, DEFAULT_ACCENT } from '../lib/accent.js'
+import { revealTransition } from '../lib/themeReveal.js'
+import { installInkAssets } from '../lib/inkArt'
+import { toast } from '../lib/dialogs.js'
+
+/** Validate the saved Sheet layout JSON: widths are clamped positive numbers,
+ *  hidden is a string list, sort is { key, dir: ±1 } or null. Anything else
+ *  falls back to the defaults. */
+function parseSheetPrefs(raw) {
+  let v = null
+  try {
+    v = raw ? JSON.parse(raw) : null
+  } catch {
+    v = null
+  }
+  const widths = {}
+  if (v?.widths && typeof v.widths === 'object') {
+    for (const [k, w] of Object.entries(v.widths)) {
+      if (Number.isFinite(w)) widths[k] = Math.min(900, Math.max(48, Math.round(w)))
+    }
+  }
+  const hidden = Array.isArray(v?.hidden) ? v.hidden.filter((k) => typeof k === 'string') : []
+  const sort =
+    typeof v?.sort?.key === 'string' && (v.sort.dir === 1 || v.sort.dir === -1)
+      ? { key: v.sort.key, dir: v.sort.dir }
+      : null
+  return { widths, hidden, sort }
+}
 
 export const useMainStore = defineStore('main', () => {
   // ── Account / session ─────────────────────────────────────────────────────
@@ -39,6 +68,13 @@ export const useMainStore = defineStore('main', () => {
   const scenes = ref([]) // every saved Scene of the project, all views
   const sceneTags = ref([]) // tag placements ("Groups"): {id, scene_id, tag_id, x, y, visible}
   const characters = ref([]) // CharacterDocs (experimental Character view)
+  const maps = ref([]) // MapDocs (the Map view)
+  const eras = ref([]) // the chronicle: named stretches of time (shared/chronicle.ts)
+  const events = ref([]) // the chronicle: story events with their cast
+  // The era / event editor dialog (ChronicleEditor.vue, mounted once in App):
+  // { kind: 'era' | 'event', data: {…draft} } or null.
+  const chronicleEditor = ref(null)
+  const activeMapId = ref(null) // the map the Map view shows (per project)
   // Which scene is open, per spatial view ('groups' | 'graph' | 'timeline').
   const activeSceneIds = ref({ groups: null, graph: null, timeline: null })
   const draggingPersonId = ref(null) // person being dragged from the member list
@@ -56,10 +92,28 @@ export const useMainStore = defineStore('main', () => {
   const modalOpen = ref(false)
   const formOpen = ref(false)
   const editingPerson = ref(null)
+  // 'dark' | 'light' | 'ink' — ink (水墨) is a light, rice-paper theme with
+  // calligraphy and a cinnabar accent (styles/ink.css, lib/inkArt.ts).
   const theme = ref('dark')
+  const THEMES = ['dark', 'light', 'ink']
+  /** Renderers' `isLight` flag — ink paints on pale paper too. */
+  const isLightTheme = computed(() => theme.value !== 'dark')
+  const isInk = computed(() => theme.value === 'ink')
+  // The theme to return to when the ink toggle is switched off (session only).
+  const inkReturnTheme = ref('light')
+  const accent = ref(DEFAULT_ACCENT) // user accent color (hex) — see lib/accent.js
   const settingsOpen = ref(false) // graph "Style" side panel
   const appSettingsOpen = ref(false) // the app-wide Settings modal (language, help, feedback)
+  const appSettingsTab = ref('general') // which Settings tab opens (see openAppSettings)
   const userPageOpen = ref(false) // the full-screen profile / account page
+  const projectsPageOpen = ref(false) // the full-screen Projects library page
+  const browsePageOpen = ref(false) // the full-screen Browse (community trees) page
+  // Monetization (src/shared/billing.ts, docs/MONETIZATION.md): the pricing /
+  // checkout dialog, plus the server's view of the account's subscription.
+  const pricingOpen = ref(false)
+  const pricingContext = ref({}) // { reason: 'menu'|'quota'|'ads'|'feature', detail?, plan? }
+  const billingCatalog = ref(null) // billing:catalog — provider mode ('sandbox'|'none')
+  const billingStatus = ref(null) // billing:status — { plan, subscription, invoices }
   // Cinematic transition curtain: a full-screen animated overlay shown during
   // sign in / out, project switches, and opening the profile. It doubles as a
   // loading screen — `runWithCurtain` keeps it up for the work plus a minimum
@@ -88,7 +142,7 @@ export const useMainStore = defineStore('main', () => {
   // arrangement (scenes + placements + current-year override). Everything
   // autosaves; this is what Revert goes back to. null = never saved one.
   const checkpoint = ref(null)
-  const activeView = ref('graph') // 'graph' | 'directory' | 'relationships' | 'timeline' | 'groups'
+  const activeView = ref('graph') // 'graph' | 'directory' | 'relationships' | 'timeline' | 'groups' | 'map'
   // What this project calls its entries ('Person', 'Character', 'Ship'…).
   // Per-project setting; the data layer keeps saying "person" regardless.
   const noun = ref('Person')
@@ -101,16 +155,44 @@ export const useMainStore = defineStore('main', () => {
   // The graph's Tab-hold action wheel: the user's 8 slot descriptors, or null
   // for the built-in defaults (see components/graph/wheelModes.js). Per project.
   const wheelSlots = ref(null)
+  // The Directory Sheet's column layout: { widths: { colKey: px }, hidden:
+  // [colKey], sort: { key, dir: 1|-1 } | null }. Per project; colKeys are
+  // field-def ids or the sheet's derived columns (see people/sheetModel.ts).
+  const sheetPrefs = ref({ widths: {}, hidden: [], sort: null })
   // Directory card style ('classic' | 'poster' | 'holo' | 'neon' | 'arcana').
   // Per-project setting; the picker lives in the Directory toolbar.
   const cardStyle = ref('classic')
-  const CARD_STYLES = ['classic', 'poster', 'holo', 'neon', 'arcana']
+  // 'scroll' = the 水墨 hanging scroll (立轴) — see people/PersonCard.vue
+  const CARD_STYLES = ['classic', 'poster', 'holo', 'neon', 'arcana', 'scroll', 'moonfan']
+  // Person profile (PersonModal) presentation: the cinematic default, or the
+  // 水墨 handscroll ('scroll'). Per-project like the card style.
+  const profileStyle = ref('cinematic')
+  const PROFILE_STYLES = ['cinematic', 'scroll']
   // Directory viewing mode: the classic virtualized grid, one of the 3D card
   // stages (carousel ring / coverflow / hand fan / swipe deck), or a non-card
   // medium — 'hive' (honeycomb of hexagons) / 'reel' (a spinning drum of
-  // film-strip rows). Card style only applies to the card-based modes.
+  // film-strip rows) / 'sheet' (an editable spreadsheet of every trait).
+  // Card style only applies to the card-based modes.
   const viewMode = ref('grid')
-  const VIEW_MODES = ['grid', 'wheel', 'flow', 'fan', 'deck', 'hive', 'reel']
+  const VIEW_MODES = [
+    'grid',
+    'wheel',
+    'flow',
+    'fan',
+    'deck',
+    'hive',
+    'reel',
+    'sheet',
+    // Showcase mediums (the ✦ gallery in ViewModeSwitch)
+    'roster',
+    'codex',
+    'board',
+    'elements',
+    'ranks',
+    'bubbles',
+    // 长卷 — a painted handscroll that unrolls through the family
+    'handscroll'
+  ]
 
   // Graph visual settings. GRAPH_SETTING_DEFAULTS is the single source of
   // truth for keys + defaults: init, reset, and the settings:getAll restore
@@ -137,17 +219,47 @@ export const useMainStore = defineStore('main', () => {
     linkOpacity: 0.6,
     // ── Aesthetics system (see components/graph/graphThemes.js) ─────────────
     nodeShape: 'circle', // circle|square|diamond|hexagon|shield|oval|octagon|heart
-    nodeDecor: 'none', // none|aura|runes|orbit|burst|pulse
+    nodeDecor: 'none', // none|aura|runes|orbit|burst|pulse|enso
     decorColor: '#d4af37',
-    linkRoute: 'organic', // organic|straight|arc|elbow|trident|circuit|wave
-    ambientFx: 'none', // none|fireflies|stars|petals|snow|embers|rain|motes
+    linkRoute: 'organic', // organic|straight|arc|elbow|trident|circuit|wave|bezier|brush
+    ambientFx: 'none', // none|fireflies|stars|petals|snow|embers|rain|motes|mist|plum
     ambientColorA: '#ffd27a',
     ambientColorB: '#7ac9ff',
     ambientDensity: 0.5,
     renderQuality: 'quality', // 'quality' | 'performance'
-    themePreset: 'classic'
+    themePreset: 'classic',
+    // ── Line effects (components/graph/webgl/lineFx.js) ──────────────────────
+    lineFx: 'none', // none|blood|river|neon|helix|ember|aurora|storm|stars|gilded
+    lineFxScope: 'lineage', // lineage (parent→child) | family (+ couples) | all
+    lineFxSpeed: 1, // animation speed ×
+    lineFxGlow: 1, // glow strength ×
+    lineFxKeep: false // true = keep each relationship's own colour
   }
   const graphSettings = ref({ ...GRAPH_SETTING_DEFAULTS })
+
+  // Timeline visual settings (the Timeline's Style pane) — same persistence
+  // scheme as the graph's (timeline_* keys, JSON values, type-checked restore).
+  const TIMELINE_SETTING_DEFAULTS = {
+    // classic | tube | glass | glow | a line-effect id (blood, river, neon, helix…)
+    lifelineStyle: 'classic',
+    lifelineWidth: 6,
+    shadows: true,
+    avatarSize: 1,
+    connectors: 'curve', // curve | straight | hidden
+    labels: 'full', // full | compact | hidden
+    ageTicks: false, // decade ticks along each lifeline
+    grid: 'bands', // bands | lines | none
+    eraIntensity: 1,
+    eventMarkers: 'pills', // pills | dots | hidden
+    fxSpeed: 1,
+    fxGlow: 1,
+    fxKeep: false, // effects keep the person's colour instead of their own palette
+    ambientFx: 'none',
+    ambientColorA: '#ffd27a',
+    ambientColorB: '#7ac9ff',
+    ambientDensity: 0.5
+  }
+  const timelineSettings = ref({ ...TIMELINE_SETTING_DEFAULTS })
 
   // ── Computed ───────────────────────────────────────────────────────────────
   const selectedPerson = computed(
@@ -254,6 +366,7 @@ export const useMainStore = defineStore('main', () => {
               'relationships',
               'timeline',
               'groups',
+              'map',
               // The experimental Character view rides the same gate as Space 3D
               ...(labs && allow('character') ? ['character'] : [])
             ],
@@ -438,6 +551,7 @@ export const useMainStore = defineStore('main', () => {
     scenes.value = []
     sceneTags.value = []
     characters.value = []
+    maps.value = []
     activeSceneIds.value = { groups: null, graph: null, timeline: null }
     selectedPersonId.value = null
     selectedPersonIds.value = []
@@ -454,8 +568,12 @@ export const useMainStore = defineStore('main', () => {
   async function logout() {
     // On the hosted build, sign-out is Supabase's; the state teardown is shared.
     if (usingSupabase) return signOut()
-    // Close the profile page first so it doesn't linger over the curtain.
+    // Close the profile/projects pages first so they don't linger over the curtain.
     userPageOpen.value = false
+    projectsPageOpen.value = false
+    browsePageOpen.value = false
+    pricingOpen.value = false
+    billingStatus.value = null
     await runWithCurtain(
       'logout',
       'Signing out…',
@@ -566,6 +684,10 @@ export const useMainStore = defineStore('main', () => {
 
   async function signOut() {
     userPageOpen.value = false
+    projectsPageOpen.value = false
+    browsePageOpen.value = false
+    pricingOpen.value = false
+    billingStatus.value = null
     const supabase = await sbClient()
     await runWithCurtain(
       'logout',
@@ -618,7 +740,7 @@ export const useMainStore = defineStore('main', () => {
       refreshUsage()
       return res.data
     }
-    if (res.error?.includes('limit')) alert(res.error)
+    if (res.error?.includes('limit')) toast(res.error, { tone: 'warning' })
     return null
   }
 
@@ -628,6 +750,63 @@ export const useMainStore = defineStore('main', () => {
       const idx = projects.value.findIndex((p) => p.id === id)
       if (idx !== -1) projects.value[idx] = res.data
     }
+  }
+
+  // Card metadata (name / description / visibility / hue / favorite).
+  // Returns the api envelope so the Projects page can surface errors inline.
+  async function updateProject(id, patch) {
+    const res = await api.invoke('projects:update', { id, ...patch })
+    if (res.success) {
+      const idx = projects.value.findIndex((p) => p.id === id)
+      if (idx !== -1) projects.value[idx] = res.data
+    }
+    return res
+  }
+
+  async function duplicateProject(id, name) {
+    const res = await api.invoke('projects:duplicate', { id, name })
+    if (res.success) {
+      projects.value.push(res.data)
+      refreshUsage()
+    }
+    return res
+  }
+
+  /** Download a project (default: the active one) as a portable project
+   *  file — see projects:export. Resolves { success, data: { file } }. */
+  async function exportProjectFile(id = activeProjectId.value) {
+    const res = await api.invoke('projects:export', { id })
+    if (!res.success) return res
+    const base =
+      String(res.data.project?.name || 'project')
+        .replace(/[\\/:*?"<>|]+/g, '')
+        .trim() || 'project'
+    const file = `${base}.familytree.json`
+    const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = file
+    a.click()
+    // Revoking in the same tick can cancel the download in some browsers.
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    return { success: true, data: { file } }
+  }
+
+  /** Import a project file's text as a NEW project (it does not switch to it). */
+  async function importProjectFile(text) {
+    let file
+    try {
+      file = JSON.parse(text)
+    } catch {
+      return { success: false, error: 'Not a project file' }
+    }
+    const res = await api.invoke('projects:import', { file })
+    if (res.success) {
+      projects.value.push(res.data)
+      refreshUsage()
+    }
+    return res
   }
 
   async function deleteProject(id) {
@@ -680,6 +859,9 @@ export const useMainStore = defineStore('main', () => {
       scenesRes,
       sceneTagsRes,
       charactersRes,
+      mapsRes,
+      erasRes,
+      eventsRes,
       settingsRes
     ] = await Promise.all([
       api.invoke('persons:getAll'),
@@ -691,6 +873,9 @@ export const useMainStore = defineStore('main', () => {
       api.invoke('scenes:getAll'),
       api.invoke('scene_tags:getAll'),
       api.invoke('characters:getAll'),
+      api.invoke('maps:getAll'),
+      api.invoke('eras:getAll'),
+      api.invoke('events:getAll'),
       api.invoke('settings:getAll')
     ])
     if (personsRes.success) persons.value = personsRes.data
@@ -705,6 +890,10 @@ export const useMainStore = defineStore('main', () => {
     if (scenesRes.success) scenes.value = scenesRes.data
     if (sceneTagsRes.success) sceneTags.value = sceneTagsRes.data
     if (charactersRes.success) characters.value = charactersRes.data
+    if (mapsRes.success) maps.value = mapsRes.data
+    // (A backend without the chronicle channels simply shows none.)
+    eras.value = erasRes.success ? erasRes.data : []
+    events.value = eventsRes.success ? eventsRes.data : []
     // Restore each view's active scene (the legacy activeScenarioId key still
     // works for groups because scenes kept the scenario ids), falling back to
     // the view's first scene.
@@ -737,6 +926,8 @@ export const useMainStore = defineStore('main', () => {
     } catch {
       wheelSlots.value = null
     }
+    // Restore the Sheet's column layout (garbage → defaults)
+    sheetPrefs.value = parseSheetPrefs(saved.sheetPrefs)
     // Restore the graph style settings (saved as JSON under graph_* keys).
     // Unknown keys are dropped; missing/garbage ones keep their default.
     const restoredGraph = { ...GRAPH_SETTING_DEFAULTS }
@@ -751,10 +942,29 @@ export const useMainStore = defineStore('main', () => {
       }
     }
     graphSettings.value = restoredGraph
+    const restoredTimeline = { ...TIMELINE_SETTING_DEFAULTS }
+    for (const key of Object.keys(TIMELINE_SETTING_DEFAULTS)) {
+      const raw = saved[`timeline_${key}`]
+      if (raw == null) continue
+      try {
+        const v = JSON.parse(raw)
+        if (typeof v === typeof TIMELINE_SETTING_DEFAULTS[key]) restoredTimeline[key] = v
+      } catch {
+        /* stale value — keep the default */
+      }
+    }
+    timelineSettings.value = restoredTimeline
     // Restore the directory card style (unknown/stale values → classic)
     cardStyle.value = CARD_STYLES.includes(saved.cardStyle) ? saved.cardStyle : 'classic'
+    profileStyle.value = PROFILE_STYLES.includes(saved.profileStyle)
+      ? saved.profileStyle
+      : 'cinematic'
     // Restore the directory viewing mode (unknown/stale values → grid)
     viewMode.value = VIEW_MODES.includes(saved.directoryViewMode) ? saved.directoryViewMode : 'grid'
+    // Restore the Map view's open map (stale ids → the first map)
+    activeMapId.value = maps.value.some((m) => m.id === saved.activeMapId)
+      ? saved.activeMapId
+      : maps.value[0]?.id || null
     // Undo stacks are per project — pick up this project's state
     refreshHistoryStatus()
   }
@@ -764,19 +974,114 @@ export const useMainStore = defineStore('main', () => {
   // the topbar buttons. Status is kept optimistically in sync (any successful
   // undoable mutation means "can undo, can't redo") and authoritatively after
   // undo/redo/load, so no extra round-trip rides on normal edits.
-  const historyStatus = ref({
+  //
+  // On top of the data stack sits ONE client-side undo timeline per project
+  // (the journal): every step the user can take back, in the order it
+  // happened — data edits ({ kind: 'data' }, mirrored 1:1 by the server's
+  // stack) interleaved with arrangement steps ({ kind: 'layout' }: a node
+  // drag, a reshaped curve, a node restyle, a layout refresh). Ctrl+Z always
+  // reverts the newest step of either kind. Layout steps carry a memento the
+  // owning view (GraphCanvas, via registerLayoutHistory) captured BEFORE the
+  // change; restoring it hands back the inverse memento for redo.
+  const serverHistory = ref({
     canUndo: false,
     canRedo: false,
     undoChannel: null,
     redoChannel: null
   })
+  const journals = new Map() // projectId → { undo: Entry[], redo: Entry[] }
+  const journalTick = ref(0)
+  const JOURNAL_CAP = 100
+  function journalOf(pid = activeProjectId.value) {
+    if (!journals.has(pid)) journals.set(pid, { undo: [], redo: [] })
+    return journals.get(pid)
+  }
+  function pushJournal(entry) {
+    const j = journalOf()
+    j.undo.push(entry)
+    if (j.undo.length > JOURNAL_CAP) j.undo.shift()
+    j.redo.length = 0 // a new step forks history — the redo branch is gone
+    journalTick.value++
+  }
+  const entryChannel = (e) => (!e ? null : e.kind === 'layout' ? 'layout:' + e.label : e.channel)
+
+  // What the topbar buttons + undo toasts read. With an empty journal (e.g.
+  // the desktop renderer reloaded while the main process kept its stacks) the
+  // server's own status is the fallback.
+  const historyStatus = computed(() => {
+    void journalTick.value
+    const j = journalOf()
+    const s = serverHistory.value
+    const top = j.undo[j.undo.length - 1]
+    const rtop = j.redo[j.redo.length - 1]
+    return {
+      canUndo: j.undo.length > 0 || s.canUndo,
+      canRedo: j.redo.length > 0 || (!j.undo.length && s.canRedo),
+      undoChannel: top ? entryChannel(top) : s.undoChannel,
+      redoChannel: rtop ? entryChannel(rtop) : s.redoChannel
+    }
+  })
   onUndoableMutation((channel) => {
-    historyStatus.value = { canUndo: true, canRedo: false, undoChannel: channel, redoChannel: null }
+    serverHistory.value = { canUndo: true, canRedo: false, undoChannel: channel, redoChannel: null }
+    pushJournal({ kind: 'data', channel })
   })
 
   async function refreshHistoryStatus() {
     const res = await api.invoke('history:status')
-    if (res.success) historyStatus.value = res.data
+    if (res.success) serverHistory.value = res.data
+    journalTick.value++
+  }
+
+  // Arrangement history: the graph registers the function that restores a
+  // memento (and returns the inverse one); views record steps as they happen.
+  let layoutHistoryHandler = null
+  function registerLayoutHistory(fn) {
+    layoutHistoryHandler = fn
+    return () => {
+      if (layoutHistoryHandler === fn) layoutHistoryHandler = null
+    }
+  }
+  /** Record one undoable arrangement step. `state` is the memento from
+   *  BEFORE the change; `label` names it for the toast (move / curve / style
+   *  / layout). */
+  function recordLayoutStep(state, label = 'move') {
+    if (!state) return
+    pushJournal({ kind: 'layout', label, state })
+  }
+  /** Groups view: remember where these groups' rings sit (in the active
+   *  groups scene) BEFORE they move, as one undo step. */
+  function recordGroupMoves(tagIds, label = 'move') {
+    const sceneId = activeSceneIds.value.groups
+    const moves = []
+    for (const tagId of tagIds) {
+      const p = sceneTags.value.find((st) => st.scene_id === sceneId && st.tag_id === tagId)
+      if (p) moves.push({ tagId, x: p.x, y: p.y })
+    }
+    if (moves.length)
+      pushJournal({ kind: 'layout', label, state: { view: 'groups', sceneId, moves } })
+  }
+  async function restoreGroupMoves(state) {
+    if (!scenes.value.some((s) => s.id === state.sceneId)) return null
+    activeView.value = 'groups'
+    if (activeSceneIds.value.groups !== state.sceneId) setActiveScene('groups', state.sceneId)
+    const inverse = { view: 'groups', sceneId: state.sceneId, moves: [] }
+    for (const m of state.moves) {
+      const p = sceneTags.value.find((st) => st.scene_id === state.sceneId && st.tag_id === m.tagId)
+      if (!p) continue
+      inverse.moves.push({ tagId: m.tagId, x: p.x, y: p.y })
+      await moveSceneTag(p.id, m.x, m.y)
+    }
+    return inverse.moves.length ? inverse : null
+  }
+
+  /** Forget every arrangement step (a checkpoint revert replaced the scenes
+   *  wholesale, so old mementos would resurrect a discarded arrangement). */
+  function dropLayoutHistory() {
+    for (const j of journals.values()) {
+      j.undo = j.undo.filter((e) => e.kind !== 'layout')
+      j.redo = j.redo.filter((e) => e.kind !== 'layout')
+    }
+    journalTick.value++
   }
 
   /** Re-fetch every data slice a history restore can touch (arrangement state
@@ -791,7 +1096,9 @@ export const useMainStore = defineStore('main', () => {
       tagsRes,
       entityTagsRes,
       sceneTagsRes,
-      charactersRes
+      charactersRes,
+      erasRes,
+      eventsRes
     ] = await Promise.all([
       api.invoke('persons:getAll'),
       api.invoke('fields:list'),
@@ -800,7 +1107,9 @@ export const useMainStore = defineStore('main', () => {
       api.invoke('tags:getAll'),
       api.invoke('entity_tags:getAll'),
       api.invoke('scene_tags:getAll'),
-      api.invoke('characters:getAll')
+      api.invoke('characters:getAll'),
+      api.invoke('eras:getAll'),
+      api.invoke('events:getAll')
     ])
     if (personsRes.success) persons.value = personsRes.data
     if (fieldsRes.success) {
@@ -813,6 +1122,8 @@ export const useMainStore = defineStore('main', () => {
     if (entityTagsRes.success) entityTags.value = entityTagsRes.data
     if (sceneTagsRes.success) sceneTags.value = sceneTagsRes.data
     if (charactersRes.success) characters.value = charactersRes.data
+    if (erasRes.success) eras.value = erasRes.data
+    if (eventsRes.success) events.value = eventsRes.data
     const alive = new Set(persons.value.map((p) => p.id))
     selectedPersonIds.value = selectedPersonIds.value.filter((id) => alive.has(id))
     if (selectedPersonId.value && !alive.has(selectedPersonId.value)) {
@@ -821,24 +1132,48 @@ export const useMainStore = defineStore('main', () => {
     }
     const relAlive = new Set(relationships.value.map((r) => r.id))
     selectedRelationshipIds.value = selectedRelationshipIds.value.filter((id) => relAlive.has(id))
-    if (relPopup.value && !relAlive.has(relPopup.value.id)) relPopup.value = null
+    // relPopup holds { rel } — the bond stays selected if it survived.
+    if (relPopup.value && !relAlive.has(relPopup.value.rel?.id)) relPopup.value = null
     refreshUsage()
   }
 
-  /** Undo/redo one data edit. Resolves to the reverted/replayed channel name
-   *  (for the toast label) or null when there was nothing to do. */
+  /** Undo/redo the newest step (data or arrangement). Resolves to the
+   *  reverted/replayed channel name — 'layout:<label>' for arrangement steps —
+   *  for the toast label, or null when there was nothing to do. */
   async function undo() {
-    const res = await api.invoke('history:undo')
-    if (!res.success) return null
-    historyStatus.value = res.data.status
-    await reloadAfterHistory()
-    return res.data.channel
+    return stepHistory('undo')
   }
-
   async function redo() {
-    const res = await api.invoke('history:redo')
-    if (!res.success) return null
-    historyStatus.value = res.data.status
+    return stepHistory('redo')
+  }
+  async function stepHistory(dir) {
+    const j = journalOf()
+    const from = dir === 'undo' ? j.undo : j.redo
+    const to = dir === 'undo' ? j.redo : j.undo
+    const top = from[from.length - 1]
+    if (top?.kind === 'layout') {
+      const restore = top.state?.view === 'groups' ? restoreGroupMoves : layoutHistoryHandler
+      if (!restore) return null
+      from.pop()
+      const inverse = await restore(top.state)
+      if (inverse) to.push({ ...top, state: inverse })
+      journalTick.value++
+      return entryChannel(top)
+    }
+    // A data step (or an empty journal → the server's own stack).
+    const res = await api.invoke(dir === 'undo' ? 'history:undo' : 'history:redo')
+    if (!res.success) {
+      // The server has nothing to give (its stack is capped at 50): drop the
+      // orphaned marker so the timeline doesn't stall on it.
+      if (top) {
+        from.pop()
+        journalTick.value++
+      }
+      return null
+    }
+    if (top) to.push(from.pop())
+    serverHistory.value = res.data.status
+    journalTick.value++
     await reloadAfterHistory()
     return res.data.channel
   }
@@ -853,6 +1188,7 @@ export const useMainStore = defineStore('main', () => {
   async function revertToCheckpoint() {
     const res = await api.invoke('checkpoint:revert')
     if (res.success) {
+      dropLayoutHistory() // the arrangement mementos describe discarded scenes
       const byDate = (a, b) => (a.created_at > b.created_at ? 1 : -1)
       scenes.value = Object.values(res.data.scenes || {}).sort(byDate)
       sceneTags.value = Object.values(res.data.scene_tags || {}).sort(byDate)
@@ -878,7 +1214,7 @@ export const useMainStore = defineStore('main', () => {
       refreshFields() // the payload was adopted into trait values server-side
       refreshUsage()
     } else if (res.error?.includes('limit')) {
-      alert(res.error)
+      toast(res.error, { tone: 'warning' })
     }
     return res
   }
@@ -902,11 +1238,59 @@ export const useMainStore = defineStore('main', () => {
         (r) => r.person_a_id !== id && r.person_b_id !== id
       )
       entityTags.value = entityTags.value.filter((row) => row.entity_id !== id)
+      dropFromCasts(new Set([id]))
       selectedPersonIds.value = selectedPersonIds.value.filter((x) => x !== id)
       if (selectedPersonId.value === id) {
         selectedPersonId.value = selectedPersonIds.value.at(-1) ?? null
         modalOpen.value = false
       }
+      refreshUsage()
+    }
+    return res
+  }
+
+  /** Create several people as one write / undo step (the Sheet's paste past
+   *  the last row). rows: [{ values: [{ field_id, value }] }]. onCreated(ids)
+   *  runs synchronously BEFORE the rows reach the store, so a caller can
+   *  claim them (e.g. pin them) before any watcher sees them arrive. */
+  async function createPersons(rows, { onCreated } = {}) {
+    if (!rows.length) return { success: true, data: { persons: [], values: [] } }
+    const res = await api.invoke('persons:createMany', { rows: JSON.parse(JSON.stringify(rows)) })
+    if (res.success) {
+      onCreated?.(res.data.persons.map((p) => p.id))
+      persons.value = persons.value.concat(res.data.persons)
+      fieldValues.value = fieldValues.value.concat(res.data.values)
+      refreshUsage()
+    }
+    return res
+  }
+
+  /** Delete several people as one write / undo step (the Sheet's row delete,
+   *  the graph's multi-select delete). `relationshipIds` also removes those
+   *  bonds in the same step (a marquee selection of people + links). */
+  async function deletePersons(ids, { relationshipIds = [] } = {}) {
+    if (!ids.length && !relationshipIds.length) return { success: true, data: { ids: [] } }
+    const res = await api.invoke('persons:deleteMany', {
+      ids: [...ids],
+      relationshipIds: [...relationshipIds]
+    })
+    if (res.success) {
+      const gone = new Set(res.data.ids)
+      const relGone = new Set(res.data.relationshipIds || [])
+      persons.value = persons.value.filter((p) => !gone.has(p.id))
+      fieldValues.value = fieldValues.value.filter((v) => !gone.has(v.person_id))
+      relationships.value = relationships.value.filter(
+        (r) => !relGone.has(r.id) && !gone.has(r.person_a_id) && !gone.has(r.person_b_id)
+      )
+      selectedRelationshipIds.value = selectedRelationshipIds.value.filter((id) => !relGone.has(id))
+      entityTags.value = entityTags.value.filter((row) => !gone.has(row.entity_id))
+      dropFromCasts(gone)
+      selectedPersonIds.value = selectedPersonIds.value.filter((x) => !gone.has(x))
+      if (gone.has(selectedPersonId.value)) {
+        selectedPersonId.value = selectedPersonIds.value.at(-1) ?? null
+        modalOpen.value = false
+      }
+      refreshUsage()
     }
     return res
   }
@@ -983,6 +1367,32 @@ export const useMainStore = defineStore('main', () => {
       if (idx !== -1) persons.value[idx] = res.data.person
       fieldValues.value = fieldValues.value
         .filter((v) => v.person_id !== personId)
+        .concat(res.data.values)
+    }
+    return res
+  }
+
+  /** Batch-save several people's trait values as ONE atomic write and one
+   *  undo step (the Sheet's paste / fill / clear-range path).
+   *  updates: [{ personId, values?, removals? }] — same shape per person as
+   *  setFieldValues. JSON-cloned: callers often pass values read straight off
+   *  reactive store rows, which Electron IPC can't clone. */
+  async function setFieldValuesBatch(updates) {
+    if (!updates.length) return { success: true, data: { persons: [], values: [] } }
+    const res = await api.invoke('fields:setValuesBatch', {
+      updates: JSON.parse(JSON.stringify(updates))
+    })
+    if (res.success) {
+      // Patch rows in place (like setFieldValues) so the persons array keeps
+      // its identity — views watching it don't rebuild for a cell edit.
+      const byId = new Map(res.data.persons.map((p) => [p.id, p]))
+      const list = persons.value
+      for (let i = 0; i < list.length; i++) {
+        const next = byId.get(list[i].id)
+        if (next) list[i] = next
+      }
+      fieldValues.value = fieldValues.value
+        .filter((v) => !byId.has(v.person_id))
         .concat(res.data.values)
     }
     return res
@@ -1261,6 +1671,92 @@ export const useMainStore = defineStore('main', () => {
     return removeEntityTag(personId, tagId)
   }
 
+  // ── Map actions (the Map view) ─────────────────────────────────────────────
+  /** Upsert a MapDoc (create without an id; patch the given fields with one).
+   *  The Map view edits its own working copy and autosaves through here. */
+  async function saveMap(data) {
+    const res = await api.invoke('maps:save', data)
+    if (res.success) {
+      const idx = maps.value.findIndex((m) => m.id === res.data.id)
+      if (idx !== -1) maps.value[idx] = res.data
+      else maps.value.push(res.data)
+    }
+    return res
+  }
+
+  async function deleteMap(id) {
+    const res = await api.invoke('maps:delete', { id })
+    if (res.success) {
+      maps.value = maps.value.filter((m) => m.id !== id)
+      if (activeMapId.value === id) setActiveMapId(maps.value[0]?.id || null)
+    }
+    return res
+  }
+
+  // ── Chronicle actions (eras + story events — src/shared/chronicle.ts) ───────
+  // Saves upsert (no id = create). Payloads are JSON-cloned at the boundary
+  // (Vue proxies can't cross Electron IPC). Deleting a person drops them from
+  // events' casts server-side, so person deletes refresh events below.
+  const plain = (v) => JSON.parse(JSON.stringify(v))
+  function upsertInto(list, row) {
+    const idx = list.value.findIndex((x) => x.id === row.id)
+    if (idx !== -1) list.value[idx] = row
+    else list.value.push(row)
+  }
+  async function saveEra(data) {
+    const res = await api.invoke('eras:save', plain(data))
+    if (res.success) upsertInto(eras, res.data)
+    return res
+  }
+  /** Several eras in one write / one undo step (the preset packs). */
+  async function saveEras(list) {
+    const res = await api.invoke('eras:saveMany', { eras: plain(list) })
+    if (res.success) for (const e of res.data) upsertInto(eras, e)
+    return res
+  }
+  async function deleteEra(id) {
+    const res = await api.invoke('eras:delete', { id })
+    if (res.success) eras.value = eras.value.filter((e) => e.id !== id)
+    return res
+  }
+  async function saveEvent(data) {
+    const res = await api.invoke('events:save', plain(data))
+    if (res.success) upsertInto(events, res.data)
+    return res
+  }
+  async function deleteEvent(id) {
+    const res = await api.invoke('events:delete', { id })
+    if (res.success) events.value = events.value.filter((e) => e.id !== id)
+    return res
+  }
+  /** Mirror the server: deleted people leave every event's cast. */
+  function dropFromCasts(gone) {
+    if (!events.value.some((e) => e.person_ids.some((p) => gone.has(p)))) return
+    events.value = events.value.map((e) =>
+      e.person_ids.some((p) => gone.has(p))
+        ? { ...e, person_ids: e.person_ids.filter((p) => !gone.has(p)) }
+        : e
+    )
+  }
+  async function refreshEvents() {
+    const res = await api.invoke('events:getAll')
+    if (res.success) events.value = res.data
+  }
+  /** Open the era editor on an existing era (by id) or a fresh draft. */
+  function openEraEditor(seed = {}) {
+    const existing = seed.id ? eras.value.find((e) => e.id === seed.id) : null
+    chronicleEditor.value = { kind: 'era', data: plain(existing || seed) }
+  }
+  /** Open the event editor on an existing event (by id) or a fresh draft
+   *  (e.g. { date: {year}, person_ids: [id] }). */
+  function openEventEditor(seed = {}) {
+    const existing = seed.id ? events.value.find((e) => e.id === seed.id) : null
+    chronicleEditor.value = { kind: 'event', data: plain(existing || seed) }
+  }
+  function closeChronicleEditor() {
+    chronicleEditor.value = null
+  }
+
   // ── Character actions (experimental Character view) ────────────────────────
   /** Upsert a CharacterDoc (create without an id; patch with one). */
   async function saveCharacter(data) {
@@ -1353,10 +1849,34 @@ export const useMainStore = defineStore('main', () => {
     editingPerson.value = null
   }
 
-  function setTheme(t) {
-    theme.value = t
-    document.documentElement.dataset.theme = t
-    api.invoke('globalSettings:set', { key: 'theme', value: t })
+  // `animate` grows the new theme out of the clicked control as a circle
+  // (lib/themeReveal.js); startup restores pass false so nothing flashes.
+  function setTheme(t, { animate = true, origin } = {}) {
+    if (!THEMES.includes(t)) return
+    const changed = t !== theme.value
+    const inkSwitch = t === 'ink' || theme.value === 'ink'
+    if (t === 'ink') {
+      installInkAssets() // paper/brush textures as CSS vars, generated once
+      if (theme.value !== 'ink') inkReturnTheme.value = theme.value
+    }
+    const apply = async () => {
+      theme.value = t
+      document.documentElement.dataset.theme = t
+      await nextTick() // let watchers (renderers) recolour inside the snapshot
+    }
+    // into or out of ink, the new theme bleeds across as an ink blot
+    if (animate && changed) revealTransition(apply, origin, { ink: inkSwitch })
+    else apply()
+    if (animate) api.invoke('globalSettings:set', { key: 'theme', value: t })
+  }
+
+  /** Apply (and, unless `persist` is false, save) the UI accent color. */
+  function setAccent(hex, { persist = true } = {}) {
+    const clean = normalizeHex(hex) ?? DEFAULT_ACCENT
+    accent.value = clean
+    const style = document.documentElement.style
+    for (const [k, v] of Object.entries(accentVars(clean))) style.setProperty(k, v)
+    if (persist) api.invoke('globalSettings:set', { key: 'accent', value: clean })
   }
 
   function toggleSettings() {
@@ -1365,10 +1885,89 @@ export const useMainStore = defineStore('main', () => {
 
   function toggleAppSettings(open) {
     appSettingsOpen.value = typeof open === 'boolean' ? open : !appSettingsOpen.value
+    if (appSettingsOpen.value) appSettingsTab.value = 'general'
+  }
+
+  /** Open Settings on a specific tab ('general' | 'help' | 'feedback' | 'about'). */
+  function openAppSettings(tab = 'general') {
+    appSettingsTab.value = tab
+    appSettingsOpen.value = true
   }
 
   function toggleUserPage(open) {
     userPageOpen.value = typeof open === 'boolean' ? open : !userPageOpen.value
+  }
+
+  function toggleProjectsPage(open) {
+    projectsPageOpen.value = typeof open === 'boolean' ? open : !projectsPageOpen.value
+  }
+
+  function toggleBrowsePage(open) {
+    browsePageOpen.value = typeof open === 'boolean' ? open : !browsePageOpen.value
+  }
+
+  // ── Monetization ───────────────────────────────────────────────────────────
+  // Plan perks (not caps flags): paid plans are ad-free and wear a badge.
+  const adFree = computed(() => planHasPerk(authUser.value?.plan, 'adFree'))
+  const isPaid = computed(() => isPaidPlan(authUser.value?.plan))
+
+  /** Open the pricing dialog. `ctx.reason` tailors its headline (a quota
+   *  hit, the "remove ads" link…); `ctx.plan` preselects a tier. */
+  function openPricing(ctx = {}) {
+    pricingContext.value = ctx
+    pricingOpen.value = true
+  }
+  function closePricing() {
+    pricingOpen.value = false
+  }
+
+  // The server owns the plan: whenever billing reports one that differs from
+  // the session's, adopt it and re-read the (plan-dependent) quotas.
+  function applyBillingStatus(status) {
+    billingStatus.value = status
+    if (authUser.value && status?.plan && authUser.value.plan !== status.plan) {
+      authUser.value = { ...authUser.value, plan: status.plan }
+      refreshUsage()
+    }
+  }
+
+  async function loadBilling() {
+    const [catalog, status] = await Promise.all([
+      api.invoke('billing:catalog', {}),
+      api.invoke('billing:status', {})
+    ])
+    billingCatalog.value = catalog.success ? catalog.data : { provider: 'none' }
+    if (status.success) applyBillingStatus(status.data)
+    return status
+  }
+
+  function quoteBilling(plan, interval, coupon) {
+    return api.invoke('billing:quote', { plan, interval, coupon: coupon || null })
+  }
+
+  /** Begin checkout. Resolves the session; a real provider will hand back a
+   *  hosted-checkout `url` to open (docs/MONETIZATION.md). */
+  function startCheckout(plan, interval, coupon) {
+    return api.invoke('billing:createCheckout', { plan, interval, coupon: coupon || null })
+  }
+
+  /** SANDBOX ONLY — finish a checkout as 'success' | 'fail' | 'cancel'. */
+  async function completeSandboxCheckout(id, outcome) {
+    const res = await api.invoke('billing:completeSandboxCheckout', { id, outcome })
+    if (res.success) applyBillingStatus(res.data.status)
+    return res
+  }
+
+  async function cancelSubscription() {
+    const res = await api.invoke('billing:cancel', {})
+    if (res.success) applyBillingStatus(res.data)
+    return res
+  }
+
+  async function resumeSubscription() {
+    const res = await api.invoke('billing:resume', {})
+    if (res.success) applyBillingStatus(res.data)
+    return res
   }
 
   // Open the profile page behind the curtain so the (brief) fetch of the
@@ -1411,11 +2010,30 @@ export const useMainStore = defineStore('main', () => {
     api.invoke('settings:set', { key: 'noun', value: noun.value })
   }
 
+  /** Ink theme on/off (the topbar 墨 seal): off returns to the theme it left. */
+  function toggleInk(opts = {}) {
+    setTheme(theme.value === 'ink' ? inkReturnTheme.value || 'light' : 'ink', opts)
+  }
+
+  /** Switch the person profile's presentation and remember it for this project. */
+  function setProfileStyle(id) {
+    if (!PROFILE_STYLES.includes(id) || id === profileStyle.value) return
+    profileStyle.value = id
+    api.invoke('settings:set', { key: 'profileStyle', value: id })
+  }
+
   /** Switch the Directory's card style and remember it for this project. */
   function setCardStyle(id) {
     if (!CARD_STYLES.includes(id) || id === cardStyle.value) return
     cardStyle.value = id
     api.invoke('settings:set', { key: 'cardStyle', value: id })
+  }
+
+  /** Open a map in the Map view and remember it for this project. */
+  function setActiveMapId(id) {
+    if (id === activeMapId.value) return
+    activeMapId.value = id
+    api.invoke('settings:set', { key: 'activeMapId', value: id })
   }
 
   /** Switch the Directory's viewing mode and remember it for this project. */
@@ -1425,10 +2043,25 @@ export const useMainStore = defineStore('main', () => {
     api.invoke('settings:set', { key: 'directoryViewMode', value: id })
   }
 
+  /** Merge a patch into the Sheet's column layout and remember it. */
+  function setSheetPrefs(patch) {
+    sheetPrefs.value = parseSheetPrefs(JSON.stringify({ ...sheetPrefs.value, ...patch }))
+    api.invoke('settings:set', { key: 'sheetPrefs', value: JSON.stringify(sheetPrefs.value) })
+  }
+
   /** Save the action wheel's slot layout (null reverts to the defaults). */
   function setWheelSlots(slots) {
     wheelSlots.value = slots ? JSON.parse(JSON.stringify(slots)) : null
     api.invoke('settings:set', { key: 'wheelSlots', value: JSON.stringify(wheelSlots.value) })
+  }
+
+  function updateTimelineSetting(key, value) {
+    timelineSettings.value = { ...timelineSettings.value, [key]: value }
+    api.invoke('settings:set', { key: `timeline_${key}`, value: JSON.stringify(value) })
+  }
+  function resetTimelineSettings() {
+    for (const [key, value] of Object.entries(TIMELINE_SETTING_DEFAULTS))
+      updateTimelineSetting(key, value)
   }
 
   function updateGraphSetting(key, value) {
@@ -1478,6 +2111,10 @@ export const useMainStore = defineStore('main', () => {
     loadProjects,
     createProject,
     renameProject,
+    updateProject,
+    duplicateProject,
+    exportProjectFile,
+    importProjectFile,
     deleteProject,
     switchProject,
     // state
@@ -1495,6 +2132,19 @@ export const useMainStore = defineStore('main', () => {
     scenes,
     sceneTags,
     characters,
+    maps,
+    eras,
+    events,
+    chronicleEditor,
+    saveEra,
+    saveEras,
+    deleteEra,
+    saveEvent,
+    deleteEvent,
+    refreshEvents,
+    openEraEditor,
+    openEventEditor,
+    closeChronicleEditor,
     activeSceneId,
     activeSceneIds,
     draggingPersonId,
@@ -1513,14 +2163,40 @@ export const useMainStore = defineStore('main', () => {
     formOpen,
     editingPerson,
     theme,
+    isLightTheme,
+    isInk,
+    toggleInk,
+    accent,
+    setAccent,
     settingsOpen,
     appSettingsOpen,
     userPageOpen,
+    projectsPageOpen,
+    toggleProjectsPage,
+    browsePageOpen,
+    toggleBrowsePage,
+    pricingOpen,
+    pricingContext,
+    billingCatalog,
+    billingStatus,
+    adFree,
+    isPaid,
+    openPricing,
+    closePricing,
+    loadBilling,
+    quoteBilling,
+    startCheckout,
+    completeSandboxCheckout,
+    cancelSubscription,
+    resumeSubscription,
     curtain,
     runWithCurtain,
     openUserPage,
     language,
     graphSettings,
+    timelineSettings,
+    updateTimelineSetting,
+    resetTimelineSettings,
     lockNodes,
     cleanView,
     currentDate,
@@ -1542,8 +2218,12 @@ export const useMainStore = defineStore('main', () => {
     setWheelSlots,
     cardStyle,
     setCardStyle,
+    profileStyle,
+    setProfileStyle,
     viewMode,
     setViewMode,
+    sheetPrefs,
+    setSheetPrefs,
     // computed
     selectedPerson,
     personCount,
@@ -1560,6 +2240,8 @@ export const useMainStore = defineStore('main', () => {
     createPerson,
     updatePerson,
     deletePerson,
+    deletePersons,
+    createPersons,
     refreshFields,
     createFieldDef,
     updateFieldDef,
@@ -1567,6 +2249,7 @@ export const useMainStore = defineStore('main', () => {
     reorderFieldDefs,
     setFieldSlot,
     setFieldValues,
+    setFieldValuesBatch,
     applyFieldDisplayAll,
     createRelationship,
     updateRelationship,
@@ -1597,6 +2280,10 @@ export const useMainStore = defineStore('main', () => {
     moveSceneTag,
     setSceneTagVisible,
     removeSceneTag,
+    saveMap,
+    deleteMap,
+    activeMapId,
+    setActiveMapId,
     saveCharacter,
     deleteCharacter,
     setCharacterPortrait,
@@ -1608,6 +2295,8 @@ export const useMainStore = defineStore('main', () => {
     setTheme,
     toggleSettings,
     toggleAppSettings,
+    openAppSettings,
+    appSettingsTab,
     toggleUserPage,
     setLanguage,
     setCurrentYear,
@@ -1620,6 +2309,10 @@ export const useMainStore = defineStore('main', () => {
     historyStatus,
     refreshHistoryStatus,
     undo,
-    redo
+    redo,
+    registerLayoutHistory,
+    recordLayoutStep,
+    recordGroupMoves,
+    dropLayoutHistory
   }
 })

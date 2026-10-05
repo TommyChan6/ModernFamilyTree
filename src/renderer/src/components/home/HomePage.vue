@@ -17,12 +17,22 @@
       </nav>
       <div class="nav-actions">
         <button
+          class="icon-btn home-ink-btn"
+          :class="{ on: store.isInk }"
+          type="button"
+          :title="store.isInk ? 'Leave the ink painting theme' : 'Ink painting theme (水墨)'"
+          :aria-pressed="store.isInk"
+          @click="store.toggleInk()"
+        >
+          墨
+        </button>
+        <button
           class="icon-btn"
           type="button"
-          :title="store.theme === 'dark' ? 'Light mode' : 'Dark mode'"
-          @click="store.setTheme(store.theme === 'dark' ? 'light' : 'dark')"
+          :title="store.isLightTheme ? 'Dark mode' : 'Light mode'"
+          @click="store.setTheme(store.isLightTheme ? 'dark' : 'light')"
         >
-          {{ store.theme === 'dark' ? '☀' : '🌙' }}
+          {{ store.isLightTheme ? '🌙' : '☀' }}
         </button>
         <!-- Signed in (visiting from the editor): editor shortcut + the same
              account chip as the editor topbar. Signed out: the auth CTAs. -->
@@ -39,6 +49,8 @@
 
     <!-- ── Hero ────────────────────────────────────────────────────────── -->
     <section ref="heroRef" class="hero" @click="onHeroClick">
+      <!-- 水墨 ink theme: paper, hills and a 家 watermark under the constellation -->
+      <InkBackdrop watermark="家" />
       <div class="hero-aurora" aria-hidden="true">
         <div class="aurora-blob blob-a"></div>
         <div class="aurora-blob blob-b"></div>
@@ -281,6 +293,7 @@ import ViewShowcase from './ViewShowcase.vue'
 import CommunityGallery from './CommunityGallery.vue'
 import LegalModal from '../LegalModal.vue'
 import AccountMenu from '../AccountMenu.vue'
+import InkBackdrop from '../ui/InkBackdrop.vue'
 
 const emit = defineEmits(['signin', 'register', 'close'])
 const store = useMainStore()
@@ -383,10 +396,7 @@ const heroCanvas = ref(null)
 const statsRef = ref(null)
 let hero = null
 
-watch(
-  () => store.theme,
-  () => hero?.refreshPalette()
-)
+watch([() => store.theme, () => store.accent], () => hero?.refreshPalette())
 
 // ── Guest demo ───────────────────────────────────────────────────────────────
 const guestBusy = ref(false)
@@ -662,8 +672,8 @@ onUnmounted(() => {
   height: 34px;
   font-size: 17px;
   border-radius: 11px;
-  background: linear-gradient(135deg, var(--adim), rgba(108, 142, 245, 0.32));
-  border: 1px solid rgba(108, 142, 245, 0.35);
+  background: linear-gradient(135deg, var(--adim), rgba(var(--accent-rgb), 0.32));
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
   transition:
     transform 0.35s cubic-bezier(0.34, 1.6, 0.64, 1),
     box-shadow 0.3s ease;
@@ -1115,7 +1125,7 @@ onUnmounted(() => {
   margin: 12px 0 0;
   font-size: 12.5px;
   font-weight: 600;
-  color: #ef5350;
+  color: var(--danger);
 }
 
 .hero-error-enter-active,
@@ -1628,8 +1638,8 @@ onUnmounted(() => {
   justify-content: center;
   font-size: 40px;
   border-radius: 26px;
-  background: linear-gradient(135deg, var(--adim), rgba(108, 142, 245, 0.3));
-  border: 1px solid rgba(108, 142, 245, 0.35);
+  background: linear-gradient(135deg, var(--adim), rgba(var(--accent-rgb), 0.3));
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
   box-shadow: 0 10px 34px color-mix(in srgb, var(--accent) 25%, transparent);
   animation: core-float 5s ease-in-out infinite;
 }
@@ -2110,5 +2120,240 @@ onUnmounted(() => {
   .hero-hint {
     opacity: 1;
   }
+}
+
+/* ── 水墨 ink theme ───────────────────────────────────────────────────────
+   The landing page as a long handscroll: rice paper throughout, the hero's
+   constellation drawn over misty hills (<InkBackdrop>), panels in silk
+   mounts, calls to action pressed as cinnabar seals. */
+:root[data-theme='ink'] .home {
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(rgba(236, 227, 207, 0.35), rgba(236, 227, 207, 0.35)), var(--ink-paper, none);
+  background-size:
+    100% 100%,
+    512px 512px;
+}
+:root[data-theme='ink'] .cursor-aura {
+  background: radial-gradient(circle, rgba(40, 30, 18, 0.06), transparent 62%);
+}
+:root[data-theme='ink'] .hero-aurora,
+:root[data-theme='ink'] .hero-grain {
+  display: none;
+}
+:root[data-theme='ink'] .hero-vignette {
+  background: radial-gradient(
+    ellipse 70% 55% at 50% 46%,
+    rgba(245, 239, 224, 0.75),
+    transparent 75%
+  );
+}
+:root[data-theme='ink'] .nav.scrolled {
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  backdrop-filter: none;
+  box-shadow:
+    0 1px 0 rgba(48, 36, 20, 0.3),
+    0 3px 0 rgba(245, 239, 224, 0.9),
+    0 4px 0 rgba(48, 36, 20, 0.16);
+}
+:root[data-theme='ink'] .nav::after {
+  height: 4px;
+  background: var(--ink-wood);
+}
+:root[data-theme='ink'] .nav-logo-mark {
+  border-radius: 3px;
+  background: var(--ink-seal, var(--accent)) center / contain no-repeat;
+  mix-blend-mode: multiply;
+  font-size: 0;
+  border: none;
+  box-shadow: none;
+}
+:root[data-theme='ink'] .nav-logo-name {
+  font-family: var(--font-brush);
+  font-size: 21px;
+  font-weight: 400;
+}
+:root[data-theme='ink'] .nav-links button,
+:root[data-theme='ink'] .nav-signin {
+  font-family: var(--font-ink-label);
+  font-size: 14px;
+}
+:root[data-theme='ink'] .nav-signin {
+  border-radius: 3px 5px 4px 6px / 5px 3px 6px 4px;
+  background: rgba(255, 251, 240, 0.6);
+}
+:root[data-theme='ink'] .nav-start,
+:root[data-theme='ink'] .cta-primary,
+:root[data-theme='ink'] .about-btn.primary {
+  border-radius: 2px 4px 3px 5px / 4px 2px 5px 3px;
+  background:
+    var(--ink-paper-light, none) center / 256px 256px,
+    var(--accent);
+  background-blend-mode: multiply, normal;
+  box-shadow:
+    inset 0 0 0 1px rgba(90, 15, 10, 0.3),
+    inset 0 0 8px rgba(90, 15, 10, 0.25),
+    0 6px 18px rgba(140, 36, 28, 0.25);
+  color: var(--on-accent);
+  font-family: var(--font-ink-label);
+  letter-spacing: 0.04em;
+}
+:root[data-theme='ink'] .cta-primary::before {
+  animation: none;
+}
+:root[data-theme='ink'] .cta-primary::after {
+  background-image: linear-gradient(
+    105deg,
+    transparent 42%,
+    rgba(60, 10, 5, 0.2) 50%,
+    transparent 58%
+  );
+}
+:root[data-theme='ink'] .cta-ghost,
+:root[data-theme='ink'] .about-btn {
+  border-radius: 3px 5px 4px 6px / 5px 3px 6px 4px;
+  border-color: var(--ink-mount-line);
+  background: rgba(255, 251, 240, 0.7);
+  backdrop-filter: none;
+  font-family: var(--font-ink-label);
+}
+:root[data-theme='ink'] .hero-eyebrow,
+:root[data-theme='ink'] .kicker,
+:root[data-theme='ink'] .stat-label,
+:root[data-theme='ink'] .marquee-title,
+:root[data-theme='ink'] .footer-col h4 {
+  font-family: var(--font-ink-label);
+  font-weight: 600;
+  font-variant: small-caps;
+  text-transform: lowercase;
+  letter-spacing: 0.22em;
+}
+:root[data-theme='ink'] .hero-title {
+  font-weight: 400;
+  letter-spacing: 0;
+  font-size: clamp(40px, 7vw, 78px);
+}
+/* the highlighted words are written in cinnabar, not a gradient */
+:root[data-theme='ink'] .word.grad {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--accent);
+  animation: word-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+:root[data-theme='ink'] .hero-sub,
+:root[data-theme='ink'] .section-sub {
+  font-style: italic;
+}
+:root[data-theme='ink'] .final h2,
+:root[data-theme='ink'] .section-head h2,
+:root[data-theme='ink'] .about-text h2 {
+  font-weight: 400;
+}
+:root[data-theme='ink'] .section-head em {
+  color: var(--accent);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+:root[data-theme='ink'] .feature {
+  border-radius: 2px;
+  border-color: var(--ink-mount-line);
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  box-shadow:
+    0 0 0 4px var(--ink-silk),
+    0 0 0 5px rgba(58, 42, 22, 0.2),
+    0 12px 28px rgba(60, 40, 15, 0.12);
+}
+:root[data-theme='ink'] .feature::before {
+  background: radial-gradient(
+    300px circle at var(--mx) var(--my),
+    rgba(40, 30, 18, 0.07),
+    transparent 60%
+  );
+}
+:root[data-theme='ink'] .feature-icon {
+  border-radius: 3px;
+  filter: grayscale(1) sepia(0.4) contrast(1.1);
+}
+:root[data-theme='ink'] .feature h3 {
+  font-size: 21px;
+}
+:root[data-theme='ink'] .stat-num {
+  font-family: var(--font-brush);
+  font-weight: 400;
+}
+:root[data-theme='ink'] .stat-block::before {
+  opacity: 0.25;
+  filter: grayscale(1);
+}
+/* the marquee of dynasties: title slips (题签) */
+:root[data-theme='ink'] .marquee-item {
+  border-radius: 1px;
+  border-color: rgba(48, 36, 20, 0.28);
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  box-shadow:
+    inset 0 0 0 2px var(--surface),
+    inset 0 0 0 3px rgba(48, 36, 20, 0.12);
+  font-family: var(--font-brush);
+  font-size: 17px;
+  font-weight: 400;
+  color: var(--t1);
+}
+:root[data-theme='ink'] .about-card {
+  border-radius: 2px;
+  border-color: var(--ink-mount-line);
+  background: var(--ink-sheet), var(--surface);
+  background-size: 512px 512px;
+  box-shadow:
+    0 0 0 4px var(--ink-silk),
+    0 0 0 5px rgba(58, 42, 22, 0.2),
+    0 12px 28px rgba(60, 40, 15, 0.12);
+}
+:root[data-theme='ink'] .about-orbit {
+  border-color: rgba(28, 26, 23, 0.25);
+}
+:root[data-theme='ink'] .final {
+  border-radius: 2px;
+  border-color: var(--ink-mount-line);
+  background:
+    var(--ink-landscape, none) center bottom / auto 70% repeat-x,
+    var(--ink-sheet),
+    var(--surface);
+  background-size:
+    auto 70%,
+    512px 512px;
+  box-shadow:
+    0 0 0 5px var(--ink-silk),
+    0 0 0 6px rgba(58, 42, 22, 0.2),
+    0 0 0 14px var(--ink-silk-deep),
+    0 0 0 15px rgba(40, 28, 14, 0.3);
+}
+:root[data-theme='ink'] .final::before,
+:root[data-theme='ink'] .final::after,
+:root[data-theme='ink'] .final-sky,
+:root[data-theme='ink'] .shoot,
+:root[data-theme='ink'] .final-border {
+  display: none;
+}
+:root[data-theme='ink'] .footer-name {
+  font-family: var(--font-brush);
+  font-size: 20px;
+  font-weight: 400;
+}
+
+:root[data-theme='ink'] .hero .inkbd {
+  -webkit-mask: linear-gradient(#000 80%, transparent);
+  mask: linear-gradient(#000 80%, transparent);
+}
+.home-ink-btn {
+  font-family: var(--font-brush);
+  font-size: 16px;
+  line-height: 1;
+}
+.home-ink-btn.on {
+  color: #fbf4e6;
+  background: #b3352a;
+  border-radius: 4px;
 }
 </style>

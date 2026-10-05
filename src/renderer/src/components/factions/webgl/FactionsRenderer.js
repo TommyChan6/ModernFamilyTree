@@ -8,6 +8,12 @@ import { CapsuleLayer } from '../../webgl/CapsuleLayer.js'
 import { ArcLayer } from '../../webgl/ArcLayer.js'
 import { createCssColorCache, roundRect } from '../../webgl/overlayUtils.js'
 import { ZoneLayer } from './ZoneLayer.js'
+import { InkStrokeLayer } from '../../webgl/InkStrokeLayer.js'
+import { InkDropLayer, RIPPLE, DROP } from '../../webgl/InkDropLayer.js'
+import { InkMistLayer } from '../../webgl/InkMistLayer.js'
+import { hexToRgb01, PAPER_RGB } from '../../webgl/inkMath'
+import { INK, inkFontsReady, paperCanvas, hashStr } from '../../../lib/inkArt'
+import { drawInkOverlay, inkNodePigment, CINNABAR } from './FactionsInk.js'
 
 const NODE_R = 17
 const ARC_R = 22.5
@@ -91,6 +97,27 @@ export class FactionsRenderer {
       this.nodes.object3d
     )
 
+    // 水墨 Ink theme (setInk): wash pools, brush threads/arcs, ink roundels,
+    // drifting mist and drop ripples; the overlay text lives in FactionsInk.js.
+    this.ink = false
+    this._reduced = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    this._fontsOk = false
+    this._lastRenderTs = 0
+    this._ripples = [] // { x, y, rgb, start }
+    this._pigments = new Map()
+    this.inkThreads = new InkStrokeLayer({ renderOrder: 2 })
+    this.inkRipples = new InkDropLayer({ renderOrder: 1.2 })
+    this.inkNodes = new InkDropLayer({ renderOrder: 3.5 }) // ink-blot roundels
+    this.inkNodes.object3d.visible = false
+    this.inkThreads.object3d.visible = false
+    this.inkRipples.object3d.visible = false
+    this.world.add(this.inkThreads.object3d, this.inkRipples.object3d, this.inkNodes.object3d)
+    this.mist = new InkMistLayer({ renderOrder: 1.5 })
+    this.mist.setLook({ color: hexToRgb01(INK.paperLight), strength: 0.26 })
+    this.mist.setMotion(this._reduced ? 0 : 1)
+    this.zones.setMotion(this._reduced ? 0 : 1)
+    this.scene.add(this.mist.object3d)
+
     this.picker = new Picker()
     this._frame = this._frame.bind(this)
     this._glCanvas = glCanvas
@@ -116,12 +143,14 @@ export class FactionsRenderer {
     this._overlayCanvas.height = Math.round(h * this.dpr)
     this._overlayCanvas.style.width = w + 'px'
     this._overlayCanvas.style.height = h + 'px'
+    this.mist.setSize(w, h, this.dpr)
     this.markAllDirty()
     this.requestRedraw()
   }
 
   setCamera(t) {
     this.transform = t
+    this.mist.setView(t.x * 0.4, t.y * 0.4, 1)
     this._uiDirty = true
     this.requestRedraw()
   }
@@ -129,7 +158,64 @@ export class FactionsRenderer {
   setTheme(isLight) {
     this._css.invalidate()
     this.nodes.setThemeUniforms(isLight)
+    this._light = isLight
+    if (this.ink) this._applyInkUniforms()
     this.markAllDirty()
+    this.requestRedraw()
+  }
+
+  // ── 水墨 Ink theme ───────────────────────────────────────────────────────────
+  /** The view is mounted but not on screen: let the ink ambience idle. */
+  setHidden(h) {
+    h = !!h
+    if (h === this._hidden) return
+    this._hidden = h
+    this.markGeomDirty()
+    this.requestRedraw()
+  }
+
+  setInk(on) {
+    on = !!on
+    if (on === this.ink) return
+    this.ink = on
+    this.zones.setInk(on)
+    this.arcs.setInk(on)
+    this.threads.object3d.visible = !on
+    this.inkThreads.object3d.visible = on
+    this.inkRipples.object3d.visible = on
+    this.inkNodes.object3d.visible = on
+    this.mist.setVisible(on)
+    this._css.invalidate()
+    if (on) {
+      this._applyInkUniforms()
+      if (!this._fontsOk) {
+        inkFontsReady().then(() => {
+          if (this.disposed) return
+          this._fontsOk = true
+          this.markAllDirty()
+          this.requestRedraw()
+        })
+      }
+    } else {
+      this._ripples = []
+      this.nodes.setThemeUniforms(!!this._light)
+    }
+    this.markAllDirty()
+    this.requestRedraw()
+  }
+
+  _applyInkUniforms() {
+    const u = this.nodes.material.uniforms
+    u.uShadowStrength.value = 0.05
+    u.uSilhouetteColor.value.setRGB(PAPER_RGB[0], PAPER_RGB[1], PAPER_RGB[2])
+  }
+
+  /** Ink dropped into water at a world point — after a drag-drop joins a group. */
+  inkRipple(x, y, color) {
+    if (!this.ink || this._reduced) return
+    this._ripples.push({ x, y, rgb: inkNodePigment(this, color || INK.ink), start: this._timeSec })
+    if (this._ripples.length > 12) this._ripples.shift()
+    this.markGeomDirty()
     this.requestRedraw()
   }
 
@@ -273,19 +359,21 @@ export class FactionsRenderer {
       const z = zonesArr[i]
       const a = this._zAnim.get(z.id)
       if (!a) continue
-      this.zones.set(i, z.x, z.y, z.r, rgb(z.color), {
+      this.zones.set(i, z.x, z.y, z.r, this.ink ? hexToRgb01(z.color) : rgb(z.color), {
         fillA: a.fillA,
         ringA: a.ringA,
         ringW: a.ringW,
         dropA: a.dropA,
         scale: a.s,
-        opacity: a.op
+        opacity: a.op,
+        seed: this.ink ? (hashStr(String(z.id)) % 1000) / 37 : 0
       })
     }
     this.zones.commit()
 
     // People + membership arcs. Arc count varies, so tally first.
     this.nodes.setCount(nodesArr.length)
+    if (this.ink) this.inkNodes.setCount(nodesArr.length)
     let arcTotal = 0
     for (const n of nodesArr) arcTotal += metas.get(n.id)?.arcs.length || 0
     this.arcs.setCount(arcTotal)
@@ -304,15 +392,33 @@ export class FactionsRenderer {
       this.nodes.setPosition(i, n.x, n.y)
       this.nodes.setStyle(i, {
         radius: NODE_R * scale,
-        fill: rgb(meta.color),
-        border: v.grabbed ? accentRGB : surfaceRGB,
+        fill: this.ink ? inkNodePigment(this, meta.color) : rgb(meta.color),
+        border: this.ink ? (v.grabbed ? CINNABAR : PAPER_RGB) : v.grabbed ? accentRGB : surfaceRGB,
         borderPx: 2.5,
         borderA: 1,
-        opacity: op,
+        // ink: photo pins keep their roundel; everyone else is an ink blot
+        opacity: this.ink && layer < 1 ? 0 : op,
         selected: false,
-        glow: v.grabbed ? 0.5 : 0,
+        glow: v.grabbed && !this.ink ? 0.5 : 0,
         avatar: layer >= 1 ? layer : 0
       })
+      if (this.ink) {
+        const seed = (hashStr(n.id) % 1000) / 41
+        const pig = v.grabbed ? CINNABAR : inkNodePigment(this, meta.color)
+        const bloom = a.start != null
+        this.inkNodes.set(
+          i,
+          n.x,
+          n.y,
+          NODE_R * scale * 0.92,
+          pig,
+          layer >= 1 ? 0 : op * 1.25,
+          DROP,
+          seed,
+          bloom ? a.start : 0,
+          bloom ? 0.45 : 0
+        )
+      }
       const arcR = (meta.multi ? ARC_R + 1.5 : ARC_R) * scale
       const arcW = meta.multi ? 3.8 : 3
       for (let j = 0; j < meta.arcs.length; j++) {
@@ -325,7 +431,7 @@ export class FactionsRenderer {
           arc.a0,
           arc.a1,
           arcW,
-          rgb(arc.color),
+          this.ink ? hexToRgb01(arc.color) : rgb(arc.color),
           op * 0.95,
           meta.multi ? SPIN : 0
         )
@@ -334,11 +440,20 @@ export class FactionsRenderer {
     }
     this.nodes.commitPositions()
     this.nodes.commitStyles()
+    if (this.ink) this.inkNodes.commit()
     this.arcs.commit()
 
     // Threads: faint always-on tethers for multi-faction people + bright
     // membership links for the active (hovered / dragged) person.
     const zoneById = new Map(zonesArr.map((z) => [z.id, z]))
+    if (this.ink) {
+      this._writeInkThreads(nodesArr, metas, zoneById, links, tetherCount)
+      let dropActive = false
+      for (const a of this._zAnim.values()) if (a.dropA > 0.01) dropActive = true
+      this._ambient = !this._hidden && (!this._reduced || tetherCount > 0 || dropActive)
+      this._writeRipples()
+      return entranceActive
+    }
     this.threads.setCount(tetherCount + links.length)
     let ti = 0
     for (const n of nodesArr) {
@@ -381,8 +496,80 @@ export class FactionsRenderer {
     return entranceActive
   }
 
+  // Ink tethers: thin dry brush threads from multi-group people to each camp,
+  // plus firmer strokes for the hovered / dragged person's memberships.
+  _writeInkThreads(nodesArr, metas, zoneById, links, tetherCount) {
+    const T = this.inkThreads
+    T.setCount(tetherCount + links.length)
+    let ti = 0
+    for (const n of nodesArr) {
+      const meta = metas.get(n.id)
+      if (!meta?.multi) continue
+      const v = this._pVis.get(n.id)
+      const a = this._pAnim.get(n.id)
+      const groupOp = (v?.tetherOp ?? 1) * (a ? a.op * this._entrance(a).e : 1)
+      for (const fid of meta.factionIds) {
+        const z = zoneById.get(fid)
+        if (!z) {
+          T.set(ti++, n.x, n.y, n.x, n.y, 0, [0, 0, 0], 0, 0, 0, 0, 0)
+          continue
+        }
+        const seed = ((hashStr(n.id + fid) % 1000) / 1000) * 50
+        T.set(
+          ti++,
+          n.x,
+          n.y,
+          z.x,
+          z.y,
+          2.2,
+          inkNodePigment(this, z.color),
+          0.42 * groupOp,
+          seed,
+          0.85,
+          0,
+          0.6
+        )
+      }
+    }
+    for (const l of links) {
+      const seed = ((hashStr(String(l.x2) + l.color) % 1000) / 1000) * 50
+      T.set(
+        ti++,
+        l.x1,
+        l.y1,
+        l.x2,
+        l.y2,
+        3.2,
+        inkNodePigment(this, l.color),
+        0.85,
+        seed,
+        0.6,
+        0,
+        0.5
+      )
+    }
+    T.commit()
+  }
+
+  // One-shot drop ripples (animated on the GPU; spent ones are dropped on the
+  // next buffer write — the mist keeps the ink loop running meanwhile).
+  _writeRipples() {
+    const now = this._timeSec
+    const DUR = 1.8
+    this._ripples = this._ripples.filter((r) => now - r.start < DUR)
+    this.inkRipples.setCount(this._ripples.length)
+    this._ripples.forEach((r, i) => {
+      this.inkRipples.set(i, r.x, r.y, 120, r.rgb, 0.9, RIPPLE, i * 3.7, r.start, DUR)
+    })
+    this.inkRipples.commit()
+  }
+
   // ── Overlay: pills, labels, badges, ghost (screen space) ───────────────────
   _drawOverlay() {
+    if (this.ink) {
+      drawInkOverlay(this)
+      return
+    }
     const ctx = this.overlay,
       c = this._css.get(),
       t = this.transform,
@@ -528,6 +715,13 @@ export class FactionsRenderer {
       this._geomDirty = true
     }
 
+    // Ink ambient-only frames (mist drift, ripples on the GPU) run at ~30fps.
+    if (this.ink && !this._geomDirty && !this._uiDirty && ts - this._lastRenderTs < 30) {
+      this.requestRedraw()
+      return
+    }
+    this._lastRenderTs = ts
+
     let entranceActive = false
     if (this._geomDirty) {
       entranceActive = this._writeBuffers()
@@ -552,6 +746,12 @@ export class FactionsRenderer {
     this.threads.setTime(time)
     this.arcs.setTime(time)
     this.zones.setTime(time)
+    if (this.ink) {
+      this.inkThreads.setTime(time)
+      this.inkRipples.setTime(time)
+      this.inkNodes.setTime(time)
+      this.mist.setTime(time)
+    }
     this.renderer.render(this.scene, this.camera)
 
     if (this._tweening || entranceActive || this._ambient) this.requestRedraw()
@@ -566,7 +766,7 @@ export class FactionsRenderer {
   exportFrame({ width, height, transform, light = null }) {
     const doc = document.documentElement
     const prevTheme = doc.dataset.theme
-    const isLight = prevTheme === 'light'
+    const isLight = prevTheme === 'light' || prevTheme === 'ink'
     const wantLight = light == null ? isLight : light
     const flip = wantLight !== isLight
     const oldW = this.width || 1
@@ -574,7 +774,10 @@ export class FactionsRenderer {
     const oldT = this.transform
     const oldDpr = this.dpr
     const uPR = this.nodes.material.uniforms.uPixelRatio
+    const wasInk = this.ink
     try {
+      if (flip && wasInk) this.setInk(false)
+      if (this.ink) this.mist.setVisible(false)
       if (flip) {
         doc.dataset.theme = wantLight ? 'light' : 'dark'
         this._css.invalidate()
@@ -626,6 +829,12 @@ export class FactionsRenderer {
       out.width = width
       out.height = height
       const g = out.getContext('2d')
+      if (this.ink) {
+        // the sheet itself — the live stage gets its paper from CSS
+        const paper = paperCanvas(512, 512, { tone: INK.paper, fiber: 0.7, seed: 11 })
+        g.fillStyle = g.createPattern(paper, 'repeat')
+        g.fillRect(0, 0, width, height)
+      }
       g.drawImage(this._glCanvas, 0, 0, width, height)
       g.drawImage(this._overlayCanvas, 0, 0, width, height)
       return out
@@ -635,6 +844,10 @@ export class FactionsRenderer {
         else doc.dataset.theme = prevTheme
         this._css.invalidate()
         this.nodes.setThemeUniforms(!wantLight)
+      }
+      if (wasInk) {
+        if (!this.ink) this.setInk(true)
+        else this.mist.setVisible(true)
       }
       this.dpr = oldDpr
       this.renderer.setPixelRatio(oldDpr)
@@ -653,6 +866,10 @@ export class FactionsRenderer {
     this.threads.dispose()
     this.arcs.dispose()
     this.nodes.dispose()
+    this.inkThreads.dispose()
+    this.inkRipples.dispose()
+    this.inkNodes.dispose()
+    this.mist.dispose()
     this.renderer.dispose()
     // The view unmounts on every view switch — release the GL context eagerly so
     // rapid switching can't exhaust the browser's context pool before GC runs.

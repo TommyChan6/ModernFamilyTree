@@ -7,6 +7,26 @@ import { TextGuideOverlay } from './TextGuideOverlay.js'
 import { Picker } from './Picking.js'
 import { approach, TWEEN_EPS } from './tween.js'
 import { nodeShapeId, nodeDecorId } from './NodeMaterial.js'
+import { inkLook, inkSealColor, staggerBirth } from '../inkStyle.js'
+import { InkBackdrop } from '../InkBackdrop.js'
+
+const NOT_BORN = -1e4 // birth time meaning 'already written / settled'
+const WRITE_DUR = 1.1 // brush write-on (s) — LinkMaterial uWriteDur
+const BLOOM_DUR = 1.3 // wash bloom (s) — NodeMaterial uBloomDur
+
+function seedOf(id) {
+  let h = 0x811c9dc5
+  const s = String(id || '')
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193)
+  return ((h >>> 0) % 10007) / 10007
+}
+function reducedMotion() {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  } catch {
+    return false
+  }
+}
 
 const _col = new THREE.Color()
 function rgb(hex) {
@@ -25,7 +45,7 @@ function rgb(hex) {
 // ease toward their targets with frame-rate-independent smoothing, reproducing the old d3
 // transitions. Positions come straight from the (already animated) node objects each frame.
 export class WebGLGraphRenderer {
-  constructor({ glCanvas, overlayCanvas, hooks }) {
+  constructor({ glCanvas, overlayCanvas, hooks, backdropEl = null }) {
     this.hooks = hooks
     this.disposed = false
     this._scheduled = false
@@ -76,7 +96,8 @@ export class WebGLGraphRenderer {
         opacity: a ? Math.min(1, a.op * 1.6) * 0.32 * a.h : 0,
         dashLen: 0,
         dashGap: 0,
-        width: (a ? a.w : 2) + 7,
+        // brush mode: a broad wet wash that spreads well past the stroke
+        width: this._look.links ? (a ? a.w : 2) * 1.9 + 12 : (a ? a.w : 2) + 7,
         arrowColorRGB: null,
         arrowSize: 0,
         flow: 0,
@@ -95,9 +116,25 @@ export class WebGLGraphRenderer {
     this._quality = 'quality'
 
     this.overlay = new TextGuideOverlay(overlayCanvas)
+    this.overlay.onFontsReady = () => this.requestRedraw()
+
+    // 水墨 ink look: brush strokes / wash roundels / paper + mountain backdrop.
+    // Resolved from (graph settings, app theme) every frame; applied on change.
+    this._appTheme = 'dark'
+    this._look = inkLook(null, 'dark')
+    this._lookKey = null
+    this._rebirth = false // next style sync re-paints every stroke/wash (write-on)
+    this._clock = 0
+    this._inkAnimUntil = 0 // keep the loop alive while strokes write / washes bloom
+    this.backdrop = backdropEl ? new InkBackdrop(backdropEl) : null
     this.picker = new Picker()
 
     this._frame = this._frame.bind(this)
+    this._labelReveal = (n) => {
+      const a = this._nodeAnim.get(n.id)
+      if (!a || a.born < -100) return 1
+      return Math.max(0, Math.min(1, (this._clock - a.born - 0.45) / 0.7))
+    }
     this._curLinkVisual = this._curLinkVisual.bind(this)
     this._onContextLost = (e) => e.preventDefault()
     this._onContextRestored = () => {
@@ -155,7 +192,10 @@ export class WebGLGraphRenderer {
     this.links = links
     this.nodeLayer.setCount(nodes.length)
     this.linkLayer.setLinks(links)
-    this._haloKey = '' // force the halo underlay to re-sync against the new data
+    // Force the halo underlay to re-sync against the new data. Must be a value
+    // no real key can equal: '' is the key for "no halo links", so resetting to ''
+    // left a deleted selection's halo drawn (stale instance count) forever.
+    this._haloKey = null
     this.markAllDirty()
     this.picker.invalidate()
     this.requestRedraw()
@@ -175,13 +215,57 @@ export class WebGLGraphRenderer {
   setCamera(t) {
     this.transform = t
     this.overlay.setCamera(t)
+    this.backdrop?.setCamera(t)
     this.requestRedraw()
   }
 
-  setTheme(isLight) {
+  // `theme` is the app theme string ('dark' | 'light' | 'ink'); optional for
+  // callers that only know light/dark.
+  setTheme(isLight, theme) {
+    this._appTheme = theme || (isLight ? 'light' : 'dark')
+    this._lookKey = null // re-resolve the ink look (uniforms, halo, overlay) next frame
     this.nodeLayer.setThemeUniforms(isLight)
     this._haloRGB = isLight ? [0.16, 0.2, 0.3] : [1, 1, 1]
     this.overlay.setTheme(isLight)
+    this.ambient.setDark(!isLight)
+    this.markAllDirty()
+    this.requestRedraw()
+  }
+
+  // Resolve the 水墨 look for these settings + theme and push it to every layer when
+  // it changes. Turning brush strokes / washes on re-paints the graph (write-on).
+  _applyLook(gs) {
+    const look = inkLook(gs, this._appTheme)
+    const key = `${look.links}|${look.nodes}|${look.backdrop}|${look.mode}|${this._appTheme}`
+    if (key === this._lookKey) return look
+    const prev = this._look
+    this._lookKey = key
+    this._look = look
+    this.nodeLayer.setInkUniforms(look.nodes, look.mode, inkSealColor(look.mode))
+    this.linkLayer.brush = look.links
+    this.linkLayer.material.uniforms.uBrush.value = look.links ? 1 : 0
+    this.haloLayer.material.uniforms.uBrush.value = look.links ? 2 : 0
+    // In ink the selection halo is a pale cinnabar wash under the chosen bonds.
+    if (look.links || look.nodes) {
+      this._haloRGB =
+        look.mode === 'moon'
+          ? [0.83, 0.4, 0.33]
+          : look.mode === 'paper'
+            ? [0.7, 0.21, 0.17]
+            : this._haloRGB
+    } else {
+      this._haloRGB = this._appTheme === 'dark' ? [1, 1, 1] : [0.16, 0.2, 0.3]
+    }
+    this.overlay.setInk(look.links || look.nodes ? look.mode : null)
+    this.backdrop?.setLook(look, this._appTheme)
+    if ((look.links && !prev.links) || (look.nodes && !prev.nodes)) this._rebirth = true
+    this.markAllDirty()
+    return look
+  }
+
+  /** Re-paint every stroke and wash from scratch (brush write-on + wash bloom). */
+  repaintInk() {
+    this._rebirth = true
     this.markAllDirty()
     this.requestRedraw()
   }
@@ -210,6 +294,12 @@ export class WebGLGraphRenderer {
     this._nodeIds.length = nodes.length
     const seen = new Set()
     this._hasNodeGlow = false // any selected/glowing node keeps the pulse loop alive
+    // Ink washes bloom in: new nodes (or all of them on a re-paint), staggered.
+    const bloom = this._look.nodes && !reducedMotion()
+    const rebirth = this._rebirth
+    let fresh = 0
+    if (bloom) for (const n of nodes) if (rebirth || !this._nodeAnim.has(n.id)) fresh++
+    let fi = 0
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i],
         v = visual(n)
@@ -221,10 +311,16 @@ export class WebGLGraphRenderer {
       this._nodeIds[i] = n.id
       seen.add(n.id)
       let a = this._nodeAnim.get(n.id)
+      const isNew = !a
       if (!a) {
-        a = { op: 0, rad: v.radius, glow: 0 }
+        a = { op: 0, rad: v.radius, glow: 0, born: NOT_BORN }
         this._nodeAnim.set(n.id, a)
       } // new -> fade in
+      if (bloom && (isNew || rebirth)) {
+        a.born = staggerBirth(this._clock, fi++, fresh, { step: 0.05, maxSpread: 0.9 })
+        this._inkAnimUntil = Math.max(this._inkAnimUntil, a.born + BLOOM_DUR)
+      } else if (!this._look.nodes) a.born = NOT_BORN
+      v.born = a.born
       a.top = v.opacity
       a.trad = v.radius
       a.tglow = v.glow
@@ -259,7 +355,8 @@ export class WebGLGraphRenderer {
         opacity: a.op,
         selected: v.selected,
         glow: a.glow,
-        avatar: v.avatar
+        avatar: v.avatar,
+        born: v.born
       })
     }
     this.nodeLayer.commitStyles()
@@ -273,14 +370,24 @@ export class WebGLGraphRenderer {
     this._linkCacheById.clear()
     const seen = new Set()
     this._hasFlow = false // any flowing dash keeps the ambient loop alive
+    // Brush strokes write themselves on: new links (or all on a re-paint), after
+    // the washes have started to bloom, as a staggered wave.
+    const write = this._look.links && !reducedMotion()
+    const rebirth = this._rebirth
+    let fresh = 0
+    if (write) for (const d of links) if (rebirth || !this._linkAnim.has(d.id)) fresh++
+    const delay = this._look.nodes && fresh > 1 ? 0.35 : 0
+    let fi = 0
     for (const d of links) {
       const v = visual(d)
       v.colorRGB = rgb(v.colorHex)
       v.arrowRGB = v.arrowColor ? rgb(v.arrowColor) : null
-      if (v.flow) this._hasFlow = true
+      // Flowing dashes and animated line effects keep the clock running.
+      if (v.flow || (v.fx && !this._look.links)) this._hasFlow = true
       this._linkCacheById.set(d.id, v)
       seen.add(d.id)
       let a = this._linkAnim.get(d.id)
+      const isNew = !a
       // New links fade in from 0 opacity (matching the old node-group fade); size/colour snap.
       if (!a)
         a = {
@@ -290,8 +397,15 @@ export class WebGLGraphRenderer {
           cr: v.colorRGB[0],
           cg: v.colorRGB[1],
           cb: v.colorRGB[2],
-          h: 0
+          h: 0,
+          born: NOT_BORN,
+          seed: seedOf(d.id)
         }
+      if (write && (isNew || rebirth)) {
+        a.born = staggerBirth(this._clock, fi++, fresh, { delay, step: 0.04, maxSpread: 1.2 })
+        if (isNew) a.op = v.opacity // the write-on is the entrance — no fade too
+        this._inkAnimUntil = Math.max(this._inkAnimUntil, a.born + WRITE_DUR)
+      } else if (!this._look.links) a.born = NOT_BORN
       a.top = v.opacity
       a.tw = v.width
       a.tar = v.arrowSize
@@ -351,7 +465,11 @@ export class WebGLGraphRenderer {
       arrowColorRGB: v.arrowRGB,
       arrowSize: a.ar,
       flow: v.flow || 0,
-      fadeTo: v.fadeTo
+      fadeTo: v.fadeTo,
+      born: a.born,
+      seed: a.seed,
+      fx: v.fx || 0,
+      fxPad: v.fxPad || 1
     }
   }
 
@@ -366,6 +484,11 @@ export class WebGLGraphRenderer {
     const nodes = this.nodes || [],
       links = this.links || []
     const gs = this.hooks.getSettings()
+    // The shader clock advances by the (clamped) frame delta rather than wall time:
+    // a main-thread stall (theme switch, art generation) pauses a write-on or a
+    // bloom instead of letting it finish unseen. Flow / pulse only need continuity.
+    this._clock += dt
+    const look = this._applyLook(gs)
 
     // ── Aesthetics: quality mode, node shape/decor uniforms, atmosphere ──────
     const quality = gs.renderQuality === 'performance' ? 'performance' : 'quality'
@@ -376,7 +499,12 @@ export class WebGLGraphRenderer {
     nu.uDecorColor.value.set(gs.decorColor || '#d4af37')
     // Decor ornaments animate only in quality mode; frozen (t=0) keeps them
     // as static jewellery in performance mode.
-    this._decorAnim = quality === 'quality' && nodeDecorId(gs.nodeDecor) > 0
+    this._decorAnim =
+      quality === 'quality' && nodeDecorId(gs.nodeDecor) > 0 && gs.nodeDecor !== 'enso'
+    // Brush strokes stop short of each roundel so they breathe (留白).
+    const gapR = (gs.nodeRadius || 22) * (look.nodes ? 1.16 : 1.04)
+    this.linkLayer.material.uniforms.uNodeR.value = gapR
+    this.haloLayer.material.uniforms.uNodeR.value = gapR
     this._hasAmbient = this.ambient.sync(gs, quality)
 
     if (this.nodeStylesDirty) {
@@ -390,6 +518,7 @@ export class WebGLGraphRenderer {
       this._linkTweening = true
       this._linkStyleWrite = true
     }
+    this._rebirth = false
 
     if (this._nodeTweening) this._nodeTweening = this._stepNodes(dt)
 
@@ -439,14 +568,23 @@ export class WebGLGraphRenderer {
     // Ambient dash flow + the selection halo's breathing pulse: advance the shared
     // clock; keep the loop alive while any link flows or any node glows (and the tab
     // is visible) — otherwise idle at 0% as before.
-    const clock = ts / 1000
+    const clock = this._clock
     this.linkLayer.material.uniforms.uTime.value = clock
+    // Line effects: speed (frozen under reduced motion), glow, palette, backdrop.
+    const lu = this.linkLayer.material.uniforms
+    lu.uFxSpeed.value = reducedMotion() ? 0 : (gs.lineFxSpeed ?? 1)
+    lu.uFxGlow.value = gs.lineFxGlow ?? 1
+    lu.uFxKeep.value = gs.lineFxKeep ? 1 : 0
+    lu.uFxLight.value = this._appTheme === 'light' ? 1 : 0
     this.nodeLayer.material.uniforms.uTime.value = clock
     nu.uDecorTime.value = this._decorAnim ? clock : 0
     this.ambient.setClock(clock, t.x, t.y)
 
     this.renderer.render(this.scene, this.camera)
-    this.overlay.draw(this.hooks.overlayOpts())
+    const oo = this.hooks.overlayOpts()
+    // Names are brushed in once their wash has bloomed.
+    if (look.nodes && clock < this._inkAnimUntil) oo.revealOf = this._labelReveal
+    this.overlay.draw(oo)
 
     // Keep the loop alive frame-to-frame while a tween is settling, dashes flow,
     // a node's focus halo is pulsing, decor ornaments are turning, or weather
@@ -454,6 +592,7 @@ export class WebGLGraphRenderer {
     if (
       this._nodeTweening ||
       this._linkTweening ||
+      this._clock < this._inkAnimUntil ||
       ((this._hasFlow || this._hasNodeGlow || this._hasAmbient || this._decorAnim) &&
         document.visibilityState === 'visible')
     ) {
@@ -500,6 +639,8 @@ export class WebGLGraphRenderer {
         a.glow = a.tglow
       }
       this._stepNodes(0)
+      // A still capture shows every wash fully bloomed (the live attrs re-sync after).
+      this.nodeLayer.born.fill(NOT_BORN)
       const nodes = this.nodes || []
       for (let i = 0; i < nodes.length; i++) this.nodeLayer.setPosition(i, nodes[i].x, nodes[i].y)
       this.nodeLayer.commitPositions()
@@ -512,6 +653,7 @@ export class WebGLGraphRenderer {
         a.cg = a.tcg
         a.cb = a.tcb
         a.h = a.th ?? 0
+        a.born = NOT_BORN // strokes fully written in the capture
       }
       const links = this.links || []
       const gs = this.hooks.getSettings()
@@ -573,6 +715,7 @@ export class WebGLGraphRenderer {
     this.linkLayer.dispose()
     this.haloLayer.dispose()
     this.ambient.dispose()
+    this.backdrop?.dispose()
     this.renderer.dispose()
   }
 }

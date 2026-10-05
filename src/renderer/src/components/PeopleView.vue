@@ -20,23 +20,27 @@
           <button v-if="query" class="pv-search-clear" title="Clear" @click="query = ''">✕</button>
         </div>
 
-        <div class="pv-sort">
-          <div class="pv-sort-track">
-            <div
-              class="pv-sort-thumb"
-              :style="{ transform: `translateX(${sortIndex * 100}%)` }"
-            ></div>
+        <!-- The Sheet sorts by its own column headers; the Handscroll is
+             always chronological -->
+        <Transition name="pv-stylepick">
+          <div v-if="!OWN_ORDER.has(store.viewMode)" class="pv-sort">
+            <div class="pv-sort-track">
+              <div
+                class="pv-sort-thumb"
+                :style="{ transform: `translateX(${sortIndex * 100}%)` }"
+              ></div>
+            </div>
+            <button
+              v-for="opt in sortOptions"
+              :key="opt.id"
+              class="pv-sort-opt"
+              :class="{ active: sortBy === opt.id }"
+              @click="sortBy = opt.id"
+            >
+              {{ opt.label }}
+            </button>
           </div>
-          <button
-            v-for="opt in sortOptions"
-            :key="opt.id"
-            class="pv-sort-opt"
-            :class="{ active: sortBy === opt.id }"
-            @click="sortBy = opt.id"
-          >
-            {{ opt.label }}
-          </button>
-        </div>
+        </Transition>
 
         <button
           class="pv-filter-btn"
@@ -221,6 +225,29 @@
       :stats-of="stats"
       :ref-year="refYear"
     />
+
+    <!-- Sheet: an editable spreadsheet over every trait (animates its own
+         entrance — no leave transition, so it never shares the column with
+         the next medium mid-swap) -->
+    <SheetView
+      v-if="store.viewMode === 'sheet'"
+      :persons="displayed"
+      :stats-of="stats"
+      :ref-year="refYear"
+    />
+
+    <!-- Showcase mediums: each draws the same filtered, sorted roster its own
+         way (see the ✦ gallery in ViewModeSwitch). One mounts at a time. -->
+    <Transition name="pv-medium" mode="out-in">
+      <component
+        :is="showcaseView"
+        v-if="showcaseView"
+        :key="store.viewMode"
+        :persons="displayed"
+        :stats-of="stats"
+        :ref-year="refYear"
+      />
+    </Transition>
   </div>
 </template>
 
@@ -233,6 +260,14 @@ import ViewModeSwitch from './people/ViewModeSwitch.vue'
 import CardStage from './people/CardStage.vue'
 import HiveView from './people/HiveView.vue'
 import ReelView from './people/ReelView.vue'
+import SheetView from './people/SheetView.vue'
+import RosterView from './people/RosterView.vue'
+import CodexView from './people/CodexView.vue'
+import BoardView from './people/BoardView.vue'
+import ElementsView from './people/ElementsView.vue'
+import RanksView from './people/RanksView.vue'
+import BubblesView from './people/BubblesView.vue'
+import HandscrollView from './people/HandscrollView.vue'
 import { useVirtualGrid } from './people/useVirtualGrid.js'
 import { useDragScroll } from './people/useDragScroll.js'
 import { ageOf, CARD_W, CARD_H, GAP, PAD } from './people/peopleLayout.js'
@@ -246,6 +281,18 @@ const refYear = computed(() => store.currentDate?.year ?? new Date().getFullYear
 // mediums (hive / reel) draw people their own way.
 const isStageMode = computed(() => ['wheel', 'flow', 'fan', 'deck'].includes(store.viewMode))
 const isCardMode = computed(() => store.viewMode === 'grid' || isStageMode.value)
+const SHOWCASE_VIEWS = {
+  roster: RosterView,
+  codex: CodexView,
+  board: BoardView,
+  elements: ElementsView,
+  ranks: RanksView,
+  bubbles: BubblesView,
+  handscroll: HandscrollView
+}
+const showcaseView = computed(() => SHOWCASE_VIEWS[store.viewMode] || null)
+// Mediums that order people themselves (the A–Z/Year/Age pill hides).
+const OWN_ORDER = new Set(['sheet', 'handscroll'])
 
 const query = ref('')
 const sortBy = ref('name')
@@ -505,8 +552,25 @@ onBeforeUnmount(() => {
   height: 100%;
   width: 100%;
   background:
-    radial-gradient(1200px 600px at 80% -10%, rgba(108, 142, 245, 0.08), transparent 60%), var(--bg);
+    radial-gradient(1200px 600px at 80% -10%, rgba(var(--accent-rgb), 0.08), transparent 60%),
+    var(--bg);
   min-height: 0;
+}
+
+/* Showcase medium swap: a soft rise + blur-in (the mediums animate their own
+   content on mount, this just keeps the hand-off from snapping). */
+.pv-medium-enter-active,
+.pv-medium-leave-active {
+  transition:
+    opacity 0.28s ease,
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.28s ease;
+}
+.pv-medium-enter-from,
+.pv-medium-leave-to {
+  opacity: 0;
+  transform: translateY(10px) scale(0.99);
+  filter: blur(4px);
 }
 
 /* ── Toolbar ─────────────────────────────────────────────── */
@@ -565,7 +629,7 @@ onBeforeUnmount(() => {
 }
 .pv-search:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(108, 142, 245, 0.15);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
 }
 .pv-search-icon {
   font-size: 13px;
@@ -620,7 +684,7 @@ onBeforeUnmount(() => {
   height: 100%;
   background: var(--accent);
   border-radius: 7px;
-  box-shadow: 0 2px 8px rgba(108, 142, 245, 0.35);
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.35);
   transition: transform 0.28s cubic-bezier(0.34, 1.4, 0.5, 1);
 }
 .pv-sort-opt {
@@ -668,7 +732,7 @@ onBeforeUnmount(() => {
 }
 .pv-filter-btn.active {
   color: var(--t1);
-  border-color: rgba(108, 142, 245, 0.45);
+  border-color: rgba(var(--accent-rgb), 0.45);
 }
 .pv-filter-icon {
   font-size: 13px;
@@ -850,8 +914,8 @@ onBeforeUnmount(() => {
     background 0.15s;
 }
 .pv-clear:hover {
-  color: #ef5350;
-  background: rgba(239, 83, 80, 0.1);
+  color: var(--danger);
+  background: rgba(var(--danger-rgb), 0.1);
 }
 .pv-clear-enter-active,
 .pv-clear-leave-active {
@@ -905,6 +969,38 @@ onBeforeUnmount(() => {
   justify-content: center;
   padding: 0 var(--pad, 24px);
   will-change: transform;
+}
+
+/* ── 水墨 Ink theme: the heading is brushed, with a writing-in underline ── */
+:root[data-theme='ink'] .pv-title {
+  position: relative;
+  font-family: var(--font-brush);
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: 0.5px;
+}
+:root[data-theme='ink'] .pv-title::after {
+  content: '';
+  position: absolute;
+  left: -4px;
+  right: -6px;
+  bottom: -5px;
+  height: 7px;
+  background: var(--ink-cinnabar);
+  opacity: 0.75;
+  -webkit-mask: var(--ink-underline, none) center / 100% 100% no-repeat;
+  mask: var(--ink-underline, none) center / 100% 100% no-repeat;
+  animation: pv-ink-write 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.15s backwards;
+}
+@keyframes pv-ink-write {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='ink'] .pv-title::after {
+    animation: none;
+  }
 }
 
 /* ── Empty state ─────────────────────────────────────────── */

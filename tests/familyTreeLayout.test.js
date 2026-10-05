@@ -4,6 +4,7 @@ import {
   computeTreeOrder,
   NODE_GAP,
   SPOUSE_GAP,
+  FAMILY_GAP,
   COMPONENT_GAP
 } from '../src/renderer/src/components/graph/familyTreeLayout'
 import { yearDate } from '../src/shared/calendarMath'
@@ -257,5 +258,153 @@ describe('computeGenLayout — registry symmetry roles', () => {
       ['spouse', 'horizontal']
     ])
     expect(computeTreeOrder(persons, rels, roles)).toEqual(computeTreeOrder(persons, rels))
+  })
+})
+
+describe('computeGenLayout — generations & straight lines', () => {
+  it("seats an in-law's parents one row above the in-law, not stranded at the top", () => {
+    // g → a → kid; kid marries inlaw, whose parents ip1+ip2 have no ancestors
+    const persons = [
+      person('g', 'male', 1900),
+      person('a', 'male', 1930),
+      person('kid', 'male', 1960),
+      person('inlaw', 'female', 1962),
+      person('ip1', 'male', 1935),
+      person('ip2', 'female', 1937)
+    ]
+    const rels = [
+      child('g', 'a'),
+      child('a', 'kid'),
+      spouse('kid', 'inlaw'),
+      spouse('ip1', 'ip2'),
+      child('ip1', 'inlaw'),
+      child('ip2', 'inlaw')
+    ]
+    const { targets } = computeGenLayout(persons, rels, W, H)
+    expect(targets.ip1.y).toBe(targets.a.y)
+    expect(targets.ip2.y).toBe(targets.a.y)
+    expect(targets.inlaw.y).toBe(targets.kid.y)
+  })
+
+  it('draws an only child straight below the parent couple', () => {
+    const persons = [
+      person('dad', 'male', 1950),
+      person('mom', 'female', 1952),
+      person('kid', 'male', 1980)
+    ]
+    const rels = [spouse('dad', 'mom'), child('dad', 'kid'), child('mom', 'kid')]
+    const { targets } = computeGenLayout(persons, rels, W, H)
+    expect(targets.kid.x).toBeCloseTo((targets.dad.x + targets.mom.x) / 2, 1)
+  })
+
+  it('turns a couple to face their own families (no forced crossing)', () => {
+    // husband's parents end up on the right, wife's on the left → wife sits left
+    const persons = [
+      person('wf', 'male', 1920),
+      person('wm', 'female', 1921),
+      person('hf', 'male', 1922),
+      person('hm', 'female', 1923),
+      person('wife', 'female', 1950),
+      person('husband', 'male', 1948),
+      person('wsib', 'male', 1952)
+    ]
+    const rels = [
+      spouse('wf', 'wm'),
+      spouse('hf', 'hm'),
+      child('wf', 'wife'),
+      child('wm', 'wife'),
+      child('wf', 'wsib'),
+      child('wm', 'wsib'),
+      child('hf', 'husband'),
+      child('hm', 'husband'),
+      spouse('husband', 'wife')
+    ]
+    const { targets } = computeGenLayout(persons, rels, W, H)
+    const wMid = (targets.wf.x + targets.wm.x) / 2
+    const hMid = (targets.hf.x + targets.hm.x) / 2
+    expect(Math.sign(targets.wife.x - targets.husband.x)).toBe(Math.sign(wMid - hMid))
+    expect(Math.abs(targets.wife.x - targets.husband.x)).toBeCloseTo(SPOUSE_GAP, 5)
+  })
+
+  it('seats unmarried co-parents side by side', () => {
+    const persons = [
+      person('p1', 'male', 1950),
+      person('x', 'male', 1951),
+      person('p2', 'female', 1952),
+      person('kid', 'female', 1980)
+    ]
+    const rels = [child('p1', 'kid'), child('p2', 'kid'), child('x', 'kid2')]
+    const { targets } = computeGenLayout(persons, rels, W, H)
+    expect(Math.abs(targets.p1.x - targets.p2.x)).toBeCloseTo(SPOUSE_GAP, 5)
+  })
+
+  it('gives cousins more room than siblings', () => {
+    // g's two married sons each have two kids — one row of two sibling pairs
+    const persons = [
+      person('g', 'male', 1890),
+      person('a1', 'male', 1920),
+      person('a2', 'female', 1921),
+      person('b1', 'male', 1922),
+      person('b2', 'female', 1923),
+      person('k1', 'male', 1950),
+      person('k2', 'male', 1951),
+      person('k3', 'male', 1952),
+      person('k4', 'male', 1953)
+    ]
+    const rels = [
+      child('g', 'a1'),
+      child('g', 'b1'),
+      spouse('a1', 'a2'),
+      spouse('b1', 'b2'),
+      ...['k1', 'k2'].flatMap((k) => [child('a1', k), child('a2', k)]),
+      ...['k3', 'k4'].flatMap((k) => [child('b1', k), child('b2', k)])
+    ]
+    const { targets } = computeGenLayout(persons, rels, W, H)
+    const xs = ['k1', 'k2', 'k3', 'k4'].map((id) => targets[id].x).sort((p, q) => p - q)
+    const gaps = xs.slice(1).map((x, i) => x - xs[i])
+    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(NODE_GAP - 1e-6)
+    expect(Math.max(...gaps)).toBeGreaterThanOrEqual(NODE_GAP + FAMILY_GAP - 1e-6)
+  })
+
+  it('scales spacing up with the node radius', () => {
+    const { persons, rels } = nuclear()
+    const { targets } = computeGenLayout(persons, rels, W, H, undefined, { nodeRadius: 44 })
+    expect(Math.abs(targets.mom.x - targets.dad.x)).toBeCloseTo(SPOUSE_GAP * 2, 5)
+    expect(Math.abs(targets.kid1.x - targets.kid2.x)).toBeGreaterThanOrEqual(NODE_GAP * 2 - 1e-6)
+  })
+
+  it('keeps a parent-child cycle to two rows', () => {
+    const persons = [person('a', 'male', 1950), person('b', 'female', 1970)]
+    const rels = [child('a', 'b'), child('b', 'a')]
+    expect(computeGenLayout(persons, rels, W, H).genLabels).toHaveLength(2)
+  })
+
+  it('lays a two-family marriage out without crossings', () => {
+    // each spouse's family has two kids; the married pair must sit at the inner ends
+    const persons = [
+      person('a1', 'male', 1920),
+      person('a2', 'female', 1921),
+      person('b1', 'male', 1922),
+      person('b2', 'female', 1923),
+      person('as', 'female', 1949),
+      person('am', 'male', 1950),
+      person('bf', 'female', 1951),
+      person('bs', 'male', 1952)
+    ]
+    const rels = [
+      spouse('a1', 'a2'),
+      spouse('b1', 'b2'),
+      ...['as', 'am'].flatMap((k) => [child('a1', k), child('a2', k)]),
+      ...['bf', 'bs'].flatMap((k) => [child('b1', k), child('b2', k)]),
+      spouse('am', 'bf')
+    ]
+    const { targets } = computeGenLayout(persons, rels, W, H)
+    const aMid = (targets.a1.x + targets.a2.x) / 2
+    const bMid = (targets.b1.x + targets.b2.x) / 2
+    const side = Math.sign(bMid - aMid)
+    // a's kids all lie on a's side of b's kids
+    for (const ak of ['as', 'am']) {
+      for (const bk of ['bf', 'bs']) expect(Math.sign(targets[bk].x - targets[ak].x)).toBe(side)
+    }
   })
 })

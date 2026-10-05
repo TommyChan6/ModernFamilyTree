@@ -22,7 +22,9 @@ export function nodeShapeId(name) {
 }
 
 // Decor ids (uDecor): procedural ornaments drawn around the shape rim.
-export const NODE_DECORS = ['none', 'aura', 'runes', 'orbit', 'burst', 'pulse']
+// 'enso' is not a rim ornament: it switches the node to the 水墨 ink-wash roundel
+// (the ink branch in the fragment shader; also automatic in the app's Ink theme).
+export const NODE_DECORS = ['none', 'aura', 'runes', 'orbit', 'burst', 'pulse', 'enso']
 export function nodeDecorId(name) {
   const i = NODE_DECORS.indexOf(name)
   return i < 0 ? 0 : i
@@ -57,7 +59,14 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
       uShadowStrength: { value: 0.35 },
       uShadowOffset: { value: new THREE.Vector2(0.09, 0.135) }, // corner units (dx2,dy3 @ r22)
       uGlowColor: { value: new THREE.Color(0xffffff) }, // focus haze; theme-set by NodeLayer
-      uSilhouetteColor: { value: new THREE.Color(1, 1, 1) }
+      uSilhouetteColor: { value: new THREE.Color(1, 1, 1) },
+      // 水墨 ink-wash roundels (the ink branch in main()).
+      uInk: { value: 0 }, // 1 = ink-wash node rendering
+      uInkMoon: { value: 0 }, // 1 = pale ink on a dark ground
+      uInkColor: { value: new THREE.Color(0x1f1b16) }, // ensō / brush ink
+      uInkPaper: { value: new THREE.Color(0xece3cf) }, // portrait highlight tone
+      uSealColor: { value: new THREE.Color(0xb3352a) }, // cinnabar selection seal
+      uBloomDur: { value: 1.3 }
     },
     vertexShader: /* glsl */ `
       // Three injects: in vec3 position; (the quad corner in [-1,1]) + matrices.
@@ -71,6 +80,7 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
       in float iSelected;   // 0/1
       in float iGlow;       // 0..1 hover/select glow amount
       in float iAvatar;     // atlas layer index, or -1
+      in float iBorn;       // ink bloom birth time (uTime clock; very negative = settled)
 
       out vec2 vCorner;     // -1..1 across the quad
       out vec3 vFill;
@@ -82,8 +92,10 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
       out float vGlow;
       out float vAvatar;
       out float vSeed;      // stable per-instance phase for decor animation
+      out float vBorn;
 
       void main() {
+        vBorn = iBorn;
         vCorner = position.xy;
         vFill = iFill;
         vBorder = iBorder;
@@ -114,7 +126,14 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
       uniform float uShape;
       uniform float uDecor;
       uniform vec3 uDecorColor;
+      uniform float uInk;
+      uniform float uInkMoon;
+      uniform vec3 uInkColor;
+      uniform vec3 uInkPaper;
+      uniform vec3 uSealColor;
+      uniform float uBloomDur;
 
+      in float vBorn;
       in vec2 vCorner;
       in vec3 vFill;
       in vec3 vBorder;
@@ -260,10 +279,140 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
         return 0.0;
       }
 
+      // ── 水墨 ink-wash roundel ─────────────────────────────────────────────
+      float iHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float iNoise(vec2 p) {
+        vec2 i = floor(p), f = fract(p);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+        float a = iHash(i), b = iHash(i + vec2(1.0, 0.0));
+        float c = iHash(i + vec2(0.0, 1.0)), d = iHash(i + vec2(1.0, 1.0));
+        return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+      }
+      float iFbm(vec2 p) {
+        return 0.5 * iNoise(p) + 0.3 * iNoise(p * 2.03 + 7.1) + 0.2 * iNoise(p * 4.07 + 3.7);
+      }
+
+      // The node painted as a wash of diluted ink that bled into rice paper (晕染):
+      // a ragged, granulated body with pigment pooled along its dried edge, a
+      // feathered bleed halo, one dry-brush ensō around it (open where the brush
+      // lifted), portraits toned to ink. Selection turns the ensō cinnabar and
+      // presses a seal (印章) at the lower right; hover is a faint ink haze. New
+      // nodes bloom: the wash spreads from a wet centre while the ensō writes round.
+      vec4 inkNode(float sd, float ext) {
+        vec2 p = vCorner;
+        float seed = vSeed * 61.0;
+        float ang = atan(p.y, p.x);
+        float aa = fwidth(sd) * 1.5 + 0.0012;
+
+        float bl = 1.0;
+        if (vBorn > -100.0) {
+          float k = clamp((uTime - vBorn) / uBloomDur, 0.0, 1.0);
+          bl = 1.0 - pow(1.0 - k, 3.0);
+        }
+
+        vec2 dir = p / max(length(p), 1e-4);
+        float rag = (iFbm(dir * 2.4 + seed) - 0.5) * 0.08 * R;
+        float sdw = sd + rag + (1.0 - bl) * 0.8 * R;
+        float gran = iFbm(p * 9.0 + seed);
+        float fib = iFbm(p * 24.0 + seed * 1.3);
+
+        // ---- body: tinted wash, or the portrait toned to ink ----
+        float inside = 1.0 - smoothstep(-aa, aa, sdw);
+        vec3 body = vFill;
+        if (uHasAtlas == 1 && vAvatar >= 0.0) {
+          vec2 uv = p * (0.5 / (R * ext)) + 0.5;
+          vec4 tex = texture(uAtlas, vec3(clamp(uv, 0.0, 1.0), vAvatar));
+          if (vAvatar >= 0.5) {
+            float L = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
+            L = smoothstep(0.04, 0.96, L);
+            vec3 toned = uInkMoon > 0.5 ? mix(uInkPaper, uInkColor, L) : mix(uInkColor, uInkPaper, L);
+            body = mix(toned, tex.rgb, 0.16);
+          } else {
+            body = mix(vFill, uSilhouetteColor, tex.a * 0.8);
+          }
+        }
+        body *= 0.84 + 0.28 * gran;
+        // the wash dries lighter in its wet heart, denser toward the rim
+        body *= mix(1.07, 0.95, smoothstep(0.1 * R, 0.95 * R, length(p - vec2(-0.18, -0.2) * R)));
+        float rimPool = smoothstep(-0.10 * R, -0.005 * R, sdw) * inside;
+        body = mix(body, body * 0.74, rimPool * 0.45);
+
+        // ---- bleed halo: diluted ink feathering into the fibres ----
+        float bleedW = 0.22 * R * (1.0 + 1.4 * (1.0 - bl));
+        float bleed = 1.0 - smoothstep(0.0, bleedW, sdw);
+        vec4 col = vec4(vFill * 0.9, bleed * (0.08 + 0.26 * fib) * (0.5 + 0.5 * bl));
+        col = over(vec4(body, inside), col);
+
+        // ---- ensō: one dry-brush ring, open where the brush lifted ----
+        float a0 = vSeed * 6.2832;
+        float along = fract((ang - a0) / 6.2832);
+        float drawn = 0.84 * bl;
+        float entry = smoothstep(0.0, 0.035, along);
+        float taper = mix(1.3, 0.16, pow(smoothstep(0.04, 0.84, along), 0.8));
+        float thick = R * 0.085 * entry * taper;
+        float rr = sd - 0.14 * R - (iNoise(vec2(along * 7.0, seed)) - 0.5) * 0.06 * R;
+        float ringCover = (1.0 - smoothstep(thick - aa, thick + aa, abs(rr)))
+                        * (1.0 - smoothstep(drawn - 0.015, drawn, along));
+        float bi = floor(rr / max(thick, 1e-4) * 3.0 + seed);
+        float streak = iNoise(vec2(bi * 3.3, along * 46.0));
+        float dry = 0.12 + 0.62 * smoothstep(0.40, 0.92, along);
+        float white = smoothstep(dry - 0.10, dry + 0.08, streak * 0.7 + iHash(vec2(bi, seed)) * 0.3);
+        float detail = smoothstep(1.2, 3.5, thick / max(fwidth(sd), 1e-5));
+        float ensoA = ringCover * mix(1.0, mix(0.12, 1.0, white), detail) * 0.92;
+        float sel = vSelected * clamp(vGlow, 0.0, 1.0);
+        vec3 ensoCol = (vBorderA > 0.5 && vSelected < 0.5) ? vBorder : uInkColor;
+        ensoCol = mix(ensoCol, uSealColor, sel);
+        col = over(vec4(ensoCol, ensoA), col);
+
+        // ---- hover / trace: a faint ink haze spreading behind ----
+        float focus = vGlow * (1.0 - vSelected);
+        if (focus > 0.001) {
+          float tt = clamp(sdw / (0.6 * R), 0.0, 1.0);
+          float haze = (1.0 - tt) * (1.0 - tt) * (1.0 - inside) * focus * 0.42 * (0.6 + 0.8 * fib);
+          col = over(col, vec4(uInkMoon > 0.5 ? uInkColor : uInkColor * 1.4, haze));
+        }
+
+        // ---- seal 印章: pressed at the lower right on selection ----
+        if (vSelected > 0.5) {
+          float st = clamp(vGlow, 0.0, 1.0);
+          float sc = mix(1.7, 1.0, st);
+          vec2 q = (p - vec2(0.82 * R, 0.78 * R)) / sc;
+          float cr = cos(-0.13), sr = sin(-0.13);
+          q = vec2(cr * q.x - sr * q.y, sr * q.x + cr * q.y);
+          float hw = 0.26 * R;
+          float boxD = sdBox(q, vec2(hw), 0.035 * R) + (iNoise(q * 48.0 + seed) - 0.5) * 0.02 * R;
+          float sealIn = 1.0 - smoothstep(-aa, aa, boxD);
+          vec2 g = q / hw;
+          float inner = 1.0 - smoothstep(-0.06 * R, -0.045 * R, boxD);
+          float bar = 0.075;
+          float v1 = (1.0 - smoothstep(bar, bar + 0.05, abs(g.x + 0.36))) * step(abs(g.y), 0.66);
+          float v2 = (1.0 - smoothstep(bar, bar + 0.05, abs(g.x - 0.36))) * step(abs(g.y), 0.66);
+          float h1 = (1.0 - smoothstep(bar, bar + 0.05, abs(g.y + 0.40))) * step(abs(g.x), 0.62);
+          float h2 = (1.0 - smoothstep(bar, bar + 0.05, abs(g.y - 0.02))) * step(abs(g.x), 0.62);
+          float h3 = (1.0 - smoothstep(bar, bar + 0.05, abs(g.y - 0.44))) * step(abs(g.x + 0.36), 0.3);
+          float carve = max(max(v1, v2), max(h1, max(h2, h3))) * inner;
+          carve *= step(0.22, iNoise(g * 5.0 + seed));
+          float sealA = sealIn * (1.0 - carve * 0.9) * st * (0.82 + 0.18 * iNoise(q * 70.0));
+          col = over(vec4(uSealColor, sealA * 0.94), col);
+        }
+
+        float dA = decorAlpha(p, sd, aa);
+        if (dA > 0.002) col = over(vec4(uDecorColor, min(dA, 1.0)), col);
+        return col;
+      }
+
       void main() {
         float ext;
         float sd = shapeSD(vCorner, ext);
         float aa = fwidth(sd) * 1.5 + 0.0012;
+
+        if (uInk > 0.5) {
+          vec4 ic = inkNode(sd, ext);
+          ic.a *= vOpacity;
+          if (ic.a < 0.002) discard;
+          fragColor = ic;
+          return;
+        }
 
         // ---- drop shadow (offset soft shape, behind everything) ----
         float extS;

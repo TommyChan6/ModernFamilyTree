@@ -235,9 +235,9 @@ async function submit() {
   margin: 0;
   padding: 8px 11px;
   border-radius: 8px;
-  background: rgba(239, 83, 80, 0.12);
-  border: 1px solid rgba(239, 83, 80, 0.35);
-  color: #ef5350;
+  background: rgba(var(--danger-rgb), 0.12);
+  border: 1px solid rgba(var(--danger-rgb), 0.35);
+  color: var(--danger);
   font-size: 12.5px;
 }
 
@@ -245,7 +245,7 @@ async function submit() {
   padding: 12px 14px;
   border-radius: 9px;
   background: var(--adim);
-  border: 1px solid rgba(108, 142, 245, 0.35);
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
   color: var(--t1);
   font-size: 13px;
   line-height: 1.5;

@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 
 // Atmospheric particle field drawn BEHIND the graph (fireflies / starfield /
-// falling petals / snow / rising embers / rain / drifting motes). One instanced
+// falling petals / snow / rising embers / rain / drifting motes / 水墨 mist veils /
+// falling plum blossoms). One instanced
 // draw call in screen space; every particle's motion is computed in the vertex
 // shader from a static per-instance seed + uTime, so animating costs ZERO
 // per-frame CPU and no buffer writes — the render loop just keeps ticking while
@@ -19,7 +20,9 @@ export const AMBIENT_MODES = [
   'snow',
   'embers',
   'rain',
-  'motes'
+  'motes',
+  'mist', // 留白 — a few vast, slow veils of mist drifting across the paper
+  'plum' // 梅 — sparse plum blossoms tumbling down
 ]
 export function ambientModeId(name) {
   const i = AMBIENT_MODES.indexOf(name)
@@ -59,6 +62,7 @@ export class AmbientLayer {
         uColorB: { value: new THREE.Color('#7ac9ff') },
         uIntensity: { value: 1 }
       },
+      // (uTime is shared by both stages — the mist veils churn in the fragment shader.)
       vertexShader: /* glsl */ `
         in vec4 iSeed;
         uniform float uMode;
@@ -84,7 +88,29 @@ export class AmbientLayer {
           float t = uTime;
           float size = 3.0, rot = 0.0, alpha = 0.5, shape = 0.0;
           vec2 stretch = vec2(1.0);
-          if (m == 1) { // fireflies — lazy wander, breathing glow
+          bool placed = false; // the branch positioned + wrapped itself
+          if (m == 8) { // mist — vast soft veils, slow lateral drift, lower-biased
+            float W = uSize.x * (0.26 + 0.30 * s.z);
+            float H = 22.0 + 64.0 * s.w;
+            float spanX = uSize.x + 2.0 * W;
+            float dir = s.z > 0.45 ? 1.0 : -0.65;
+            float x = s.x * spanX + t * (3.0 + 7.0 * s.w) * dir + uCam.x * (0.04 + 0.10 * s.w);
+            pos.x = mod(x, spanX) - W;
+            pos.y = uSize.y * (0.18 + 0.82 * pow(s.y, 0.65))
+                  + sin(t * 0.045 + s.x * 6.283) * 14.0 + uCam.y * (0.03 + 0.05 * s.w);
+            size = 1.0;
+            stretch = vec2(W, H);
+            alpha = 0.30 + 0.40 * s.z;
+            shape = 6.0;
+            placed = true;
+          } else if (m == 9) { // plum blossoms — slow tumble, wide sway
+            pos.y += t * (7.0 + 9.0 * s.z);
+            pos.x += sin(t * (0.25 + 0.3 * s.w) + s.x * 6.283) * 34.0 + t * 2.5;
+            rot = t * (0.25 + 0.5 * s.w) * (s.x > 0.5 ? 1.0 : -1.0) + s.y * 6.283;
+            size = 4.5 + 4.5 * s.z * s.z;
+            alpha = 0.72 + 0.26 * s.w;
+            shape = 7.0;
+          } else if (m == 1) { // fireflies — lazy wander, breathing glow
             pos += vec2(sin(t * (0.10 + 0.12 * s.z) + s.w * 40.0),
                         cos(t * (0.08 + 0.10 * s.w) + s.z * 40.0)) * (30.0 + 60.0 * s.x);
             size = 2.0 + 2.6 * s.z;
@@ -129,8 +155,10 @@ export class AmbientLayer {
             shape = 5.0;
           }
           // Parallax with the camera pan — deeper (higher s.w) drifts more.
-          pos += uCam * (0.10 + 0.25 * s.w);
-          pos = mod(pos, span) - 30.0;
+          if (!placed) {
+            pos += uCam * (0.10 + 0.25 * s.w);
+            pos = mod(pos, span) - 30.0;
+          }
 
           vLocal = position.xy;
           vShape = shape;
@@ -144,11 +172,20 @@ export class AmbientLayer {
         precision highp float;
         uniform vec3 uColorA;
         uniform vec3 uColorB;
+        uniform float uTime;
         in vec2 vLocal;
         in float vShape;
         in float vAlpha;
         in float vMix;
         out vec4 fragColor;
+
+        float aHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float aNoise(vec2 p) {
+          vec2 i = floor(p), f = fract(p);
+          vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(mix(aHash(i), aHash(i + vec2(1.0, 0.0)), u.x),
+                     mix(aHash(i + vec2(0.0, 1.0)), aHash(i + vec2(1.0, 1.0)), u.x), u.y);
+        }
 
         void main() {
           float r = length(vLocal);
@@ -170,6 +207,21 @@ export class AmbientLayer {
             a = smoothstep(1.0, 0.15, abs(vLocal.x)) * (1.0 - abs(vLocal.y)) * (0.6 + 0.4 * vLocal.y);
           } else if (sh == 5) {   // mote — big blurred blot
             a = exp(-r * r * 2.2);
+          } else if (sh == 6) {   // mist veil — a soft band whose body churns slowly
+            vec2 q = vLocal;
+            float n = 0.6 * aNoise(vec2(q.x * 3.0 + vMix * 17.0 + uTime * 0.03, q.y * 1.6 + vMix * 5.0))
+                    + 0.4 * aNoise(vec2(q.x * 7.0 - uTime * 0.05, q.y * 3.4 + 9.0));
+            float body = exp(-q.y * q.y * 3.2) * smoothstep(1.0, 0.45, abs(q.x));
+            a = body * smoothstep(0.18, 0.85, n + 0.25 * (1.0 - abs(q.y)));
+          } else if (sh == 7) {   // plum blossom 梅 — five round petals, pale heart, stamens
+            float ang = atan(vLocal.y, vLocal.x);
+            float pr = 0.58 + 0.42 * pow(abs(cos(2.5 * ang)), 0.7);
+            float e = r / pr;
+            a = smoothstep(1.0, 0.82, e);
+            col = mix(col, vec3(1.0, 0.96, 0.9), smoothstep(0.42, 0.0, r) * 0.55);
+            float stamen = smoothstep(0.08, 0.0, abs(r - 0.36)) * step(0.55, cos(ang * 9.0));
+            col = mix(col, vec3(0.42, 0.18, 0.12), stamen * 0.8);
+            col *= 0.86 + 0.14 * (1.0 - e);
           } else {                // plain soft disc
             a = smoothstep(1.0, 0.5, r);
           }
@@ -194,6 +246,11 @@ export class AmbientLayer {
     return this.geometry.instanceCount > 0
   }
 
+  /** Theme hint (the mist thins on dark grounds). */
+  setDark(dark) {
+    this.dark = !!dark
+  }
+
   resize(w, h) {
     this.material.uniforms.uSize.value.set(w, h)
   }
@@ -205,9 +262,19 @@ export class AmbientLayer {
     u.uMode.value = mode
     u.uColorA.value.set(gs.ambientColorA || '#ffd27a')
     u.uColorB.value.set(gs.ambientColorB || '#7ac9ff')
-    u.uIntensity.value = 0.55 + 0.45 * (gs.ambientDensity ?? 0.5)
     const density = gs.ambientDensity ?? 0.5
-    this.geometry.instanceCount = mode === 0 ? 0 : Math.round(60 + density * (MAX - 60))
+    const mist = mode === ambientModeId('mist'),
+      plum = mode === ambientModeId('plum')
+    // Pale veils read far stronger on a dark ground — thin the mist there.
+    u.uIntensity.value = (0.55 + 0.45 * density) * (mist && this.dark ? 0.4 : 1)
+    this.geometry.instanceCount =
+      mode === 0
+        ? 0
+        : mist
+          ? Math.round(6 + density * 12)
+          : plum
+            ? Math.round(14 + density * 40)
+            : Math.round(60 + density * (MAX - 60))
     this.mesh.visible = mode !== 0
     return mode !== 0
   }

@@ -4,39 +4,47 @@
       <button class="home-btn" title="Homepage" @click="homeOpen = true">
         <span class="home-btn-mark">🌳</span>
       </button>
-      <div class="project-tabs-area">
-        <TransitionGroup name="tab" tag="div" class="project-tabs">
-          <div
-            v-for="project in store.projects"
-            :key="project.id"
-            class="project-tab"
-            :class="{ active: project.id === store.activeProjectId }"
-            @click="handleSwitchProject(project.id)"
-            @dblclick="startRenaming(project)"
-          >
-            <span v-if="renamingId !== project.id" class="tab-name">{{ project.name }}</span>
-            <input
-              v-else
-              ref="renameInputRef"
-              v-model="renameValue"
-              class="tab-rename-input"
-              @keydown.enter="confirmRename"
-              @keydown.escape="cancelRename"
-              @blur="confirmRename"
-              @click.stop
-            />
-            <button
-              v-if="store.projects.length > 1 && renamingId !== project.id"
-              class="tab-close"
-              title="Close project"
-              @click.stop="handleDeleteProject(project.id)"
-            >
-              ×
-            </button>
-          </div>
-        </TransitionGroup>
-        <button class="tab-add" title="New project" @click="handleAddProject">
-          <span class="tab-add-icon">+</span>
+      <div class="project-btn-area">
+        <button class="projects-btn" :title="t('topbar.projectsHint')" @click="openProjectsPage">
+          <span class="projects-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor">
+              <circle cx="3.2" cy="12.2" r="1.6" />
+              <circle cx="8" cy="3.6" r="1.6" />
+              <circle cx="12.8" cy="10.4" r="1.6" />
+              <path
+                d="M3.2 12.2 8 3.6l4.8 6.8"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.1"
+                opacity="0.55"
+              />
+            </svg>
+          </span>
+          <span class="projects-btn-label">{{ t('topbar.projects') }}</span>
+          <span class="projects-btn-count">{{ store.projects.length }}</span>
+          <span class="projects-btn-divider"></span>
+          <span class="projects-btn-live-dot"></span>
+          <span class="projects-btn-current">{{ store.activeProject?.name }}</span>
+          <span class="projects-btn-chevron">›</span>
+        </button>
+        <button class="browse-btn" :title="t('browse.buttonHint')" @click="openBrowsePage">
+          <span class="browse-btn-compass" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15">
+              <circle
+                cx="12"
+                cy="12"
+                r="9.5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              />
+              <g class="browse-btn-needle">
+                <path d="M12 5.2 14.2 12h-4.4z" fill="currentColor" />
+                <path d="M12 18.8 9.8 12h4.4z" fill="currentColor" opacity="0.4" />
+              </g>
+            </svg>
+          </span>
+          <span class="browse-btn-label">{{ t('browse.button') }}</span>
         </button>
       </div>
       <ProjectMenu
@@ -99,18 +107,21 @@
       </div>
       <div class="topbar-spacer"></div>
       <button
-        class="btn btn-ghost btn-sm"
-        :title="t('topbar.search') + ' (Ctrl+K)'"
+        class="btn btn-outline btn-sm topbar-search"
+        :title="t('topbar.search') + ` (${MOD}+K)`"
         @click="openPalette"
       >
-        🔍 ⌘K
+        <UiIcon name="search" :size="14" />
+        <span class="topbar-search-label">{{ t('topbar.search') }}</span>
+        <kbd>{{ MOD === '⌘' ? '⌘K' : 'Ctrl K' }}</kbd>
       </button>
       <button
         class="btn btn-ghost btn-sm"
         :title="t('topbar.exportImage')"
         @click="exportOpen = true"
       >
-        🖼 {{ t('topbar.export') }}
+        <UiIcon name="image" :size="14" />
+        {{ t('topbar.export') }}
       </button>
       <label class="mode-picker-wrap" :title="t('topbar.modeHint')">
         <span class="mode-picker-label">{{ t('topbar.mode') }}</span>
@@ -138,25 +149,73 @@
           <span class="labs-label">{{ t('topbar.labs') }}</span>
         </button>
       </Transition>
+      <!-- 墨: the ink-painting theme, toggled by stamping a seal -->
       <button
-        class="icon-btn"
-        :title="store.theme === 'dark' ? t('topbar.lightMode') : t('topbar.darkMode')"
-        @click="store.setTheme(store.theme === 'dark' ? 'light' : 'dark')"
+        class="icon-btn ink-toggle"
+        :class="{ on: store.isInk }"
+        :title="store.isInk ? t('topbar.inkOff') : t('topbar.inkOn')"
+        :aria-label="store.isInk ? t('topbar.inkOff') : t('topbar.inkOn')"
+        :aria-pressed="store.isInk"
+        @click="toggleInk"
       >
-        {{ store.theme === 'dark' ? '☀' : '🌙' }}
+        <span class="ink-toggle-seal" aria-hidden="true">墨</span>
       </button>
-      <button class="icon-btn" :title="t('topbar.settingsHint')" @click="store.toggleAppSettings()">
-        ⚙
+      <button
+        class="icon-btn theme-toggle"
+        :class="store.isLightTheme ? 'light' : 'dark'"
+        :title="store.isLightTheme ? t('topbar.darkMode') : t('topbar.lightMode')"
+        :aria-label="store.isLightTheme ? t('topbar.darkMode') : t('topbar.lightMode')"
+        @click="toggleTheme"
+      >
+        <!-- One glyph that morphs: the moon's bite slides away and the rays
+             spin in as the sun rises (and back). -->
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <mask id="tt-moon-mask">
+            <rect x="0" y="0" width="24" height="24" fill="#fff" />
+            <circle class="tt-bite" cx="17" cy="7" r="6" fill="#000" />
+          </mask>
+          <circle class="tt-core" cx="12" cy="12" r="5" mask="url(#tt-moon-mask)" />
+          <g class="tt-rays">
+            <path
+              d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"
+            />
+          </g>
+        </svg>
+      </button>
+      <button
+        class="icon-btn settings-btn"
+        :title="t('topbar.settingsHint')"
+        :aria-label="t('topbar.settings')"
+        @click="store.toggleAppSettings()"
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" class="tb-svg">
+          <circle cx="12" cy="12" r="3" />
+          <path
+            d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"
+          />
+        </svg>
+      </button>
+      <!-- Upgrade nudge for free accounts (guests register first) -->
+      <button
+        v-if="store.authUser && !store.isPaid && !store.isGuest"
+        class="upgrade-pill"
+        :title="t('billing.upgradeHint')"
+        @click="store.openPricing({ reason: 'menu' })"
+      >
+        <span class="upgrade-pill-spark">✦</span>
+        <span class="upgrade-pill-label">{{ t('billing.upgradeShort') }}</span>
       </button>
       <AccountMenu v-if="store.authUser" />
     </header>
     <div class="workspace" :style="workspaceStyle">
       <IconRail />
-      <div class="canvas-stack">
+      <div ref="canvasStackRef" class="canvas-stack">
         <!-- Graph stays mounted (tucked away) so its layout & simulation state persist -->
-        <div v-show="store.activeView === 'graph'" class="canvas-layer">
-          <GraphCanvas ref="graphRef" :key="store.activeProjectId" />
-        </div>
+        <Transition name="people-view">
+          <div v-show="store.activeView === 'graph'" class="canvas-layer">
+            <GraphCanvas ref="graphRef" :key="store.activeProjectId" />
+          </div>
+        </Transition>
         <Transition name="people-view">
           <PeopleView v-if="store.activeView === 'directory'" :key="store.activeProjectId" />
         </Transition>
@@ -184,6 +243,11 @@
             :key="store.activeProjectId"
             :active="store.activeView === 'groups'"
           />
+        </Transition>
+        <!-- Map view — Canvas-2D, cheap to recreate, so plain v-if; the map's
+             camera + year are saved on the MapDoc so nothing is lost. -->
+        <Transition name="people-view">
+          <MapView v-if="store.activeView === 'map'" :key="store.activeProjectId" />
         </Transition>
         <!-- Experimental Character view (Advanced + Labs). Canvas-2D — cheap to
              recreate, so plain v-if; edits live in the DB, not the component. -->
@@ -214,6 +278,22 @@
     <ExportModal :open="exportOpen" :capture="captureViewImage" @close="exportOpen = false" />
     <SettingsModal />
     <UserPage />
+    <ProjectsPage />
+    <BrowsePage />
+    <PricingModal />
+    <!-- Project file import (Project ▾ → Import project file) -->
+    <input
+      ref="importInput"
+      type="file"
+      accept=".json,application/json"
+      class="visually-hidden"
+      tabindex="-1"
+      aria-hidden="true"
+      @change="onImportFile"
+    />
+    <!-- In-app confirm dialogs + toasts (lib/dialogs.js) -->
+    <ChronicleEditor />
+    <DialogHost />
     <!-- Landing page: what signed-out visitors meet first (marketing + mock
          community gallery); its CTAs hand off to whichever sign-in gate the
          build uses (native or Supabase). Signed-in users can revisit it via
@@ -257,10 +337,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useMainStore } from './store/index.js'
 import { useI18n } from './i18n'
-import { api } from './api'
+import { api, onPlanLimit } from './api'
 import IconRail from './components/IconRail.vue'
 import ProjectMenu from './components/ProjectMenu.vue'
 import CommandPalette from './components/CommandPalette.vue'
@@ -269,6 +349,7 @@ import PeopleView from './components/PeopleView.vue'
 import RelationshipsView from './components/RelationshipsView.vue'
 import TimelineView from './components/TimelineView.vue'
 import FactionsView from './components/FactionsView.vue'
+import MapView from './components/MapView.vue'
 // Lazy-loaded through the paid-features gate (chunk downloads on first open,
 // only when the plan/caps switchboard allows it) — see src/renderer/src/paid/.
 import { CharacterView } from './paid'
@@ -283,8 +364,16 @@ import AccountMenu from './components/AccountMenu.vue'
 import ExportModal from './components/ExportModal.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import UserPage from './components/UserPage.vue'
+import ProjectsPage from './components/ProjectsPage.vue'
+import BrowsePage from './components/BrowsePage.vue'
+import PricingModal from './components/billing/PricingModal.vue'
 import TransitionCurtain from './components/TransitionCurtain.vue'
 import TimeSlider from './components/time/TimeSlider.vue'
+import DialogHost from './components/ui/DialogHost.vue'
+import ChronicleEditor from './components/chronicle/ChronicleEditor.vue'
+import UiIcon from './components/ui/UiIcon.js'
+import { confirmDialog, toast } from './lib/dialogs.js'
+import { recentPointer } from './lib/themeReveal.js'
 
 const store = useMainStore()
 const { t } = useI18n()
@@ -293,10 +382,41 @@ const timelineRef = ref(null)
 const factionsRef = ref(null)
 const exportOpen = ref(false)
 const paletteRef = ref(null)
-const renameInputRef = ref(null)
-const renamingId = ref(null)
-const renameValue = ref('')
 const dockCollapsed = ref(false)
+const canvasStackRef = ref(null)
+const importInput = ref(null)
+
+// Key-hint glyph for the platform: ⌘ on Apple devices, Ctrl elsewhere.
+const MOD = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent) ? '⌘' : 'Ctrl'
+
+function toggleTheme(e) {
+  // ink is a paper (light) theme — the sun/moon takes it to dark
+  store.setTheme(store.isLightTheme ? 'dark' : 'light', {
+    origin: { x: e.clientX, y: e.clientY }
+  })
+}
+
+function toggleInk(e) {
+  store.toggleInk({ origin: { x: e.clientX, y: e.clientY } })
+}
+
+// View switches reveal the incoming view as a circle growing from wherever
+// the switch was clicked (the rail button), or from the rail's edge for
+// keyboard switches. The origin is set before the DOM patch, so the enter
+// transition picks it up (see .people-view-enter-from).
+watch(
+  () => store.activeView,
+  () => {
+    const el = canvasStackRef.value
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const p = recentPointer(600)
+    const x = p ? p.x - r.left : 0
+    const y = p ? p.y - r.top : r.height / 2
+    el.style.setProperty('--reveal-x', `${Math.round(x)}px`)
+    el.style.setProperty('--reveal-y', `${Math.round(y)}px`)
+  }
+)
 
 // Signed-out flow: the HomePage landing shows first; its CTAs open the
 // AuthGate in the right mode. Signing out lands back on the homepage.
@@ -334,18 +454,28 @@ function captureViewImage(view, opts) {
 // revert to (see docs/client-structure.md §6.2) ─────────────────────────────
 async function handleSave() {
   await graphRef.value?.flushLayout?.() // fold in any not-yet-autosaved drag
-  await store.saveCheckpoint()
+  const res = await store.saveCheckpoint()
+  if (res?.success) toast(t('toasts.saved'), { tone: 'success', icon: '💾', duration: 1800 })
+  return res
 }
 
 async function handleRevert(skipConfirm = false) {
   if (!store.hasUnsavedChanges) return
-  if (
-    !skipConfirm &&
-    !confirm('Revert to the last saved checkpoint? Changes since then will be lost.')
-  )
-    return
+  if (!skipConfirm) {
+    const ok = await confirmDialog({
+      title: t('confirm.revert'),
+      message: t('confirm.revertBody'),
+      confirmLabel: t('confirm.revertConfirm'),
+      tone: 'danger',
+      icon: '↩'
+    })
+    if (!ok) return
+  }
   const res = await store.revertToCheckpoint()
-  if (res.success) await graphRef.value?.reloadScenes?.()
+  if (res.success) {
+    await graphRef.value?.reloadScenes?.()
+    if (!skipConfirm) toast(t('toasts.reverted'), { tone: 'success', icon: '↩' })
+  }
 }
 
 // ── Undo / redo (topbar buttons + Ctrl+Z / Ctrl+X) ──────────────────────────
@@ -369,8 +499,12 @@ const HISTORY_KINDS = new Set([
 ])
 
 function showHistoryToast(verb, channel) {
-  const domain = String(channel || '').split(':')[0]
-  const what = t(`history.kind.${HISTORY_KINDS.has(domain) ? domain : 'generic'}`)
+  const [domain, sub] = String(channel || '').split(':')
+  // Arrangement steps ('layout:move' / curve / style / layout) name themselves.
+  const what =
+    domain === 'layout'
+      ? t(`history.kind.layout_${sub || 'move'}`)
+      : t(`history.kind.${HISTORY_KINDS.has(domain) ? domain : 'generic'}`)
   clearTimeout(historyToastTimer)
   historyToast.value = { key: ++historyToastKey, verb, text: t(`history.${verb}`, { what }) }
   historyToastTimer = setTimeout(() => (historyToast.value = null), 1700)
@@ -405,6 +539,10 @@ async function doRedo() {
 // the person form holds an unsaved working copy.
 function isEditableTarget(e) {
   const el = e.target
+  // The Directory Sheet's key sink is a hidden textarea (clipboard + IME
+  // events need a real text field) but it acts as a grid, not a text box —
+  // undo/redo stay live while it has focus.
+  if (el?.dataset?.gridKeys != null) return false
   return (
     !!el &&
     (el.tagName === 'INPUT' ||
@@ -419,72 +557,75 @@ function historyHotkeysBlocked() {
     !store.authUser ||
     store.curtain.active ||
     store.userPageOpen ||
+    store.projectsPageOpen ||
+    store.browsePageOpen ||
     homeOpen.value ||
     authOpen.value ||
-    store.formOpen
+    store.formOpen ||
+    store.pricingOpen ||
+    !!store.chronicleEditor
   )
 }
 
+// Rail order — Alt+1… picks the Nth *visible* view, matching IconRail.
+const VIEW_ORDER = ['graph', 'directory', 'relationships', 'timeline', 'groups', 'map', 'character']
+
 function onKeydown(e) {
-  if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return
+  if (e.defaultPrevented) return
+  const plain = !e.ctrlKey && !e.metaKey && !e.altKey
+  // Alt+1…9 switches view, Alt+N adds a person (e.code: layout-independent).
+  if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    if (isEditableTarget(e) || historyHotkeysBlocked() || store.appSettingsOpen) return
+    const digit = /^Digit([1-9])$/.exec(e.code)
+    if (digit) {
+      const views = VIEW_ORDER.filter((v) => store.caps.views.includes(v))
+      const view = views[Number(digit[1]) - 1]
+      if (view) {
+        e.preventDefault()
+        store.activeView = view
+      }
+    } else if (e.code === 'KeyN') {
+      e.preventDefault()
+      store.openForm()
+    }
+    return
+  }
+  if (plain && e.key === '?' && !isEditableTarget(e) && !historyHotkeysBlocked()) {
+    e.preventDefault()
+    store.openAppSettings('help')
+    return
+  }
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return
   const key = e.key.toLowerCase()
-  if (key === 's') {
+  if (key === 's' && !e.shiftKey) {
     e.preventDefault()
     handleSave()
     return
   }
-  if ((key === 'z' || key === 'x') && !isEditableTarget(e) && !historyHotkeysBlocked()) {
+  // Undo: Ctrl+Z. Redo: Ctrl+X (the app's own), plus the platform-standard
+  // Ctrl+Y and Ctrl+Shift+Z.
+  const isUndo = key === 'z' && !e.shiftKey
+  const isRedo = (!e.shiftKey && (key === 'x' || key === 'y')) || (e.shiftKey && key === 'z')
+  if ((isUndo || isRedo) && !isEditableTarget(e) && !historyHotkeysBlocked()) {
     e.preventDefault()
-    if (key === 'z') doUndo()
+    if (isUndo) doUndo()
     else doRedo()
   }
 }
 
-// ── Project tab actions ─────────────────────────────────────────────────────
-async function handleSwitchProject(id) {
-  if (id === store.activeProjectId || renamingId.value) return
-  // Flush any not-yet-autosaved layout changes before switching
+// ── Projects page (the tabs' replacement) ───────────────────────────────────
+// Flush any not-yet-autosaved graph layout first, so opening a different
+// project from the page never loses the current arrangement.
+async function openProjectsPage() {
   await graphRef.value?.flushLayout?.()
-  await store.switchProject(id)
+  store.toggleProjectsPage(true)
 }
 
-async function handleAddProject() {
-  const project = await store.createProject()
-  if (project) {
-    await graphRef.value?.flushLayout?.()
-    await store.switchProject(project.id)
-  }
-}
-
-async function handleDeleteProject(id) {
-  const project = store.projects.find((p) => p.id === id)
-  if (!project) return
-  const confirmed = confirm(
-    `Delete "${project.name}"? All persons, relationships, and images in this project will be permanently deleted.`
-  )
-  if (confirmed) {
-    await store.deleteProject(id)
-  }
-}
-
-function startRenaming(project) {
-  renamingId.value = project.id
-  renameValue.value = project.name
-  nextTick(() => {
-    const inputs = document.querySelectorAll('.tab-rename-input')
-    if (inputs.length) inputs[inputs.length - 1].focus()
-  })
-}
-
-async function confirmRename() {
-  if (renamingId.value && renameValue.value.trim()) {
-    await store.renameProject(renamingId.value, renameValue.value.trim())
-  }
-  renamingId.value = null
-}
-
-function cancelRename() {
-  renamingId.value = null
+// ── Browse page (community trees) — same flush, since grafting a tree and
+// opening it switches project straight from the page.
+async function openBrowsePage() {
+  await graphRef.value?.flushLayout?.()
+  store.toggleBrowsePage(true)
 }
 
 // ── Right-dock resize ───────────────────────────────────────────────────────
@@ -524,23 +665,47 @@ const workspaceStyle = computed(() => ({
   gridTemplateColumns: dockCollapsed.value ? '56px 1fr 28px' : `56px 1fr 4px ${rightWidth.value}px`
 }))
 
+// ── Project files (Project ▾ → Export / Import project file) ───────────────
 function handleImport() {
-  alert('Import feature: drop a JSON file exported from this app to restore your project data.')
+  const input = importInput.value
+  if (!input) return
+  input.value = '' // re-picking the same file must still fire `change`
+  input.click()
 }
 
-function handleExport() {
-  const data = {
-    persons: store.persons,
-    relationships: store.relationships,
-    exportedAt: new Date().toISOString()
+async function onImportFile(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  const res = await store.importProjectFile(await file.text())
+  if (!res.success) {
+    toast(t('toasts.importFailed', { error: res.error }), { tone: 'error' })
+    return
   }
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${store.activeProject?.name || 'project'}-export.json`
-  a.click()
-  URL.revokeObjectURL(url)
+  const project = res.data
+  toast(t('toasts.imported', { name: project.name }), {
+    tone: 'success',
+    duration: 8000,
+    action: {
+      label: t('projectsPage.open'),
+      run: async () => {
+        await graphRef.value?.flushLayout?.()
+        await store.switchProject(project.id)
+      }
+    }
+  })
+}
+
+async function handleExport() {
+  await graphRef.value?.flushLayout?.() // the file should hold the latest arrangement
+  const res = await store.exportProjectFile()
+  if (res.success) {
+    toast(`${t('toasts.exported', { file: res.data.file })} ${t('toasts.importPhotos')}`, {
+      tone: 'success',
+      duration: 5000
+    })
+  } else {
+    toast(res.error || 'Export failed', { tone: 'error' })
+  }
 }
 
 // In the browser there is no main-process close dialog, so prompt about a
@@ -551,11 +716,31 @@ function onBeforeUnload(e) {
   if (store.hasUnsavedChanges) e.preventDefault()
 }
 
+// Any refused action over a plan quota — wherever it started — offers the
+// upgrade once (throttled, so a batch of refusals doesn't stack toasts).
+let lastPlanLimitToast = 0
+onPlanLimit((_channel, error) => {
+  if (Date.now() - lastPlanLimitToast < 8000 || store.pricingOpen) return
+  lastPlanLimitToast = Date.now()
+  toast(t('billing.limitToast'), {
+    tone: 'warning',
+    icon: '✦',
+    duration: 8000,
+    action: {
+      label: t('billing.seePlans'),
+      run: () => store.openPricing({ reason: 'quota', detail: error })
+    }
+  })
+})
+
 onMounted(async () => {
   // Load global settings (theme, program mode)
   const globalRes = await api.invoke('globalSettings:getAll')
   if (globalRes.success && globalRes.data.theme) {
-    store.setTheme(globalRes.data.theme)
+    store.setTheme(globalRes.data.theme, { animate: false })
+  }
+  if (globalRes.success && globalRes.data.accent) {
+    store.setAccent(globalRes.data.accent, { persist: false })
   }
   if (globalRes.success && globalRes.data.programMode) {
     store.setProgramMode(globalRes.data.programMode)
@@ -630,9 +815,9 @@ onUnmounted(() => {
   width: 34px;
   height: 34px;
   margin-left: 10px;
-  border: 1px solid rgba(108, 142, 245, 0.3);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
   border-radius: 11px;
-  background: linear-gradient(135deg, var(--adim), rgba(108, 142, 245, 0.24));
+  background: linear-gradient(135deg, var(--adim), rgba(var(--accent-rgb), 0.24));
   cursor: pointer;
   flex-shrink: 0;
   transition:
@@ -642,8 +827,8 @@ onUnmounted(() => {
 }
 
 .home-btn:hover {
-  border-color: rgba(108, 142, 245, 0.55);
-  box-shadow: 0 0 12px rgba(108, 142, 245, 0.3);
+  border-color: rgba(var(--accent-rgb), 0.55);
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.3);
   transform: translateY(-1px);
 }
 
@@ -652,180 +837,386 @@ onUnmounted(() => {
   line-height: 1;
 }
 
-.project-tabs-area {
+/* ── The Projects button (replaces the old per-project tab strip) ─────────── */
+.project-btn-area {
   display: flex;
   align-items: center;
   min-width: 0;
   flex: 1;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
   padding: 0 4px;
 }
 
-.project-tabs-area::-webkit-scrollbar {
-  display: none;
-}
-
-.project-tabs {
-  display: flex;
+.projects-btn {
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
+  max-width: 100%;
   min-width: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--elevated);
+  color: var(--t2);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    border-color 0.22s ease,
+    box-shadow 0.28s ease,
+    transform 0.2s ease,
+    color 0.2s ease;
 }
 
-.project-tab {
-  display: flex;
+.projects-btn:hover {
+  color: var(--t1);
+  border-color: rgba(var(--accent-rgb), 0.5);
+  box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.25);
+  transform: translateY(-1px);
+}
+
+/* Upgrade pill: a small sparkle that keeps glinting */
+.upgrade-pill {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
-  border-radius: 8px 8px 0 0;
-  background: transparent;
-  color: var(--t3);
-  font-size: 13px;
-  font-weight: 500;
+  padding: 5px 12px;
+  border: none;
+  border-radius: var(--r-pill);
+  color: var(--on-accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: var(--glow);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 800;
   cursor: pointer;
-  transition: all 0.2s ease;
   white-space: nowrap;
-  min-width: 0;
-  max-width: 220px;
-  position: relative;
-  border: 1px solid transparent;
-  border-bottom: none;
-  margin-top: 6px;
+  transition: transform 0.2s var(--ease-spring);
+}
+
+.upgrade-pill:hover {
+  transform: translateY(-1px) scale(1.03);
+}
+
+.upgrade-pill-spark {
+  display: inline-block;
+  animation: upgrade-glint 3.2s ease-in-out infinite;
+}
+
+@keyframes upgrade-glint {
+  0%,
+  70%,
+  100% {
+    transform: rotate(0) scale(1);
+  }
+  80% {
+    transform: rotate(90deg) scale(1.35);
+  }
+}
+
+@media (max-width: 1100px) {
+  .upgrade-pill-label {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upgrade-pill-spark {
+    animation: none;
+  }
+}
+
+/* Browse: a compass whose needle swings to a new heading on hover */
+.browse-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: 8px;
+  padding: 6px 12px 6px 9px;
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.16), rgba(var(--accent-rgb), 0.04));
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 0.22s ease,
+    box-shadow 0.28s ease,
+    transform 0.2s ease;
+}
+
+.browse-btn:hover {
+  border-color: rgba(var(--accent-rgb), 0.7);
+  box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.3);
+  transform: translateY(-1px);
+}
+
+.browse-btn-compass {
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+
+.browse-btn-needle {
+  transform-origin: 12px 12px;
+  transition: transform 0.7s var(--ease-spring);
+}
+
+.browse-btn:hover .browse-btn-needle {
+  transform: rotate(215deg);
+}
+
+@media (max-width: 900px) {
+  .browse-btn-label {
+    display: none;
+  }
+}
+
+/* A shine sweeps across on hover — the button wants to be pressed */
+.projects-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  left: -60%;
+  background: linear-gradient(100deg, transparent, rgba(var(--accent-rgb), 0.18), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.5s ease;
+  pointer-events: none;
+}
+
+.projects-btn:hover::after {
+  left: 120%;
+}
+
+.projects-btn-icon {
+  display: grid;
+  place-items: center;
+  color: var(--accent);
   flex-shrink: 0;
 }
 
-.project-tab:hover {
-  background: var(--hover);
-  color: var(--t2);
+.projects-btn:hover .projects-btn-icon svg {
+  animation: projects-icon-spin 0.6s cubic-bezier(0.34, 1.3, 0.64, 1);
 }
 
-.project-tab.active {
-  background: var(--bg);
+@keyframes projects-icon-spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(-14deg) scale(1.2);
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+.projects-btn-label {
+  flex-shrink: 0;
+}
+
+.projects-btn-count {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--adim);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.projects-btn-divider {
+  flex-shrink: 0;
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+}
+
+.projects-btn-live-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green, #2bb385);
+  animation: projects-live-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes projects-live-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(43, 179, 133, 0.6);
+  }
+  55% {
+    box-shadow: 0 0 0 5px rgba(43, 179, 133, 0);
+  }
+}
+
+.projects-btn-current {
   color: var(--t1);
-  font-weight: 600;
-  border-color: var(--border);
-}
-
-.project-tab.active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--bg);
-}
-
-.tab-name {
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
   min-width: 0;
 }
 
-.tab-rename-input {
-  background: transparent;
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  color: var(--t1);
-  font-size: 13px;
-  font-weight: 500;
-  font-family: var(--font);
-  padding: 1px 4px;
-  width: 140px;
-  outline: none;
-}
-
-.tab-close {
-  display: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  border: none;
-  background: transparent;
+.projects-btn-chevron {
+  flex-shrink: 0;
   color: var(--t3);
   font-size: 14px;
   line-height: 1;
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.12s;
-  padding: 0;
+  transition: transform 0.2s ease;
 }
 
-.project-tab:hover .tab-close {
-  display: flex;
-}
-
-.tab-close:hover {
-  background: rgba(239, 83, 80, 0.15);
-  color: #ef5350;
-}
-
-.tab-add {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  border: 1px dashed var(--border);
-  background: transparent;
-  color: var(--t3);
-  font-size: 16px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-left: 4px;
-  transition: all 0.2s ease;
-}
-
-.tab-add:hover {
-  background: var(--hover);
+.projects-btn:hover .projects-btn-chevron {
+  transform: translateX(3px);
   color: var(--accent);
-  border-color: var(--accent);
-  border-style: solid;
-}
-
-.tab-add-icon {
-  font-weight: 300;
-  line-height: 1;
-}
-
-/* Tab transition animations */
-.tab-enter-active {
-  transition: all 0.3s ease;
-}
-.tab-leave-active {
-  transition: all 0.2s ease;
-}
-.tab-enter-from {
-  opacity: 0;
-  transform: translateY(-8px) scale(0.95);
-  max-width: 0;
-  padding: 6px 0;
-}
-.tab-enter-to {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  max-width: 220px;
-  padding: 6px 14px;
-}
-.tab-leave-from {
-  opacity: 1;
-  transform: scale(1);
-}
-.tab-leave-to {
-  opacity: 0;
-  transform: scale(0.9);
-  max-width: 0;
-  padding: 6px 0;
 }
 
 .topbar-spacer {
   flex: 0;
+}
+
+/* Shared stroke style for the topbar's inline SVG icons */
+.tb-svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+.topbar-search {
+  color: var(--t2);
+  gap: 7px;
+  padding-right: 6px;
+}
+.topbar-search:hover {
+  color: var(--t1);
+}
+.topbar-search kbd {
+  font-size: 9.5px;
+  padding: 0 5px;
+}
+@media (max-width: 1100px) {
+  .topbar-search-label {
+    display: none;
+  }
+}
+
+/* Theme toggle: sun ⇄ moon morph */
+.ink-toggle {
+  position: relative;
+}
+.ink-toggle-seal {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  font-family: var(--font-brush);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--t2);
+  border: 1.5px solid currentColor;
+  border-radius: 3px 4px 3px 5px;
+  transition:
+    color var(--dur) ease,
+    background var(--dur) ease,
+    border-color var(--dur) ease,
+    transform 0.45s var(--ease-spring);
+}
+.ink-toggle:hover .ink-toggle-seal {
+  color: var(--t1);
+  transform: rotate(-6deg) scale(1.06);
+}
+/* on: a pressed cinnabar seal — characters cut white from the red paste */
+.ink-toggle.on .ink-toggle-seal {
+  color: #fbf4e6;
+  background: #b3352a;
+  border-color: #b3352a;
+  box-shadow: 0 1px 4px rgba(140, 36, 28, 0.35);
+  animation: ink-toggle-stamp 0.5s var(--ease-spring);
+}
+@keyframes ink-toggle-stamp {
+  0% {
+    transform: scale(1.45) rotate(-10deg);
+  }
+  55% {
+    transform: scale(0.92) rotate(2deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.theme-toggle svg {
+  overflow: visible;
+}
+.theme-toggle .tt-core {
+  fill: currentColor;
+  transform-origin: center;
+  transition: transform 0.5s var(--ease-spring);
+}
+.theme-toggle .tt-bite {
+  transition: transform 0.5s var(--ease-out);
+}
+.theme-toggle .tt-rays {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  transform-origin: 12px 12px;
+  transition:
+    transform 0.5s var(--ease-spring),
+    opacity 0.3s ease;
+}
+/* dark theme → the button shows a sun (click for light) */
+.theme-toggle.dark .tt-bite {
+  transform: translate(8px, -8px);
+}
+.theme-toggle.dark .tt-core {
+  transform: scale(0.85);
+}
+/* light theme → a crescent moon, rays tucked away */
+.theme-toggle.light .tt-rays {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.4);
+}
+.theme-toggle.light .tt-core {
+  transform: scale(1.35);
+}
+.theme-toggle:hover {
+  color: var(--amber);
+}
+.theme-toggle.light:hover {
+  color: var(--accent);
+}
+
+.settings-btn svg {
+  transition: transform 0.6s var(--ease-spring);
+}
+.settings-btn:hover svg {
+  transform: rotate(75deg);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ── Undo / redo (beside the Project menu) ────────────────────────────────── */
@@ -1040,9 +1431,9 @@ onUnmounted(() => {
 }
 .labs-btn.labs-on {
   color: var(--accent);
-  border-color: rgba(108, 142, 245, 0.45);
+  border-color: rgba(var(--accent-rgb), 0.45);
   background: var(--adim);
-  box-shadow: 0 0 10px rgba(108, 142, 245, 0.25);
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.25);
 }
 .labs-btn.labs-on .labs-flask {
   animation: labs-bubble 0.5s cubic-bezier(0.34, 1.4, 0.64, 1);
@@ -1097,11 +1488,14 @@ onUnmounted(() => {
   display: grid;
 }
 
-/* People view cross-fade / rise */
+/* View switch: the incoming view is revealed as a circle growing from the
+   click point (--reveal-x/y, set in the activeView watcher) while it settles
+   from a slight zoom; the outgoing one fades underneath. */
 .people-view-enter-active {
   transition:
-    opacity 0.32s ease,
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    clip-path 0.62s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.3s ease,
+    transform 0.62s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .people-view-leave-active {
   transition:
@@ -1111,8 +1505,12 @@ onUnmounted(() => {
   inset: 0;
 }
 .people-view-enter-from {
-  opacity: 0;
-  transform: translateY(14px) scale(0.99);
+  opacity: 0.35;
+  transform: scale(1.02);
+  clip-path: circle(0% at var(--reveal-x, 0px) var(--reveal-y, 50%));
+}
+.people-view-enter-to {
+  clip-path: circle(150% at var(--reveal-x, 0px) var(--reveal-y, 50%));
 }
 .people-view-leave-to {
   opacity: 0;

@@ -64,6 +64,9 @@ export function initDB() {
   _db.scene_tags = _db.scene_tags || {}
   _db.images = _db.images || {}
   _db.characters = _db.characters || {}
+  _db.maps = _db.maps || {}
+  _db.eras = _db.eras || {}
+  _db.events = _db.events || {}
   _db.settings = _db.settings || {}
   _db.globalSettings = _db.globalSettings || {}
 

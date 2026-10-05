@@ -434,9 +434,9 @@ async function continueAsGuest() {
   justify-content: center;
   font-size: 28px;
   border-radius: 18px;
-  background: linear-gradient(135deg, var(--adim), rgba(108, 142, 245, 0.32));
-  border: 1px solid rgba(108, 142, 245, 0.35);
-  box-shadow: 0 6px 22px rgba(108, 142, 245, 0.22);
+  background: linear-gradient(135deg, var(--adim), rgba(var(--accent-rgb), 0.32));
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
+  box-shadow: 0 6px 22px rgba(var(--accent-rgb), 0.22);
   animation: logo-float 5s ease-in-out infinite;
 }
 
@@ -705,7 +705,7 @@ async function continueAsGuest() {
   margin: -2px 0;
   font-size: 12px;
   font-weight: 500;
-  color: #ef5350;
+  color: var(--danger);
   text-align: center;
 }
 
@@ -741,7 +741,7 @@ async function continueAsGuest() {
 
 .auth-submit:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(108, 142, 245, 0.35);
+  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.35);
   filter: brightness(1.06);
 }
 
@@ -827,7 +827,7 @@ async function continueAsGuest() {
 
 .auth-guest:hover:not(:disabled) {
   transform: translateY(-1px);
-  border-color: rgba(108, 142, 245, 0.45);
+  border-color: rgba(var(--accent-rgb), 0.45);
   background: var(--hover);
 }
 

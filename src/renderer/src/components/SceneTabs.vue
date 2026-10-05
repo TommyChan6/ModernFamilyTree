@@ -153,7 +153,7 @@ defineExpose({ startRename })
 .st-chip.active {
   background: var(--adim);
   color: var(--accent);
-  border-color: rgba(108, 142, 245, 0.35);
+  border-color: rgba(var(--accent-rgb), 0.35);
 }
 .st-name {
   max-width: 140px;
@@ -207,7 +207,7 @@ defineExpose({ startRename })
   pointer-events: auto;
 }
 .st-x:hover {
-  color: #ef5350;
+  color: var(--danger);
   transform: scale(1.18);
 }
 .st-rename {
@@ -269,5 +269,81 @@ defineExpose({ startRename })
 .stpill-leave-to {
   opacity: 0;
   transform: scale(0.9);
+}
+
+/* ── 水墨 ink theme: scenes are paper tabs; the active one is underlined by
+   a cinnabar brush stroke that writes in ─────────────────────────────── */
+:root[data-theme='ink'] .scene-tabs {
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: none;
+  border-top-color: rgba(48, 36, 20, 0.16);
+}
+:root[data-theme='ink'] .st-label {
+  font-family: var(--font-ink-label);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant: small-caps;
+  text-transform: lowercase;
+  letter-spacing: 0.12em;
+  color: var(--t2);
+}
+:root[data-theme='ink'] .st-chip {
+  position: relative;
+  border-color: transparent;
+  border-radius: 2px;
+  background: radial-gradient(closest-side, rgba(40, 30, 18, 0.1), transparent) center / 0% 0%
+    no-repeat;
+  font-family: var(--font-ink-label);
+  font-size: 13.5px;
+  transition:
+    background-size 0.5s var(--ease-out),
+    color 0.15s,
+    transform 0.15s;
+}
+:root[data-theme='ink'] .st-chip:hover {
+  background-size: 160% 220%;
+  transform: none;
+}
+:root[data-theme='ink'] .st-chip::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -1px;
+  height: 6px;
+  background-color: var(--accent);
+  -webkit-mask: var(--ink-underline) center / 100% 100% no-repeat;
+  mask: var(--ink-underline) center / 100% 100% no-repeat;
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.5s var(--ease-out);
+  pointer-events: none;
+}
+:root[data-theme='ink'] .st-chip.active {
+  background-color: transparent;
+  border-color: transparent;
+  color: var(--t1);
+}
+:root[data-theme='ink'] .st-chip.active::after {
+  clip-path: inset(0 0 0 0);
+}
+:root[data-theme='ink'] .st-chip.active .st-name {
+  font-family: var(--font-brush);
+  font-size: 16px;
+  font-weight: 400;
+}
+:root[data-theme='ink'] .st-badge {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(48, 36, 20, 0.22);
+  border-radius: 2px;
+}
+:root[data-theme='ink'] .st-add {
+  border-radius: 3px;
+  border-color: rgba(48, 36, 20, 0.3);
+}
+:root[data-theme='ink'] .st-add:hover {
+  background: rgba(179, 53, 42, 0.06);
+}
+:root[data-theme='ink'] .st-rename {
+  border-radius: 2px;
 }
 </style>

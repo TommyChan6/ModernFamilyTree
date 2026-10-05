@@ -390,4 +390,36 @@ defineExpose({ bayAt })
     left 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
     background 0.25s;
 }
+
+/* ── 水墨 ink theme: slot bays are paper wells with a ruled border ──────── */
+:root[data-theme='ink'] .sd-bay {
+  border-radius: 2px;
+  border-width: 1px;
+  border-color: rgba(48, 36, 20, 0.2);
+  background: rgba(255, 251, 240, 0.42);
+  box-shadow: inset 0 0 0 3px rgba(245, 239, 224, 0.6);
+}
+:root[data-theme='ink'] .sd-bay.ok {
+  border-color: rgba(179, 53, 42, 0.55);
+  box-shadow: 0 0 0 3px rgba(179, 53, 42, 0.1);
+}
+:root[data-theme='ink'] .sd-bay-label {
+  font-family: var(--font-ink-label);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant: small-caps;
+  text-transform: lowercase;
+  letter-spacing: 0.12em;
+}
+:root[data-theme='ink'] .sd-bay-hint,
+:root[data-theme='ink'] .sd-empty-hint {
+  font-size: 11px;
+  font-style: italic;
+}
+:root[data-theme='ink'] .sd-card-label {
+  font-size: 12px;
+}
+:root[data-theme='ink'] .sd-grad-bar {
+  border-radius: 2px;
+}
 </style>

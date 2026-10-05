@@ -866,4 +866,52 @@ function yearStyle(year) {
     animation: none !important;
   }
 }
+
+/* ── 水墨 ink theme: the demo stage is a mounted painting ───────────────── */
+:root[data-theme='ink'] .tab {
+  border-radius: 3px 5px 4px 6px / 5px 3px 6px 4px;
+  font-family: var(--font-ink-label);
+}
+:root[data-theme='ink'] .tab-icon {
+  filter: grayscale(1) sepia(0.4);
+}
+:root[data-theme='ink'] .stage-frame {
+  border-radius: 2px;
+  border-color: var(--ink-mount-line);
+  background:
+    var(--ink-landscape, none) center bottom / auto 40% repeat-x,
+    var(--ink-sheet),
+    var(--surface);
+  background-size:
+    auto 40%,
+    512px 512px;
+  box-shadow:
+    var(--ink-mount-rings),
+    0 18px 40px rgba(60, 40, 15, 0.16);
+}
+:root[data-theme='ink'] .stage-frame::before,
+:root[data-theme='ink'] .stage-stars {
+  display: none;
+}
+:root[data-theme='ink'] .dot {
+  box-shadow: none;
+  filter: saturate(0.55);
+}
+:root[data-theme='ink'] .link {
+  opacity: 0.7;
+}
+:root[data-theme='ink'] .dot-name {
+  font-family: var(--font-brush);
+  font-weight: 400;
+  font-size: 14px;
+}
+:root[data-theme='ink'] .live-chip {
+  border-radius: 2px;
+  font-family: var(--font-ink-label);
+}
+:root[data-theme='ink'] .caption strong {
+  font-family: var(--font-brush);
+  font-weight: 400;
+  font-size: 17px;
+}
 </style>
