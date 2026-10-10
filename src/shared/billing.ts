@@ -35,18 +35,19 @@ export type PerkKey =
   | 'aiCredits'
   | 'prioritySupport'
 
+/** `icon` is a UiIcon name (renderer: components/ui/icons.js). */
 export const PERKS: Record<PerkKey, { live: boolean; icon: string }> = {
-  adFree: { live: true, icon: '🚫' },
-  moreProjects: { live: true, icon: '🗂️' },
-  morePeople: { live: true, icon: '👥' },
-  morePhotos: { live: true, icon: '🖼️' },
-  supporterBadge: { live: true, icon: '✦' },
-  earlyLabs: { live: true, icon: '🧪' },
-  coEdit: { live: false, icon: '🤝' },
-  hiresExport: { live: false, icon: '🖨️' },
-  gedcom: { live: false, icon: '🧬' },
-  aiCredits: { live: false, icon: '🪄' },
-  prioritySupport: { live: false, icon: '💬' }
+  adFree: { live: true, icon: 'ban' },
+  moreProjects: { live: true, icon: 'folder-plus' },
+  morePeople: { live: true, icon: 'users' },
+  morePhotos: { live: true, icon: 'images' },
+  supporterBadge: { live: true, icon: 'sparkles' },
+  earlyLabs: { live: true, icon: 'flask-conical' },
+  coEdit: { live: false, icon: 'handshake' },
+  hiresExport: { live: false, icon: 'printer' },
+  gedcom: { live: false, icon: 'dna' },
+  aiCredits: { live: false, icon: 'wand-sparkles' },
+  prioritySupport: { live: false, icon: 'message-circle' }
 }
 
 export interface PlanOffer {

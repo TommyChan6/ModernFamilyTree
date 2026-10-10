@@ -9,7 +9,7 @@ export const GRAPH_THEMES = [
     id: 'classic',
     name: 'Classic',
     tagline: 'The signature look — clean discs, organic lines',
-    icon: '🌳',
+    icon: 'tree-deciduous',
     swatch: ['#8b6cc5', '#d4af37', '#3a7bd5'],
     settings: {
       nodeShape: 'circle',
@@ -34,7 +34,7 @@ export const GRAPH_THEMES = [
     id: 'lineage',
     name: 'Lineage',
     tagline: 'Formal genealogy — sibling rails and couple bars',
-    icon: '🏛️',
+    icon: 'landmark',
     swatch: ['#a8b2c1', '#d4af37', '#6b7f99'],
     settings: {
       nodeShape: 'square',
@@ -59,7 +59,7 @@ export const GRAPH_THEMES = [
     id: 'storybook',
     name: 'Storybook',
     tagline: 'Fantasy — gilded shields and fireflies in the dark',
-    icon: '🐉',
+    icon: 'book-open',
     swatch: ['#e8c15a', '#57a773', '#4f74c9'],
     settings: {
       nodeShape: 'shield',
@@ -84,7 +84,7 @@ export const GRAPH_THEMES = [
     id: 'neon',
     name: 'Neon Circuit',
     tagline: 'Sci-fi — hex cells on glowing traces under starlight',
-    icon: '🛰️',
+    icon: 'satellite',
     swatch: ['#59f2ff', '#c86bfa', '#ff5ec4'],
     settings: {
       nodeShape: 'hexagon',
@@ -109,7 +109,7 @@ export const GRAPH_THEMES = [
     id: 'noir',
     name: 'Noir',
     tagline: 'Crime drama — hard edges, monochrome, endless rain',
-    icon: '🕵️',
+    icon: 'glasses',
     swatch: ['#aab3bd', '#c25b6a', '#5c6670'],
     settings: {
       nodeShape: 'square',
@@ -134,7 +134,7 @@ export const GRAPH_THEMES = [
     id: 'dynasty',
     name: 'Dynasty',
     tagline: '朝代 — vermillion, jade and gold; petals on the wind',
-    icon: '🏮',
+    icon: 'lamp',
     swatch: ['#c04851', '#e3b341', '#3a8f7a'],
     settings: {
       nodeShape: 'octagon',
@@ -159,7 +159,7 @@ export const GRAPH_THEMES = [
     id: 'wuxia',
     name: 'Ink & Blade',
     tagline: '武侠 — brush-stroke calm, ink motes drifting in water',
-    icon: '⚔️',
+    icon: 'swords',
     swatch: ['#6d7885', '#a5836a', '#9d6b7b'],
     settings: {
       nodeShape: 'oval',
@@ -188,7 +188,7 @@ export const GRAPH_THEMES = [
     id: 'shuimo',
     name: 'Shuimo',
     tagline: '水墨 — brush strokes, ink washes, mist over far mountains',
-    icon: '🖌️',
+    icon: 'brush',
     swatch: ['#1f1b16', '#b3352a', '#8a8478'],
     settings: {
       nodeShape: 'circle',
@@ -215,7 +215,7 @@ export const GRAPH_THEMES = [
     id: 'qinglu',
     name: 'Qinglü',
     tagline: '青绿 — azurite and malachite washes, mist-veiled peaks',
-    icon: '⛰️',
+    icon: 'mountain',
     swatch: ['#2f5f8a', '#4c8a72', '#b4884c'],
     settings: {
       nodeShape: 'circle',
@@ -241,7 +241,7 @@ export const GRAPH_THEMES = [
     id: 'meihua',
     name: 'Ink Plum',
     tagline: '墨梅 — dry-brush branches, plum blossoms on the wind',
-    icon: '🌺',
+    icon: 'flower',
     swatch: ['#2a2420', '#c2414b', '#f0d9d2'],
     settings: {
       nodeShape: 'circle',
@@ -266,7 +266,7 @@ export const GRAPH_THEMES = [
     id: 'celestial',
     name: 'Celestial',
     tagline: '仙侠 — jade crystals in arcs, spirit wisps ascending',
-    icon: '🌙',
+    icon: 'moon-star',
     swatch: ['#7fe7d2', '#b7a3f5', '#58a4d6'],
     settings: {
       nodeShape: 'diamond',
@@ -291,7 +291,7 @@ export const GRAPH_THEMES = [
     id: 'rosewater',
     name: 'Rosewater',
     tagline: 'Romance — hearts, blush arcs and falling petals',
-    icon: '🌹',
+    icon: 'heart',
     swatch: ['#ff6f91', '#ffb3c6', '#7f9ddb'],
     settings: {
       nodeShape: 'heart',
@@ -316,7 +316,7 @@ export const GRAPH_THEMES = [
     id: 'winter',
     name: 'Winterhold',
     tagline: 'Northern saga — burst crowns and quiet snowfall',
-    icon: '❄️',
+    icon: 'snowflake',
     swatch: ['#a8d8f0', '#e8f1f8', '#5b87a6'],
     settings: {
       nodeShape: 'hexagon',
@@ -341,7 +341,7 @@ export const GRAPH_THEMES = [
     id: 'minimal',
     name: 'Minimal',
     tagline: 'Modern and quiet — clean lines, no ornament',
-    icon: '◻️',
+    icon: 'square',
     swatch: ['#8a9099', '#b0a080', '#5b7fa6'],
     settings: {
       nodeShape: 'circle',
@@ -366,7 +366,7 @@ export const GRAPH_THEMES = [
     id: 'heirloom',
     name: 'Heirloom',
     tagline: 'Family archive — sepia cameos and drifting dust',
-    icon: '🕰️',
+    icon: 'clock',
     swatch: ['#a68a64', '#c9a46a', '#b07a6e'],
     settings: {
       nodeShape: 'oval',
@@ -391,7 +391,7 @@ export const GRAPH_THEMES = [
     id: 'blueprint',
     name: 'Blueprint',
     tagline: 'Drafting table — crisp octagons on right-angle runs',
-    icon: '📐',
+    icon: 'pencil-ruler',
     swatch: ['#8fbfee', '#e6d28a', '#4a90d9'],
     settings: {
       nodeShape: 'octagon',
@@ -416,7 +416,7 @@ export const GRAPH_THEMES = [
     id: 'wildwood',
     name: 'Wildwood',
     tagline: 'Enchanted forest — rune rings on winding vines',
-    icon: '🌲',
+    icon: 'tree-pine',
     swatch: ['#6fa35a', '#d8c25a', '#4fb39a'],
     settings: {
       nodeShape: 'circle',
@@ -441,7 +441,7 @@ export const GRAPH_THEMES = [
     id: 'harvest',
     name: 'Harvest',
     tagline: 'Autumn — amber crests glowing by the hearth',
-    icon: '🍂',
+    icon: 'leaf',
     swatch: ['#c07a3a', '#e8b04a', '#8a9a4a'],
     settings: {
       nodeShape: 'octagon',
@@ -466,7 +466,7 @@ export const GRAPH_THEMES = [
     id: 'sakura',
     name: 'Sakura',
     tagline: '桜 — blossoms in orbit on a spring breeze',
-    icon: '🌸',
+    icon: 'flower-2',
     swatch: ['#ffb7c5', '#9a7a6a', '#6f9fcf'],
     settings: {
       nodeShape: 'oval',
@@ -491,7 +491,7 @@ export const GRAPH_THEMES = [
     id: 'pharaoh',
     name: 'Sands of Time',
     tagline: 'Ancient empire — lapis and gold on drifting sand',
-    icon: '🏺',
+    icon: 'hourglass',
     swatch: ['#e6c060', '#2f5fa8', '#2f9a8a'],
     settings: {
       nodeShape: 'diamond',
@@ -516,7 +516,7 @@ export const GRAPH_THEMES = [
     id: 'ember',
     name: 'Ember Throne',
     tagline: 'Dark fantasy war — burning crests and rising sparks',
-    icon: '🔥',
+    icon: 'flame',
     swatch: ['#c2452d', '#ffb347', '#5d7fb8'],
     settings: {
       nodeShape: 'shield',
@@ -541,7 +541,7 @@ export const GRAPH_THEMES = [
     id: 'nocturne',
     name: 'Nocturne',
     tagline: 'Gothic — crimson crests beneath moonlit rain',
-    icon: '🦇',
+    icon: 'moon',
     swatch: ['#c7324a', '#9a8fb0', '#5a6a8f'],
     settings: {
       nodeShape: 'shield',
@@ -566,7 +566,7 @@ export const GRAPH_THEMES = [
     id: 'grimoire',
     name: 'Grimoire',
     tagline: 'Arcane — sigil-bound crystals and wandering wisps',
-    icon: '🔮',
+    icon: 'wand-sparkles',
     swatch: ['#9a6fe0', '#ffd06a', '#5fd0b0'],
     settings: {
       nodeShape: 'diamond',
@@ -591,7 +591,7 @@ export const GRAPH_THEMES = [
     id: 'abyss',
     name: 'Abyss',
     tagline: 'Deep sea — bioluminescent pulses among plankton',
-    icon: '🌊',
+    icon: 'waves',
     swatch: ['#2fc6c0', '#8a7cff', '#3a8ee6'],
     settings: {
       nodeShape: 'circle',
@@ -616,7 +616,7 @@ export const GRAPH_THEMES = [
     id: 'nebula',
     name: 'Nebula',
     tagline: 'Space opera — orbiting worlds in a violet starfield',
-    icon: '🪐',
+    icon: 'orbit',
     swatch: ['#b07cff', '#ff9ad5', '#5a8cff'],
     settings: {
       nodeShape: 'circle',

@@ -54,18 +54,19 @@ const TYPE_ALIGN: Record<string, SheetColumn['align']> = {
   slider: 'left'
 }
 
-/** Short glyph per trait type, shown in the column header. */
+/** Icon name (components/ui/icons.js) per trait type, shown in the column
+ *  header and the add-trait menu. */
 export const TYPE_GLYPH: Record<string, string> = {
-  text: 'Aa',
-  boolean: '☑',
-  number: '#',
-  number_range: '#–#',
-  select: '▾',
-  slider: '⟷',
-  date: '📅',
-  date_range: '📅–',
-  custom_date: '📅',
-  custom_date_range: '📅–'
+  text: 'type',
+  boolean: 'toggle-left',
+  number: 'hash',
+  number_range: 'arrow-left-right',
+  select: 'chevrons-up-down',
+  slider: 'sliders-horizontal',
+  date: 'calendar',
+  date_range: 'calendar-range',
+  custom_date: 'calendar-days',
+  custom_date_range: 'calendar-range'
 }
 
 /** Types the sheet can type into (custom_date* have no editor yet). */

@@ -1,7 +1,7 @@
 <template>
   <div class="elx">
     <div v-if="!persons.length" class="elx-empty">
-      <div class="elx-empty-icon">⚛</div>
+      <div class="elx-empty-icon"><UiIcon name="atom" :size="44" :stroke="1.5" /></div>
       <div class="elx-empty-title">No elements discovered</div>
       <div class="elx-empty-text">No people match — clear the search or add someone.</div>
     </div>
@@ -18,7 +18,13 @@
         >
           <div class="elx-big">
             <span class="elx-big-num">{{ featured.no }}</span>
-            <span v-if="featured.dead" class="elx-big-moon" title="Deceased">☾</span>
+            <UiIcon
+              v-if="featured.dead"
+              class="elx-big-moon"
+              name="moon"
+              :size="14"
+              label="Deceased"
+            />
             <div class="elx-big-sym" :data-len="symLen(featured.sym)">{{ featured.sym }}</div>
             <div class="elx-big-name">{{ featured.p.name || 'Unnamed' }}</div>
             <div class="elx-big-mass">{{ featured.mass }}</div>
@@ -65,8 +71,8 @@
                 class="elx-tag"
                 :style="{ '--tc': t.color || 'var(--accent)' }"
               >
-                <span v-if="t.icon">{{ t.icon }}</span
-                >{{ t.label }}
+                <UiIcon v-if="t.icon" :name="t.icon" :size="12" />
+                {{ t.label }}
               </span>
             </div>
           </div>
@@ -172,7 +178,7 @@
           >
             <div class="el-in">
               <span class="el-num">{{ t.no }}</span>
-              <span v-if="t.dead" class="el-moon">☾</span>
+              <UiIcon v-if="t.dead" class="el-moon" name="moon" :size="12" label="Deceased" />
               <div class="el-sym" :data-len="symLen(t.sym)">{{ t.sym }}</div>
               <div class="el-name">{{ t.p.name || 'Unnamed' }}</div>
               <div class="el-mass">{{ t.mass }}</div>
@@ -189,6 +195,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, h } from 'v
 import { useMainStore } from '../../store/index.js'
 import { isDeceased, ageOf } from './peopleLayout.js'
 import { useThumbnail } from './useThumbnail.js'
+import UiIcon from '../ui/UiIcon.js'
 import {
   COL_PITCH,
   ROW_PITCH,
@@ -844,9 +851,8 @@ onBeforeUnmount(() => {
 }
 .elx-big-moon {
   position: absolute;
-  top: 6px;
+  top: 8px;
   right: 9px;
-  font-size: 14px;
   color: var(--t2);
 }
 .elx-big-sym {
@@ -869,7 +875,7 @@ onBeforeUnmount(() => {
 }
 .elx-big-name {
   max-width: 100%;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--t1);
   white-space: nowrap;
@@ -877,7 +883,7 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
 }
 .elx-big-mass {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--t2);
   font-variant-numeric: tabular-nums;
@@ -942,14 +948,14 @@ onBeforeUnmount(() => {
 }
 .elx-facts-cat {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.4px;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--el-cc) 55%, var(--t1));
 }
 .elx-facts-sub {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
   white-space: nowrap;
   overflow: hidden;
@@ -965,14 +971,14 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 .elx-stats dt {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.6px;
   text-transform: uppercase;
   color: var(--t3);
 }
 .elx-stats dd {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--t1);
   font-variant-numeric: tabular-nums;
@@ -989,6 +995,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 .elx-tag {
+  align-items: center;
   display: inline-flex;
   gap: 3px;
   padding: 1px 8px;
@@ -996,7 +1003,7 @@ onBeforeUnmount(() => {
   border: 1px solid color-mix(in srgb, var(--tc) 45%, transparent);
   background: color-mix(in srgb, var(--tc) 14%, transparent);
   color: var(--t1);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -1026,7 +1033,7 @@ onBeforeUnmount(() => {
 }
 .elx-seg-label {
   padding: 0 7px 0 6px;
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 800;
   letter-spacing: 0.6px;
   text-transform: uppercase;
@@ -1039,7 +1046,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1075,7 +1082,7 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--el-cc) 10%, transparent);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1108,13 +1115,13 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
 }
 .elx-leg-n {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--t2);
   font-variant-numeric: tabular-nums;
 }
 .elx-hint {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
 }
 
@@ -1148,7 +1155,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   color: var(--t3);
   background: var(--bg);
@@ -1176,7 +1183,7 @@ onBeforeUnmount(() => {
 }
 .elx-col-label {
   max-width: 100%;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   color: var(--t1);
   white-space: nowrap;
@@ -1187,7 +1194,7 @@ onBeforeUnmount(() => {
   color: var(--t3);
 }
 .elx-col-n {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--t3);
   font-variant-numeric: tabular-nums;
@@ -1238,7 +1245,7 @@ onBeforeUnmount(() => {
   left: 0;
   width: 100%;
   text-align: center;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--t3);
   font-variant-numeric: tabular-nums;
@@ -1300,19 +1307,16 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 3px;
   left: 5px;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--t2);
   font-variant-numeric: tabular-nums;
 }
 .el-moon {
   position: absolute;
-  top: 1px;
+  top: 3px;
   right: 4px;
-  font-size: 12px;
-  line-height: 1.2;
   color: var(--t2);
-  opacity: 0.85;
 }
 .el-sym {
   font-size: 25px;
@@ -1334,7 +1338,7 @@ onBeforeUnmount(() => {
 }
 .el-name {
   max-width: 100%;
-  font-size: 8.5px;
+  font-size: 9.5px;
   font-weight: 700;
   color: var(--t1);
   white-space: nowrap;
@@ -1342,7 +1346,7 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
 }
 .el-mass {
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 600;
   color: var(--t2);
   font-variant-numeric: tabular-nums;
@@ -1427,8 +1431,8 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 .elx-empty-icon {
-  font-size: 44px;
-  opacity: 0.6;
+  display: flex;
+  color: var(--t3);
 }
 .elx-empty-title {
   font-size: 16px;

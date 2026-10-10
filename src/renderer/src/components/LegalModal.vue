@@ -16,7 +16,14 @@
                 Privacy Policy
               </button>
             </div>
-            <button class="legal-close" title="Close" @click="$emit('close')">×</button>
+            <button
+              class="icon-btn legal-close"
+              title="Close"
+              aria-label="Close"
+              @click="$emit('close')"
+            >
+              <UiIcon name="x" :size="16" />
+            </button>
           </header>
 
           <div class="legal-body">
@@ -83,6 +90,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import UiIcon from './ui/UiIcon.js'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -144,7 +152,7 @@ watch(
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   padding: 6px 12px;
   border-radius: 8px;
@@ -158,40 +166,23 @@ watch(
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
 
-.legal-close {
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--t3);
-  font-size: 18px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.legal-close:hover {
-  background: var(--hover);
-  color: var(--t1);
-}
-
 .legal-body {
   padding: 8px 20px 20px;
   overflow-y: auto;
   color: var(--t2);
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.65;
 }
 
 .legal-body h3 {
   color: var(--t1);
-  font-size: 16px;
+  font-size: 17px;
   margin: 12px 0 2px;
 }
 
 .legal-body h4 {
   color: var(--t1);
-  font-size: 13px;
+  font-size: 14px;
   margin: 14px 0 4px;
 }
 
@@ -201,7 +192,7 @@ watch(
 
 .legal-updated {
   color: var(--t3);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .legal-enter-active,

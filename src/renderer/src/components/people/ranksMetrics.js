@@ -12,7 +12,7 @@ export const METRICS = [
   {
     id: 'age',
     label: 'Age',
-    icon: '⏳',
+    icon: 'hourglass',
     unit: ['yr', 'yrs'],
     blurb: 'Age at the reference year — full lifespan for the departed',
     zeroIsNone: false
@@ -20,7 +20,7 @@ export const METRICS = [
   {
     id: 'connections',
     label: 'Connections',
-    icon: '🔗',
+    icon: 'link',
     unit: ['link', 'links'],
     blurb: 'Every relationship a person takes part in',
     zeroIsNone: true
@@ -28,7 +28,7 @@ export const METRICS = [
   {
     id: 'children',
     label: 'Children',
-    icon: '🌱',
+    icon: 'sprout',
     unit: ['child', 'children'],
     blurb: 'Direct children on record',
     zeroIsNone: true
@@ -36,7 +36,7 @@ export const METRICS = [
   {
     id: 'descendants',
     label: 'Descendants',
-    icon: '🌳',
+    icon: 'tree-deciduous',
     unit: ['descendant', 'descendants'],
     blurb: 'Children, grandchildren and every generation below',
     zeroIsNone: true
@@ -44,7 +44,7 @@ export const METRICS = [
   {
     id: 'depth',
     label: 'Lineage',
-    icon: '🧬',
+    icon: 'dna',
     unit: ['gen', 'gens'],
     blurb: 'Generations of recorded ancestors above them',
     zeroIsNone: true
@@ -52,7 +52,7 @@ export const METRICS = [
   {
     id: 'siblings',
     label: 'Siblings',
-    icon: '👥',
+    icon: 'users',
     unit: ['sibling', 'siblings'],
     blurb: 'People who share at least one parent',
     zeroIsNone: true

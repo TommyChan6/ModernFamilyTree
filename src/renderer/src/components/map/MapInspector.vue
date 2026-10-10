@@ -3,7 +3,7 @@
     <!-- ── a feature ─────────────────────────────────────────────────────── -->
     <template v-if="feature">
       <header class="mi-head">
-        <span class="mi-kind-icon">{{ kindIcon }}</span>
+        <span class="mi-kind-icon"><UiIcon :name="kindIcon" :size="22" /></span>
         <div class="mi-head-text">
           <div class="mi-kicker">{{ t('map.kinds.' + feature.kind) }}</div>
           <input
@@ -14,7 +14,14 @@
             @input="patch({ name: $event.target.value }, 'name')"
           />
         </div>
-        <button class="mi-x" :title="t('map.inspector.close')" @click="emit('close')">✕</button>
+        <button
+          class="mi-x"
+          :title="t('map.inspector.close')"
+          :aria-label="t('map.inspector.close')"
+          @click="emit('close')"
+        >
+          <UiIcon name="x" :size="16" />
+        </button>
       </header>
 
       <section v-if="sameGeometry.length > 1" class="mi-sec">
@@ -27,7 +34,8 @@
             :class="{ on: feature.kind === k.id }"
             @click="patch({ kind: k.id })"
           >
-            {{ k.icon }} {{ t('map.kinds.' + k.id) }}
+            <UiIcon :name="k.icon" :size="14" />
+            {{ t('map.kinds.' + k.id) }}
           </button>
         </div>
       </section>
@@ -41,9 +49,10 @@
             class="mi-glyph"
             :class="{ on: feature.icon === g.glyph }"
             :title="t('map.tools.' + g.id.replace(':', '_'))"
+            :aria-label="t('map.tools.' + g.id.replace(':', '_'))"
             @click="patch({ icon: g.glyph })"
           >
-            {{ g.icon }}
+            <UiIcon :name="g.icon" :size="16" />
           </button>
         </div>
       </section>
@@ -68,9 +77,10 @@
             class="mi-swatch mi-swatch-auto"
             :class="{ on: !feature.color }"
             :title="t('map.inspector.styleColor')"
+            :aria-label="t('map.inspector.styleColor')"
             @click="patch({ color: '' })"
           >
-            ✦
+            <UiIcon name="sparkles" :size="12" />
           </button>
           <button
             v-for="c in SWATCHES"
@@ -86,7 +96,7 @@
               :value="feature.color || '#888888'"
               @input="patch({ color: $event.target.value }, 'color')"
             />
-            ＋
+            <UiIcon name="plus" :size="12" />
           </label>
         </div>
       </section>
@@ -124,7 +134,7 @@
       </section>
 
       <section class="mi-sec">
-        <div class="mi-label">⏳ {{ t('map.inspector.when') }}</div>
+        <div class="mi-label">{{ t('map.inspector.when') }}</div>
         <div class="mi-when">
           <label class="mi-when-field">
             <span>{{ t('map.inspector.from') }}</span>
@@ -135,7 +145,7 @@
               @change="onYear('from', $event.target.value)"
             />
           </label>
-          <span class="mi-when-dash">→</span>
+          <UiIcon class="mi-when-dash" name="arrow-right" :size="14" />
           <label class="mi-when-field">
             <span>{{ t('map.inspector.to') }}</span>
             <input
@@ -148,17 +158,21 @@
         </div>
         <div class="mi-row">
           <button class="mi-mini" @click="patch({ from: Math.round(year) })">
-            ⏱ {{ t('map.inspector.fromNow', { y: Math.round(year) }) }}
+            <UiIcon name="clock" :size="14" />
+            {{ t('map.inspector.fromNow', { y: Math.round(year) }) }}
           </button>
           <button class="mi-mini" @click="patch({ to: Math.round(year) })">
-            ⏱ {{ t('map.inspector.untilNow', { y: Math.round(year) }) }}
+            <UiIcon name="clock" :size="14" />
+            {{ t('map.inspector.untilNow', { y: Math.round(year) }) }}
           </button>
           <button
             v-if="feature.from != null || feature.to != null"
             class="mi-mini"
+            :title="t('map.inspector.always')"
+            :aria-label="t('map.inspector.always')"
             @click="patch({ from: null, to: null })"
           >
-            ∞
+            <UiIcon name="infinity" :size="14" />
           </button>
         </div>
         <p class="mi-hint">{{ t('map.inspector.whenHint') }}</p>
@@ -176,14 +190,29 @@
       </section>
 
       <footer class="mi-actions">
-        <button class="mi-act" :title="t('map.inspector.duplicate')" @click="emit('duplicate')">
-          ⧉
+        <button
+          class="mi-act"
+          :title="t('map.inspector.duplicate')"
+          :aria-label="t('map.inspector.duplicate')"
+          @click="emit('duplicate')"
+        >
+          <UiIcon name="copy" :size="16" />
         </button>
-        <button class="mi-act" :title="t('map.inspector.front')" @click="emit('order', 1)">
-          ⬆
+        <button
+          class="mi-act"
+          :title="t('map.inspector.front')"
+          :aria-label="t('map.inspector.front')"
+          @click="emit('order', 1)"
+        >
+          <UiIcon name="arrow-up" :size="16" />
         </button>
-        <button class="mi-act" :title="t('map.inspector.back')" @click="emit('order', -1)">
-          ⬇
+        <button
+          class="mi-act"
+          :title="t('map.inspector.back')"
+          :aria-label="t('map.inspector.back')"
+          @click="emit('order', -1)"
+        >
+          <UiIcon name="arrow-down" :size="16" />
         </button>
         <button
           v-if="geometry === 'area' || geometry === 'line'"
@@ -191,10 +220,16 @@
           :title="t('map.inspector.newEraHint')"
           @click="emit('fork-era')"
         >
-          ✂ {{ t('map.inspector.newEra', { y: Math.round(year) }) }}
+          <UiIcon name="scissors" :size="16" />
+          <span class="mi-act-text">{{ t('map.inspector.newEra', { y: Math.round(year) }) }}</span>
         </button>
-        <button class="mi-act mi-danger" :title="t('map.inspector.delete')" @click="emit('delete')">
-          🗑
+        <button
+          class="mi-act mi-danger"
+          :title="t('map.inspector.delete')"
+          :aria-label="t('map.inspector.delete')"
+          @click="emit('delete')"
+        >
+          <UiIcon name="trash-2" :size="16" />
         </button>
       </footer>
     </template>
@@ -211,12 +246,19 @@
           <div class="mi-person">{{ token.name }}</div>
           <div v-if="token.life" class="mi-life">{{ token.life }}</div>
         </div>
-        <button class="mi-x" :title="t('map.inspector.close')" @click="emit('close')">✕</button>
+        <button
+          class="mi-x"
+          :title="t('map.inspector.close')"
+          :aria-label="t('map.inspector.close')"
+          @click="emit('close')"
+        >
+          <UiIcon name="x" :size="16" />
+        </button>
       </header>
 
       <section class="mi-sec">
         <div class="mi-label">
-          🧭 {{ t('map.inspector.journey') }} <span class="mi-val">{{ token.keys.length }}</span>
+          {{ t('map.inspector.journey') }} <span class="mi-val">{{ token.keys.length }}</span>
         </div>
         <TransitionGroup name="mi-stop" tag="div" class="mi-stops">
           <div
@@ -241,17 +283,19 @@
             <button
               class="mi-stop-go"
               :title="t('map.inspector.goTo')"
+              :aria-label="t('map.inspector.goTo')"
               @click="emit('goto-stop', k)"
             >
-              ➜
+              <UiIcon name="arrow-right" :size="14" />
             </button>
             <button
               v-if="token.keys.length > 1"
               class="mi-stop-x"
               :title="t('map.inspector.removeStop')"
+              :aria-label="t('map.inspector.removeStop')"
               @click="onStopRemove(i)"
             >
-              ✕
+              <UiIcon name="x" :size="14" />
             </button>
           </div>
         </TransitionGroup>
@@ -260,17 +304,22 @@
 
       <footer class="mi-actions">
         <button class="mi-act mi-act-wide" :class="{ on: following }" @click="emit('follow')">
-          🎥 {{ following ? t('map.inspector.following') : t('map.inspector.follow') }}
+          <UiIcon name="video" :size="16" />
+          <span class="mi-act-text">{{
+            following ? t('map.inspector.following') : t('map.inspector.follow')
+          }}</span>
         </button>
         <button class="mi-act mi-act-wide" @click="emit('open-person')">
-          👤 {{ t('map.inspector.profile') }}
+          <UiIcon name="user" :size="16" />
+          <span class="mi-act-text">{{ t('map.inspector.profile') }}</span>
         </button>
         <button
           class="mi-act mi-danger"
           :title="t('map.inspector.removeFromMap')"
+          :aria-label="t('map.inspector.removeFromMap')"
           @click="emit('token-remove')"
         >
-          🗑
+          <UiIcon name="trash-2" :size="16" />
         </button>
       </footer>
     </template>
@@ -281,6 +330,7 @@
 import { computed, ref, nextTick } from 'vue'
 import { useI18n } from '../../i18n'
 import { ALL_TOOLS, MAP_KIND_GEOMETRY, TOOL_BY_ID } from './mapKinds'
+import UiIcon from '../ui/UiIcon.js'
 
 // The right-hand inspector for whatever is selected on the map: a feature
 // (name, type, icon, color, size, time window, group link, notes) or a
@@ -329,7 +379,7 @@ const kindIcon = computed(() => {
   const f = props.feature
   if (!f) return ''
   const byGlyph = f.icon && ALL_TOOLS.find((tl) => tl.glyph === f.icon)
-  return byGlyph?.icon || TOOL_BY_ID.get(f.kind)?.icon || '•'
+  return byGlyph?.icon || TOOL_BY_ID.get(f.kind)?.icon || 'map-pin'
 })
 /** Kinds the selection can switch to without redrawing (same geometry). */
 const sameGeometry = computed(() => {
@@ -339,7 +389,7 @@ const sameGeometry = computed(() => {
   if (geo === 'point') return []
   return Object.keys(MAP_KIND_GEOMETRY)
     .filter((k) => MAP_KIND_GEOMETRY[k] === geo)
-    .map((k) => ({ id: k, icon: TOOL_BY_ID.get(k)?.icon || '•' }))
+    .map((k) => ({ id: k, icon: TOOL_BY_ID.get(k)?.icon || 'dot' }))
 })
 const glyphs = computed(() => {
   const f = props.feature
@@ -429,7 +479,7 @@ defineExpose({ focusName })
   gap: 10px;
 }
 .mi-kind-icon {
-  font-size: 22px;
+  color: var(--t1);
   width: 42px;
   height: 42px;
   display: grid;
@@ -469,7 +519,7 @@ defineExpose({ focusName })
   min-width: 0;
 }
 .mi-kicker {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 1.2px;
   text-transform: uppercase;
@@ -500,7 +550,7 @@ defineExpose({ focusName })
   text-overflow: ellipsis;
 }
 .mi-life {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
 }
 .mi-x {
@@ -508,11 +558,15 @@ defineExpose({ focusName })
   background: transparent;
   color: var(--t3);
   cursor: pointer;
-  font-size: 13px;
-  width: 26px;
-  height: 26px;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
   border-radius: 7px;
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
 }
 .mi-x:hover {
   background: var(--hover);
@@ -524,7 +578,7 @@ defineExpose({ focusName })
   gap: 6px;
 }
 .mi-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--t2);
   display: flex;
@@ -541,12 +595,16 @@ defineExpose({ focusName })
   gap: 4px;
 }
 .mi-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: var(--ctl-xs);
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--t1);
   border-radius: 999px;
   padding: 3px 9px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-family: var(--font);
   cursor: pointer;
   transition:
@@ -568,10 +626,14 @@ defineExpose({ focusName })
 }
 .mi-glyph {
   aspect-ratio: 1;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--border);
   background: var(--elevated);
+  color: var(--t1);
   border-radius: 9px;
-  font-size: 16px;
   cursor: pointer;
   transition: transform 0.12s;
 }
@@ -581,6 +643,7 @@ defineExpose({ focusName })
 .mi-glyph.on {
   border-color: var(--accent);
   background: var(--adim);
+  color: var(--accent);
 }
 .mi-select,
 .mi-notes,
@@ -592,7 +655,7 @@ defineExpose({ focusName })
   color: var(--t1);
   border-radius: 8px;
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   padding: 6px 8px;
   outline: none;
 }
@@ -621,7 +684,7 @@ defineExpose({ focusName })
   transition: transform 0.12s;
   display: grid;
   place-items: center;
-  font-size: 11px;
+  padding: 0;
   color: var(--t2);
   position: relative;
   overflow: hidden;
@@ -656,7 +719,7 @@ defineExpose({ focusName })
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
 }
 .mi-when-field input {
@@ -664,7 +727,8 @@ defineExpose({ focusName })
 }
 .mi-when-dash {
   color: var(--t3);
-  padding-bottom: 7px;
+  flex: 0 0 auto;
+  margin-bottom: 9px;
 }
 .mi-row {
   display: flex;
@@ -672,12 +736,17 @@ defineExpose({ focusName })
   gap: 4px;
 }
 .mi-mini {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: var(--ctl-xs);
   border: 1px solid var(--border);
   background: transparent;
   color: var(--t2);
   border-radius: 7px;
   padding: 3px 8px;
-  font-size: 11px;
+  font-size: 12px;
   font-family: var(--font);
   cursor: pointer;
 }
@@ -686,7 +755,7 @@ defineExpose({ focusName })
   color: var(--t1);
 }
 .mi-hint {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.45;
   color: var(--t3);
 }
@@ -699,15 +768,19 @@ defineExpose({ focusName })
   border-top: 1px solid var(--border);
 }
 .mi-act {
-  height: 32px;
-  min-width: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ctl-md);
+  min-width: var(--ctl-md);
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--t1);
   border-radius: 9px;
   cursor: pointer;
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   padding: 0 8px;
   transition:
     background 0.12s,
@@ -724,7 +797,10 @@ defineExpose({ focusName })
 }
 .mi-act-wide {
   flex: 1;
+  min-width: 0;
   white-space: nowrap;
+}
+.mi-act-text {
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -734,6 +810,7 @@ defineExpose({ focusName })
 }
 .mi-danger:hover {
   background: rgba(var(--danger-rgb), 0.18);
+  color: var(--danger);
 }
 .mi-stops {
   display: flex;
@@ -775,8 +852,13 @@ defineExpose({ focusName })
   color: var(--t3);
   cursor: pointer;
   border-radius: 6px;
-  width: 22px;
-  height: 22px;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
 }
 .mi-stop-go:hover,
 .mi-stop-x:hover {

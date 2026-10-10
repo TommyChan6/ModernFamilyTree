@@ -18,20 +18,9 @@
         >
           <path class="wheel-fill" :d="sectorPath(i, 42, 116)" />
           <g class="wheel-ic-g" :transform="iconTransform(i)">
-            <text class="wheel-ic" text-anchor="middle" dominant-baseline="central">
-              {{ s.empty ? '+' : s.icon }}
-            </text>
+            <UiIcon class="wheel-ic" :name="s.empty ? 'plus' : s.icon" :size="22" x="-11" y="-11" />
             <circle v-if="s.kind === 'paint'" class="wheel-paint-dot" cx="11" cy="11" r="5" />
-            <text
-              v-if="s.disabled"
-              class="wheel-lock"
-              x="12"
-              y="-10"
-              text-anchor="middle"
-              dominant-baseline="central"
-            >
-              🔒
-            </text>
+            <UiIcon v-if="s.disabled" class="wheel-lock" name="lock" :size="11" x="7" y="-16" />
           </g>
         </g>
       </svg>
@@ -39,22 +28,23 @@
       <div class="wheel-hub" :class="{ aimed: hi }">
         <Transition name="hub" mode="out-in">
           <div v-if="hi" :key="hi.id + highlight" class="wheel-hub-inner" :style="hubStyle">
-            <span class="wheel-hub-ic">{{ hi.empty ? '＋' : hi.icon }}</span>
+            <UiIcon class="wheel-hub-ic" :name="hi.empty ? 'plus' : hi.icon" :size="20" />
             <span class="wheel-hub-label">{{ hi.label }}</span>
           </div>
           <div v-else key="idle" class="wheel-hub-inner wheel-hub-idle">
-            <span class="wheel-hub-ic">✥</span>
+            <UiIcon class="wheel-hub-ic" name="move" :size="20" />
             <span class="wheel-hub-label">Edit</span>
           </div>
         </Transition>
       </div>
-      <div class="wheel-tip">release to select · <b>C</b> customize · <b>Esc</b> cancel</div>
+      <div class="wheel-tip">Release to select · <b>C</b> customize · <b>Esc</b> cancel</div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import UiIcon from '../ui/UiIcon.js'
 import { sectorPath, sectorCentroid, sectorUnit, sectorFromPoint } from './wheelModes.js'
 
 const props = defineProps({
@@ -177,11 +167,9 @@ function iconTransform(i) {
     stroke 0.18s ease;
 }
 .wheel-ic {
-  font-size: 21px;
-  fill: var(--t1);
-  opacity: 0.92;
-  transition: fill 0.18s ease;
-  user-select: none;
+  color: var(--t1);
+  transition: color 0.18s ease;
+  overflow: visible;
 }
 .wheel-ic-g {
   transition: transform 0.2s cubic-bezier(0.34, 1.55, 0.5, 1);
@@ -192,8 +180,8 @@ function iconTransform(i) {
   stroke-width: 1.5;
 }
 .wheel-lock {
-  font-size: 9px;
-  opacity: 0.9;
+  color: var(--t2);
+  overflow: visible;
 }
 
 /* Aimed sector: nudged outward along its direction, lit in its mode color. */
@@ -206,7 +194,7 @@ function iconTransform(i) {
   filter: drop-shadow(0 0 14px color-mix(in srgb, var(--sc) 45%, transparent));
 }
 .wheel-sector.hi .wheel-ic {
-  fill: var(--t1);
+  color: var(--t1);
 }
 /* The mode that's already running keeps a quiet glow so you can find it. */
 .wheel-sector.is-active .wheel-fill {
@@ -218,8 +206,7 @@ function iconTransform(i) {
   stroke-dasharray: 4 5;
 }
 .wheel-sector.is-empty .wheel-ic {
-  fill: var(--t3);
-  font-size: 24px;
+  color: var(--t3);
 }
 .wheel-sector.is-disabled .wheel-ic {
   opacity: 0.35;
@@ -258,12 +245,11 @@ function iconTransform(i) {
   max-width: 66px;
 }
 .wheel-hub-ic {
-  font-size: 19px;
-  line-height: 1.2;
+  margin-bottom: 2px;
   color: var(--sc, var(--accent));
 }
 .wheel-hub-label {
-  font-size: 9.5px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   color: var(--t1);
   max-width: 64px;
@@ -302,7 +288,7 @@ function iconTransform(i) {
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
   background: var(--glass-strong);
   border: 1px solid var(--border);

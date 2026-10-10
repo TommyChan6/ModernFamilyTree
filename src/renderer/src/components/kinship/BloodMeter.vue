@@ -63,7 +63,7 @@ const LABELS = {
   cousins: 'Cousin marriage',
   close: 'Close kin',
   royal: 'Royal-house territory',
-  habsburg: 'Habsburg jaw 👑'
+  habsburg: 'Habsburg jaw'
 }
 const NOTES = {
   none: 'Their child would carry no inbreeding.',
@@ -146,7 +146,7 @@ const ticks = computed(() =>
   color: var(--t1);
 }
 .bm-band {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--kin-blood);
 }
@@ -158,7 +158,7 @@ const ticks = computed(() =>
   color: var(--danger);
 }
 .bm-note {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
   line-height: 1.35;
 }

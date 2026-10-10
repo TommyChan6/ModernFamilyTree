@@ -5,11 +5,12 @@
         class="mtb-btn"
         :class="{ active: groupOf(tool) === g.id, open: openGroup === g.id }"
         :title="groupTitle(g)"
+        :aria-label="groupTitle(g)"
         @click="onGroupClick(g)"
         @mouseenter="hoverOpen(g)"
       >
-        <span class="mtb-icon">{{ face(g).icon }}</span>
-        <span v-if="g.tools.length > 1" class="mtb-more">◢</span>
+        <UiIcon :name="face(g).icon" :size="18" />
+        <span v-if="g.tools.length > 1" class="mtb-more" aria-hidden="true"></span>
       </button>
       <Transition name="mtb-fly">
         <div
@@ -27,7 +28,7 @@
               :style="{ '--i': i }"
               @click="pick(g, tl)"
             >
-              <span class="mtb-tool-icon">{{ tl.icon }}</span>
+              <UiIcon class="mtb-tool-icon" :name="tl.icon" :size="16" />
               <span class="mtb-tool-name">{{ toolName(tl.id) }}</span>
               <kbd v-if="tl.hotkey" class="mtb-kbd">{{ tl.hotkey.toUpperCase() }}</kbd>
             </button>
@@ -40,9 +41,10 @@
       class="mtb-btn"
       :class="{ active: peopleOpen }"
       :title="t('map.people.toggle')"
+      :aria-label="t('map.people.toggle')"
       @click="emit('toggle-people')"
     >
-      <span class="mtb-icon">👥</span>
+      <UiIcon name="users" :size="18" />
     </button>
   </nav>
 </template>
@@ -51,6 +53,7 @@
 import { ref, reactive } from 'vue'
 import { useI18n } from '../../i18n'
 import { TOOL_GROUPS } from './mapKinds'
+import UiIcon from '../ui/UiIcon.js'
 
 // The Map view's left tool palette. Each group shows its last-used tool as
 // its face; hovering (or clicking an active group) opens a labelled flyout
@@ -152,8 +155,9 @@ defineExpose({ remember })
 }
 .mtb-btn {
   position: relative;
-  width: 42px;
-  height: 42px;
+  width: var(--ctl-lg);
+  height: var(--ctl-lg);
+  padding: 0;
   border: none;
   border-radius: 11px;
   background: transparent;
@@ -173,16 +177,16 @@ defineExpose({ remember })
   background: var(--adim);
   box-shadow: inset 0 0 0 1.5px var(--accent);
 }
-.mtb-icon {
-  font-size: 19px;
-  line-height: 1;
-}
 .mtb-more {
+  /* small corner wedge: this group has more tools in its flyout */
   position: absolute;
   right: 4px;
-  bottom: 2px;
-  font-size: 7px;
-  color: var(--t3);
+  bottom: 4px;
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid var(--t3);
+  border-bottom: 1.5px solid var(--t3);
+  border-bottom-right-radius: 1px;
 }
 .mtb-sep {
   height: 1px;
@@ -210,7 +214,7 @@ defineExpose({ remember })
   height: 60px;
 }
 .mtb-fly-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 1.2px;
   text-transform: uppercase;
@@ -236,7 +240,7 @@ defineExpose({ remember })
   background: transparent;
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   cursor: pointer;
   text-align: left;
   animation: mtb-tool-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards;
@@ -257,9 +261,7 @@ defineExpose({ remember })
   color: var(--accent);
 }
 .mtb-tool-icon {
-  font-size: 16px;
-  width: 20px;
-  text-align: center;
+  flex: 0 0 auto;
 }
 .mtb-tool-name {
   flex: 1;
@@ -267,7 +269,7 @@ defineExpose({ remember })
 }
 .mtb-kbd {
   font-family: var(--font);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
   border: 1px solid var(--border);
   border-radius: 4px;

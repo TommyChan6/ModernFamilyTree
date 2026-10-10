@@ -32,7 +32,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     role_a: 'Parent',
     role_b: 'Child',
     color: '',
-    glyph: '↓',
+    glyph: 'arrow-down',
     band: 'family',
     statuses: ['active']
   },
@@ -45,7 +45,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     role_a: 'Adoptive parent',
     role_b: 'Adopted child',
     color: '',
-    glyph: '☂',
+    glyph: 'hand-heart',
     band: 'family',
     statuses: ['active']
   },
@@ -58,7 +58,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     role_a: '',
     role_b: '',
     color: '',
-    glyph: '⚭',
+    glyph: 'heart-handshake',
     band: 'family',
     statuses: ['active', 'engaged', 'divorced', 'widowed']
   },
@@ -75,7 +75,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     role_a: '',
     role_b: '',
     color: '#58b5bc',
-    glyph: '⇄',
+    glyph: 'users',
     band: 'family',
     statuses: ['active']
   },
@@ -88,7 +88,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     role_a: '',
     role_b: '',
     color: '#e0669e',
-    glyph: '♥',
+    glyph: 'heart',
     band: 'social',
     statuses: ['active', 'ended']
   },
@@ -101,7 +101,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     role_a: '',
     role_b: '',
     color: '#5cb85c',
-    glyph: '✦',
+    glyph: 'handshake',
     band: 'social',
     statuses: ['active', 'estranged']
   },
@@ -116,7 +116,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     role_a: 'Admirer',
     role_b: 'Crush',
     color: '#e8a33d',
-    glyph: '➜',
+    glyph: 'heart-pulse',
     band: 'social',
     statuses: ['active', 'ended']
   },
@@ -129,7 +129,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     role_a: '',
     role_b: '',
     color: '#d9534f',
-    glyph: '⚔',
+    glyph: 'swords',
     band: 'social',
     statuses: ['active', 'resolved']
   },
@@ -142,7 +142,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     role_a: 'Mentor',
     role_b: 'Student',
     color: '#9d7ff0',
-    glyph: '★',
+    glyph: 'graduation-cap',
     band: 'power',
     statuses: ['active', 'ended']
   },
@@ -155,7 +155,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     role_a: 'Superior',
     role_b: 'Subordinate',
     color: '#8a93a6',
-    glyph: '↳',
+    glyph: 'corner-down-right',
     band: 'power',
     statuses: ['active', 'ended']
   }

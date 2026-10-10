@@ -375,7 +375,7 @@ const styleVars = computed(() => ({
   flex-direction: column;
   gap: 1px;
   font-family: var(--font-ink-serif);
-  font-size: 9.5px;
+  font-size: 10.5px;
   line-height: 1.25;
   color: #5d5246;
   max-height: 100%;
@@ -409,7 +409,7 @@ const styleVars = computed(() => ({
   left: 9px;
   bottom: 5px;
   font-family: var(--font-ink-serif);
-  font-size: 8.5px;
+  font-size: 9.5px;
   color: rgba(40, 32, 22, 0.62);
   letter-spacing: 0.3px;
   white-space: nowrap;

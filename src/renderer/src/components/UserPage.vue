@@ -12,11 +12,14 @@
 
         <header class="up-topbar">
           <button class="up-back" @click="close">
-            <span class="up-back-arrow">←</span>
+            <UiIcon class="up-back-arrow" name="arrow-left" :size="16" />
             {{ t('account.back') }}
           </button>
           <div class="up-topbar-spacer"></div>
-          <button class="up-signout" @click="signOut">↩ {{ t('account.security.signOut') }}</button>
+          <button class="up-signout" @click="signOut">
+            <UiIcon name="log-out" :size="16" />
+            {{ t('account.security.signOut') }}
+          </button>
         </header>
 
         <main class="up-scroll">
@@ -44,7 +47,10 @@
             <!-- ── Profile + Security + Usage cards ─────────────────────── -->
             <div class="up-grid">
               <section class="up-card up-reveal" style="--d: 60ms">
-                <h2 class="up-card-title">👤 {{ t('account.profile.title') }}</h2>
+                <h2 class="up-card-title">
+                  <UiIcon name="user" :size="18" />
+                  {{ t('account.profile.title') }}
+                </h2>
                 <p class="up-card-desc">{{ t('account.profile.desc') }}</p>
 
                 <label class="up-label">{{ t('account.profile.displayName') }}</label>
@@ -92,7 +98,7 @@
                     :disabled="!profileDirty || saveState === 'saving'"
                     @click="saveProfile"
                   >
-                    <span v-if="saveState === 'saved'" class="up-check">✓</span>
+                    <UiIcon v-if="saveState === 'saved'" class="up-check" name="check" :size="16" />
                     {{
                       saveState === 'saved' ? t('account.profile.saved') : t('account.profile.save')
                     }}
@@ -104,7 +110,10 @@
               </section>
 
               <section class="up-card up-reveal" style="--d: 120ms">
-                <h2 class="up-card-title">🔒 {{ t('account.security.title') }}</h2>
+                <h2 class="up-card-title">
+                  <UiIcon name="lock" :size="18" />
+                  {{ t('account.security.title') }}
+                </h2>
                 <p class="up-card-desc">{{ t('account.security.desc') }}</p>
 
                 <label class="up-label">{{ t('account.security.username') }}</label>
@@ -135,7 +144,10 @@
               </section>
 
               <section class="up-card up-reveal" style="--d: 180ms">
-                <h2 class="up-card-title">📊 {{ t('account.usage.title') }}</h2>
+                <h2 class="up-card-title">
+                  <UiIcon name="chart-bar" :size="18" />
+                  {{ t('account.usage.title') }}
+                </h2>
                 <p class="up-card-desc">{{ t('account.usage.desc') }}</p>
                 <div v-if="store.authUsage" class="up-usage">
                   <div v-for="row in usageRows" :key="row.label" class="up-usage-row">
@@ -157,7 +169,10 @@
 
             <!-- ── Projects ─────────────────────────────────────────────── -->
             <section class="up-section up-reveal" style="--d: 240ms">
-              <h2 class="up-section-title">🌳 {{ t('account.projects.title') }}</h2>
+              <h2 class="up-section-title">
+                <UiIcon name="folder-tree" :size="18" />
+                {{ t('account.projects.title') }}
+              </h2>
               <p class="up-card-desc">{{ t('account.projects.desc') }}</p>
               <div class="up-projects">
                 <article
@@ -175,20 +190,32 @@
                     }}</span>
                   </div>
                   <div class="up-project-stats">
-                    <span :title="t('account.usage.people')">👥 {{ p.counts.persons }}</span>
-                    <span :title="t('rail.relationships')">🔗 {{ p.counts.relationships }}</span>
-                    <span :title="t('account.usage.photos')">🖼 {{ p.counts.images }}</span>
+                    <span :title="t('account.usage.people')">
+                      <UiIcon name="users" :size="14" />
+                      {{ p.counts.persons }}
+                    </span>
+                    <span :title="t('rail.relationships')">
+                      <UiIcon name="link" :size="14" />
+                      {{ p.counts.relationships }}
+                    </span>
+                    <span :title="t('account.usage.photos')">
+                      <UiIcon name="image" :size="14" />
+                      {{ p.counts.images }}
+                    </span>
                   </div>
                   <div class="up-project-foot">
                     <span class="up-project-date">{{
                       t('account.projects.updated', { date: fmtDate(p.updated_at) })
                     }}</span>
-                    <span class="up-project-open">{{ t('account.projects.open') }} →</span>
+                    <span class="up-project-open">
+                      {{ t('account.projects.open') }}
+                      <UiIcon name="arrow-right" :size="14" />
+                    </span>
                   </div>
                 </article>
 
                 <button class="up-project up-project-new" @click="newProject">
-                  <span class="up-project-new-plus">＋</span>
+                  <UiIcon class="up-project-new-plus" name="plus" :size="22" />
                   <span>{{ t('account.projects.new') }}</span>
                 </button>
               </div>
@@ -196,7 +223,10 @@
 
             <!-- ── Plan & billing (monetization client; docs/MONETIZATION.md) -->
             <section class="up-section up-reveal" style="--d: 280ms">
-              <h2 class="up-section-title">💳 {{ t('billing.panel.title') }}</h2>
+              <h2 class="up-section-title">
+                <UiIcon name="credit-card" :size="18" />
+                {{ t('billing.panel.title') }}
+              </h2>
               <p class="up-card-desc">{{ t('billing.panel.desc') }}</p>
               <BillingPanel />
             </section>
@@ -204,7 +234,10 @@
             <!-- ── Sharing (preview of the planned feature) ─────────────── -->
             <section class="up-section up-reveal" style="--d: 320ms">
               <div class="up-section-head">
-                <h2 class="up-section-title">🌐 {{ t('account.sharing.title') }}</h2>
+                <h2 class="up-section-title">
+                  <UiIcon name="globe" :size="18" />
+                  {{ t('account.sharing.title') }}
+                </h2>
                 <span class="up-soon-badge">{{ t('account.sharing.soon') }}</span>
               </div>
               <p class="up-card-desc">{{ t('account.sharing.desc') }}</p>
@@ -227,12 +260,16 @@
                   <div class="up-share-link">
                     <span class="up-share-url">{{ mock.url }}</span>
                     <button class="up-share-copy" disabled>
-                      ⧉ {{ t('account.sharing.copyLink') }}
+                      <UiIcon name="copy" :size="14" />
+                      {{ t('account.sharing.copyLink') }}
                     </button>
                   </div>
                 </div>
               </div>
-              <p class="up-note">🔒 {{ t('account.sharing.mockNote') }}</p>
+              <p class="up-note up-note-icon">
+                <UiIcon name="lock" :size="14" />
+                <span>{{ t('account.sharing.mockNote') }}</span>
+              </p>
             </section>
           </div>
         </main>
@@ -245,6 +282,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import BillingPanel from './billing/BillingPanel.vue'
 import InkBackdrop from './ui/InkBackdrop.vue'
+import UiIcon from './ui/UiIcon.js'
 import { useMainStore } from '../store/index.js'
 import { useI18n } from '../i18n'
 import { derivedHue, gradientForHue } from '../lib/avatar.js'
@@ -529,9 +567,10 @@ onUnmounted(() => {
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 7px 14px;
+  height: var(--ctl-md);
+  padding: 0 14px 0 11px;
   cursor: pointer;
   transition: all 0.18s ease;
 }
@@ -543,7 +582,7 @@ onUnmounted(() => {
 }
 
 .up-back-arrow {
-  display: inline-block;
+  flex-shrink: 0;
   transition: transform 0.2s ease;
 }
 
@@ -552,14 +591,18 @@ onUnmounted(() => {
 }
 
 .up-signout {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: var(--ctl-md);
   border: none;
   border-radius: 9px;
   background: transparent;
   color: var(--t3);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 7px 12px;
+  padding: 0 12px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -685,7 +728,7 @@ onUnmounted(() => {
   background: var(--adim);
   border: 1px solid rgba(var(--accent-rgb), 0.35);
   color: var(--accent);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -693,7 +736,7 @@ onUnmounted(() => {
 
 .up-since {
   color: var(--t3);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .up-hero-bio {
@@ -731,6 +774,19 @@ onUnmounted(() => {
   border-color: rgba(var(--accent-rgb), 0.25);
 }
 
+.up-card-title,
+.up-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.up-card-title .ui-icon,
+.up-section-title .ui-icon {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
 .up-card-title {
   margin: 0;
   color: var(--t1);
@@ -741,13 +797,13 @@ onUnmounted(() => {
 .up-card-desc {
   margin: -4px 0 4px;
   color: var(--t3);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.55;
 }
 
 .up-label {
   color: var(--t2);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -787,7 +843,7 @@ onUnmounted(() => {
 .up-charcount {
   align-self: flex-end;
   color: var(--t3);
-  font-size: 10.5px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   margin-top: -6px;
 }
@@ -827,7 +883,7 @@ onUnmounted(() => {
   border: 2px dashed var(--border);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -848,14 +904,19 @@ onUnmounted(() => {
 }
 
 .up-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--ctl-md);
   border: none;
   border-radius: 10px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
-  padding: 9px 18px;
+  padding: 0 18px;
   cursor: pointer;
   transition:
     filter 0.15s ease,
@@ -880,7 +941,7 @@ onUnmounted(() => {
 }
 
 .up-check {
-  display: inline-block;
+  flex-shrink: 0;
   animation: up-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -895,14 +956,25 @@ onUnmounted(() => {
 
 .up-error {
   color: var(--danger);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .up-note {
   color: var(--t3);
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.5;
   margin: 0;
+}
+
+.up-note-icon {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.up-note-icon .ui-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 /* ── Usage bars ─────────────────────────────────────────────────────────── */
@@ -919,13 +991,13 @@ onUnmounted(() => {
 }
 
 .up-usage-label {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--t2);
 }
 
 .up-usage-count {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
   font-variant-numeric: tabular-nums;
 }
@@ -940,7 +1012,7 @@ onUnmounted(() => {
 .up-usage-fill {
   height: 100%;
   border-radius: 3px;
-  background: linear-gradient(90deg, var(--accent), #8b6cc5);
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
   transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -1027,7 +1099,7 @@ onUnmounted(() => {
   border-radius: 999px;
   background: var(--adim);
   color: var(--accent);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -1036,9 +1108,20 @@ onUnmounted(() => {
 .up-project-stats {
   display: flex;
   gap: 14px;
+  align-items: center;
   color: var(--t2);
-  font-size: 12px;
+  font-size: 12.5px;
   font-variant-numeric: tabular-nums;
+}
+
+.up-project-stats > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.up-project-stats .ui-icon {
+  color: var(--t3);
 }
 
 .up-project-foot {
@@ -1051,12 +1134,15 @@ onUnmounted(() => {
 
 .up-project-date {
   color: var(--t3);
-  font-size: 10.5px;
+  font-size: 12px;
 }
 
 .up-project-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--accent);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   opacity: 0;
   transform: translateX(-4px);
@@ -1078,7 +1164,7 @@ onUnmounted(() => {
   background: transparent;
   color: var(--t3);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   min-height: 108px;
 }
@@ -1090,9 +1176,7 @@ onUnmounted(() => {
 }
 
 .up-project-new-plus {
-  font-size: 22px;
-  font-weight: 300;
-  line-height: 1;
+  flex-shrink: 0;
 }
 
 /* ── Sharing preview ────────────────────────────────────────────────────── */
@@ -1101,7 +1185,7 @@ onUnmounted(() => {
   border-radius: 999px;
   border: 1px dashed rgba(245, 166, 35, 0.55);
   color: var(--amber);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -1132,17 +1216,11 @@ onUnmounted(() => {
   border: 1px dashed var(--border);
   border-radius: 14px;
   padding: 15px 16px;
-  opacity: 0.75;
-  transition: opacity 0.25s ease;
-}
-
-.up-share-card:hover {
-  opacity: 0.95;
 }
 
 .up-share-kind {
   color: var(--t3);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -1169,7 +1247,7 @@ onUnmounted(() => {
   background: transparent;
   color: var(--t3);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   padding: 4px 10px;
   border-radius: 7px;
@@ -1198,17 +1276,20 @@ onUnmounted(() => {
   border-radius: 8px;
   background: var(--elevated);
   color: var(--t3);
-  font-size: 11.5px;
+  font-size: 12.5px;
 }
 
 .up-share-copy {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--elevated);
   color: var(--t3);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   padding: 6px 10px;
   cursor: not-allowed;
@@ -1342,7 +1423,7 @@ onUnmounted(() => {
 }
 :root[data-theme='ink'] .up-label {
   font-family: var(--font-ink-label);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   font-variant: small-caps;
   text-transform: lowercase;

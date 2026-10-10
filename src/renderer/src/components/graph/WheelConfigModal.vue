@@ -16,7 +16,14 @@
                 and give it a job.
               </p>
             </div>
-            <button class="wcfg-close" title="Close (Esc)" @click="emit('close')">×</button>
+            <button
+              class="wcfg-close"
+              title="Close (Esc)"
+              aria-label="Close"
+              @click="emit('close')"
+            >
+              <UiIcon name="x" :size="16" />
+            </button>
           </header>
 
           <div class="wcfg-body">
@@ -33,17 +40,15 @@
                   @click="sel = i"
                 >
                   <path class="wcfg-fill" :d="sectorPath(i, 32, 90)" />
-                  <text
+                  <UiIcon
                     class="wcfg-ic"
-                    :x="sectorCentroid(i, 61).x"
-                    :y="sectorCentroid(i, 61).y"
-                    text-anchor="middle"
-                    dominant-baseline="central"
-                  >
-                    {{ s.empty ? '+' : s.icon }}
-                  </text>
+                    :name="s.empty ? 'plus' : s.icon"
+                    :size="16"
+                    :x="sectorCentroid(i, 61).x - 8"
+                    :y="sectorCentroid(i, 61).y - 8"
+                  />
                 </g>
-                <text class="wcfg-hub-ic" text-anchor="middle" dominant-baseline="central">✥</text>
+                <UiIcon class="wcfg-hub-ic" name="move" :size="16" x="-8" y="-8" />
               </svg>
               <div class="wcfg-dir">
                 <span class="wcfg-dir-badge">{{ WHEEL_DIRECTIONS[sel] }}</span>
@@ -65,7 +70,7 @@
                     :title="c.hint"
                     @click="assign(c.slot)"
                   >
-                    <span class="wcfg-card-ic">{{ c.icon }}</span>
+                    <UiIcon class="wcfg-card-ic" :name="c.icon" :size="16" />
                     <span class="wcfg-card-label">{{ c.label }}</span>
                   </button>
                 </div>
@@ -83,8 +88,8 @@
                     :style="{ '--sc': typeColor(d) }"
                     @click="assign({ kind: 'link', type: d.key })"
                   >
-                    <span class="wcfg-chip-glyph">{{ d.glyph }}</span
-                    >{{ d.label }}
+                    <UiIcon class="wcfg-chip-glyph" :name="iconOr(d.glyph, 'link')" :size="14" />
+                    {{ d.label }}
                   </button>
                 </div>
               </section>
@@ -115,8 +120,8 @@
                     :style="{ '--sc': t.color || 'var(--accent)' }"
                     @click="assign({ kind: 'tag', tagId: t.id })"
                   >
-                    <span class="wcfg-chip-glyph">{{ t.icon || '🏷' }}</span
-                    >{{ t.label }}
+                    <UiIcon class="wcfg-chip-glyph" :name="iconOr(t.icon, 'tag')" :size="14" />
+                    {{ t.label }}
                   </button>
                 </div>
               </section>
@@ -136,6 +141,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useMainStore } from '../../store/index.js'
+import UiIcon, { hasIcon } from '../ui/UiIcon.js'
 import {
   DEFAULT_WHEEL_SLOTS,
   WHEEL_DIRECTIONS,
@@ -181,11 +187,18 @@ const currentId = computed(() => resolved.value[sel.value]?.id || 'empty')
 const coreCards = computed(() => {
   const noun = store.noun.toLowerCase()
   return [
-    { id: 'empty', slot: null, icon: '∅', label: 'Empty', color: null, hint: 'Nothing here' },
+    {
+      id: 'empty',
+      slot: null,
+      icon: 'circle-dashed',
+      label: 'Empty',
+      color: null,
+      hint: 'Nothing here'
+    },
     {
       id: 'add',
       slot: { kind: 'add' },
-      icon: '✚',
+      icon: 'plus',
       label: `Add ${noun}`,
       color: '#4caf72',
       hint: `Click an empty spot to add a ${noun}`
@@ -193,7 +206,7 @@ const coreCards = computed(() => {
     {
       id: 'delete',
       slot: { kind: 'delete' },
-      icon: '🗑',
+      icon: 'trash-2',
       label: 'Delete',
       color: '#ef5350',
       hint: 'Click a node or bond, click again to confirm'
@@ -201,7 +214,7 @@ const coreCards = computed(() => {
     {
       id: 'pin',
       slot: { kind: 'pin' },
-      icon: '📌',
+      icon: 'pin',
       label: 'Pin',
       color: '#f5a623',
       hint: 'Click people to pin / release them'
@@ -209,7 +222,7 @@ const coreCards = computed(() => {
     {
       id: 'end',
       slot: { kind: 'end' },
-      icon: '⌛',
+      icon: 'hourglass',
       label: 'End bond',
       color: '#8a93a6',
       hint: 'Click a bond to mark it ended'
@@ -217,7 +230,7 @@ const coreCards = computed(() => {
     {
       id: 'swap',
       slot: { kind: 'swap' },
-      icon: '⇄',
+      icon: 'arrow-right-left',
       label: 'Flip bond',
       color: '#26c6da',
       hint: 'Click a directed bond to reverse it'
@@ -235,6 +248,11 @@ function typeColor(def) {
   if (def.key === 'adopted') return gs.adoptedColor
   if (def.key === 'parent_child') return gs.parentChildColor
   return def.color || gs.parentChildColor
+}
+
+/** A stored icon (name or legacy glyph) when it resolves, else a fallback. */
+function iconOr(value, fallback) {
+  return value && hasIcon(value) ? value : fallback
 }
 
 function assign(slot) {
@@ -321,20 +339,24 @@ function resetDefaults() {
 }
 .wcfg-sub {
   margin: 3px 0 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 .wcfg-sub b {
   color: var(--t2);
 }
 .wcfg-close {
-  width: 26px;
-  height: 26px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
   border: none;
   border-radius: 8px;
   background: transparent;
   color: var(--t3);
-  font-size: 16px;
   cursor: pointer;
   transition:
     background 0.12s,
@@ -404,17 +426,16 @@ function resetDefaults() {
   stroke-dasharray: 4 5;
 }
 .wcfg-ic {
-  font-size: 15px;
-  fill: var(--t2);
+  color: var(--t2);
+  overflow: visible;
   pointer-events: none;
-  user-select: none;
 }
 .wcfg-hub-ic {
-  font-size: 15px;
-  fill: var(--t3);
+  color: var(--t3);
+  overflow: visible;
 }
 .wcfg-dir {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t2);
   display: flex;
@@ -430,7 +451,7 @@ function resetDefaults() {
   border-radius: 6px;
   background: var(--adim);
   color: var(--accent);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -446,7 +467,7 @@ function resetDefaults() {
 }
 .wcfg-label {
   margin: 0 0 6px;
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -454,7 +475,7 @@ function resetDefaults() {
 }
 .wcfg-note {
   margin: -4px 0 6px;
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
 }
 .wcfg-cards {
@@ -492,10 +513,10 @@ function resetDefaults() {
   color: var(--t1);
 }
 .wcfg-card-ic {
-  font-size: 15px;
+  color: var(--sc);
 }
 .wcfg-card-label {
-  font-size: 10px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
@@ -508,14 +529,15 @@ function resetDefaults() {
   --sc: var(--accent);
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 9px;
+  gap: 5px;
+  height: var(--ctl-sm);
+  padding: 0 10px;
   border: 1px solid color-mix(in srgb, var(--sc) 28%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--sc) 8%, transparent);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -535,7 +557,6 @@ function resetDefaults() {
 }
 .wcfg-chip-glyph {
   color: var(--sc);
-  font-size: 11px;
 }
 
 .wcfg-swatches {
@@ -572,13 +593,17 @@ function resetDefaults() {
   border-top: 1px solid var(--border);
 }
 .wcfg-btn {
-  padding: 7px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--ctl-md);
+  padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: var(--fs-md);
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -594,11 +619,11 @@ function resetDefaults() {
 .wcfg-btn-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .wcfg-btn-primary:hover {
-  background: color-mix(in srgb, var(--accent) 88%, #fff);
-  color: #fff;
+  background: var(--accent-hover);
+  color: var(--on-accent);
 }
 
 @media (prefers-reduced-motion: reduce) {

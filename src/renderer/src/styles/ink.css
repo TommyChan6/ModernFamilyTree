@@ -111,7 +111,7 @@
 :root[data-theme='ink'] {
   --bg: #ece3cf;
   --surface: #f5efe0;
-  --glass-strong: rgba(245, 239, 224, 0.74);
+  --glass-strong: rgba(245, 239, 224, 0.86);
   --glass-soft: rgba(245, 239, 224, 0.88);
   --elevated: #e9dfc8;
   --hover: #e0d4b8;
@@ -138,8 +138,8 @@
   --kin-distant: #857a68;
 
   --t1: #1f1b15;
-  --t2: #574e41;
-  --t3: #978b76;
+  --t2: #4a4236;
+  --t3: #75695a;
 
   --shadow-sm: 0 1px 3px rgba(60, 40, 15, 0.12);
   --shadow: 0 6px 22px rgba(60, 40, 15, 0.14);
@@ -203,7 +203,7 @@
 }
 :root[data-theme='ink'] .eyebrow {
   font-family: var(--font-ink-label);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   font-variant: small-caps;
   letter-spacing: 0.12em;
@@ -606,7 +606,7 @@
   font-variant: small-caps;
   text-transform: lowercase;
   letter-spacing: 0.1em;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 :root[data-theme='ink'] .mode-picker,
 :root[data-theme='ink'] .labs-btn {

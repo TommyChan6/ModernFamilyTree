@@ -1,13 +1,13 @@
 <template>
   <div class="app-shell">
     <header class="topbar">
-      <button class="home-btn" title="Homepage" @click="homeOpen = true">
-        <span class="home-btn-mark">🌳</span>
+      <button class="home-btn" title="Homepage" aria-label="Homepage" @click="homeOpen = true">
+        <UiIcon class="home-btn-mark" name="tree-deciduous" :size="18" />
       </button>
       <div class="project-btn-area">
         <button class="projects-btn" :title="t('topbar.projectsHint')" @click="openProjectsPage">
           <span class="projects-btn-icon" aria-hidden="true">
-            <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor">
+            <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor">
               <circle cx="3.2" cy="12.2" r="1.6" />
               <circle cx="8" cy="3.6" r="1.6" />
               <circle cx="12.8" cy="10.4" r="1.6" />
@@ -25,11 +25,11 @@
           <span class="projects-btn-divider"></span>
           <span class="projects-btn-live-dot"></span>
           <span class="projects-btn-current">{{ store.activeProject?.name }}</span>
-          <span class="projects-btn-chevron">›</span>
+          <UiIcon class="projects-btn-chevron" name="chevron-right" :size="14" />
         </button>
         <button class="browse-btn" :title="t('browse.buttonHint')" @click="openBrowsePage">
           <span class="browse-btn-compass" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="15" height="15">
+            <svg viewBox="0 0 24 24" width="16" height="16">
               <circle
                 cx="12"
                 cy="12"
@@ -100,27 +100,27 @@
         </button>
         <Transition name="history-toast">
           <div v-if="historyToast" :key="historyToast.key" class="history-toast">
-            <span class="history-toast-glyph">{{ historyToast.verb === 'undid' ? '↺' : '↻' }}</span>
+            <UiIcon
+              class="history-toast-glyph"
+              :name="historyToast.verb === 'undid' ? 'undo-2' : 'redo-2'"
+              :size="14"
+            />
             {{ historyToast.text }}
           </div>
         </Transition>
       </div>
       <div class="topbar-spacer"></div>
       <button
-        class="btn btn-outline btn-sm topbar-search"
+        class="btn btn-outline topbar-search"
         :title="t('topbar.search') + ` (${MOD}+K)`"
         @click="openPalette"
       >
-        <UiIcon name="search" :size="14" />
+        <UiIcon name="search" :size="16" />
         <span class="topbar-search-label">{{ t('topbar.search') }}</span>
         <kbd>{{ MOD === '⌘' ? '⌘K' : 'Ctrl K' }}</kbd>
       </button>
-      <button
-        class="btn btn-ghost btn-sm"
-        :title="t('topbar.exportImage')"
-        @click="exportOpen = true"
-      >
-        <UiIcon name="image" :size="14" />
+      <button class="btn btn-ghost" :title="t('topbar.exportImage')" @click="exportOpen = true">
+        <UiIcon name="image" :size="16" />
         {{ t('topbar.export') }}
       </button>
       <label class="mode-picker-wrap" :title="t('topbar.modeHint')">
@@ -133,7 +133,7 @@
           <option value="simple">{{ t('mode.simple') }}</option>
           <option value="standard">{{ t('mode.standard') }}</option>
           <option value="advanced" :disabled="store.isGuest">
-            {{ t('mode.advanced') }}{{ store.isGuest ? ' 🔒' : '' }}
+            {{ t('mode.advanced') }}
           </option>
         </select>
       </label>
@@ -145,7 +145,7 @@
           :title="store.labsEnabled ? t('topbar.labsOn') : t('topbar.labsOff')"
           @click="store.setLabsEnabled(!store.labsEnabled)"
         >
-          <span class="labs-flask">🧪</span>
+          <UiIcon class="labs-flask" name="labs" :size="16" />
           <span class="labs-label">{{ t('topbar.labs') }}</span>
         </button>
       </Transition>
@@ -169,7 +169,7 @@
       >
         <!-- One glyph that morphs: the moon's bite slides away and the rays
              spin in as the sun rises (and back). -->
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
           <mask id="tt-moon-mask">
             <rect x="0" y="0" width="24" height="24" fill="#fff" />
             <circle class="tt-bite" cx="17" cy="7" r="6" fill="#000" />
@@ -188,12 +188,7 @@
         :aria-label="t('topbar.settings')"
         @click="store.toggleAppSettings()"
       >
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" class="tb-svg">
-          <circle cx="12" cy="12" r="3" />
-          <path
-            d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"
-          />
-        </svg>
+        <UiIcon name="settings" :size="16" />
       </button>
       <!-- Upgrade nudge for free accounts (guests register first) -->
       <button
@@ -202,7 +197,7 @@
         :title="t('billing.upgradeHint')"
         @click="store.openPricing({ reason: 'menu' })"
       >
-        <span class="upgrade-pill-spark">✦</span>
+        <UiIcon class="upgrade-pill-spark" name="sparkles" :size="14" />
         <span class="upgrade-pill-label">{{ t('billing.upgradeShort') }}</span>
       </button>
       <AccountMenu v-if="store.authUser" />
@@ -455,7 +450,7 @@ function captureViewImage(view, opts) {
 async function handleSave() {
   await graphRef.value?.flushLayout?.() // fold in any not-yet-autosaved drag
   const res = await store.saveCheckpoint()
-  if (res?.success) toast(t('toasts.saved'), { tone: 'success', icon: '💾', duration: 1800 })
+  if (res?.success) toast(t('toasts.saved'), { tone: 'success', icon: 'save', duration: 1800 })
   return res
 }
 
@@ -467,14 +462,14 @@ async function handleRevert(skipConfirm = false) {
       message: t('confirm.revertBody'),
       confirmLabel: t('confirm.revertConfirm'),
       tone: 'danger',
-      icon: '↩'
+      icon: 'undo-2'
     })
     if (!ok) return
   }
   const res = await store.revertToCheckpoint()
   if (res.success) {
     await graphRef.value?.reloadScenes?.()
-    if (!skipConfirm) toast(t('toasts.reverted'), { tone: 'success', icon: '↩' })
+    if (!skipConfirm) toast(t('toasts.reverted'), { tone: 'success', icon: 'undo-2' })
   }
 }
 
@@ -724,7 +719,7 @@ onPlanLimit((_channel, error) => {
   lastPlanLimitToast = Date.now()
   toast(t('billing.limitToast'), {
     tone: 'warning',
-    icon: '✦',
+    icon: 'sparkles',
     duration: 8000,
     action: {
       label: t('billing.seePlans'),
@@ -812,9 +807,11 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: var(--ctl-md);
+  height: var(--ctl-md);
   margin-left: 10px;
+  padding: 0;
+  color: var(--accent);
   border: 1px solid rgba(var(--accent-rgb), 0.3);
   border-radius: 11px;
   background: linear-gradient(135deg, var(--adim), rgba(var(--accent-rgb), 0.24));
@@ -830,11 +827,6 @@ onUnmounted(() => {
   border-color: rgba(var(--accent-rgb), 0.55);
   box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.3);
   transform: translateY(-1px);
-}
-
-.home-btn-mark {
-  font-size: 16px;
-  line-height: 1;
 }
 
 /* ── The Projects button (replaces the old per-project tab strip) ─────────── */
@@ -853,13 +845,14 @@ onUnmounted(() => {
   gap: 8px;
   max-width: 100%;
   min-width: 0;
-  padding: 6px 12px;
+  height: var(--ctl-md);
+  padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   overflow: hidden;
@@ -882,14 +875,15 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  height: var(--ctl-md);
+  padding: 0 14px;
   border: none;
   border-radius: var(--r-pill);
   color: var(--on-accent);
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   box-shadow: var(--glow);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   cursor: pointer;
   white-space: nowrap;
@@ -901,7 +895,7 @@ onUnmounted(() => {
 }
 
 .upgrade-pill-spark {
-  display: inline-block;
+  flex-shrink: 0;
   animation: upgrade-glint 3.2s ease-in-out infinite;
 }
 
@@ -935,13 +929,14 @@ onUnmounted(() => {
   gap: 6px;
   flex-shrink: 0;
   margin-left: 8px;
-  padding: 6px 12px 6px 9px;
+  height: var(--ctl-md);
+  padding: 0 12px 0 10px;
   border: 1px solid rgba(var(--accent-rgb), 0.35);
   border-radius: 10px;
   background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.16), rgba(var(--accent-rgb), 0.04));
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   transition:
@@ -1024,7 +1019,7 @@ onUnmounted(() => {
 
 .projects-btn-count {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   padding: 0 6px;
   border-radius: 999px;
@@ -1071,8 +1066,6 @@ onUnmounted(() => {
 .projects-btn-chevron {
   flex-shrink: 0;
   color: var(--t3);
-  font-size: 14px;
-  line-height: 1;
   transition: transform 0.2s ease;
 }
 
@@ -1085,26 +1078,16 @@ onUnmounted(() => {
   flex: 0;
 }
 
-/* Shared stroke style for the topbar's inline SVG icons */
-.tb-svg {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  flex-shrink: 0;
-}
-
 .topbar-search {
   color: var(--t2);
   gap: 7px;
-  padding-right: 6px;
+  padding-right: 7px;
 }
 .topbar-search:hover {
   color: var(--t1);
 }
 .topbar-search kbd {
-  font-size: 9.5px;
+  font-size: 11px;
   padding: 0 5px;
 }
 @media (max-width: 1100px) {
@@ -1113,17 +1096,16 @@ onUnmounted(() => {
   }
 }
 
-/* Theme toggle: sun ⇄ moon morph */
 .ink-toggle {
   position: relative;
 }
 .ink-toggle-seal {
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
   font-family: var(--font-brush);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1;
   color: var(--t2);
   border: 1.5px solid currentColor;
@@ -1157,6 +1139,7 @@ onUnmounted(() => {
     transform: none;
   }
 }
+/* Theme toggle: sun / moon morph */
 .theme-toggle svg {
   overflow: visible;
 }
@@ -1229,10 +1212,10 @@ onUnmounted(() => {
 
 .history-btn {
   position: relative;
-  width: 30px;
-  height: 30px;
+  width: var(--ctl-md);
+  height: var(--ctl-md);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--t2);
   display: grid;
@@ -1341,7 +1324,7 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
   color: var(--t1);
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
   padding: 5px 11px;
   border-radius: 999px;
@@ -1351,9 +1334,8 @@ onUnmounted(() => {
 }
 
 .history-toast-glyph {
+  flex-shrink: 0;
   color: var(--accent);
-  font-size: 13px;
-  line-height: 1;
 }
 
 .history-toast-enter-active {
@@ -1385,7 +1367,7 @@ onUnmounted(() => {
 }
 
 .mode-picker-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.6px;
@@ -1393,13 +1375,14 @@ onUnmounted(() => {
 }
 
 .mode-picker {
-  padding: 5px 8px;
+  height: var(--ctl-md);
+  padding: 0 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   outline: none;
   cursor: pointer;
@@ -1409,14 +1392,15 @@ onUnmounted(() => {
 .labs-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
+  gap: 6px;
+  height: var(--ctl-md);
+  padding: 0 12px 0 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1439,8 +1423,7 @@ onUnmounted(() => {
   animation: labs-bubble 0.5s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 .labs-flask {
-  font-size: 13px;
-  line-height: 1;
+  flex-shrink: 0;
 }
 @keyframes labs-bubble {
   0% {

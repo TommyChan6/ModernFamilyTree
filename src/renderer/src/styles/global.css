@@ -10,8 +10,8 @@
 [data-theme='dark'] {
   --bg: #0f1117;
   --surface: #181c27;
-  --glass-strong: rgba(24, 28, 39, 0.68);
-  --glass-soft: rgba(24, 28, 39, 0.82);
+  --glass-strong: rgba(24, 28, 39, 0.82);
+  --glass-soft: rgba(24, 28, 39, 0.9);
   --elevated: #1f2437;
   --hover: #252c42;
   --border: rgba(255, 255, 255, 0.07);
@@ -39,9 +39,9 @@
   --success: var(--green);
   --warning: var(--amber);
 
-  --t1: #e8eaf6;
-  --t2: #9ea3b8;
-  --t3: #4a5068;
+  --t1: #eef0f9;
+  --t2: #b3b8cb; /* 8.6:1 on --surface */
+  --t3: #8088a0; /* 4.8:1 on --surface — hints and captions must stay readable */
 
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
@@ -61,6 +61,20 @@
   --r-pill: 999px;
   --radius: 12px; /* legacy alias */
 
+  /* Control heights — every button/field/segment in one toolbar row should
+     use the SAME step, so icon-only, text and icon+text controls line up. */
+  --ctl-xs: 24px;
+  --ctl-sm: 28px;
+  --ctl-md: 32px;
+  --ctl-lg: 40px;
+
+  /* Text scale for panels/modals (body copy never below --fs-sm). */
+  --fs-xs: 11px; /* badges, kbd, eyebrows */
+  --fs-sm: 12px; /* captions, hints, dense rows */
+  --fs-md: 13px; /* body, controls */
+  --fs-lg: 15px; /* panel titles */
+  --fs-xl: 18px; /* modal titles */
+
   /* Motion */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-std: cubic-bezier(0.4, 0, 0.2, 1);
@@ -73,8 +87,8 @@
 [data-theme='light'] {
   --bg: #f0f2f8;
   --surface: #ffffff;
-  --glass-strong: rgba(255, 255, 255, 0.66);
-  --glass-soft: rgba(255, 255, 255, 0.82);
+  --glass-strong: rgba(255, 255, 255, 0.84);
+  --glass-soft: rgba(255, 255, 255, 0.9);
   --elevated: #e8ecf5;
   --hover: #dde3f0;
   --border: rgba(0, 0, 0, 0.08);
@@ -88,8 +102,8 @@
   --kin-social: #2f9e62;
   --kin-distant: #7a8296;
   --t1: #1a1d2e;
-  --t2: #4a5068;
-  --t3: #9099b8;
+  --t2: #3d4358;
+  --t3: #646c86; /* 5.2:1 on white */
   --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.08);
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 18px 48px rgba(20, 24, 40, 0.18);
@@ -169,7 +183,8 @@ a:focus-visible,
   font-weight: 500;
   line-height: 1.2;
   cursor: pointer;
-  padding: 7px 14px;
+  min-height: var(--ctl-md);
+  padding: 6px 14px;
   transition:
     background var(--dur) ease,
     color var(--dur) ease,
@@ -287,20 +302,23 @@ a:focus-visible,
 }
 
 .btn-xs {
+  min-height: var(--ctl-xs);
   padding: 3px 8px;
-  font-size: 11px;
+  font-size: 11.5px;
   border-radius: var(--r-xs);
   gap: 4px;
 }
 
 .btn-sm {
-  padding: 5px 11px;
-  font-size: 12px;
+  min-height: var(--ctl-sm);
+  padding: 4px 11px;
+  font-size: 12.5px;
   border-radius: 7px;
 }
 
 .btn-lg {
-  padding: 10px 20px;
+  min-height: var(--ctl-lg);
+  padding: 9px 20px;
   font-size: 14px;
   font-weight: 600;
   border-radius: var(--r-md);
@@ -312,12 +330,20 @@ a:focus-visible,
 
 .btn-icon {
   padding: 0;
-  width: 32px;
-  height: 32px;
+  width: var(--ctl-md);
+  height: var(--ctl-md);
+}
+.btn-icon.btn-xs {
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
 }
 .btn-icon.btn-sm {
-  width: 28px;
-  height: 28px;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+}
+.btn-icon.btn-lg {
+  width: var(--ctl-lg);
+  height: var(--ctl-lg);
 }
 
 /* Loading: the label fades and a spinner takes its place (width is kept) */
@@ -363,8 +389,8 @@ a:focus-visible,
 
 /* ── Icon Button ──────────────────────────────────────────────────────────── */
 .icon-btn {
-  width: 32px;
-  height: 32px;
+  width: var(--ctl-md);
+  height: var(--ctl-md);
   border-radius: var(--r-sm);
   border: none;
   background: transparent;
@@ -398,6 +424,24 @@ a:focus-visible,
 .icon-btn svg {
   display: block;
 }
+.icon-btn.sm {
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+}
+
+/* ── Icons (<UiIcon>, components/ui/icons.js) ─────────────────────────────── */
+/* Inline in text the icon sits on the text's optical middle; inside flex
+   controls (buttons, chips, segments) it is centred by the flex box. Emoji are
+   never used as icons — their per-font metrics are what pushed button
+   contents off-centre. */
+.ui-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: -0.2em;
+}
+:is(.btn, .chip, .seg-btn, .icon-btn, .badge) > .ui-icon {
+  vertical-align: middle;
+}
 
 /* ── Badge / Chip ─────────────────────────────────────────────────────────── */
 .badge {
@@ -406,7 +450,7 @@ a:focus-visible,
   justify-content: center;
   background: var(--adim);
   color: var(--accent);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   border-radius: 10px;
   padding: 1px 7px;
@@ -424,7 +468,7 @@ a:focus-visible,
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.5;
   white-space: nowrap;
@@ -458,14 +502,20 @@ a:focus-visible,
 }
 .seg-btn {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: calc(var(--ctl-md) - 8px);
   border: none;
   background: transparent;
   color: var(--t2);
-  padding: 5px 12px;
+  padding: 4px 12px;
   border-radius: 7px;
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
   white-space: nowrap;
   transition:
@@ -536,7 +586,7 @@ kbd {
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1.5;
   white-space: nowrap;
@@ -558,10 +608,10 @@ kbd {
 
 /* Section label: small caps above a group of controls */
 .eyebrow {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.7px;
+  letter-spacing: 0.6px;
   color: var(--t3);
 }
 

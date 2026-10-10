@@ -12,11 +12,15 @@
 
     <div class="fr-main">
       <div class="fr-head">
-        <span v-if="def.icon" class="fr-icon">{{ def.icon }}</span>
+        <UiIcon v-if="def.icon" class="fr-icon" :name="def.icon" :size="14" />
         <span class="fr-label">{{ def.label }}</span>
-        <span class="fr-type">{{ meta.glyph }}</span>
-        <span v-if="def.locked" class="fr-lock" title="Template trait — on every form">🔒</span>
-        <span v-if="draft.display_in_graph" class="fr-eye" title="Shown in the graph label">◉</span>
+        <span class="fr-type" :title="meta.label"><UiIcon :name="meta.icon" :size="12" /></span>
+        <span v-if="def.locked" class="fr-lock" title="Template trait — on every form">
+          <UiIcon name="lock" :size="12" />
+        </span>
+        <span v-if="draft.display_in_graph" class="fr-eye" title="Shown in the graph label">
+          <UiIcon name="eye" :size="13" />
+        </span>
       </div>
 
       <FieldInput
@@ -27,11 +31,13 @@
 
       <!-- timeframe (Advanced) -->
       <div v-if="def.has_timeframe && advanced" class="fr-timeframe">
-        <span class="fr-tf-glyph" title="When this trait applied">⧗</span>
+        <span class="fr-tf-glyph" title="When this trait applied">
+          <UiIcon name="hourglass" :size="14" />
+        </span>
         <input
           class="fr-tf-input"
           type="number"
-          placeholder="from"
+          placeholder="From"
           :value="draft.timeframe?.from?.year ?? ''"
           @input="setTimeframe('from', $event.target.value)"
         />
@@ -39,7 +45,7 @@
         <input
           class="fr-tf-input"
           type="number"
-          placeholder="to"
+          placeholder="To"
           :value="draft.timeframe?.to?.year ?? ''"
           @input="setTimeframe('to', $event.target.value)"
         />
@@ -52,10 +58,6 @@
             <label class="fr-cfg-field">
               <span>Label</span>
               <input v-model="cfg.label" type="text" />
-            </label>
-            <label class="fr-cfg-field fr-cfg-sm">
-              <span>Icon</span>
-              <input v-model="cfg.icon" type="text" maxlength="4" placeholder="✦" />
             </label>
             <label v-if="hasUnit" class="fr-cfg-field fr-cfg-sm">
               <span>Unit</span>
@@ -84,6 +86,15 @@
                 <span>Right label</span><input v-model="cfg.rightLabel" type="text" />
               </label>
             </template>
+            <div class="fr-cfg-field fr-cfg-icon">
+              <span>Icon</span>
+              <IconPicker
+                v-model="cfg.icon"
+                :options="TRAIT_ICONS"
+                allow-none
+                aria-label="Trait icon"
+              />
+            </div>
           </div>
 
           <!-- select options editor -->
@@ -95,12 +106,16 @@
                 class="fr-opt-x"
                 type="button"
                 title="Remove option"
+                aria-label="Remove option"
                 @click="cfg.options.splice(i, 1)"
               >
-                ✕
+                <UiIcon name="x" :size="14" />
               </button>
             </div>
-            <button class="fr-opt-add" type="button" @click="addOption">＋ option</button>
+            <button class="fr-opt-add" type="button" @click="addOption">
+              <UiIcon name="plus" :size="14" />
+              Add option
+            </button>
           </div>
 
           <div class="fr-cfg-actions">
@@ -119,24 +134,31 @@
         class="fr-menu-btn"
         type="button"
         title="Trait options"
+        aria-label="Trait options"
         @pointerdown.stop
         @click.stop="menuOpen = !menuOpen"
       >
-        ⋯
+        <UiIcon name="ellipsis" :size="16" />
       </button>
       <Transition name="fr-pop">
         <div v-if="menuOpen" class="fr-menu" @pointerdown.stop @click.stop>
           <button class="fr-mi" @click="openEditor">
-            <i>✎</i>Edit trait<span class="fr-mi-hint">label · icon · options</span>
+            <UiIcon class="fr-mi-ic" name="pencil" :size="14" />Edit trait<span class="fr-mi-hint"
+              >Label · icon · options</span
+            >
           </button>
           <button class="fr-mi" @click="toggleLock">
-            <i>{{ def.locked ? '🔓' : '🔒' }}</i
-            >{{ def.locked ? 'Unlock' : 'Lock' }}
-            <span class="fr-mi-hint">{{ def.locked ? 'this person only' : 'on every form' }}</span>
+            <UiIcon class="fr-mi-ic" :name="def.locked ? 'lock-open' : 'lock'" :size="14" />{{
+              def.locked ? 'Unlock' : 'Lock'
+            }}
+            <span class="fr-mi-hint">{{ def.locked ? 'This person only' : 'On every form' }}</span>
           </button>
           <div class="fr-mi" role="button" tabindex="0" @click="toggleDisplay">
-            <i>{{ draft.display_in_graph ? '◉' : '○' }}</i
-            >Show in graph
+            <UiIcon
+              class="fr-mi-ic"
+              :name="draft.display_in_graph ? 'eye' : 'eye-off'"
+              :size="14"
+            />Show in graph
             <button
               v-if="def.locked"
               class="fr-mi-apply"
@@ -144,11 +166,13 @@
               title="Apply to this trait on every person"
               @click.stop="applyAll"
             >
-              apply to all
+              Apply to all
             </button>
           </div>
           <button v-if="advanced" class="fr-mi" @click="toggleTimeframe">
-            <i>⧗</i>{{ def.has_timeframe ? 'Remove timeframe' : 'Set timeframe' }}
+            <UiIcon class="fr-mi-ic" name="hourglass" :size="14" />{{
+              def.has_timeframe ? 'Remove timeframe' : 'Set timeframe'
+            }}
           </button>
           <div class="fr-mi-sep"></div>
           <div class="fr-mi-slots">
@@ -160,18 +184,24 @@
                 class="fr-mi-slot"
                 :disabled="!s.ok"
                 :title="s.ok ? s.label : `${meta.label} traits can't go here`"
+                :aria-label="s.label"
                 @click="moveToSlot(s.slot)"
               >
-                {{ s.glyph }}
+                <UiIcon :name="s.icon" :size="14" />
               </button>
             </div>
           </div>
           <div class="fr-mi-sep"></div>
-          <button class="fr-mi" @click="duplicate"><i>⧉</i>Duplicate</button>
-          <button v-if="!def.locked && attached" class="fr-mi" @click="removeFromPerson">
-            <i>⏏</i>Remove from this person
+          <button class="fr-mi" @click="duplicate">
+            <UiIcon class="fr-mi-ic" name="copy" :size="14" />Duplicate
           </button>
-          <button class="fr-mi fr-mi-danger" @click="deleteDef"><i>🗑</i>Delete trait</button>
+          <button v-if="!def.locked && attached" class="fr-mi" @click="removeFromPerson">
+            <UiIcon class="fr-mi-ic" name="circle-minus" :size="14" />Remove from this
+            {{ store.noun.toLowerCase() }}
+          </button>
+          <button class="fr-mi fr-mi-danger" @click="deleteDef">
+            <UiIcon class="fr-mi-ic" name="trash-2" :size="14" />Delete trait
+          </button>
         </div>
       </Transition>
     </div>
@@ -185,6 +215,8 @@ import { yearDate } from '../../../../shared/calendarMath'
 import { slotAccepts } from '../../../../shared/fields'
 import { typeMeta, SLOT_META } from './fieldUi.js'
 import FieldInput from './FieldInput.vue'
+import UiIcon from '../ui/UiIcon.js'
+import IconPicker from '../ui/IconPicker.vue'
 import { confirmDialog } from '../../lib/dialogs.js'
 import { translate as tr } from '../../i18n'
 
@@ -195,6 +227,41 @@ const props = defineProps({
   attached: { type: Boolean, default: false }
 })
 const emit = defineEmits(['update', 'drag-start', 'remove-from-person'])
+
+// Curated trait icons for the config editor (search widens to every icon).
+const TRAIT_ICONS = [
+  'star',
+  'heart',
+  'briefcase',
+  'map-pin',
+  'house',
+  'graduation-cap',
+  'book-open',
+  'church',
+  'crown',
+  'shield',
+  'swords',
+  'gem',
+  'coins',
+  'trophy',
+  'music',
+  'palette',
+  'ruler',
+  'eye',
+  'brain',
+  'dna',
+  'heart-pulse',
+  'flag',
+  'globe',
+  'sparkles',
+  'flame',
+  'leaf',
+  'sun',
+  'moon',
+  'calendar',
+  'clock',
+  'user'
+]
 
 const store = useMainStore()
 const menuOpen = ref(false)
@@ -387,27 +454,32 @@ async function deleteDef() {
   gap: 6px;
 }
 .fr-icon {
-  font-size: 12px;
+  flex-shrink: 0;
+  color: var(--t2);
 }
 .fr-label {
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--t2);
 }
 .fr-type {
-  font-size: 9.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  min-width: 20px;
   color: var(--t3);
   border: 1px solid var(--border);
   border-radius: 5px;
-  padding: 0 4px;
-  line-height: 1.5;
+  padding: 0 3px;
 }
-.fr-lock {
-  font-size: 9px;
-  opacity: 0.7;
+.fr-lock,
+.fr-eye {
+  display: inline-flex;
+  align-items: center;
+  color: var(--t3);
 }
 .fr-eye {
-  font-size: 10px;
   color: var(--accent);
 }
 
@@ -425,13 +497,14 @@ async function deleteDef() {
   }
 }
 .fr-tf-glyph {
+  display: inline-flex;
+  align-items: center;
   color: var(--t3);
-  font-size: 12px;
 }
 .fr-tf-input {
   width: 72px;
   padding: 4px 8px;
-  font-size: 11px;
+  font-size: 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--elevated);
@@ -482,8 +555,11 @@ async function deleteDef() {
   flex: 0 0 64px;
   min-width: 64px;
 }
-.fr-cfg-field span {
-  font-size: 9.5px;
+.fr-cfg-icon {
+  flex: 1 0 100%;
+}
+.fr-cfg-field > span {
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -492,7 +568,7 @@ async function deleteDef() {
 .fr-cfg-field input[type='text'],
 .fr-cfg-field input[type='number'] {
   padding: 5px 8px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
@@ -511,10 +587,10 @@ async function deleteDef() {
   flex: 0 0 auto;
   padding-top: 14px;
 }
-.fr-cfg-check span {
+.fr-cfg-check > span {
   text-transform: none;
   letter-spacing: 0;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--t2);
 }
@@ -530,8 +606,8 @@ async function deleteDef() {
   gap: 6px;
 }
 .fr-opt-color {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   padding: 1px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -541,8 +617,9 @@ async function deleteDef() {
 }
 .fr-opt-label {
   flex: 1;
-  padding: 5px 8px;
-  font-size: 11.5px;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12.5px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
@@ -553,23 +630,36 @@ async function deleteDef() {
   border-color: var(--accent);
 }
 .fr-opt-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
   border: none;
+  border-radius: 6px;
   background: transparent;
   color: var(--t3);
   cursor: pointer;
-  font-size: 10px;
 }
 .fr-opt-x:hover {
+  background: rgba(var(--danger-rgb), 0.1);
   color: var(--danger);
 }
 .fr-opt-add {
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
   border: 1px dashed var(--border);
   background: transparent;
   color: var(--t2);
   border-radius: 6px;
-  padding: 3px 9px;
-  font-size: 11px;
+  padding: 0 10px;
+  font-family: var(--font);
+  font-size: 12px;
   cursor: pointer;
 }
 .fr-opt-add:hover {
@@ -588,12 +678,15 @@ async function deleteDef() {
   flex-shrink: 0;
 }
 .fr-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
   border: none;
   background: transparent;
   color: var(--t3);
-  font-size: 15px;
-  line-height: 1;
-  padding: 6px 8px;
+  padding: 0;
   border-radius: 7px;
   cursor: pointer;
   opacity: 0;
@@ -614,7 +707,7 @@ async function deleteDef() {
   right: 0;
   top: calc(100% + 4px);
   z-index: 30;
-  min-width: 218px;
+  min-width: 240px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -647,7 +740,7 @@ async function deleteDef() {
   background: transparent;
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   padding: 7px 9px;
   border-radius: 8px;
   cursor: pointer;
@@ -657,16 +750,17 @@ async function deleteDef() {
 .fr-mi:hover {
   background: var(--hover);
 }
-.fr-mi i {
-  font-style: normal;
-  width: 16px;
-  text-align: center;
-  font-size: 11px;
-  opacity: 0.85;
+.fr-mi-ic {
+  flex-shrink: 0;
+  color: var(--t2);
+}
+.fr-mi-danger .fr-mi-ic {
+  color: inherit;
 }
 .fr-mi-hint {
   margin-left: auto;
-  font-size: 9.5px;
+  padding-left: 8px;
+  font-size: 12px;
   color: var(--t3);
 }
 .fr-mi-apply {
@@ -674,10 +768,11 @@ async function deleteDef() {
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--accent);
-  font-size: 9.5px;
+  font-family: var(--font);
+  font-size: 11.5px;
   font-weight: 600;
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 2px 9px;
   cursor: pointer;
 }
 .fr-mi-apply:hover {
@@ -698,7 +793,7 @@ async function deleteDef() {
   padding: 4px 9px 6px;
 }
 .fr-mi-slots-label {
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -710,14 +805,17 @@ async function deleteDef() {
   margin-top: 5px;
 }
 .fr-mi-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   width: 30px;
-  height: 26px;
+  height: var(--ctl-sm);
   border: 1px solid var(--border);
   border-radius: 7px;
   background: var(--elevated);
   color: var(--t1);
   cursor: pointer;
-  font-size: 12px;
   transition:
     transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1),
     border-color 0.14s;

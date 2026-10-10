@@ -8,8 +8,7 @@
 
     <!-- Search -->
     <div class="search-wrap">
-      <span class="search-icon">🔍</span>
-      <input v-model="searchQuery" class="search-input" placeholder="Filter members…" />
+      <SearchField v-model="searchQuery" size="sm" placeholder="Search people…" />
     </div>
 
     <!-- Person List (virtualized: only rows near the viewport are in the DOM) -->
@@ -46,22 +45,26 @@
               <span v-if="row.p.birth?.year && row.p.occupation"> · </span>
               <span v-if="row.p.occupation" class="person-occ">{{ row.p.occupation }}</span>
             </div>
-            <div v-if="row.p.location" class="person-location">📍 {{ row.p.location }}</div>
+            <div v-if="row.p.location" class="person-location">
+              <UiIcon name="map-pin" :size="12" />
+              <span class="person-location-text">{{ row.p.location }}</span>
+            </div>
           </div>
           <div class="gender-dot" :style="{ background: genderColor(row.p.gender) }"></div>
         </div>
       </div>
 
       <div v-if="filteredPersons.length === 0" class="empty-state">
-        <div class="empty-icon">👤</div>
-        <div class="empty-text">No members found</div>
+        <div class="empty-icon"><UiIcon name="user" :size="28" :stroke="1.6" /></div>
+        <div class="empty-text">No people found</div>
       </div>
     </div>
 
     <!-- Add Person Footer -->
     <div class="sidebar-footer">
-      <button class="btn btn-primary" style="width: 100%" @click="store.openForm()">
-        ＋ Add {{ store.noun }}
+      <button class="btn btn-primary sidebar-add" @click="store.openForm()">
+        <UiIcon name="plus" :size="16" />
+        Add {{ store.noun.toLowerCase() }}
       </button>
     </div>
   </aside>
@@ -72,6 +75,8 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { api } from '../api'
 import { inkAvatarBg } from './ui/inkChrome'
+import UiIcon from './ui/UiIcon.js'
+import SearchField from './ui/SearchField.vue'
 
 const store = useMainStore()
 const searchQuery = ref('')
@@ -213,35 +218,9 @@ function avatarGradient(gender) {
 }
 
 .search-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-}
-
-.search-icon {
-  font-size: 12px;
-  color: var(--t3);
-  flex-shrink: 0;
-}
-
-.search-input {
-  flex: 1;
-  background: none;
-  border: none;
-  outline: none;
-  font-size: 12px;
-  color: var(--t1);
-  font-family: var(--font);
-  padding: 0;
-  box-shadow: none;
-  width: auto;
-}
-
-.search-input::placeholder {
-  color: var(--t3);
 }
 
 .person-list {
@@ -322,7 +301,7 @@ function avatarGradient(gender) {
 }
 
 .person-meta {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t2);
   margin-top: 1px;
   white-space: nowrap;
@@ -335,9 +314,16 @@ function avatarGradient(gender) {
 }
 
 .person-location {
-  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 11px;
   color: var(--t3);
   margin-top: 1px;
+}
+.person-location-text {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -360,12 +346,12 @@ function avatarGradient(gender) {
 }
 
 .empty-icon {
-  font-size: 28px;
-  opacity: 0.4;
+  display: flex;
+  color: var(--t3);
 }
 
 .empty-text {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 
@@ -373,6 +359,10 @@ function avatarGradient(gender) {
   padding: 10px 12px;
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+}
+.sidebar-add {
+  width: 100%;
+  gap: 6px;
 }
 
 /* ── 水墨 ink theme: the roster is a paper list; names are brushed, the
@@ -391,12 +381,7 @@ function avatarGradient(gender) {
 :root[data-theme='ink'] .search-wrap {
   border-bottom-color: rgba(48, 36, 20, 0.12);
 }
-:root[data-theme='ink'] .search-icon,
-:root[data-theme='ink'] .person-location,
-:root[data-theme='ink'] .empty-icon {
-  filter: grayscale(1) sepia(0.35);
-}
-:root[data-theme='ink'] .search-input {
+:root[data-theme='ink'] .search-wrap :deep(.sf-input) {
   font-size: 13.5px;
   background: none;
   box-shadow: none;
@@ -444,7 +429,10 @@ function avatarGradient(gender) {
   place-items: center;
   width: 70px;
   height: 70px;
-  font-size: 22px;
+}
+:root[data-theme='ink'] .empty-icon .ui-icon {
+  width: 22px;
+  height: 22px;
 }
 :root[data-theme='ink'] .empty-icon::before {
   content: '';

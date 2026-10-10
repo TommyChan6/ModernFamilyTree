@@ -7,15 +7,19 @@
       <span class="path-armed-beacon"></span>
       <span class="path-armed-name">{{ personName(anchorId) }}</span>
       <span class="path-armed-hint">{{ armedHint }}</span>
-      <button class="path-close" title="Cancel (Esc)" @click="emit('close')">✕</button>
+      <button class="path-close" title="Cancel (Esc)" aria-label="Cancel" @click="emit('close')">
+        <UiIcon name="x" :size="14" />
+      </button>
     </div>
     <div v-else-if="info && info.none" key="none" class="path-card path-none">
-      <span class="path-none-icon">🛰</span>
+      <UiIcon class="path-none-icon" name="satellite" :size="16" />
       <span>
         No connection between <b>{{ personName(info.fromId) }}</b> and
         <b>{{ personName(info.toId) }}</b>
       </span>
-      <button class="path-close" title="Dismiss (Esc)" @click="emit('close')">✕</button>
+      <button class="path-close" title="Dismiss (Esc)" aria-label="Dismiss" @click="emit('close')">
+        <UiIcon name="x" :size="14" />
+      </button>
     </div>
     <div v-else-if="info" key="path" class="path-card path-card-kin">
       <KinshipCard
@@ -26,7 +30,7 @@
       />
       <div class="path-row">
         <div class="path-title">
-          <span class="path-title-icon">🧭</span>
+          <UiIcon class="path-title-icon" name="compass" :size="14" />
           Connection
           <span class="path-count">
             {{ hops.length - 1 }} hop{{ hops.length > 2 ? 's' : '' }}
@@ -35,7 +39,9 @@
         <div class="path-chain">
           <template v-for="(hop, i) in hops" :key="hop.id">
             <div v-if="hop.via" class="path-via" :style="{ '--i': i * 2 - 1 }">
-              <span class="path-via-label">{{ hop.via.glyph }} {{ hop.via.text }}</span>
+              <span class="path-via-label">
+                <UiIcon v-if="hop.via.glyph" :name="hop.via.glyph" :size="12" />{{ hop.via.text }}
+              </span>
               <span class="path-via-line"></span>
             </div>
             <button
@@ -50,7 +56,9 @@
           </template>
         </div>
       </div>
-      <button class="path-close" title="Clear (Esc)" @click="emit('close')">✕</button>
+      <button class="path-close" title="Clear (Esc)" aria-label="Clear" @click="emit('close')">
+        <UiIcon name="x" :size="14" />
+      </button>
     </div>
   </Transition>
 </template>
@@ -60,6 +68,7 @@ import { computed } from 'vue'
 import { useMainStore } from '../../store/index.js'
 import { nodeColor } from '../graph/linkHelpers.js'
 import KinshipCard from './KinshipCard.vue'
+import UiIcon from '../ui/UiIcon.js'
 
 const props = defineProps({
   /** Armed: the first person, waiting for the second. */
@@ -88,8 +97,8 @@ const hops = computed(() => {
     if (i > 0) {
       const r = info.rels[i - 1]
       const def = store.relTypeByKey.get(r.type)
-      if (r.label) via = { text: r.label, glyph: def?.glyph || '·' }
-      else if (!def) via = { text: r.type, glyph: '·' }
+      if (r.label) via = { text: r.label, glyph: def?.glyph || '' }
+      else if (!def) via = { text: r.type, glyph: '' }
       else if (def.directed) {
         const prevIsA = r.person_a_id === info.ids[i - 1]
         via = { text: `${prevIsA ? def.role_a : def.role_b} of`, glyph: def.glyph }
@@ -142,7 +151,7 @@ const hops = computed(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.09em;
@@ -150,7 +159,6 @@ const hops = computed(() => {
   white-space: nowrap;
 }
 .path-title-icon {
-  font-size: 14px;
   animation: compass-wander 5s ease-in-out infinite;
 }
 @keyframes compass-wander {
@@ -166,7 +174,7 @@ const hops = computed(() => {
   }
 }
 .path-count {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--accent);
   background: var(--adim);
@@ -193,7 +201,7 @@ const hops = computed(() => {
   background: color-mix(in srgb, var(--pc) 12%, transparent);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -230,7 +238,10 @@ const hops = computed(() => {
   animation-delay: calc(var(--i) * 0.09s);
 }
 .path-via-label {
-  font-size: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   color: var(--t3);
   white-space: nowrap;
@@ -261,12 +272,16 @@ const hops = computed(() => {
   position: absolute;
   top: 7px;
   right: 9px;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
   color: var(--t3);
-  font-size: 12px;
   cursor: pointer;
-  padding: 3px 5px;
+  padding: 0;
   border-radius: 6px;
   transition:
     color 0.15s,
@@ -296,17 +311,17 @@ const hops = computed(() => {
   }
 }
 .path-armed-name {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--t1);
   white-space: nowrap;
 }
 .path-armed-hint {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
 }
 .path-none {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
   padding-right: 40px;
 }
@@ -314,7 +329,8 @@ const hops = computed(() => {
   color: var(--t1);
 }
 .path-none-icon {
-  font-size: 15px;
+  flex-shrink: 0;
+  color: var(--t3);
 }
 .pathcard-enter-active {
   transition:

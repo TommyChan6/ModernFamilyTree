@@ -18,9 +18,9 @@
       :data-slot="bay.slot"
     >
       <div class="sd-bay-head">
-        <span class="sd-bay-glyph">{{ bay.glyph }}</span>
+        <UiIcon class="sd-bay-glyph" :name="bay.icon" :size="14" />
         <span class="sd-bay-label">{{ bay.label }}</span>
-        <span class="sd-bay-hint">{{ bay.hint }}</span>
+        <span class="sd-bay-hint" :title="bay.hint">{{ bay.hint }}</span>
       </div>
 
       <!-- gender gradient bar: ends edit the graph's male/female colors -->
@@ -52,7 +52,7 @@
       <TransitionGroup name="sd-card" tag="div" class="sd-cards">
         <div v-for="(def, i) in bay.defs" :key="def.id" class="sd-card">
           <div class="sd-card-head">
-            <span v-if="def.icon" class="sd-card-icon">{{ def.icon }}</span>
+            <UiIcon v-if="def.icon" class="sd-card-icon" :name="def.icon" :size="13" />
             <span class="sd-card-label">{{ def.label }}</span>
             <template v-if="bay.slot === 'name' && bay.defs.length > 1">
               <button
@@ -60,18 +60,20 @@
                 type="button"
                 :disabled="i === 0"
                 title="Earlier in the name"
+                aria-label="Earlier in the name"
                 @click="reorderName(def, -1)"
               >
-                ‹
+                <UiIcon name="chevron-left" :size="14" />
               </button>
               <button
                 class="sd-mini"
                 type="button"
                 :disabled="i === bay.defs.length - 1"
                 title="Later in the name"
+                aria-label="Later in the name"
                 @click="reorderName(def, 1)"
               >
-                ›
+                <UiIcon name="chevron-right" :size="14" />
               </button>
             </template>
             <input
@@ -86,9 +88,10 @@
               class="sd-mini sd-eject"
               type="button"
               title="Remove from slot (back to the trait list)"
+              aria-label="Remove from slot"
               @click="store.setFieldSlot(def.id, null)"
             >
-              ⏏
+              <UiIcon name="corner-up-left" :size="14" />
             </button>
           </div>
           <FieldInput
@@ -102,7 +105,7 @@
       </TransitionGroup>
 
       <div v-if="bay.defs.length === 0" class="sd-empty-hint">
-        {{ dragState.active && bay.accepts ? 'Drop it here' : 'drag a trait here' }}
+        {{ dragState.active && bay.accepts ? 'Drop it here' : 'Drag a trait here' }}
       </div>
     </div>
   </div>
@@ -114,6 +117,7 @@ import { useMainStore } from '../../store/index.js'
 import { genderInfo, lerpColorHex, slotAccepts } from '../../../../shared/fields'
 import { SLOT_META } from './fieldUi.js'
 import FieldInput from './FieldInput.vue'
+import UiIcon from '../ui/UiIcon.js'
 
 const props = defineProps({
   defs: { type: Array, required: true },
@@ -225,22 +229,23 @@ defineExpose({ bayAt })
 
 .sd-bay-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
 }
 .sd-bay-glyph {
+  flex-shrink: 0;
   color: var(--accent);
-  font-size: 12px;
 }
 .sd-bay-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.7px;
   color: var(--t2);
 }
 .sd-bay-hint {
-  font-size: 9px;
+  min-width: 0;
+  font-size: 12px;
   color: var(--t3);
   margin-left: auto;
   overflow: hidden;
@@ -287,12 +292,13 @@ defineExpose({ bayAt })
   gap: 4px;
 }
 .sd-card-icon {
-  font-size: 10.5px;
+  flex-shrink: 0;
+  color: var(--t3);
 }
 .sd-card-label {
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--t3);
+  color: var(--t2);
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -300,13 +306,17 @@ defineExpose({ bayAt })
   white-space: nowrap;
 }
 .sd-mini {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
   border: none;
   background: transparent;
   color: var(--t3);
   cursor: pointer;
-  font-size: 11px;
-  line-height: 1;
-  padding: 2px 4px;
+  padding: 0;
   border-radius: 5px;
   transition:
     color 0.12s,
@@ -324,8 +334,8 @@ defineExpose({ bayAt })
   color: var(--amber) !important;
 }
 .sd-hl-color {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   padding: 1px;
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -334,7 +344,7 @@ defineExpose({ bayAt })
 }
 
 .sd-empty-hint {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--t3);
   font-style: italic;
   text-align: center;
@@ -405,7 +415,7 @@ defineExpose({ bayAt })
 }
 :root[data-theme='ink'] .sd-bay-label {
   font-family: var(--font-ink-label);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   font-variant: small-caps;
   text-transform: lowercase;
@@ -413,11 +423,11 @@ defineExpose({ bayAt })
 }
 :root[data-theme='ink'] .sd-bay-hint,
 :root[data-theme='ink'] .sd-empty-hint {
-  font-size: 11px;
+  font-size: 12px;
   font-style: italic;
 }
 :root[data-theme='ink'] .sd-card-label {
-  font-size: 12px;
+  font-size: 12.5px;
 }
 :root[data-theme='ink'] .sd-grad-bar {
   border-radius: 2px;

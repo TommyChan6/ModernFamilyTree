@@ -179,7 +179,7 @@ const styleVars = computed(() => ({ '--fn-paper': `url(${paintingPaperUrl()})` }
 }
 .fn-meta {
   font-family: var(--font-ink-serif);
-  font-size: 9.5px;
+  font-size: 10.5px;
   color: #5d5246;
   white-space: nowrap;
   overflow: hidden;

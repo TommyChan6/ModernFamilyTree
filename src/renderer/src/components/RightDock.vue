@@ -1,7 +1,14 @@
 <template>
   <!-- Collapsed: a slim strip with just the expand handle -->
   <aside v-if="collapsed" class="right-dock collapsed">
-    <button class="dock-collapse" title="Expand panel" @click="$emit('toggle-collapse')">◀</button>
+    <button
+      class="dock-collapse"
+      title="Expand panel"
+      aria-label="Expand panel"
+      @click="$emit('toggle-collapse')"
+    >
+      <UiIcon name="chevron-left" :size="16" />
+    </button>
   </aside>
 
   <aside v-else class="right-dock">
@@ -20,8 +27,13 @@
       >
         Directory
       </button>
-      <button class="dock-collapse" title="Collapse panel" @click="$emit('toggle-collapse')">
-        ▶
+      <button
+        class="dock-collapse"
+        title="Collapse panel"
+        aria-label="Collapse panel"
+        @click="$emit('toggle-collapse')"
+      >
+        <UiIcon name="chevron-right" :size="16" />
       </button>
     </div>
 
@@ -69,12 +81,17 @@
           <button class="btn btn-ghost btn-sm" @click="store.selectPerson(person.id)">
             Open profile
           </button>
-          <button class="btn btn-primary btn-sm" @click="store.openForm(person)">✎ Edit</button>
+          <button class="btn btn-primary btn-sm" @click="store.openForm(person)">
+            <UiIcon name="pencil" :size="14" />
+            Edit
+          </button>
         </div>
       </template>
 
       <div v-else class="insp-empty">
-        <div class="insp-empty-icon">◈</div>
+        <div class="insp-empty-icon">
+          <UiIcon name="mouse-pointer-click" :size="28" :stroke="1.6" />
+        </div>
         <div class="insp-empty-text">
           Select a person on the canvas — or pick one from the Directory tab — to inspect and edit
           them here.
@@ -94,6 +111,7 @@ import { api } from '../api'
 import RightSidebar from './RightSidebar.vue'
 import TagChipsEditor from './TagChipsEditor.vue'
 import { inkAvatarBg } from './ui/inkChrome'
+import UiIcon from './ui/UiIcon.js'
 
 // The tabbed, collapsible right dock: Inspector (selection details + quick
 // edit) and Directory (the draggable member roster, dragged onto a canvas to
@@ -158,7 +176,7 @@ function avatarGradient(gender) {
   border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--t3);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   font-family: var(--font);
   cursor: pointer;
@@ -177,15 +195,21 @@ function avatarGradient(gender) {
 }
 
 .dock-collapse {
-  width: 24px;
-  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
   border: none;
   border-radius: 6px;
   background: transparent;
   color: var(--t3);
-  font-size: 10px;
   cursor: pointer;
   flex-shrink: 0;
+}
+.dock-tabs .dock-collapse {
+  margin-bottom: 4px;
 }
 
 .dock-collapse:hover {
@@ -244,7 +268,7 @@ function avatarGradient(gender) {
 }
 
 .insp-dates {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 
@@ -255,7 +279,7 @@ function avatarGradient(gender) {
 }
 
 .insp-field {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
 }
 
@@ -265,7 +289,7 @@ function avatarGradient(gender) {
 
 .insp-label {
   display: block;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -280,6 +304,7 @@ function avatarGradient(gender) {
 
 .insp-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
   justify-content: center;
   padding-top: 4px;
@@ -297,12 +322,12 @@ function avatarGradient(gender) {
 }
 
 .insp-empty-icon {
-  font-size: 28px;
-  opacity: 0.5;
+  display: flex;
+  color: var(--t3);
 }
 
 .insp-empty-text {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t3);
   line-height: 1.6;
   max-width: 200px;
@@ -371,7 +396,7 @@ function avatarGradient(gender) {
 }
 :root[data-theme='ink'] .insp-label {
   font-family: var(--font-ink-label);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   font-variant: small-caps;
   text-transform: lowercase;
@@ -386,10 +411,11 @@ function avatarGradient(gender) {
   height: 84px;
   display: grid;
   place-items: center;
-  font-family: var(--font-brush);
-  font-size: 26px;
   color: var(--accent);
-  opacity: 0.85;
+}
+:root[data-theme='ink'] .insp-empty-icon .ui-icon {
+  width: 24px;
+  height: 24px;
 }
 :root[data-theme='ink'] .insp-empty-icon::before {
   content: '';

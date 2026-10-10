@@ -99,7 +99,7 @@ export default {
     reviewTitle: 'Review your order',
     couponPh: 'Promo code',
     apply: 'Apply',
-    couponOk: '{code} applied 🎉',
+    couponOk: '{code} applied',
     couponErr: {
       unknown: 'That code doesn’t exist.',
       interval: 'That code only works with yearly billing.'
@@ -167,7 +167,7 @@ export default {
         'You keep everything until {date}; after that your account returns to Free. Nothing is deleted.',
       cancelConfirm: 'Cancel plan',
       keep: 'Keep it',
-      canceledToast: 'Your plan won’t renew. Thanks for supporting the forest 🌳',
+      canceledToast: 'Your plan won’t renew. Thanks for supporting the forest',
       resumedToast: 'Welcome back — your plan will renew as usual.'
     }
   },
@@ -349,15 +349,15 @@ export default {
       castPh: 'Find a person…',
       access: 'What you can do here',
       download: 'Download project file',
-      downloaded: 'Saved {file} — open it any time with Project ▾ → Import.',
+      downloaded: 'Saved {file} — open it any time from the Project menu → Import.',
       graft: 'Graft to my projects',
       grafting: 'Grafting…',
-      grafted: '“{name}” was grafted into your projects 🌱',
+      grafted: '“{name}” was grafted into your projects',
       graftFailed: 'Couldn’t graft: {error}',
       openCopy: 'Open my copy',
       join: 'Join as gardener',
       pending: 'Request sent — waiting for the creator…',
-      member: 'You’re a gardener 🌻',
+      member: 'You’re a gardener',
       memberNote:
         'Live co-editing arrives with the hosted community. Until then, graft a copy and share ideas in the comments.',
       glassNote:
@@ -795,7 +795,7 @@ export default {
       confirmDelete: 'Delete the map “{name}”? This can’t be undone.'
     },
     toast: {
-      created: '🗺 {name} is ready',
+      created: '{name} is ready',
       undo: 'Undone',
       redo: 'Redone',
       nothingToUndo: 'Nothing to undo',
@@ -806,7 +806,7 @@ export default {
       autoPlaced: 'Placed {n} by their Location',
       noLater: 'Nothing later on this map',
       noEarlier: 'Nothing earlier on this map',
-      firstJourney: 'Journey started — press ▶ to watch it',
+      firstJourney: 'Journey started — press Play to watch it',
       tooSmall: 'Too small — drag a bigger shape',
       exported: 'Map saved as PNG'
     },
@@ -955,7 +955,7 @@ export default {
     inherit: 'Inherit from parents',
     resemblance: 'Resemblance',
     rollChild: 'Roll a family face',
-    inherited: 'A face with a family resemblance ✨',
+    inherited: 'A face with a family resemblance',
     noParents: 'No parents are linked to this person yet.',
     parentsNoLooks: 'Give their parents a look first — then their features can be passed down.',
     genePool: 'Gene pool',

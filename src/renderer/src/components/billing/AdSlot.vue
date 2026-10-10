@@ -8,7 +8,7 @@
   >
     <div class="ad-art" aria-hidden="true">
       <span class="ad-orb"></span>
-      <span class="ad-emoji">{{ ad.emoji }}</span>
+      <UiIcon class="ad-icon" :name="ad.icon" :size="artIconSize" :stroke="1.8" />
     </div>
     <div class="ad-copy">
       <p class="ad-meta">
@@ -18,12 +18,15 @@
       <h4 class="ad-title">{{ copy.title }}</h4>
       <p v-if="placement !== 'strip'" class="ad-body">{{ copy.body }}</p>
       <div class="ad-actions">
-        <button class="ad-cta" @click="click">{{ copy.cta }} →</button>
+        <button class="ad-cta" @click="click">
+          {{ copy.cta }}
+          <UiIcon name="arrow-right" :size="14" />
+        </button>
         <button class="ad-remove" @click="removeAds">{{ t('ads.remove') }}</button>
       </div>
     </div>
     <button class="ad-x" :title="t('ads.dismiss')" :aria-label="t('ads.dismiss')" @click="dismiss">
-      ✕
+      <UiIcon name="x" :size="14" />
     </button>
   </aside>
 </template>
@@ -33,6 +36,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useMainStore } from '../../store/index.js'
 import { useI18n } from '../../i18n'
 import { dismissAd, getAdProvider } from '../../lib/ads'
+import UiIcon from '../ui/UiIcon.js'
 
 const props = defineProps({
   placement: { type: String, default: 'banner' }, // 'card' | 'banner' | 'strip'
@@ -54,6 +58,7 @@ const ad = computed(() => {
     exclude: props.exclude
   })
 })
+const artIconSize = computed(() => ({ card: 48, strip: 20 })[props.placement] || 30)
 const copy = computed(() => {
   const a = ad.value
   if (!a) return { title: '', body: '', cta: '' }
@@ -126,10 +131,9 @@ function dismiss() {
     transform: rotate(360deg);
   }
 }
-.ad-emoji {
+.ad-icon {
   position: relative;
-  color: #fff; /* text glyphs (✦) on the always-dark art tile */
-  font-size: 30px;
+  color: #fff; /* on the always-dark art tile */
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.45));
 }
 .ad-copy {
@@ -144,7 +148,7 @@ function dismiss() {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--t3);
 }
 .ad-chip {
@@ -163,7 +167,7 @@ function dismiss() {
 }
 .ad-body {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
   line-height: 1.5;
 }
@@ -175,11 +179,15 @@ function dismiss() {
   flex-wrap: wrap;
 }
 .ad-cta {
-  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--ctl-sm);
+  padding: 0 12px;
   border-radius: var(--r-pill);
   border: none;
   font-weight: 800;
-  font-size: 12px;
+  font-size: 12.5px;
   cursor: pointer;
   color: var(--on-accent);
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
@@ -192,7 +200,7 @@ function dismiss() {
   border: none;
   background: none;
   padding: 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
   cursor: pointer;
   text-decoration: underline;
@@ -205,13 +213,16 @@ function dismiss() {
   position: absolute;
   top: 8px;
   right: 8px;
-  width: 22px;
-  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
+  padding: 0;
   border-radius: 50%;
   border: none;
   background: var(--elevated);
   color: var(--t3);
-  font-size: 10px;
   cursor: pointer;
 }
 .ad-x:hover {
@@ -228,9 +239,6 @@ function dismiss() {
 .ad-card .ad-art {
   height: 150px;
   border-radius: 0;
-}
-.ad-card .ad-emoji {
-  font-size: 52px;
 }
 .ad-card .ad-copy {
   padding: 12px 14px 14px;
@@ -255,9 +263,6 @@ function dismiss() {
 .ad-strip .ad-art {
   width: 44px;
   height: 44px;
-}
-.ad-strip .ad-emoji {
-  font-size: 20px;
 }
 .ad-strip .ad-copy {
   flex-direction: row;

@@ -35,7 +35,7 @@ export interface BrowseProfile {
   id: string
   username: string
   displayName: string
-  avatar: string // emoji
+  avatar: string // UiIcon name
   hue: number
   bio: string
   location: string
@@ -53,7 +53,7 @@ export interface BrowseProject {
   lang: Lang
   access: ShareAccess
   hue: number
-  crest: string // emoji
+  crest: string // UiIcon name
   era: string
   tags: string[]
   blurb: string
@@ -73,7 +73,7 @@ export interface BrowseProject {
 /** Curated shelves. Titles are UI copy, so they carry every locale. */
 export interface BrowseCollection {
   id: string
-  emoji: string
+  icon: string // UiIcon name
   hue: number
   title: Record<'en' | 'zh-Hans' | 'zh-Hant', string>
   projectIds: string[]
@@ -84,7 +84,7 @@ export const PROFILES: BrowseProfile[] = [
     id: 'hokage_archivist',
     username: 'hokage_archivist',
     displayName: 'Konoha Archives',
-    avatar: '🍥',
+    avatar: 'scroll',
     hue: 18,
     bio: 'Keeper of scrolls. If a shinobi has a cousin, I have a node for them.',
     location: 'Hidden Leaf Village',
@@ -97,7 +97,7 @@ export const PROFILES: BrowseProfile[] = [
     id: 'stand_user_77',
     username: 'stand_user_77',
     displayName: 'Yare Yare Genealogy',
-    avatar: '⭐',
+    avatar: 'star',
     hue: 280,
     bio: 'Mapping the Joestar curse one part at a time. ゴゴゴゴ',
     location: 'Morioh, S City',
@@ -110,7 +110,7 @@ export const PROFILES: BrowseProfile[] = [
     id: 'capsule_corp_intern',
     username: 'capsule_corp_intern',
     displayName: 'Capsule Corp Intern',
-    avatar: '🐉',
+    avatar: 'rocket',
     hue: 32,
     bio: 'I count Saiyans for a living. It’s over 9000 and still going.',
     location: 'West City',
@@ -123,7 +123,7 @@ export const PROFILES: BrowseProfile[] = [
     id: 'maester_gyldayn',
     username: 'maester_gyldayn',
     displayName: 'Archmaester Gyldayn',
-    avatar: '📜',
+    avatar: 'scroll-text',
     hue: 0,
     bio: 'Chronicler of the Dance. Sources: Mushroom, Septon Eustace, and vibes.',
     location: 'The Citadel, Oldtown',
@@ -136,7 +136,7 @@ export const PROFILES: BrowseProfile[] = [
     id: 'springfield_genealogy',
     username: 'springfield_genealogy',
     displayName: 'Springfield Historical Society',
-    avatar: '🍩',
+    avatar: 'house',
     hue: 50,
     bio: 'Est. 1796 by Jebediah Springfield (allegedly). A noble spirit embiggens the smallest tree.',
     location: 'Springfield, USA',
@@ -149,7 +149,7 @@ export const PROFILES: BrowseProfile[] = [
     id: 'waystar_hr',
     username: 'waystar_hr',
     displayName: 'Waystar HR (unofficial)',
-    avatar: '💼',
+    avatar: 'briefcase',
     hue: 215,
     bio: 'Succession planning, literally. Not affiliated with any boar on the floor.',
     location: 'Manhattan',
@@ -162,7 +162,7 @@ export const PROFILES: BrowseProfile[] = [
     id: 'tudor_rose',
     username: 'tudor_rose',
     displayName: 'Dr. Rosalind Hale',
-    avatar: '🌹',
+    avatar: 'flower',
     hue: 345,
     bio: 'Early-modern historian. Six wives, two crowns, zero chill. Every date footnoted.',
     location: 'London',
@@ -175,7 +175,7 @@ export const PROFILES: BrowseProfile[] = [
     id: 'changan_scribe',
     username: 'changan_scribe',
     displayName: '长安史官',
-    avatar: '🏮',
+    avatar: 'feather',
     hue: 12,
     bio: '考据派。唐与三国，一个都不能少。欢迎指正。',
     location: '西安',
@@ -188,7 +188,7 @@ export const PROFILES: BrowseProfile[] = [
     id: 'forbidden_city_notes',
     username: 'forbidden_city_notes',
     displayName: '紫禁城笔记',
-    avatar: '🏯',
+    avatar: 'landmark',
     hue: 42,
     bio: '从洪武到宣统，把六百年装进一张图。宫斗剧爱好者，史料洁癖。',
     location: '北京',
@@ -201,7 +201,7 @@ export const PROFILES: BrowseProfile[] = [
     id: 'tvb_forever',
     username: 'tvb_forever',
     displayName: 'TVB 老友記',
-    avatar: '📺',
+    avatar: 'tv',
     hue: 150,
     bio: '港劇迷，《皆大歡喜》重溫第 38 次。金家大宅係我第二個屋企。',
     location: '香港',
@@ -214,7 +214,7 @@ export const PROFILES: BrowseProfile[] = [
     id: 'pantheon_lab',
     username: 'pantheon_lab',
     displayName: 'Pantheon Lab',
-    avatar: '⚡',
+    avatar: 'zap',
     hue: 200,
     bio: 'Gods are just families with extra lightning. Open grove — bring your favourite demigod.',
     location: 'Mount Olympus (remote)',
@@ -227,7 +227,7 @@ export const PROFILES: BrowseProfile[] = [
     id: 'edo_archive',
     username: 'edo_archive',
     displayName: '江戸アーカイブ',
-    avatar: '🎐',
+    avatar: 'library',
     hue: 130,
     bio: '三百年の天下泰平を一枚の図に。将軍家と御三家の系譜を整理中。',
     location: '東京',
@@ -248,7 +248,7 @@ export const PROJECTS: BrowseProject[] = [
     lang: 'en',
     access: 'graft',
     hue: 355,
-    crest: '🔥',
+    crest: 'flame',
     era: 'Warring States → Boruto era',
     tags: ['naruto', 'ninja', 'sharingan', 'clan', 'shinobi', 'rivalry', '宇智波', 'うちは'],
     blurb:
@@ -315,7 +315,7 @@ export const PROJECTS: BrowseProject[] = [
     lang: 'en',
     access: 'seedbank',
     hue: 272,
-    crest: '⭐',
+    crest: 'star',
     era: '1868 → 2012',
     tags: ['jojo', 'stands', 'hamon', 'bizarre', 'vampire', 'rivalry', 'ジョジョ', 'JOJO'],
     blurb:
@@ -383,7 +383,7 @@ export const PROJECTS: BrowseProject[] = [
     lang: 'en',
     access: 'grove',
     hue: 30,
-    crest: '🐉',
+    crest: 'biceps-flexed',
     era: 'Age 737 → Age 790',
     tags: [
       'dragon ball',
@@ -466,7 +466,7 @@ export const PROJECTS: BrowseProject[] = [
     lang: 'en',
     access: 'graft',
     hue: 2,
-    crest: '🐲',
+    crest: 'egg',
     era: '34 AC → 172 AC',
     tags: [
       'house of the dragon',
@@ -572,7 +572,7 @@ export const PROJECTS: BrowseProject[] = [
     lang: 'en',
     access: 'glasshouse',
     hue: 214,
-    crest: '💼',
+    crest: 'briefcase-business',
     era: '1938 → 2023',
     tags: [
       'succession',
@@ -628,7 +628,7 @@ export const PROJECTS: BrowseProject[] = [
     },
     comments: [
       ['maester_gyldayn', 'Glasshouse mode is the only mode Logan would ever allow.', 2],
-      ['tvb_forever', '想嫁接但係唔俾 😂', 8]
+      ['tvb_forever', '想嫁接但係唔俾', 8]
     ]
   },
 
@@ -641,7 +641,7 @@ export const PROJECTS: BrowseProject[] = [
     lang: 'en',
     access: 'seedbank',
     hue: 50,
-    crest: '🍩',
+    crest: 'sofa',
     era: 'Three generations, forever the same age',
     tags: ['simpsons', 'springfield', 'animation', 'cartoon', 'comedy', '辛普森'],
     blurb:
@@ -700,7 +700,7 @@ export const PROJECTS: BrowseProject[] = [
     lang: 'zh-Hant',
     access: 'grove',
     hue: 152,
-    crest: '🧧',
+    crest: 'gift',
     era: 'TVB 2001 – 2002',
     tags: [
       '皆大歡喜',
@@ -767,7 +767,7 @@ export const PROJECTS: BrowseProject[] = [
     lang: 'en',
     access: 'graft',
     hue: 345,
-    crest: '🌹',
+    crest: 'flower',
     era: '1400 → 1625',
     tags: [
       'tudor',
@@ -872,7 +872,7 @@ export const PROJECTS: BrowseProject[] = [
     lang: 'en',
     access: 'seedbank',
     hue: 205,
-    crest: '👑',
+    crest: 'crown',
     era: '1818 → 1960',
     tags: ['romanov', 'russia', 'tsar', 'imperial', '1917', 'royalty', '罗曼诺夫', '羅曼諾夫'],
     blurb:
@@ -925,7 +925,7 @@ export const PROJECTS: BrowseProject[] = [
     lang: 'ja',
     access: 'seedbank',
     hue: 128,
-    crest: '⛩️',
+    crest: 'castle',
     era: '1543 → 1913',
     tags: ['徳川', 'tokugawa', 'shogun', 'edo', 'japan', '将軍', '江戸', '德川'],
     blurb: '家康から慶喜まで、十五代の将軍と御三家・御三卿の系譜。大奥の人間関係も少しだけ。',
@@ -1019,7 +1019,7 @@ export const PROJECTS: BrowseProject[] = [
     lang: 'zh-Hans',
     access: 'graft',
     hue: 26,
-    crest: '🏮',
+    crest: 'lamp',
     era: '566 → 775',
     tags: ['唐朝', '唐代', 'tang', '李世民', '武则天', '玄武门', '长安', 'china', '大唐'],
     blurb: '从晋阳起兵到开元盛世：玄武门之变、女皇登基、先天政变，一张图看懂李唐两百年。',
@@ -1093,7 +1093,7 @@ export const PROJECTS: BrowseProject[] = [
     lang: 'zh-Hans',
     access: 'seedbank',
     hue: 6,
-    crest: '🏯',
+    crest: 'landmark',
     era: '1328 → 1644',
     tags: ['明朝', 'ming', '朱元璋', '靖难', '紫禁城', 'china', '大明', '万历'],
     blurb: '十六帝、二百七十六年。靖难之役、夺门之变、大礼议——皇位如何在叔侄兄弟间辗转。',
@@ -1183,7 +1183,7 @@ export const PROJECTS: BrowseProject[] = [
     lang: 'zh-Hans',
     access: 'grove',
     hue: 44,
-    crest: '🏹',
+    crest: 'target',
     era: '1559 → 1967',
     tags: [
       '清朝',
@@ -1269,7 +1269,7 @@ export const PROJECTS: BrowseProject[] = [
     },
     comments: [
       ['changan_scribe', '九子夺嫡建议再加上十三阿哥和十四阿哥！', 0.1],
-      ['tvb_forever', '加入咗共耕林，幫手補後宮 👑', 0.6],
+      ['tvb_forever', '加入咗共耕林，幫手補後宮', 0.6],
       ['maester_gyldayn', 'Cixi vs Guangxu is peak Dance-of-the-Dragons energy.', 5]
     ]
   },
@@ -1281,7 +1281,7 @@ export const PROJECTS: BrowseProject[] = [
     lang: 'zh-Hans',
     access: 'glasshouse',
     hue: 222,
-    crest: '⚔️',
+    crest: 'swords',
     era: '155 → 274',
     tags: ['三国', '曹操', 'three kingdoms', '魏', '七步诗', 'china', '三國', '赤壁'],
     blurb: '“宁我负人”的曹孟德与他的儿子们：七步成诗、称象神童，还有三国枭雄的对手盘。',
@@ -1340,7 +1340,7 @@ export const PROJECTS: BrowseProject[] = [
     lang: 'en',
     access: 'grove',
     hue: 198,
-    crest: '⚡',
+    crest: 'zap',
     era: 'Before time → Age of Heroes',
     tags: ['greek mythology', 'olympus', 'gods', 'titans', 'zeus', 'myth', '希腊神话', '希臘神話'],
     blurb:
@@ -1420,7 +1420,7 @@ export const PROJECTS: BrowseProject[] = [
     },
     comments: [
       ['tudor_rose', 'Zeus has more spouse-adjacent edges than Henry VIII. Impressive.', 1],
-      ['capsule_corp_intern', 'Added Perseus to the grove — pending review 🙏', 2]
+      ['capsule_corp_intern', 'Added Perseus to the grove — pending review', 2]
     ]
   }
 ]
@@ -1428,42 +1428,42 @@ export const PROJECTS: BrowseProject[] = [
 export const COLLECTIONS: BrowseCollection[] = [
   {
     id: 'dragon-thrones',
-    emoji: '🐉',
+    icon: 'flame',
     hue: 12,
     title: { en: 'Dragon thrones', 'zh-Hans': '龙椅之争', 'zh-Hant': '龍椅之爭' },
     projectIds: ['qing', 'tang', 'ming', 'caowei', 'targaryen']
   },
   {
     id: 'anime-clans',
-    emoji: '⛩️',
+    icon: 'sparkles',
     hue: 330,
     title: { en: 'Anime clans', 'zh-Hans': '动漫家族', 'zh-Hant': '動漫家族' },
     projectIds: ['uchiha', 'joestar', 'sonfamily']
   },
   {
     id: 'crowns',
-    emoji: '👑',
+    icon: 'crown',
     hue: 280,
     title: { en: 'Crowns & courts', 'zh-Hans': '王冠与宫廷', 'zh-Hant': '王冠與宮廷' },
     projectIds: ['tudors', 'romanovs', 'tokugawa', 'targaryen']
   },
   {
     id: 'sofa',
-    emoji: '🛋️',
+    icon: 'sofa',
     hue: 150,
     title: { en: 'Sofa families', 'zh-Hans': '沙发上的家人', 'zh-Hant': '梳化上的家人' },
     projectIds: ['simpsons', 'jdhx', 'roys']
   },
   {
     id: 'feuds',
-    emoji: '⚔️',
+    icon: 'swords',
     hue: 0,
     title: { en: 'Legendary feuds', 'zh-Hans': '传奇恩怨', 'zh-Hant': '傳奇恩怨' },
     projectIds: ['uchiha', 'targaryen', 'roys', 'tang', 'olympus']
   },
   {
     id: 'open-groves',
-    emoji: '🤝',
+    icon: 'handshake',
     hue: 140,
     title: { en: 'Open for gardeners', 'zh-Hans': '招募园丁中', 'zh-Hant': '招募園丁中' },
     projectIds: ['qing', 'jdhx', 'sonfamily', 'olympus']

@@ -1,6 +1,6 @@
 <template>
   <span class="pb" :class="['pb-' + tier, { big }]">
-    <span v-if="GLYPH[tier]" class="pb-glyph">{{ GLYPH[tier] }}</span>
+    <UiIcon v-if="GLYPH[tier]" class="pb-glyph" :name="GLYPH[tier]" :size="big ? 14 : 12" />
     {{ t('billing.plans.' + tier + '.name') }}
   </span>
 </template>
@@ -8,13 +8,14 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from '../../i18n'
+import UiIcon from '../ui/UiIcon.js'
 
 const props = defineProps({
   plan: { type: String, default: 'free' },
   big: { type: Boolean, default: false }
 })
 const { t } = useI18n()
-const GLYPH = { plus: '✦', pro: '◆', guest: '👋' }
+const GLYPH = { plus: 'sparkles', pro: 'gem', guest: 'hand' }
 const tier = computed(() => (['plus', 'pro', 'guest'].includes(props.plan) ? props.plan : 'free'))
 </script>
 
@@ -25,7 +26,7 @@ const tier = computed(() => (['plus', 'pro', 'guest'].includes(props.plan) ? pro
   gap: 4px;
   padding: 2px 8px;
   border-radius: var(--r-pill);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.02em;
   white-space: nowrap;
@@ -35,7 +36,7 @@ const tier = computed(() => (['plus', 'pro', 'guest'].includes(props.plan) ? pro
 }
 .pb.big {
   padding: 4px 12px;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .pb-plus {
   color: var(--on-accent);
@@ -57,7 +58,7 @@ const tier = computed(() => (['plus', 'pro', 'guest'].includes(props.plan) ? pro
   }
 }
 .pb-glyph {
-  font-size: 0.95em;
+  flex-shrink: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .pb-pro {

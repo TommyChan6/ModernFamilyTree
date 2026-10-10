@@ -4,7 +4,7 @@
        ticks, era wash, event markers) and the atmosphere — plus one-click looks. -->
   <div class="canvas-pane tsp" @pointerdown.stop @wheel.stop @click.stop>
     <div class="tsp-head">
-      <span class="tsp-title">🎨 Style</span>
+      <span class="tsp-title"><UiIcon name="palette" :size="14" />Style</span>
       <button class="tsp-reset" title="Back to the defaults" @click="store.resetTimelineSettings()">
         Reset
       </button>
@@ -21,7 +21,7 @@
         :title="l.hint"
         @click="applyLook(l)"
       >
-        <span class="tsp-look-ic">{{ l.icon }}</span>
+        <UiIcon class="tsp-look-ic" :name="l.icon" :size="16" />
         <span class="tsp-look-name">{{ l.label }}</span>
       </button>
     </div>
@@ -42,7 +42,8 @@
       <!-- ── Lifelines ── -->
       <div v-if="tab === 'lines'" key="lines" class="tsp-body">
         <div v-if="store.isInk" class="tsp-note">
-          🖌 In the Ink theme lifelines are brushed — looks apply in every other theme.
+          <UiIcon name="brush" :size="14" />
+          <span>In the Ink theme lifelines are brushed — looks apply in every other theme.</span>
         </div>
         <div class="tsp-grid">
           <button
@@ -56,8 +57,7 @@
           >
             <FxPreview :id="f.id" />
             <span class="tsp-tile-name">
-              <span class="tsp-tile-ic">{{ f.icon }}</span
-              >{{ f.label }}
+              <UiIcon class="tsp-tile-ic" :name="f.icon" :size="13" />{{ f.label }}
             </span>
           </button>
         </div>
@@ -179,7 +179,8 @@
       <!-- ── Atmosphere ── -->
       <div v-else key="air" class="tsp-body">
         <div v-if="store.isInk" class="tsp-note">
-          🌫 The Ink theme brings its own mist — atmospheres apply in every other theme.
+          <UiIcon name="cloud-fog" :size="14" />
+          <span>The Ink theme brings its own mist — atmospheres apply in every other theme.</span>
         </div>
         <div class="tsp-chips">
           <button
@@ -190,8 +191,7 @@
             :style="{ '--i': i }"
             @click="set('ambientFx', a.id)"
           >
-            <span>{{ a.icon }}</span
-            >{{ a.label }}
+            <UiIcon :name="a.icon" :size="14" />{{ a.label }}
           </button>
         </div>
         <template v-if="st.ambientFx !== 'none'">
@@ -233,6 +233,7 @@ import { ref, computed } from 'vue'
 import { useMainStore } from '../../store/index.js'
 import { LINE_FX } from '../graph/webgl/lineFx.js'
 import FxPreview from '../graph/FxPreview.vue'
+import UiIcon from '../ui/UiIcon.js'
 import { LIFELINE_STYLES, SHADOWED } from './LifelineLayer.js'
 
 const store = useMainStore()
@@ -248,7 +249,7 @@ const TABS = [
 ]
 const tab = ref('lines')
 
-const BASE_ICONS = { classic: '／', tube: '🧪', glass: '🔮', glow: '💡' }
+const BASE_ICONS = { classic: 'minus', tube: 'test-tube', glass: 'gem', glow: 'lightbulb' }
 const looks = [
   ...LIFELINE_STYLES.map((s) => ({ ...s, icon: BASE_ICONS[s.id] })),
   ...LINE_FX.filter((f) => f.id !== 'none')
@@ -296,23 +297,23 @@ const SEGS = [
 ]
 
 const AMBIENTS = [
-  { id: 'none', label: 'None', icon: '◦' },
-  { id: 'fireflies', label: 'Fireflies', icon: '✨' },
-  { id: 'stars', label: 'Stars', icon: '🌌' },
-  { id: 'petals', label: 'Petals', icon: '🌸' },
-  { id: 'snow', label: 'Snow', icon: '❄️' },
-  { id: 'embers', label: 'Embers', icon: '🔥' },
-  { id: 'rain', label: 'Rain', icon: '🌧️' },
-  { id: 'motes', label: 'Motes', icon: '🌫️' },
-  { id: 'mist', label: 'Mist', icon: '⛰️' },
-  { id: 'plum', label: 'Plum', icon: '🌺' }
+  { id: 'none', label: 'None', icon: 'ban' },
+  { id: 'fireflies', label: 'Fireflies', icon: 'sparkles' },
+  { id: 'stars', label: 'Stars', icon: 'star' },
+  { id: 'petals', label: 'Petals', icon: 'flower' },
+  { id: 'snow', label: 'Snow', icon: 'snowflake' },
+  { id: 'embers', label: 'Embers', icon: 'flame' },
+  { id: 'rain', label: 'Rain', icon: 'cloud-rain' },
+  { id: 'motes', label: 'Motes', icon: 'sparkle' },
+  { id: 'mist', label: 'Mist', icon: 'cloud-fog' },
+  { id: 'plum', label: 'Plum', icon: 'flower-2' }
 ]
 
 // One-click looks. (Colours are the looks' own pigments, like the shader palettes.)
 const LOOKS = [
   {
     id: 'clean',
-    icon: '📄',
+    icon: 'file',
     label: 'Clean',
     color: '#8a93a6',
     hint: 'Flat lines, no atmosphere',
@@ -320,7 +321,7 @@ const LOOKS = [
   },
   {
     id: 'bloodline',
-    icon: '🩸',
+    icon: 'droplet',
     label: 'Bloodline',
     color: '#d0303f',
     hint: 'Blood pulsing down every life, embers drifting',
@@ -335,7 +336,7 @@ const LOOKS = [
   },
   {
     id: 'tides',
-    icon: '🌊',
+    icon: 'waves',
     label: 'Tides',
     color: '#1d7fc0',
     hint: 'Rivers of time under a drifting mist',
@@ -343,7 +344,7 @@ const LOOKS = [
   },
   {
     id: 'cosmos',
-    icon: '🌌',
+    icon: 'orbit',
     label: 'Cosmos',
     color: '#7a6cf5',
     hint: 'Starlit lives in a twinkling night',
@@ -357,7 +358,7 @@ const LOOKS = [
   },
   {
     id: 'neon',
-    icon: '🌃',
+    icon: 'building-2',
     label: 'Neon city',
     color: '#26c6da',
     hint: 'Data streams, rain and hard lines',
@@ -372,7 +373,7 @@ const LOOKS = [
   },
   {
     id: 'gilded',
-    icon: '👑',
+    icon: 'crown',
     label: 'Gilded',
     color: '#d4a640',
     hint: 'Gold-leaf dynasties, motes of light',
@@ -386,7 +387,7 @@ const LOOKS = [
   },
   {
     id: 'glasshouse',
-    icon: '🔮',
+    icon: 'gem',
     label: 'Glasshouse',
     color: '#8fb2ff',
     hint: 'Glass rods catching the light, soft snow',
@@ -394,7 +395,7 @@ const LOOKS = [
   },
   {
     id: 'sakura',
-    icon: '🌸',
+    icon: 'flower',
     label: 'Sakura',
     color: '#f06292',
     hint: 'Lit tubes under falling petals',
@@ -431,20 +432,26 @@ function applyLook(l) {
   justify-content: space-between;
 }
 .tsp-title {
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
   font-weight: 800;
   letter-spacing: 0.02em;
   color: var(--t1);
 }
 .tsp-reset {
+  display: inline-flex;
+  align-items: center;
+  height: var(--ctl-xs);
   border: 1px solid var(--border);
   background: transparent;
   color: var(--t3);
   border-radius: var(--r-pill);
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 650;
-  padding: 2px 9px;
+  padding: 0 10px;
   cursor: pointer;
 }
 .tsp-reset:hover {
@@ -496,7 +503,7 @@ function applyLook(l) {
     0 6px 18px color-mix(in srgb, var(--lc) 35%, transparent);
 }
 .tsp-look-ic {
-  font-size: 16px;
+  color: var(--lc);
   filter: drop-shadow(0 0 6px color-mix(in srgb, var(--lc) 70%, transparent));
 }
 .tsp-look.on .tsp-look-ic {
@@ -508,7 +515,7 @@ function applyLook(l) {
   }
 }
 .tsp-look-name {
-  font-size: 9.5px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -539,8 +546,15 @@ function applyLook(l) {
   transform: translateX(-10px);
 }
 
+.tsp-note .ui-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
 .tsp-note {
-  font-size: 10.5px;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11.5px;
   color: var(--t2);
   line-height: 1.4;
   padding: 7px 9px;
@@ -587,13 +601,13 @@ function applyLook(l) {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 650;
   white-space: nowrap;
   overflow: hidden;
 }
 .tsp-tile-ic {
-  font-size: 11px;
+  flex-shrink: 0;
 }
 
 .tsp-row {
@@ -607,7 +621,7 @@ function applyLook(l) {
 }
 .tsp-row > label {
   flex: 0 0 78px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t2);
 }
@@ -619,7 +633,7 @@ function applyLook(l) {
 .tsp-val {
   flex: 0 0 38px;
   text-align: right;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--t3);
   font-variant-numeric: tabular-nums;
@@ -632,7 +646,7 @@ function applyLook(l) {
   flex: 1;
   padding-left: 4px;
   padding-right: 4px;
-  font-size: 10.5px;
+  font-size: 11.5px;
 }
 
 .tsp-chips {
@@ -643,14 +657,15 @@ function applyLook(l) {
 .tsp-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 9px;
+  gap: 5px;
+  height: var(--ctl-sm);
+  padding: 0 10px;
   border-radius: var(--r-pill);
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   animation: cp-row-in 0.4s var(--ease-out) backwards;

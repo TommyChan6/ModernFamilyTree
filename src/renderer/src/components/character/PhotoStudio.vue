@@ -17,10 +17,12 @@
       <div class="ps-controls">
         <div class="ps-seg">
           <button :class="{ on: framing === 'portrait' }" @click="framing = 'portrait'">
-            🙂 {{ t('character.photo.portrait') }}
+            <UiIcon name="user-round" :size="14" />
+            {{ t('character.photo.portrait') }}
           </button>
           <button :class="{ on: framing === 'full' }" @click="framing = 'full'">
-            🧍 {{ t('character.photo.full') }}
+            <UiIcon name="person-standing" :size="14" />
+            {{ t('character.photo.full') }}
           </button>
         </div>
         <div class="ps-backdrops">
@@ -30,17 +32,20 @@
             class="ps-bd"
             :class="{ on: backdrop === b.id }"
             :title="t('character.backdrops.' + b.id)"
+            :aria-label="t('character.backdrops.' + b.id)"
             @click="backdrop = b.id"
           >
-            {{ b.icon }}
+            <UiIcon :name="b.icon" :size="18" />
           </button>
         </div>
         <div class="ps-actions">
           <button class="btn btn-primary btn-sm" @click="download">
-            ⬇ {{ t('character.photo.download') }}
+            <UiIcon name="download" :size="14" />
+            {{ t('character.photo.download') }}
           </button>
           <button class="btn btn-sm" :disabled="busy" @click="framedPortrait">
-            🖼 {{ t('character.photo.setFramed') }}
+            <UiIcon name="image" :size="14" />
+            {{ t('character.photo.setFramed') }}
           </button>
           <button class="btn btn-ghost btn-sm" @click="$emit('close')">
             {{ t('character.photo.close') }}
@@ -56,6 +61,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from '../../i18n'
 import { paintCard } from './render/card'
 import { BACKDROPS } from './render/backdrops'
+import UiIcon from '../ui/UiIcon.js'
 
 // Photo mode: the look as a collectible character card (gacha-reveal
 // entrance, pointer-driven 3D tilt with a holographic sheen). Download the
@@ -269,13 +275,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 .ps-seg button {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--ctl-sm);
   border: none;
   background: transparent;
   color: rgba(255, 255, 255, 0.75);
-  padding: 7px 12px;
+  padding: 0 12px;
   border-radius: 999px;
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -292,12 +303,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 }
 
 .ps-bd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 36px;
   height: 36px;
+  padding: 0;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.06);
-  font-size: 16px;
+  color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
   transition:
     transform 0.15s,
@@ -311,6 +326,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 .ps-bd.on {
   border-color: var(--accent);
   background: var(--adim);
+  color: #fff;
 }
 
 .ps-actions {

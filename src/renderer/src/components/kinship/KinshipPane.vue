@@ -8,14 +8,14 @@
                   founders, couples who share blood, family islands. -->
   <div class="kp canvas-pane" @pointerdown.stop @wheel.stop>
     <div class="kp-head">
-      <span class="kp-title"><span class="kp-title-ic">🧬</span>Kinship</span>
+      <span class="kp-title"><UiIcon class="kp-title-ic" name="dna" :size="14" />Kinship</span>
       <KinLangPicker />
       <button
         class="kp-quiz"
         title="Kinship quiz — how well do you know this family?"
         @click="$emit('quiz')"
       >
-        🎲 Quiz
+        <UiIcon name="dices" :size="14" />Quiz
       </button>
     </div>
 
@@ -30,7 +30,7 @@
         :aria-selected="tab === t.id"
         @click="tab = t.id"
       >
-        {{ t.label }}
+        <UiIcon :name="t.icon" :size="14" />{{ t.label }}
       </button>
     </div>
 
@@ -54,7 +54,7 @@
         :title="`Use ${personName(selectedId)}`"
         @click="$emit('update:anchorId', selectedId)"
       >
-        ⤓ Use {{ firstName(selectedId) }}
+        <UiIcon name="user-check" :size="14" />Use {{ firstName(selectedId) }}
       </button>
     </div>
 
@@ -148,11 +148,19 @@
             title="Remove this step"
             @click="chain.splice(i, 1)"
           >
-            {{ tokenLabel(t, kinLang) }}<span class="kp-chain-x">×</span>
+            {{ tokenLabel(t, kinLang) }}<UiIcon class="kp-chain-x" name="x" :size="12" />
           </button>
         </TransitionGroup>
         <span v-if="!chain.length" class="kp-hint">Tap steps to build a chain…</span>
-        <button v-else class="kp-clear" title="Clear" @click="chain.splice(0)">⌫</button>
+        <button
+          v-else
+          class="kp-clear"
+          title="Clear the chain"
+          aria-label="Clear the chain"
+          @click="chain.splice(0)"
+        >
+          <UiIcon name="delete" :size="14" />
+        </button>
       </div>
       <div v-if="chain.length" class="kp-phrase">“{{ chainPhrase(chain, kinLang) }}”</div>
 
@@ -193,7 +201,7 @@
 
       <template v-if="insights.linchpins.length">
         <div class="kp-sub" title="Remove one of these people and the family splits apart">
-          🔗 Linchpins
+          <UiIcon name="link" :size="12" />Linchpins
         </div>
         <button
           v-for="(l, i) in insights.linchpins"
@@ -213,7 +221,7 @@
       </template>
 
       <template v-if="insights.founders.length">
-        <div class="kp-sub">👑 Dynasty founders</div>
+        <div class="kp-sub"><UiIcon name="crown" :size="12" />Dynasty founders</div>
         <button
           v-for="(f, i) in insights.founders"
           :key="f.id"
@@ -228,7 +236,9 @@
       </template>
 
       <template v-if="insights.tangled.length">
-        <div class="kp-sub" title="Couples who are also blood relatives">🌀 Tangled roots</div>
+        <div class="kp-sub" title="Couples who are also blood relatives">
+          <UiIcon name="git-merge" :size="12" />Tangled roots
+        </div>
         <button
           v-for="(t, i) in insights.tangled"
           :key="t.a + t.b"
@@ -237,13 +247,15 @@
           @click="$emit('trace-pair', [t.a, t.b])"
         >
           <span class="kp-row-dot"></span>
-          <span class="kp-row-name">{{ firstName(t.a) }} ⚭ {{ firstName(t.b) }}</span>
+          <span class="kp-row-name">{{ firstName(t.a) }} &amp; {{ firstName(t.b) }}</span>
           <span class="kp-row-rel">{{ (t.phi * 100).toFixed(t.phi < 0.01 ? 2 : 1) }}%</span>
         </button>
       </template>
 
       <template v-if="insights.islands.length > 1">
-        <div class="kp-sub" title="Groups with no connection to each other">🏝 Islands</div>
+        <div class="kp-sub" title="Groups with no connection to each other">
+          <UiIcon name="tree-palm" :size="12" />Islands
+        </div>
         <div class="kp-islands">
           <span
             v-for="(isl, i) in insights.islands.slice(0, 18)"
@@ -271,6 +283,7 @@ import { useKinship, kinClass, kinPalette } from './useKinship'
 import { walkChain, linchpins, founders, tangledCouples, islands } from './kinshipGraph'
 import { chainPhrase, tokenLabel } from './kinshipNames'
 import KinLangPicker from './KinLangPicker.vue'
+import UiIcon from '../ui/UiIcon.js'
 
 const props = defineProps({
   anchorId: { type: String, default: null },
@@ -296,9 +309,9 @@ const palette = computed(() => {
 })
 
 const TABS = [
-  { id: 'lens', label: '👁 Lens' },
-  { id: 'walk', label: '🧭 Walk' },
-  { id: 'insights', label: '✦ Insights' }
+  { id: 'lens', label: 'Lens', icon: 'eye' },
+  { id: 'walk', label: 'Walk', icon: 'footprints' },
+  { id: 'insights', label: 'Insights', icon: 'sparkle' }
 ]
 const tab = ref('lens')
 const tabIdx = computed(() => TABS.findIndex((t) => t.id === tab.value))
@@ -429,7 +442,7 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
   gap: 8px;
 }
 .kp-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.09em;
@@ -440,8 +453,6 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
   gap: 6px;
 }
 .kp-title-ic {
-  font-size: 13px;
-  display: inline-block;
   animation: kp-spin 6s ease-in-out infinite;
 }
 @keyframes kp-spin {
@@ -450,13 +461,17 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
   }
 }
 .kp-quiz {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--ctl-xs);
   border: 1px solid color-mix(in srgb, var(--kin-blood) 40%, transparent);
   background: color-mix(in srgb, var(--kin-blood) 14%, transparent);
   color: var(--t1);
   border-radius: var(--r-pill);
-  padding: 2px 9px;
+  padding: 0 10px 0 8px;
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
@@ -488,10 +503,14 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
 .kp-tab {
   position: relative;
   z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   border: none;
   background: transparent;
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--t3);
   padding: 5px 0;
@@ -516,7 +535,7 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
   place-items: center;
   background: var(--pc);
   color: #fff;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   box-shadow:
     0 0 0 2px var(--surface),
@@ -540,7 +559,7 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
   flex: 1;
 }
 .kp-anchor-k {
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   color: var(--t3);
   text-transform: uppercase;
@@ -555,20 +574,24 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
   text-overflow: ellipsis;
 }
 .kp-use {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--ctl-xs);
   border: 1px dashed var(--border-strong);
   background: transparent;
   color: var(--accent);
   border-radius: var(--r-pill);
-  padding: 3px 9px;
+  padding: 0 10px 0 8px;
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
   margin-left: auto;
 }
 .kp-hint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
 }
 
@@ -658,10 +681,10 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
   min-width: 0;
 }
 .kp-eye-text b {
-  font-size: 12px;
+  font-size: 12.5px;
 }
 .kp-eye-text small {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
 }
 
@@ -681,7 +704,7 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
   border-radius: var(--r-pill);
   padding: 2px 9px;
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 650;
   cursor: pointer;
   transition:
@@ -705,7 +728,7 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
   grid-template-columns: 10px 1fr auto 54px;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t2);
 }
 .kp-leg-dot {
@@ -735,7 +758,10 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
 }
 
 .kp-sub {
-  font-size: 9.5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-xs);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -757,7 +783,7 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
   background: transparent;
   color: var(--t1);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   cursor: pointer;
   text-align: left;
   transition:
@@ -784,7 +810,7 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
 }
 .kp-row-rel {
   margin-left: auto;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--kc);
   white-space: nowrap;
@@ -816,7 +842,7 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
   align-items: center;
 }
 .kp-walk-label {
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -829,7 +855,7 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
   border-radius: 8px;
   padding: 4px 2px;
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 650;
   cursor: pointer;
   white-space: nowrap;
@@ -867,7 +893,7 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -877,19 +903,28 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
   color: var(--t3);
 }
 .kp-chain-x {
-  opacity: 0.5;
-  font-size: 11px;
+  color: var(--t3);
 }
 .kp-clear {
   margin-left: auto;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: none;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--t3);
   cursor: pointer;
-  font-size: 12px;
+}
+.kp-clear:hover {
+  background: var(--hover);
+  color: var(--t1);
 }
 .kp-phrase {
-  font-size: 12px;
+  font-size: 12.5px;
   font-style: italic;
   color: var(--t2);
 }
@@ -936,7 +971,7 @@ const maxCut = computed(() => Math.max(1, ...insights.value.linchpins.map((l) =>
   font-variant-numeric: tabular-nums;
 }
 .kp-stat span {
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;

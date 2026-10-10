@@ -7002,7 +7002,7 @@ const OUTFIT_SWATCHES = [
 export const realisticPack: StylePack = {
   id: 'realistic',
   name: 'Realistic',
-  icon: '🎨',
+  icon: 'paintbrush',
   width: 320,
   height: 640,
   ink: '#2b201c',
@@ -7011,7 +7011,7 @@ export const realisticPack: StylePack = {
     // `layers` (straps, clasps, shoulder drapes) sit over the torso.
     {
       id: 'back',
-      icon: '🎒',
+      icon: 'backpack',
       socket: { x: 160, y: 172 },
       z: 35,
       backZ: 2,
@@ -7020,7 +7020,7 @@ export const realisticPack: StylePack = {
     },
     {
       id: 'head',
-      icon: '🙂',
+      icon: 'user-round',
       socket: { x: 160, y: 103 },
       z: 40,
       backZ: 26,
@@ -7028,7 +7028,7 @@ export const realisticPack: StylePack = {
     },
     {
       id: 'hair',
-      icon: '💇',
+      icon: 'waves',
       socket: { x: 160, y: 66 },
       z: 60,
       backZ: 4,
@@ -7036,21 +7036,21 @@ export const realisticPack: StylePack = {
     },
     {
       id: 'eyes',
-      icon: '👁',
+      icon: 'eye',
       socket: { x: 160, y: EYE_Y },
       z: 50,
       thumb: { cx: 160, cy: EYE_Y, span: 44 }
     },
     {
       id: 'brows',
-      icon: '🤨',
+      icon: 'spline',
       socket: { x: 160, y: 96 },
       z: 52,
       thumb: { cx: 160, cy: 99, span: 46 }
     },
     {
       id: 'nose',
-      icon: '👃',
+      icon: 'scan-face',
       socket: { x: 160, y: 112 },
       z: 45,
       optional: true,
@@ -7058,14 +7058,14 @@ export const realisticPack: StylePack = {
     },
     {
       id: 'mouth',
-      icon: '👄',
+      icon: 'smile',
       socket: { x: 160, y: MOUTH_Y },
       z: 51,
       thumb: { cx: 160, cy: 129, span: 34 }
     },
     {
       id: 'facialHair',
-      icon: '🧔',
+      icon: 'scissors',
       socket: { x: 160, y: 128 },
       z: 53,
       optional: true,
@@ -7073,7 +7073,7 @@ export const realisticPack: StylePack = {
     },
     {
       id: 'marks',
-      icon: '✨',
+      icon: 'sparkles',
       socket: { x: 160, y: 108 },
       z: 42,
       optional: true,
@@ -7081,28 +7081,28 @@ export const realisticPack: StylePack = {
     },
     {
       id: 'torso',
-      icon: '👕',
+      icon: 'shirt',
       socket: { x: 160, y: 220 },
       z: 30,
       thumb: { cx: 160, cy: 300, span: 330 }
     },
     {
       id: 'legs',
-      icon: '👖',
+      icon: 'person-standing',
       socket: { x: 160, y: 330 },
       z: 20,
       thumb: { cx: 160, cy: 455, span: 330 }
     },
     {
       id: 'feet',
-      icon: '👟',
+      icon: 'footprints',
       socket: { x: 160, y: 610 },
       z: 22,
       thumb: { cx: 160, cy: 598, span: 96 }
     },
     {
       id: 'headwear',
-      icon: '🎩',
+      icon: 'crown',
       socket: { x: 160, y: 66 },
       z: 70,
       optional: true,
@@ -7110,7 +7110,7 @@ export const realisticPack: StylePack = {
     },
     {
       id: 'accessory',
-      icon: '👓',
+      icon: 'glasses',
       socket: { x: 160, y: EYE_Y },
       z: 65,
       optional: true,

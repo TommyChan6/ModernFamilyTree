@@ -1,8 +1,19 @@
 <template>
   <div class="mn-backdrop" :class="{ hero: first }" @pointerdown.self="!first && emit('close')">
     <div class="mn" @keydown.stop>
-      <button v-if="!first" class="mn-x" @click="emit('close')">✕</button>
-      <div class="mn-kicker">🗺 {{ first ? t('map.new.kickerFirst') : t('map.new.kicker') }}</div>
+      <button
+        v-if="!first"
+        class="mn-x"
+        :title="t('map.inspector.close')"
+        :aria-label="t('map.inspector.close')"
+        @click="emit('close')"
+      >
+        <UiIcon name="x" :size="18" />
+      </button>
+      <div class="mn-kicker">
+        <UiIcon name="map" :size="14" />
+        {{ first ? t('map.new.kickerFirst') : t('map.new.kicker') }}
+      </div>
       <h2 class="mn-title">{{ first ? t('map.new.titleFirst') : t('map.new.title') }}</h2>
       <p class="mn-sub">{{ t('map.new.sub') }}</p>
 
@@ -16,7 +27,7 @@
           :style="{ '--i': i }"
           @click="start = s.id"
         >
-          <span class="mn-start-icon">{{ s.icon }}</span>
+          <UiIcon class="mn-start-icon" :name="s.icon" :size="22" />
           <span class="mn-start-name">{{ t('map.new.starts.' + s.id) }}</span>
           <span class="mn-start-blurb">{{ t('map.new.startsBlurb.' + s.id) }}</span>
         </button>
@@ -38,7 +49,8 @@
           </button>
         </div>
         <button v-if="start === 'generate'" class="mn-reroll" @click="reroll">
-          🎲 {{ t('map.new.reroll') }}
+          <UiIcon name="dices" :size="14" />
+          {{ t('map.new.reroll') }}
         </button>
       </div>
 
@@ -59,7 +71,10 @@
             :height="thumbH"
             :theme="theme"
           />
-          <span class="mn-style-name">{{ st.icon }} {{ t('map.styles.' + st.id) }}</span>
+          <span class="mn-style-name">
+            <UiIcon :name="st.icon" :size="14" />
+            {{ t('map.styles.' + st.id) }}
+          </span>
           <span class="mn-style-blurb">{{ t('map.stylesBlurb.' + st.id) }}</span>
         </button>
       </div>
@@ -72,7 +87,10 @@
           maxlength="80"
           @keydown.enter="create"
         />
-        <button class="btn btn-primary mn-go" @click="create">✨ {{ t('map.new.create') }}</button>
+        <button class="btn btn-primary mn-go" @click="create">
+          <UiIcon name="sparkles" :size="16" />
+          {{ t('map.new.create') }}
+        </button>
       </div>
     </div>
   </div>
@@ -82,6 +100,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from '../../i18n'
 import MapStyleThumb from './MapStyleThumb.vue'
+import UiIcon from '../ui/UiIcon.js'
 import { MAP_STYLE_LIST, styleOf } from './mapStyles'
 import { generateWorld } from './mapGen'
 
@@ -96,9 +115,9 @@ const emit = defineEmits(['create', 'close'])
 const { t } = useI18n()
 
 const STARTS = [
-  { id: 'generate', icon: '🎲' },
-  { id: 'ocean', icon: '🌊' },
-  { id: 'land', icon: '🌾' }
+  { id: 'generate', icon: 'dices' },
+  { id: 'ocean', icon: 'waves' },
+  { id: 'land', icon: 'wheat' }
 ]
 const SHAPES = [
   { id: 'landscape', w: 2400, h: 1600 },
@@ -213,8 +232,12 @@ function create() {
   position: absolute;
   top: 14px;
   right: 14px;
-  width: 30px;
-  height: 30px;
+  width: var(--ctl-md);
+  height: var(--ctl-md);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 8px;
   background: transparent;
@@ -226,7 +249,10 @@ function create() {
   color: var(--t1);
 }
 .mn-kicker {
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
   letter-spacing: 1.6px;
   text-transform: uppercase;
   font-weight: 700;
@@ -246,7 +272,7 @@ function create() {
 }
 .mn-step {
   margin: 18px 0 8px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 1.2px;
   text-transform: uppercase;
@@ -297,16 +323,25 @@ function create() {
     0 8px 24px rgba(0, 0, 0, 0.25);
 }
 .mn-start-icon {
-  font-size: 22px;
+  color: var(--t2);
+  margin-bottom: 2px;
+}
+.mn-start.on .mn-start-icon {
+  color: var(--accent);
 }
 .mn-start-name,
 .mn-style-name {
   font-weight: 700;
   font-size: 13.5px;
 }
+.mn-style-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .mn-start-blurb,
 .mn-style-blurb {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
   line-height: 1.4;
 }
@@ -324,16 +359,17 @@ function create() {
   flex-wrap: wrap;
 }
 .mn-shape {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 5px 10px;
+  height: var(--ctl-sm);
+  padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   cursor: pointer;
 }
 .mn-shape.on {
@@ -347,13 +383,18 @@ function create() {
   border-radius: 2px;
 }
 .mn-reroll {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ctl-sm);
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--t1);
   border-radius: 999px;
-  padding: 5px 12px;
+  padding: 0 12px;
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   cursor: pointer;
   transition: transform 0.3s;
 }
@@ -394,6 +435,7 @@ function create() {
   border-color: var(--accent);
 }
 .mn-go {
+  gap: 6px;
   padding: 10px 22px;
   font-size: 14px;
   font-weight: 700;

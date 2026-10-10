@@ -187,7 +187,7 @@ export const PRESETS_3D: Preset3D[] = [
   {
     id: 'young-woman',
     label: 'Young woman',
-    icon: '👩',
+    icon: 'venus',
     apply: (m) => {
       Object.assign(m.body, {
         gender: 0.05,
@@ -211,7 +211,7 @@ export const PRESETS_3D: Preset3D[] = [
   {
     id: 'young-man',
     label: 'Young man',
-    icon: '👨',
+    icon: 'mars',
     apply: (m) => {
       Object.assign(m.body, { gender: 0.95, age: 27, muscle: 0.6, weight: 0.5, height: 0.6 })
       Object.assign(m.hair, { style: 'side-part', length: 0.5, fringe: 'none' })
@@ -223,7 +223,7 @@ export const PRESETS_3D: Preset3D[] = [
   {
     id: 'elder',
     label: 'Grandparent',
-    icon: '🧓',
+    icon: 'hourglass',
     apply: (m) => {
       Object.assign(m.body, { age: 76, muscle: 0.35, weight: 0.58, height: 0.4 })
       Object.assign(m.hair, { grey: 0.9, color: '#cfcac2', volume: 0.35 })
@@ -240,7 +240,7 @@ export const PRESETS_3D: Preset3D[] = [
   {
     id: 'child',
     label: 'Child',
-    icon: '🧒',
+    icon: 'baby',
     apply: (m) => {
       Object.assign(m.body, { age: 11, muscle: 0.4, weight: 0.45, height: 0.45 })
       Object.assign(m.makeup, { lips: 0, mascara: 0, blush: 0, shadow: 0, liner: 0 })
@@ -253,7 +253,7 @@ export const PRESETS_3D: Preset3D[] = [
   {
     id: 'athlete',
     label: 'Athlete',
-    icon: '🏃',
+    icon: 'medal',
     apply: (m) => {
       Object.assign(m.body, {
         age: 26,
@@ -273,7 +273,7 @@ export const PRESETS_3D: Preset3D[] = [
   {
     id: 'scholar',
     label: 'Scholar',
-    icon: '🧑‍🏫',
+    icon: 'graduation-cap',
     apply: (m) => {
       Object.assign(m.body, { age: 45, muscle: 0.35, weight: 0.55 })
       Object.assign(m.outfit, {
@@ -289,7 +289,7 @@ export const PRESETS_3D: Preset3D[] = [
   {
     id: 'royal',
     label: 'Royalty',
-    icon: '👑',
+    icon: 'crown',
     apply: (m) => {
       Object.assign(m.outfit, {
         top: m.body.gender > 0.5 ? 'robe' : 'gown',
@@ -306,7 +306,7 @@ export const PRESETS_3D: Preset3D[] = [
   {
     id: 'knight',
     label: 'Knight',
-    icon: '🛡',
+    icon: 'shield',
     apply: (m) => {
       Object.assign(m.body, { muscle: 0.85 })
       Object.assign(m.outfit, {

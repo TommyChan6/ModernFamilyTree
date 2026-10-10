@@ -102,7 +102,9 @@
                       class="ps-slip"
                       :style="{ '--tc': tag.color || 'var(--ps-cinnabar)' }"
                     >
-                      <i class="ps-slip-dot"></i>{{ tag.icon ? tag.icon + ' ' : '' }}{{ tag.label }}
+                      <i class="ps-slip-dot"></i>
+                      <UiIcon v-if="tag.icon" :name="tag.icon" :size="14" />
+                      {{ tag.label }}
                     </span>
                   </div>
                 </div>
@@ -260,8 +262,8 @@
                       :style="{ '--d': t.d + 's' }"
                     >
                       <div class="ps-trait-k">
-                        <span v-if="t.icon" class="ps-trait-icon">{{ t.icon }}</span
-                        >{{ t.label }}
+                        <UiIcon v-if="t.icon" class="ps-trait-icon" :name="t.icon" :size="14" />
+                        {{ t.label }}
                       </div>
                       <div v-if="t.kind === 'slider'" class="ps-slider">
                         <div class="ps-slider-track">
@@ -365,7 +367,8 @@
                   {{ person.name || 'them' }} in.
                 </div>
                 <button class="ps-blank-cta ps-ink" style="--d: 0.8s" @click="emit('edit')">
-                  ✎ Start editing
+                  <UiIcon name="pencil" :size="16" />
+                  Start editing
                 </button>
               </section>
 
@@ -416,6 +419,7 @@ import {
 } from './scrollModel'
 import { fmtDate } from './profileFormat'
 import ScrollFamilySketch from './ScrollFamilySketch.vue'
+import UiIcon from '../ui/UiIcon.js'
 import KinshipSection from '../kinship/KinshipSection.vue'
 import KinLangPicker from '../kinship/KinLangPicker.vue'
 
@@ -1778,7 +1782,7 @@ watch(vertical, () => nextTick(scheduleLand))
   align-items: flex-end;
   padding-bottom: 6px;
   font-family: var(--font-ink-serif);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -1910,15 +1914,14 @@ watch(vertical, () => nextTick(scheduleLand))
   align-items: center;
   gap: 6px;
   font-family: var(--font-ink-serif);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ps-ink-soft);
 }
 .ps-trait-icon {
-  font-size: 13px;
-  letter-spacing: 0;
+  flex-shrink: 0;
 }
 .ps-trait-v {
   display: flex;
@@ -1985,7 +1988,7 @@ watch(vertical, () => nextTick(scheduleLand))
   margin-top: 4px;
   font-family: var(--font-ink-serif);
   font-style: italic;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--ps-ink-soft);
 }
 
@@ -2045,7 +2048,7 @@ watch(vertical, () => nextTick(scheduleLand))
   grid-column: 3;
   font-family: var(--font-ink-serif);
   font-style: italic;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--ps-ink-soft);
 }
 
@@ -2192,6 +2195,9 @@ watch(vertical, () => nextTick(scheduleLand))
   max-width: 340px;
 }
 .ps-blank-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 8px;
   padding: 8px 20px 9px;
   border: none;
@@ -2239,7 +2245,7 @@ watch(vertical, () => nextTick(scheduleLand))
 .ps-stat-k {
   margin-top: 4px;
   font-family: var(--font-ink-serif);
-  font-size: 11.5px;
+  font-size: 12.5px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ps-ink-soft);

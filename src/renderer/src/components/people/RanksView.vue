@@ -24,7 +24,7 @@
           :title="m.blurb"
           @click="setMetric(m.id)"
         >
-          <span class="rk-pill-ic">{{ m.icon }}</span>
+          <UiIcon class="rk-pill-ic" :name="m.icon" :size="14" />
           <span class="rk-pill-lb">{{ m.label }}</span>
         </button>
       </div>
@@ -45,7 +45,7 @@
     </header>
 
     <div v-if="!persons.length" class="rk-empty">
-      <div class="rk-empty-icon">🏆</div>
+      <div class="rk-empty-icon"><UiIcon name="trophy" :size="44" :stroke="1.5" /></div>
       <div class="rk-empty-title">No contenders</div>
       <div class="rk-empty-text">No people match — clear the search or add someone.</div>
     </div>
@@ -82,13 +82,27 @@
                       <circle cx="2.5" cy="8" r="2.1" class="rk-crown-gem" />
                       <circle cx="41.5" cy="8" r="2.1" class="rk-crown-gem" />
                     </svg>
-                    <span v-for="k in 5" :key="k" class="rk-spark" :class="'sp' + k">✦</span>
+                    <UiIcon
+                      v-for="k in 5"
+                      :key="k"
+                      class="rk-spark"
+                      :class="'sp' + k"
+                      name="sparkle"
+                      :size="12"
+                    />
                   </div>
                   <div class="rk-portrait" :style="{ '--gc': s.color }">
                     <RankArt :person="s.p" :size="256" />
                   </div>
                   <div class="rk-fig-name">
-                    {{ s.p.name || 'Unnamed' }}<span v-if="s.dead" class="rk-moon"> ☾</span>
+                    {{ s.p.name || 'Unnamed'
+                    }}<UiIcon
+                      v-if="s.dead"
+                      class="rk-moon"
+                      name="moon"
+                      :size="12"
+                      label="Deceased"
+                    />
                   </div>
                   <div class="rk-fig-val">
                     <b>{{ fmt(s.val) }}</b> {{ unitFor(metric, s.e.value) }}
@@ -116,7 +130,10 @@
       <div class="rk-cols" aria-hidden="true">
         <span class="rk-col-rank">#</span>
         <span class="rk-col-name">Name</span>
-        <span class="rk-col-bar">{{ metric.icon }} {{ metric.label }}</span>
+        <span class="rk-col-bar">
+          <UiIcon :name="metric.icon" :size="12" :stroke="2.4" />
+          {{ metric.label }}
+        </span>
       </div>
       <div ref="boardEl" class="rk-board" :style="{ height: boardH + 'px' }">
         <div
@@ -151,8 +168,9 @@
             </span>
             <span class="rk-id">
               <span class="rk-name"
-                >{{ r.p.name || 'Unnamed' }}<span v-if="r.dead" class="rk-moon"> ☾</span></span
-              >
+                >{{ r.p.name || 'Unnamed'
+                }}<UiIcon v-if="r.dead" class="rk-moon" name="moon" :size="12" label="Deceased"
+              /></span>
               <span class="rk-sub">{{ r.sub }}</span>
             </span>
             <span class="rk-track">
@@ -172,17 +190,20 @@
                 :key="t.id || t.label"
                 class="rk-tag"
                 :style="{ '--tc': t.color || 'var(--accent)' }"
-                >{{ t.icon ? t.icon + ' ' : '' }}{{ t.label }}</span
               >
+                <UiIcon v-if="t.icon" :name="t.icon" :size="11" />
+                {{ t.label }}
+              </span>
             </span>
             <span class="rk-delta-slot">
-              <span
-                v-if="deltaOn && r.delta"
-                :key="raceId"
-                class="rk-delta"
-                :class="r.delta.kind"
-                >{{ r.delta.text }}</span
-              >
+              <span v-if="deltaOn && r.delta" :key="raceId" class="rk-delta" :class="r.delta.kind">
+                <UiIcon
+                  v-if="r.delta.kind !== 'new'"
+                  :name="r.delta.kind === 'up' ? 'arrow-up' : 'arrow-down'"
+                  :size="11"
+                  :stroke="3"
+                />{{ r.delta.text }}
+              </span>
             </span>
           </div>
         </div>
@@ -195,6 +216,7 @@
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick, h } from 'vue'
 import { useMainStore } from '../../store/index.js'
 import { isDeceased } from './peopleLayout.js'
+import UiIcon from '../ui/UiIcon.js'
 import { useThumbnail } from './useThumbnail.js'
 import {
   METRICS,
@@ -539,7 +561,7 @@ const rows = computed(() => {
       if (from == null) delta = { kind: 'new', text: 'NEW' }
       else if (from !== e.rank) {
         const d = from - e.rank
-        delta = d > 0 ? { kind: 'up', text: '▲' + d } : { kind: 'down', text: '▼' + -d }
+        delta = d > 0 ? { kind: 'up', text: String(d) } : { kind: 'down', text: String(-d) }
       }
     }
 
@@ -760,7 +782,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
@@ -773,7 +795,6 @@ onBeforeUnmount(() => {
   color: var(--t1);
 }
 .rk-pill-ic {
-  font-size: 13px;
   transition: transform 0.3s var(--ease-spring);
 }
 .rk-pill.on .rk-pill-ic {
@@ -792,7 +813,7 @@ onBeforeUnmount(() => {
   gap: 6px 12px;
   min-width: 0;
   color: var(--t3);
-  font-size: 11.5px;
+  font-size: 12.5px;
 }
 .rk-blurb {
   color: var(--t2);
@@ -992,7 +1013,7 @@ onBeforeUnmount(() => {
   max-width: 100%;
   margin-top: 8px;
   padding: 0 4px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 800;
   color: var(--t1);
   letter-spacing: -0.2px;
@@ -1004,7 +1025,7 @@ onBeforeUnmount(() => {
   font-size: 14px;
 }
 .rk-fig-val {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t2);
   font-variant-numeric: tabular-nums;
@@ -1148,9 +1169,8 @@ onBeforeUnmount(() => {
 }
 .rk-spark {
   position: absolute;
-  font-size: 11px;
   color: var(--gold);
-  text-shadow: 0 0 8px color-mix(in srgb, var(--gold) 80%, transparent);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--gold) 80%, transparent));
   animation: rk-twinkle 1.9s ease-in-out infinite;
   pointer-events: none;
 }
@@ -1167,19 +1187,19 @@ onBeforeUnmount(() => {
 .rk-spark.sp3 {
   left: -14px;
   top: -18px;
-  font-size: 8px;
+  font-size: 9px;
   animation-delay: 0.9s;
 }
 .rk-spark.sp4 {
   left: 48px;
   top: 32px;
-  font-size: 9px;
+  font-size: 10px;
   animation-delay: 1.3s;
 }
 .rk-spark.sp5 {
   left: 20px;
   top: -26px;
-  font-size: 10px;
+  font-size: 11px;
   animation-delay: 0.25s;
 }
 @keyframes rk-twinkle {
@@ -1272,7 +1292,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 12px;
   padding: 6px 14px 8px 10px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.9px;
   text-transform: uppercase;
@@ -1290,8 +1310,11 @@ onBeforeUnmount(() => {
 }
 .rk-col-bar {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 .rk-narrow .rk-col-name {
   width: 180px;
@@ -1308,7 +1331,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 800;
   letter-spacing: 0.9px;
   text-transform: uppercase;
@@ -1425,10 +1448,10 @@ onBeforeUnmount(() => {
   box-shadow: 0 3px 10px -3px color-mix(in srgb, var(--mc) 70%, transparent);
 }
 .rk-rank.long {
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .rk-rank.xlong {
-  font-size: 10.5px;
+  font-size: 11.5px;
   letter-spacing: -0.3px;
 }
 .rk-row.unr .rk-rank {
@@ -1467,7 +1490,7 @@ onBeforeUnmount(() => {
   filter: grayscale(0.45) sepia(0.1);
 }
 .ranks :deep(.rk-mono) {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 800;
   color: var(--t1);
 }
@@ -1493,11 +1516,11 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
 }
 .rk-moon {
+  margin-left: 4px;
   color: var(--t3);
-  font-weight: 600;
 }
 .rk-sub {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 500;
   color: var(--t3);
   white-space: nowrap;
@@ -1592,7 +1615,7 @@ onBeforeUnmount(() => {
   top: 50%;
   transform: translate(9px, -50%);
   white-space: nowrap;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--t3);
   font-variant-numeric: tabular-nums;
@@ -1630,13 +1653,16 @@ onBeforeUnmount(() => {
 }
 .rk-tag {
   flex-shrink: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   min-width: 0;
   padding: 2px 9px;
   border-radius: 12px;
   border: 1px solid color-mix(in srgb, var(--tc) 45%, transparent);
   background: color-mix(in srgb, var(--tc) 14%, transparent);
   color: var(--t1);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -1653,9 +1679,12 @@ onBeforeUnmount(() => {
   width: 30px;
 }
 .rk-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   padding: 2px 6px;
   border-radius: 8px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1706,8 +1735,8 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 .rk-empty-icon {
-  font-size: 44px;
-  opacity: 0.6;
+  display: flex;
+  color: var(--t3);
 }
 .rk-empty-title {
   font-size: 16px;

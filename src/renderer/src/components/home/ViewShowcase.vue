@@ -12,7 +12,7 @@
         :aria-selected="active === view.id"
         @click="pick(view.id)"
       >
-        <span class="tab-icon">{{ view.icon }}</span>
+        <UiIcon class="tab-icon" :name="view.icon" :size="16" />
         <span class="tab-name">{{ view.name }}</span>
         <span v-if="autoplay && active === view.id" :key="cycle" class="tab-progress"></span>
       </button>
@@ -33,7 +33,7 @@
               :class="'disc-' + gi"
               :style="discStyle(g)"
             >
-              <span class="disc-label">{{ g.label }}</span>
+              <span class="disc-label"><UiIcon :name="g.icon" :size="12" />{{ g.label }}</span>
             </div>
 
             <!-- Timeline year grid (timeline view only) -->
@@ -83,6 +83,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import UiIcon from '../ui/UiIcon.js'
 
 // ── One tiny family, five layouts ────────────────────────────────────────────
 // Positions live in a 100×60 design space; the stage keeps that aspect ratio,
@@ -133,9 +134,9 @@ const LINKS = [
 ]
 
 const GROUPS = [
-  { label: '🌾 The farm', x: 21, y: 34, r: 13.5 },
-  { label: '⚓ Seafarers', x: 52, y: 32, r: 14.5 },
-  { label: '🎻 Musicians', x: 81, y: 30, r: 11.5 }
+  { icon: 'wheat', label: 'The farm', x: 21, y: 34, r: 13.5 },
+  { icon: 'anchor', label: 'Seafarers', x: 52, y: 32, r: 14.5 },
+  { icon: 'music', label: 'Musicians', x: 81, y: 30, r: 11.5 }
 ]
 
 const YEARS = [1920, 1940, 1960, 1980, 2000]
@@ -144,35 +145,35 @@ const yearToX = (year) => 8 + ((year - 1915) / (2026 - 1915)) * 84
 const VIEWS = [
   {
     id: 'tree',
-    icon: '🕸',
+    icon: 'graph',
     name: 'Graph',
     title: 'The living graph',
     caption: 'a physics-driven web of everyone — drag someone and the whole family sways.'
   },
   {
     id: 'timeline',
-    icon: '⏳',
+    icon: 'timeline',
     name: 'Timeline',
     title: 'Lifelines',
     caption: 'every person becomes a lifespan — see who overlapped, who never met.'
   },
   {
     id: 'groups',
-    icon: '🫧',
+    icon: 'groups',
     name: 'Groups',
     title: 'Houses & clans',
     caption: 'tag people into groups and watch them gather into glowing constellations.'
   },
   {
     id: 'grid',
-    icon: '📇',
+    icon: 'directory',
     name: 'Directory',
     title: 'The directory',
     caption: 'a searchable card index of your whole cast — built to scroll thousands.'
   },
   {
     id: 'space',
-    icon: '🌌',
+    icon: 'orbit',
     name: '3D Space',
     title: 'Space mode',
     caption: 'the experimental lens — your dynasty floating in three dimensions.'
@@ -334,13 +335,14 @@ function yearStyle(year) {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 8px 15px;
+  height: var(--ctl-lg);
+  padding: 0 15px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   overflow: hidden;
@@ -361,10 +363,6 @@ function yearStyle(year) {
   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
   background: var(--adim);
   box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 22%, transparent);
-}
-
-.tab-icon {
-  font-size: 14px;
 }
 
 /* autoplay countdown sweeping along the bottom edge of the active tab */
@@ -490,7 +488,7 @@ function yearStyle(year) {
   background: var(--glass-strong);
   border: 1px solid var(--border);
   backdrop-filter: blur(8px);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 1.2px;
   text-transform: uppercase;
@@ -658,7 +656,7 @@ function yearStyle(year) {
 }
 
 .mode-timeline .dot-name {
-  font-size: 8.5px;
+  font-size: 9.5px;
   color: rgba(255, 255, 255, 0.92);
 }
 
@@ -746,6 +744,9 @@ function yearStyle(year) {
 }
 
 .disc-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   position: absolute;
   top: -12px;
   left: 50%;
@@ -754,7 +755,7 @@ function yearStyle(year) {
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 3px 11px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--t1);
   white-space: nowrap;
@@ -788,7 +789,7 @@ function yearStyle(year) {
   bottom: -2px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--t3);
 }
@@ -871,9 +872,6 @@ function yearStyle(year) {
 :root[data-theme='ink'] .tab {
   border-radius: 3px 5px 4px 6px / 5px 3px 6px 4px;
   font-family: var(--font-ink-label);
-}
-:root[data-theme='ink'] .tab-icon {
-  filter: grayscale(1) sepia(0.4);
 }
 :root[data-theme='ink'] .stage-frame {
   border-radius: 2px;

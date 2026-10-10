@@ -17,6 +17,7 @@ import { inkWriteSchedule, writeArrival, hexToRgb01, PAPER_RGB } from '../webgl/
 import { inkFontsReady, paperCanvas, INK } from '../../lib/inkArt'
 import { writeInkBuffers, drawInkBg, drawInkFg } from './TimelineInk.js'
 import { drawChronicleBg, drawChronicleFg, chronicleAt } from './chronicleDraw.js'
+import { drawIcon } from '../../lib/canvasIcon.js'
 
 const SEG = 16
 const TICK_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000, 2000, 5000]
@@ -762,11 +763,18 @@ export class TimelineRenderer {
         ctx.fill()
         ctx.stroke()
         ctx.setLineDash([])
-        ctx.fillStyle = m.estimated ? c.t3 : c.t1
+        // Icon + text centred in the pill as one unit.
+        const ink = m.estimated ? c.t3 : c.t1
         ctx.font = `700 ${10.5 * s}px ${font}`
-        ctx.textAlign = 'center'
+        const isz = 11 * s,
+          gap = 4 * s
+        const tw = ctx.measureText(m.badge).width
+        const left = cx - (isz + gap + tw) / 2
+        drawIcon(ctx, m.badgeIcon, left + isz / 2, midY, isz, { color: v.color, lineWidth: 2.3 })
+        ctx.fillStyle = ink
+        ctx.textAlign = 'left'
         ctx.textBaseline = 'middle'
-        ctx.fillText(m.badge, cx, midY + 0.5)
+        ctx.fillText(m.badge, left + isz + gap, midY + 0.5)
         ctx.globalAlpha = 1
         this._badgeRects.push({ x: cx - bw / 2, y: midY - bh / 2, w: bw, h: bh, id: m.id, m })
       }
@@ -801,13 +809,15 @@ export class TimelineRenderer {
         ctx.font = `700 12.5px ${font}`
         ctx.fillStyle = v.selected ? c.accent : c.t1
         const name = trunc(p.name, nameLen)
-        ctx.strokeText(name, x + 21, y0 - 1)
-        ctx.fillText(name, x + 21, y0 - 1)
+        // Beside the avatar: offset by its drawn radius (Style → Portraits).
+        const lx = x + 15 * (st.avatarSize ?? 1) * (a.s ?? 1) + 6
+        ctx.strokeText(name, lx, y0 - 1)
+        ctx.fillText(name, lx, y0 - 1)
         if (ls >= 0.55 && !compact) {
-          ctx.font = `600 10px ${font}`
+          ctx.font = `600 11px ${font}`
           ctx.fillStyle = c.t3
-          ctx.strokeText(p.yearsLabel, x + 21, y0 + 12)
-          ctx.fillText(p.yearsLabel, x + 21, y0 + 12)
+          ctx.strokeText(p.yearsLabel, lx, y0 + 12)
+          ctx.fillText(p.yearsLabel, lx, y0 + 12)
         }
         ctx.globalAlpha = 1
       }
@@ -845,7 +855,7 @@ export class TimelineRenderer {
       ctx.fillStyle = c.accent
       ctx.font = `700 10.5px ${font}`
       ctx.textAlign = 'center'
-      ctx.fillText(String(refYear), GUTTER / 2 + 1, nowY + 1)
+      ctx.fillText(String(refYear), 6 + (GUTTER - 14) / 2, nowY + 1)
     }
 
     // Time-travel year chip: a filled accent pill riding the curtain edge.
@@ -859,7 +869,7 @@ export class TimelineRenderer {
         ctx.fillStyle = '#fff'
         ctx.font = `800 10.5px ${font}`
         ctx.textAlign = 'center'
-        ctx.fillText(String(Math.floor(tYear)), GUTTER / 2 + 1, cy + 1)
+        ctx.fillText(String(Math.floor(tYear)), 6 + (GUTTER - 14) / 2, cy + 1)
       }
     }
 
@@ -885,7 +895,7 @@ export class TimelineRenderer {
       ctx.fillStyle = c.t1
       ctx.font = `700 10.5px ${font}`
       ctx.textAlign = 'center'
-      ctx.fillText(String(year), GUTTER / 2 + 1, this.mouseY + 1)
+      ctx.fillText(String(year), 6 + (GUTTER - 14) / 2, this.mouseY + 1)
     }
 
     // The chronicle: era rail + headers, event pills and participant rings.

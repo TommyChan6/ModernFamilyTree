@@ -14,7 +14,7 @@
 
         <header class="pp-topbar">
           <button class="pp-back" @click="close">
-            <span class="pp-back-arrow">←</span>
+            <UiIcon class="pp-back-arrow" name="arrow-left" :size="16" />
             {{ t('projectsPage.back') }}
           </button>
           <div class="pp-topbar-spacer"></div>
@@ -37,7 +37,7 @@
             <span class="pp-quota-label">{{ quota.used }}/{{ quota.max }}</span>
           </div>
           <button class="pp-new" @click="newProject">
-            <span class="pp-new-plus">＋</span>
+            <UiIcon class="pp-new-plus" name="plus" :size="16" :stroke="2.4" />
             {{ t('projectsPage.new') }}
           </button>
         </header>
@@ -63,16 +63,12 @@
 
             <!-- ── Toolbar: search / filters / sort / view ──────────────── -->
             <div class="pp-toolbar">
-              <div class="pp-search">
-                <span class="pp-search-icon">🔍</span>
-                <input
-                  v-model="query"
-                  class="pp-search-input"
-                  :placeholder="t('projectsPage.searchPh')"
-                  spellcheck="false"
-                />
-                <button v-if="query" class="pp-search-clear" @click="query = ''">×</button>
-              </div>
+              <SearchField
+                v-model="query"
+                class="pp-search"
+                size="sm"
+                :placeholder="t('projectsPage.searchPh')"
+              />
               <div class="pp-chips">
                 <button
                   v-for="f in FILTERS"
@@ -81,14 +77,14 @@
                   :class="{ active: filter === f.key }"
                   @click="filter = f.key"
                 >
-                  <span class="pp-chip-icon">{{ f.icon }}</span>
+                  <UiIcon class="pp-chip-icon" :name="f.icon" :size="14" />
                   {{ t('projectsPage.filters.' + f.key) }}
                   <span class="pp-chip-n">{{ countFor(f.key) }}</span>
                 </button>
               </div>
               <div class="pp-toolbar-right">
                 <label class="pp-sort">
-                  <span class="pp-sort-glyph">⇅</span>
+                  <UiIcon class="pp-sort-glyph" name="arrow-down-up" :size="16" />
                   <select v-model="sortBy" class="pp-sort-select">
                     <option v-for="s in SORTS" :key="s" :value="s">
                       {{ t('projectsPage.sort.' + s) }}
@@ -101,17 +97,19 @@
                     class="pp-viewbtn"
                     :class="{ on: layout === 'grid' }"
                     :title="t('projectsPage.view.grid')"
+                    :aria-label="t('projectsPage.view.grid')"
                     @click="layout = 'grid'"
                   >
-                    ▦
+                    <UiIcon name="layout-grid" :size="14" />
                   </button>
                   <button
                     class="pp-viewbtn"
                     :class="{ on: layout === 'list' }"
                     :title="t('projectsPage.view.list')"
+                    :aria-label="t('projectsPage.view.list')"
                     @click="layout = 'list'"
                   >
-                    ☰
+                    <UiIcon name="layout-list" :size="14" />
                   </button>
                 </div>
               </div>
@@ -170,9 +168,11 @@
                         class="pp-star-btn"
                         :class="{ on: p.favorite, bursting: burstId === p.id }"
                         :title="t('projectsPage.favorite')"
+                        :aria-label="t('projectsPage.favorite')"
+                        :aria-pressed="!!p.favorite"
                         @click.stop="toggleFavorite(p)"
                       >
-                        ★
+                        <UiIcon name="star" :size="16" />
                       </button>
                       <span v-if="renamingId !== p.id" class="pp-name">
                         {{ p.name }}
@@ -193,30 +193,33 @@
                       <button
                         class="pp-kebab"
                         :title="t('projectsPage.actions')"
+                        :aria-label="t('projectsPage.actions')"
                         @click.stop="toggleMenu(p.id)"
                       >
-                        ⋯
+                        <UiIcon name="ellipsis" :size="16" />
                       </button>
                       <Transition name="pp-menu">
                         <div v-if="menuId === p.id" class="pp-menu" @click.stop>
                           <button class="pp-menu-item" @click="menuOpen(p)">
-                            <span>↗</span>{{ t('projectsPage.menu.open') }}
+                            <UiIcon name="arrow-up-right" :size="14" />{{
+                              t('projectsPage.menu.open')
+                            }}
                           </button>
                           <button class="pp-menu-item" @click="menuRename(p)">
-                            <span>✎</span>{{ t('projectsPage.menu.rename') }}
+                            <UiIcon name="pencil" :size="14" />{{ t('projectsPage.menu.rename') }}
                           </button>
                           <button class="pp-menu-item" @click="openEdit(p)">
-                            <span>✨</span>{{ t('projectsPage.menu.edit') }}
+                            <UiIcon name="square-pen" :size="14" />{{ t('projectsPage.menu.edit') }}
                           </button>
                           <button class="pp-menu-item" @click="duplicate(p)">
-                            <span>⧉</span>{{ t('projectsPage.menu.duplicate') }}
+                            <UiIcon name="copy" :size="14" />{{ t('projectsPage.menu.duplicate') }}
                           </button>
                           <button
                             class="pp-menu-item danger"
                             :disabled="cards.length <= 1"
                             @click="menuDelete(p)"
                           >
-                            <span>🗑</span>{{ t('projectsPage.menu.delete') }}
+                            <UiIcon name="trash-2" :size="14" />{{ t('projectsPage.menu.delete') }}
                           </button>
                         </div>
                       </Transition>
@@ -227,9 +230,18 @@
                     </p>
 
                     <div class="pp-counts">
-                      <span :title="t('account.usage.people')">👥 {{ p.counts.persons }}</span>
-                      <span :title="t('rail.relationships')">🔗 {{ p.counts.relationships }}</span>
-                      <span :title="t('account.usage.photos')">🖼 {{ p.counts.images }}</span>
+                      <span :title="t('account.usage.people')">
+                        <UiIcon name="users" :size="14" />
+                        {{ p.counts.persons }}
+                      </span>
+                      <span :title="t('rail.relationships')">
+                        <UiIcon name="link" :size="14" />
+                        {{ p.counts.relationships }}
+                      </span>
+                      <span :title="t('account.usage.photos')">
+                        <UiIcon name="image" :size="14" />
+                        {{ p.counts.images }}
+                      </span>
                     </div>
 
                     <footer class="pp-card-foot">
@@ -241,7 +253,10 @@
                       >
                         <Transition name="visflip" mode="out-in">
                           <span :key="p.visibility || 'private'" class="pp-vis-face">
-                            {{ p.visibility === 'public' ? '🌍' : '🔒' }}
+                            <UiIcon
+                              :name="p.visibility === 'public' ? 'earth' : 'lock'"
+                              :size="12"
+                            />
                             {{ t('projectsPage.visibility.' + (p.visibility || 'private')) }}
                           </span>
                         </Transition>
@@ -249,13 +264,16 @@
                       <span class="pp-date">{{
                         t('projectsPage.updated', { date: fmtDate(p.updated_at) })
                       }}</span>
-                      <span class="pp-open">{{ t('projectsPage.open') }} →</span>
+                      <span class="pp-open">
+                        {{ t('projectsPage.open') }}
+                        <UiIcon name="arrow-right" :size="14" />
+                      </span>
                     </footer>
                   </div>
 
                   <!-- back (delete confirm) -->
                   <div class="pp-face pp-backface" @click.stop>
-                    <div class="pp-back-warn">⚠</div>
+                    <UiIcon class="pp-back-warn" name="triangle-alert" :size="26" />
                     <h3 class="pp-back-title">
                       {{ t('projectsPage.deleteTitle', { name: p.name }) }}
                     </h3>
@@ -293,7 +311,7 @@
               >
                 <span class="pp-portal">
                   <span class="pp-portal-ring"></span>
-                  <span class="pp-portal-plus">＋</span>
+                  <UiIcon class="pp-portal-plus" name="plus" :size="24" />
                 </span>
                 <span class="pp-new-label">{{ t('projectsPage.new') }}</span>
                 <span v-if="store.authUsage" class="pp-new-quota">
@@ -364,9 +382,18 @@
                     </span>
                   </div>
                   <div class="pp-counts pp-row-counts">
-                    <span>👥 {{ p.counts.persons }}</span>
-                    <span>🔗 {{ p.counts.relationships }}</span>
-                    <span>🖼 {{ p.counts.images }}</span>
+                    <span :title="t('account.usage.people')">
+                      <UiIcon name="users" :size="14" />
+                      {{ p.counts.persons }}
+                    </span>
+                    <span :title="t('rail.relationships')">
+                      <UiIcon name="link" :size="14" />
+                      {{ p.counts.relationships }}
+                    </span>
+                    <span :title="t('account.usage.photos')">
+                      <UiIcon name="image" :size="14" />
+                      {{ p.counts.images }}
+                    </span>
                   </div>
                   <button
                     class="pp-vis"
@@ -375,7 +402,7 @@
                   >
                     <Transition name="visflip" mode="out-in">
                       <span :key="p.visibility || 'private'" class="pp-vis-face">
-                        {{ p.visibility === 'public' ? '🌍' : '🔒' }}
+                        <UiIcon :name="p.visibility === 'public' ? 'earth' : 'lock'" :size="12" />
                         {{ t('projectsPage.visibility.' + (p.visibility || 'private')) }}
                       </span>
                     </Transition>
@@ -384,32 +411,44 @@
                   <button
                     class="pp-star-btn"
                     :class="{ on: p.favorite, bursting: burstId === p.id }"
+                    :title="t('projectsPage.favorite')"
+                    :aria-label="t('projectsPage.favorite')"
+                    :aria-pressed="!!p.favorite"
                     @click.stop="toggleFavorite(p)"
                   >
-                    ★
+                    <UiIcon name="star" :size="16" />
                   </button>
                   <div class="pp-row-kebabwrap">
-                    <button class="pp-kebab" @click.stop="toggleMenu(p.id)">⋯</button>
+                    <button
+                      class="pp-kebab"
+                      :title="t('projectsPage.actions')"
+                      :aria-label="t('projectsPage.actions')"
+                      @click.stop="toggleMenu(p.id)"
+                    >
+                      <UiIcon name="ellipsis" :size="16" />
+                    </button>
                     <Transition name="pp-menu">
                       <div v-if="menuId === p.id" class="pp-menu" @click.stop>
                         <button class="pp-menu-item" @click="menuOpen(p)">
-                          <span>↗</span>{{ t('projectsPage.menu.open') }}
+                          <UiIcon name="arrow-up-right" :size="14" />{{
+                            t('projectsPage.menu.open')
+                          }}
                         </button>
                         <button class="pp-menu-item" @click="menuRename(p)">
-                          <span>✎</span>{{ t('projectsPage.menu.rename') }}
+                          <UiIcon name="pencil" :size="14" />{{ t('projectsPage.menu.rename') }}
                         </button>
                         <button class="pp-menu-item" @click="openEdit(p)">
-                          <span>✨</span>{{ t('projectsPage.menu.edit') }}
+                          <UiIcon name="square-pen" :size="14" />{{ t('projectsPage.menu.edit') }}
                         </button>
                         <button class="pp-menu-item" @click="duplicate(p)">
-                          <span>⧉</span>{{ t('projectsPage.menu.duplicate') }}
+                          <UiIcon name="copy" :size="14" />{{ t('projectsPage.menu.duplicate') }}
                         </button>
                         <button
                           class="pp-menu-item danger"
                           :disabled="cards.length <= 1"
                           @click="menuDelete(p)"
                         >
-                          <span>🗑</span>{{ t('projectsPage.menu.delete') }}
+                          <UiIcon name="trash-2" :size="14" />{{ t('projectsPage.menu.delete') }}
                         </button>
                       </div>
                     </Transition>
@@ -417,7 +456,7 @@
                 </template>
                 <template v-else>
                   <div class="pp-row-confirm" @click.stop>
-                    <span class="pp-back-warn small">⚠</span>
+                    <UiIcon class="pp-back-warn small" name="triangle-alert" :size="18" />
                     <span class="pp-row-confirm-text">
                       {{
                         t('projectsPage.deleteBody', {
@@ -444,7 +483,7 @@
 
             <!-- ── Empty state ──────────────────────────────────────────── -->
             <div v-if="shown.length === 0" class="pp-empty">
-              <span class="pp-empty-scope">🔭</span>
+              <UiIcon class="pp-empty-scope" name="telescope" :size="44" :stroke="1.6" />
               <p class="pp-empty-title">{{ t('projectsPage.emptyTitle') }}</p>
               <p class="pp-empty-sub">{{ t('projectsPage.emptySub') }}</p>
             </div>
@@ -458,7 +497,10 @@
         <Transition name="pp-modal">
           <div v-if="editDraft" class="pp-modal-backdrop ink-veil" @click.self="editDraft = null">
             <div class="pp-modal ink-mount ink-unroll ink-rollers">
-              <h2 class="pp-modal-title">✨ {{ t('projectsPage.editTitle') }}</h2>
+              <h2 class="pp-modal-title">
+                <UiIcon name="square-pen" :size="18" />
+                {{ t('projectsPage.editTitle') }}
+              </h2>
 
               <label class="pp-label">{{ t('projectsPage.editName') }}</label>
               <input v-model="editDraft.name" class="pp-input" maxlength="60" />
@@ -500,14 +542,16 @@
                   :class="{ on: editDraft.visibility !== 'public' }"
                   @click="editDraft.visibility = 'private'"
                 >
-                  🔒 {{ t('projectsPage.visibility.private') }}
+                  <UiIcon name="lock" :size="14" />
+                  {{ t('projectsPage.visibility.private') }}
                 </button>
                 <button
                   class="pp-seg-btn"
                   :class="{ on: editDraft.visibility === 'public' }"
                   @click="editDraft.visibility = 'public'"
                 >
-                  🌍 {{ t('projectsPage.visibility.public') }}
+                  <UiIcon name="earth" :size="14" />
+                  {{ t('projectsPage.visibility.public') }}
                 </button>
               </div>
               <p class="pp-modal-note">{{ t('projectsPage.publicNote') }}</p>
@@ -524,7 +568,7 @@
                       :title="t('browse.modes.' + m + '.desc')"
                       @click="editDraft.access = m"
                     >
-                      <span class="pp-access-icon">{{ ACCESS_ICONS[m] }}</span>
+                      <UiIcon class="pp-access-icon" :name="ACCESS_ICONS[m]" :size="18" />
                       <span class="pp-access-name">{{ t('browse.modes.' + m + '.name') }}</span>
                       <span class="pp-access-short">{{ t('browse.modes.' + m + '.short') }}</span>
                     </button>
@@ -565,15 +609,17 @@ import { useI18n } from '../i18n'
 import { ACCESS_ICONS, ACCESS_MODES } from './browse/browseModel'
 import AdSlot from './billing/AdSlot.vue'
 import InkBackdrop from './ui/InkBackdrop.vue'
+import SearchField from './ui/SearchField.vue'
+import UiIcon from './ui/UiIcon.js'
 
 const store = useMainStore()
 const { t, locale } = useI18n()
 
 const FILTERS = [
-  { key: 'all', icon: '✦' },
-  { key: 'favorites', icon: '★' },
-  { key: 'public', icon: '🌍' },
-  { key: 'private', icon: '🔒' }
+  { key: 'all', icon: 'layers' },
+  { key: 'favorites', icon: 'star' },
+  { key: 'public', icon: 'earth' },
+  { key: 'private', icon: 'lock' }
 ]
 const SORTS = ['updated', 'nameAsc', 'nameDesc', 'people', 'newest', 'oldest']
 const HUES = [0, 30, 55, 90, 140, 175, 205, 230, 260, 290, 320, 345]
@@ -1230,9 +1276,10 @@ function fmtDate(s) {
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 7px 14px;
+  height: var(--ctl-md);
+  padding: 0 14px 0 11px;
   cursor: pointer;
   transition: all 0.18s ease;
 }
@@ -1244,7 +1291,7 @@ function fmtDate(s) {
 }
 
 .pp-back-arrow {
-  display: inline-block;
+  flex-shrink: 0;
   transition: transform 0.2s ease;
 }
 
@@ -1257,7 +1304,7 @@ function fmtDate(s) {
   align-items: center;
   gap: 7px;
   color: var(--t3);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -1295,12 +1342,13 @@ function fmtDate(s) {
   gap: 7px;
   border: none;
   border-radius: 999px;
-  background: linear-gradient(120deg, var(--accent), #8b6cc5);
-  color: #fff;
+  background: linear-gradient(120deg, var(--accent), var(--accent-2));
+  color: var(--on-accent);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
-  padding: 9px 18px;
+  height: var(--ctl-md);
+  padding: 0 18px 0 14px;
   cursor: pointer;
   overflow: hidden;
   box-shadow: 0 4px 18px rgba(var(--accent-rgb), 0.35);
@@ -1337,8 +1385,7 @@ function fmtDate(s) {
 }
 
 .pp-new-plus {
-  font-weight: 400;
-  line-height: 1;
+  flex-shrink: 0;
 }
 
 /* ── Scroll body ─────────────────────────────────────────────────────────── */
@@ -1430,7 +1477,7 @@ function fmtDate(s) {
 
 .pp-stat-label {
   color: var(--t3);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -1455,52 +1502,10 @@ function fmtDate(s) {
   animation: pp-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) 180ms both;
 }
 
-.pp-search {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--elevated);
-  padding: 0 10px;
-  min-width: 200px;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.pp-search:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--adim);
-}
-
-.pp-search-icon {
-  font-size: 12px;
-  opacity: 0.7;
-}
-
-.pp-search-input {
-  border: none;
-  background: transparent;
-  color: var(--t1);
-  font-family: var(--font);
-  font-size: 12.5px;
-  padding: 8px 0;
-  outline: none;
-  width: 160px;
-}
-
-.pp-search-clear {
-  border: none;
-  background: transparent;
-  color: var(--t3);
-  font-size: 14px;
-  cursor: pointer;
-  padding: 0 2px;
-}
-
-.pp-search-clear:hover {
-  color: var(--t1);
+/* every toolbar control shares one height (--ctl-md) */
+.pp-toolbar .pp-search {
+  --sf-h: var(--ctl-md);
+  width: 220px;
 }
 
 .pp-chips {
@@ -1518,9 +1523,10 @@ function fmtDate(s) {
   background: transparent;
   color: var(--t3);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
-  padding: 6px 12px;
+  height: var(--ctl-md);
+  padding: 0 12px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -1538,11 +1544,11 @@ function fmtDate(s) {
 }
 
 .pp-chip-icon {
-  font-size: 10.5px;
+  flex-shrink: 0;
 }
 
 .pp-chip-n {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   padding: 0 6px;
   border-radius: 999px;
@@ -1571,17 +1577,18 @@ function fmtDate(s) {
 }
 
 .pp-sort-glyph {
-  font-size: 12px;
+  flex-shrink: 0;
 }
 
 .pp-sort-select {
-  padding: 6px 8px;
+  height: var(--ctl-md);
+  padding: 0 8px;
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
   outline: none;
   cursor: pointer;
@@ -1617,7 +1624,10 @@ function fmtDate(s) {
   border: none;
   background: transparent;
   color: var(--t3);
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   width: 30px;
   height: 24px;
   cursor: pointer;
@@ -1873,29 +1883,33 @@ function fmtDate(s) {
 .pp-star-btn {
   position: relative;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   border: none;
   background: transparent;
   color: var(--t3);
-  opacity: 0.55;
-  font-size: 15px;
-  line-height: 1;
   cursor: pointer;
-  padding: 2px;
+  padding: 0;
   transition:
     color 0.25s ease,
-    opacity 0.25s ease,
     transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .pp-star-btn:hover {
-  opacity: 1;
+  color: var(--t1);
   transform: scale(1.25) rotate(18deg);
 }
 
 .pp-star-btn.on {
   color: #ffd24a;
-  opacity: 1;
-  text-shadow: 0 0 10px rgba(255, 210, 74, 0.65);
+  filter: drop-shadow(0 0 6px rgba(255, 210, 74, 0.65));
+}
+
+.pp-star-btn.on .ui-icon {
+  fill: currentColor;
 }
 
 .pp-star-btn.bursting {
@@ -1944,7 +1958,7 @@ function fmtDate(s) {
   background: var(--adim);
   border: 1px solid rgba(var(--accent-rgb), 0.4);
   color: var(--accent);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.6px;
   text-transform: uppercase;
@@ -1970,11 +1984,13 @@ function fmtDate(s) {
 
 .pp-kebab {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: none;
   background: transparent;
   color: var(--t3);
-  font-size: 15px;
-  line-height: 1;
   width: 24px;
   height: 24px;
   border-radius: 7px;
@@ -2013,7 +2029,7 @@ function fmtDate(s) {
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   text-align: left;
   padding: 8px 10px;
@@ -2022,10 +2038,13 @@ function fmtDate(s) {
   transition: all 0.14s ease;
 }
 
-.pp-menu-item span {
-  width: 16px;
-  text-align: center;
-  font-size: 12px;
+.pp-menu-item .ui-icon {
+  flex-shrink: 0;
+  color: var(--t3);
+}
+
+.pp-menu-item.danger .ui-icon {
+  color: inherit;
 }
 
 .pp-menu-item:hover {
@@ -2070,7 +2089,7 @@ function fmtDate(s) {
 .pp-desc {
   margin: 9px 0 0;
   color: var(--t2);
-  font-size: 12px;
+  font-size: 12.5px;
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -2087,11 +2106,22 @@ function fmtDate(s) {
 
 .pp-counts {
   display: flex;
+  align-items: center;
   gap: 14px;
   margin-top: 10px;
   color: var(--t2);
-  font-size: 12px;
+  font-size: 12.5px;
   font-variant-numeric: tabular-nums;
+}
+
+.pp-counts > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pp-counts .ui-icon {
+  color: var(--t3);
 }
 
 .pp-card-foot {
@@ -2109,7 +2139,7 @@ function fmtDate(s) {
   background: var(--elevated);
   color: var(--t3);
   font-family: var(--font);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   padding: 3px 9px;
   cursor: pointer;
@@ -2130,7 +2160,9 @@ function fmtDate(s) {
 }
 
 .pp-vis-face {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .visflip-enter-active,
@@ -2152,14 +2184,17 @@ function fmtDate(s) {
 
 .pp-date {
   color: var(--t3);
-  font-size: 10px;
+  font-size: 12px;
   margin-left: auto;
 }
 
 .pp-open {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--pa);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   opacity: 0;
   transform: translateX(-6px);
@@ -2199,12 +2234,12 @@ function fmtDate(s) {
 
 /* Delete back face */
 .pp-back-warn {
-  font-size: 26px;
+  flex-shrink: 0;
+  color: var(--danger);
   animation: pp-wobble 1.6s ease-in-out infinite;
 }
 
 .pp-back-warn.small {
-  font-size: 17px;
   animation: none;
 }
 
@@ -2228,7 +2263,7 @@ function fmtDate(s) {
 .pp-back-body {
   margin: 0;
   color: var(--t2);
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.55;
 }
 
@@ -2239,14 +2274,15 @@ function fmtDate(s) {
 }
 
 .pp-back-keep {
+  min-height: var(--ctl-md);
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 700;
-  padding: 7px 14px;
+  padding: 0 14px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -2256,14 +2292,15 @@ function fmtDate(s) {
 }
 
 .pp-back-del {
+  min-height: var(--ctl-md);
   border: none;
   border-radius: 9px;
   background: var(--danger);
-  color: #fff;
+  color: var(--on-accent);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 700;
-  padding: 7px 14px;
+  padding: 0 14px;
   cursor: pointer;
   transition: all 0.15s ease;
   box-shadow: 0 3px 14px rgba(var(--danger-rgb), 0.4);
@@ -2336,9 +2373,6 @@ function fmtDate(s) {
 }
 
 .pp-portal-plus {
-  font-size: 24px;
-  font-weight: 300;
-  line-height: 1;
   transition: transform 0.35s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
@@ -2352,7 +2386,7 @@ function fmtDate(s) {
 }
 
 .pp-new-quota {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
   font-variant-numeric: tabular-nums;
 }
@@ -2486,7 +2520,7 @@ function fmtDate(s) {
 
 .pp-row-desc {
   color: var(--t3);
-  font-size: 11.5px;
+  font-size: 12.5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2525,7 +2559,7 @@ function fmtDate(s) {
 .pp-row-confirm-text {
   flex: 1;
   color: var(--t2);
-  font-size: 11.5px;
+  font-size: 12.5px;
   line-height: 1.4;
 }
 
@@ -2565,7 +2599,7 @@ function fmtDate(s) {
 
 .pp-empty-scope {
   display: inline-block;
-  font-size: 44px;
+  color: var(--t3);
   animation: pp-float 3.2s ease-in-out infinite;
 }
 
@@ -2589,7 +2623,7 @@ function fmtDate(s) {
 .pp-empty-sub {
   margin: 0;
   color: var(--t3);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 /* ── Edit dialog ─────────────────────────────────────────────────────────── */
@@ -2618,15 +2652,23 @@ function fmtDate(s) {
 }
 
 .pp-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0 0 4px;
   color: var(--t1);
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 800;
+}
+
+.pp-modal-title .ui-icon {
+  flex-shrink: 0;
+  color: var(--accent);
 }
 
 .pp-label {
   color: var(--t2);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -2661,7 +2703,7 @@ function fmtDate(s) {
 .pp-charcount {
   align-self: flex-end;
   color: var(--t3);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-variant-numeric: tabular-nums;
   margin-top: -4px;
 }
@@ -2700,7 +2742,7 @@ function fmtDate(s) {
   border: 2px dashed var(--border);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -2741,13 +2783,18 @@ function fmtDate(s) {
 
 .pp-seg-btn {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--ctl-md);
   border: none;
   background: transparent;
   color: var(--t3);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
-  padding: 8px 0;
+  padding: 0;
   cursor: pointer;
   border-radius: 8px;
   transition: color 0.2s ease;
@@ -2797,16 +2844,17 @@ function fmtDate(s) {
 }
 
 .pp-access-icon {
-  font-size: 18px;
+  flex-shrink: 0;
+  margin-bottom: 2px;
 }
 
 .pp-access-name {
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 800;
 }
 
 .pp-access-short {
-  font-size: 9.5px;
+  font-size: 11.5px;
   color: var(--t3);
   text-align: center;
   line-height: 1.3;
@@ -2815,7 +2863,7 @@ function fmtDate(s) {
 .pp-modal-note {
   margin: 2px 0 0;
   color: var(--t3);
-  font-size: 10.5px;
+  font-size: 12.5px;
   line-height: 1.5;
 }
 
@@ -2830,18 +2878,19 @@ function fmtDate(s) {
 .pp-modal-error {
   margin-right: auto;
   color: var(--danger);
-  font-size: 11.5px;
+  font-size: 12.5px;
 }
 
 .pp-btn-ghost {
+  min-height: var(--ctl-md);
   border: 1px solid var(--border);
   border-radius: 10px;
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
-  padding: 8px 16px;
+  padding: 0 16px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -2852,14 +2901,15 @@ function fmtDate(s) {
 }
 
 .pp-btn-primary {
+  min-height: var(--ctl-md);
   border: none;
   border-radius: 10px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
-  padding: 8px 18px;
+  padding: 0 18px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -2920,7 +2970,7 @@ function fmtDate(s) {
     0 10px 32px rgba(0, 0, 0, 0.35),
     0 0 18px rgba(var(--accent-rgb), 0.2);
   color: var(--t1);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   max-width: min(520px, 86vw);
   text-align: center;
@@ -3005,7 +3055,7 @@ function fmtDate(s) {
   display: none;
 }
 :root[data-theme='ink'] .pp-back,
-:root[data-theme='ink'] .pp-search,
+:root[data-theme='ink'] .pp-search :deep(.sf-input),
 :root[data-theme='ink'] .pp-chip,
 :root[data-theme='ink'] .pp-sort-select,
 :root[data-theme='ink'] .pp-viewtoggle,
@@ -3106,7 +3156,7 @@ function fmtDate(s) {
 :root[data-theme='ink'] .pp-stat-label,
 :root[data-theme='ink'] .pp-label {
   font-family: var(--font-ink-label);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   font-variant: small-caps;
   text-transform: lowercase;
@@ -3124,14 +3174,8 @@ function fmtDate(s) {
     0 0 0 4px rgba(58, 42, 22, 0.2),
     0 8px 20px rgba(60, 40, 15, 0.1);
 }
-:root[data-theme='ink'] .pp-search {
+:root[data-theme='ink'] .pp-search :deep(.sf-input) {
   background: rgba(255, 251, 240, 0.55);
-}
-:root[data-theme='ink'] .pp-search-icon,
-:root[data-theme='ink'] .pp-chip-icon,
-:root[data-theme='ink'] .pp-empty-scope,
-:root[data-theme='ink'] .pp-access-icon {
-  filter: grayscale(1) sepia(0.4) contrast(1.1);
 }
 :root[data-theme='ink'] .pp-chip.active {
   background: rgba(179, 53, 42, 0.08);
@@ -3194,7 +3238,7 @@ function fmtDate(s) {
 :root[data-theme='ink'] .pp-live {
   background: transparent;
   font-family: var(--font-ink-label);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.12em;
 }
 :root[data-theme='ink'] .pp-live-dot {
@@ -3255,10 +3299,6 @@ function fmtDate(s) {
   background-color: var(--accent);
   box-shadow: none;
   animation-duration: 12s;
-}
-:root[data-theme='ink'] .pp-portal-plus {
-  font-family: var(--font-brush);
-  font-size: 28px;
 }
 :root[data-theme='ink'] .pp-new-label {
   font-family: var(--font-brush);

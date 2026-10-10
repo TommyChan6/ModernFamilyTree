@@ -17,6 +17,8 @@
 // (a / b are fractional-year ordinals; ±Infinity = an open era end.)
 
 import { GUTTER } from './timelineLayout.js'
+import { drawIcon } from '../../lib/canvasIcon.js'
+import { hasIcon } from '../ui/icons.js'
 
 // The event rail sits just clear of the Time-travel slider panel that rides
 // the gutter's right edge, so pills and chapter headers are never under it.
@@ -103,10 +105,14 @@ export function drawChronicleFg(r, ctx, c) {
 
     // Header: sticky at the top of the visible band, pushed off by its end.
     if (y1 - y0 < 26) continue
-    const label = `${e.icon ? e.icon + ' ' : ''}${e.name}`
+    const label = e.name
     const span = `${yearText(e.a) || '…'} – ${yearText(e.b) || 'now'}`
+    // The era icon is drawn (not typed) before the name; the pair is
+    // measured as one unit so the header stays snug around it.
+    const icon = hasIcon(e.icon) ? e.icon : ''
+    const iconW = icon ? 12 + 5 : 0
     ctx.font = `800 11px ${font}`
-    const tw = ctx.measureText(label).width
+    const tw = iconW + ctx.measureText(label).width
     ctx.font = `600 9.5px ${font}`
     const sw = ctx.measureText(span).width
     const w = tw + sw + 30
@@ -129,7 +135,8 @@ export function drawChronicleFg(r, ctx, c) {
     ctx.textAlign = 'left'
     ctx.font = `800 11px ${font}`
     ctx.fillStyle = c.t1
-    ctx.fillText(label, hx + 15, hy + h / 2 + 0.5)
+    if (icon) drawIcon(ctx, icon, hx + 15 + 6, hy + h / 2, 12, { color: c.t1, lineWidth: 2.2 })
+    ctx.fillText(label, hx + 15 + iconW, hy + h / 2 + 0.5)
     ctx.font = `600 9.5px ${font}`
     ctx.fillStyle = c.t3
     ctx.fillText(span, hx + 21 + tw, hy + h / 2 + 0.5)
@@ -239,11 +246,11 @@ export function drawChronicleFg(r, ctx, c) {
     ctx.arc(x + h / 2, y, h / 2 - 2.5, 0, Math.PI * 2)
     ctx.fillStyle = rgba(ev.color, 0.28)
     ctx.fill()
-    ctx.font = `${11 * s}px ${font}`
-    ctx.textAlign = 'center'
+    // The kind's icon stands in when a stored custom value doesn't resolve.
+    const iconOpts = { color: c.t1, lineWidth: 2.2 }
+    if (!drawIcon(ctx, ev.icon, x + h / 2, y, 11 * s, iconOpts))
+      drawIcon(ctx, ev.kindIcon || 'sparkle', x + h / 2, y, 11 * s, iconOpts)
     ctx.textBaseline = 'middle'
-    ctx.fillStyle = c.t1
-    ctx.fillText(ev.icon, x + h / 2, y + 0.5)
     if (title) {
       ctx.textAlign = 'left'
       ctx.font = `${ev.importance === 3 ? 800 : 700} ${11 * s}px ${font}`

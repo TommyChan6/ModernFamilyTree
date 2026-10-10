@@ -67,7 +67,7 @@
 
       <!-- Empty state -->
       <div v-if="!placedCount" class="tl-empty">
-        <div class="tl-empty-icon">📅</div>
+        <UiIcon class="tl-empty-icon" name="calendar" :size="44" :stroke="1.6" />
         <div class="tl-empty-title">
           {{ store.persons.length ? 'No datable people' : 'No people yet' }}
         </div>
@@ -101,9 +101,7 @@
         @click.stop
         @wheel.stop
       >
-        <span class="tl-search-icon">🔍</span>
-        <input v-model="searchQuery" placeholder="Search family members…" />
-        <button v-if="searchQuery" class="tl-search-clear" @click="searchQuery = ''">✕</button>
+        <SearchField v-model="searchQuery" class="tl-search-field" placeholder="Search people…" />
       </div>
 
       <!-- Zoom controls (matches the tree view's control bar) -->
@@ -114,20 +112,35 @@
         @pointerdown.stop
         @click.stop
       >
-        <button class="tl-ctrl-btn" title="Zoom in" @click="zoomBy(1.3333)">＋</button>
-        <button class="tl-ctrl-btn" title="Zoom out" @click="zoomBy(0.75)">－</button>
+        <button class="tl-ctrl-btn" title="Zoom in" aria-label="Zoom in" @click="zoomBy(1.3333)">
+          <UiIcon name="zoom-in" :size="16" />
+        </button>
+        <button class="tl-ctrl-btn" title="Zoom out" aria-label="Zoom out" @click="zoomBy(0.75)">
+          <UiIcon name="zoom-out" :size="16" />
+        </button>
         <div class="tl-ctrl-sep"></div>
-        <button class="tl-ctrl-btn" title="Fit all" @click="fitAll(true)">⊡</button>
+        <button class="tl-ctrl-btn" title="Fit all" aria-label="Fit all" @click="fitAll(true)">
+          <UiIcon name="maximize" :size="16" />
+        </button>
         <button
           class="tl-ctrl-btn tl-ctrl-refresh"
           :class="{ 'tl-ctrl-refreshing': refreshSpinning }"
           title="Refresh layout — re-run the family tree algorithm"
+          aria-label="Refresh layout"
           @click="refreshLayout"
         >
-          <span class="tl-refresh-icon">⟳</span>
+          <UiIcon class="tl-refresh-icon" name="refresh-cw" :size="16" />
         </button>
         <div class="tl-ctrl-sep"></div>
-        <span class="tl-zoom-label">{{ zoomLabel }}</span>
+        <span v-if="zoomParts.same" class="tl-zoom-label">{{ zoomParts.v }}</span>
+        <span
+          v-else
+          class="tl-zoom-label"
+          :title="`Time axis ${zoomParts.v} · lanes ${zoomParts.h}`"
+        >
+          <UiIcon name="move-vertical" :size="12" />{{ zoomParts.v }}
+          <UiIcon name="move-horizontal" :size="12" />{{ zoomParts.h }}
+        </span>
       </div>
 
       <!-- Right-docked overlay panes: Focus + Legend (shared toggle cluster) -->
@@ -175,10 +188,13 @@
                   v-for="o in genderFocusOpts"
                   :key="o.id"
                   class="tl-focus-chip"
-                  :class="{ on: focusGender === o.id }"
+                  :class="{ on: focusGender === o.id, 'is-icon': !!o.icon }"
+                  :title="o.icon ? o.label : undefined"
+                  :aria-label="o.label"
                   @click="focusGender = o.id"
                 >
-                  {{ o.label }}
+                  <UiIcon v-if="o.icon" :name="o.icon" :size="14" />
+                  <template v-else>{{ o.label }}</template>
                 </button>
               </div>
             </div>
@@ -251,11 +267,13 @@
           :style="{ left: chronTip.x + 'px', top: chronTip.y + 'px', '--c': chronTip.color }"
         >
           <div class="tl-chtip-head">
-            <span class="tl-chtip-ic">{{ chronTip.icon }}</span>
+            <span class="tl-chtip-ic"><UiIcon :name="chronTip.icon" :size="14" /></span>
             <b>{{ chronTip.title }}</b>
           </div>
           <div class="tl-chtip-when">{{ chronTip.when }}</div>
-          <div v-if="chronTip.cast" class="tl-chtip-cast">👥 {{ chronTip.cast }}</div>
+          <div v-if="chronTip.cast" class="tl-chtip-cast">
+            <UiIcon name="users" :size="13" />{{ chronTip.cast }}
+          </div>
           <div v-if="chronTip.text" class="tl-chtip-text">{{ chronTip.text }}</div>
           <div class="tl-chtip-hint">
             {{ tool === 'retime' ? 'Drag to move' : 'Click to edit' }}
@@ -273,7 +291,9 @@
           @wheel.stop
           @click.stop
         >
-          <div class="tl-medit-title">⚭ {{ mEdit.names }}</div>
+          <div class="tl-medit-title">
+            <UiIcon name="heart-handshake" :size="14" /><span>{{ mEdit.names }}</span>
+          </div>
           <div class="tl-medit-row">
             <input
               ref="meditInputRef"
@@ -331,7 +351,7 @@
         >
           <span class="tl-hud-badge">
             <span class="tl-hud-ring"></span>
-            <span class="tl-hud-ic">{{ toolDef.icon }}</span>
+            <UiIcon class="tl-hud-ic" :name="toolDef.icon" :size="16" />
           </span>
           <div class="tl-hud-text">
             <div class="tl-hud-label">
@@ -339,7 +359,14 @@
             </div>
             <div class="tl-hud-hint">{{ hudHint }}</div>
           </div>
-          <button class="tl-hud-btn" title="Exit the tool (Esc)" @click="setTool(null)">✕</button>
+          <button
+            class="tl-hud-btn"
+            title="Exit the tool (Esc)"
+            aria-label="Exit the tool"
+            @click="setTool(null)"
+          >
+            <UiIcon name="x" :size="14" />
+          </button>
         </div>
       </Transition>
 
@@ -353,7 +380,9 @@
         @dblclick.stop
         @wheel.stop
       >
-        <div class="tl-bubble-head">{{ nameBubble.title }}</div>
+        <div class="tl-bubble-head">
+          <UiIcon v-if="nameBubble.icon" :name="nameBubble.icon" :size="14" />{{ nameBubble.title }}
+        </div>
         <input
           ref="bubbleInputEl"
           v-model="nameBubble.value"
@@ -376,7 +405,9 @@
         </div>
         <div class="tl-bubble-actions">
           <button class="btn btn-xs btn-ghost" @click="commitBubble(false)">Cancel</button>
-          <button class="btn btn-xs btn-primary" @click="commitBubble(true)">Create ↵</button>
+          <button class="btn btn-xs btn-primary" title="Create (Enter)" @click="commitBubble(true)">
+            Create
+          </button>
         </div>
       </div>
 
@@ -395,8 +426,13 @@
           <b :style="{ color: genderColor(personById.get(linkPick.a)?.gender) }">{{
             shortName(linkPick.a)
           }}</b>
-          <button class="tl-lp-swap" title="Swap direction (parent → child…)" @click="swapLink">
-            ⇄
+          <button
+            class="tl-lp-swap"
+            title="Swap direction (parent → child…)"
+            aria-label="Swap direction"
+            @click="swapLink"
+          >
+            <UiIcon name="arrow-right-left" :size="13" />
           </button>
           <b :style="{ color: genderColor(personById.get(linkPick.b)?.gender) }">{{
             shortName(linkPick.b)
@@ -416,8 +452,7 @@
             "
             @click="commitLink(d)"
           >
-            <span class="tl-lp-glyph">{{ d.glyph }}</span
-            >{{ d.label }}
+            <UiIcon class="tl-lp-glyph" :name="d.glyph" :size="13" />{{ d.label }}
           </button>
         </div>
       </div>
@@ -460,6 +495,9 @@ import ChroniclePane from './chronicle/ChroniclePane.vue'
 import { chronicleViewModel } from './chronicle/chronicleModel.js'
 import { toOrdinal, format as fmtDate } from '../../../shared/calendarMath'
 import { erasAt } from '../../../shared/chronicle'
+import { hasIcon } from './ui/icons.js'
+import UiIcon from './ui/UiIcon.js'
+import SearchField from './ui/SearchField.vue'
 import { useTimeTravel } from './time/useTimeTravel'
 import { withAlpha } from './webgl/overlayUtils.js'
 import { inkPigment, rgbToHex, hexToRgb01 } from './webgl/inkMath'
@@ -574,16 +612,16 @@ const searchSet = computed(() => {
 // ── Overlay panes (shared header toggle cluster) ────────────────────────────
 const focusOpen = ref(false)
 const legendOpen = ref(true)
-const styleOpen = ref(false) // 🎨 Style pane (lifeline looks, canvas, atmosphere)
+const styleOpen = ref(false) // Style pane (lifeline looks, canvas, atmosphere)
 // Focus emphasis: dim the people who don't match. Applied through the same
 // dimming path the renderer already tweens (no renderer changes needed).
 const focusGender = ref('all') // 'all' | 'male' | 'female' | 'unknown'
 const focusLife = ref('all') // 'all' | 'living' | 'deceased'
 const genderFocusOpts = [
   { id: 'all', label: 'All' },
-  { id: 'male', label: '♂' },
-  { id: 'female', label: '♀' },
-  { id: 'unknown', label: '?' }
+  { id: 'male', label: 'Male', icon: 'mars' },
+  { id: 'female', label: 'Female', icon: 'venus' },
+  { id: 'unknown', label: 'Unknown', icon: 'circle-help' }
 ]
 const lifeFocusOpts = [
   { id: 'all', label: 'All' },
@@ -632,10 +670,11 @@ function connDimmed(ids) {
 }
 
 const fmtPct = (v) => (v >= 10 ? `${Math.round(v)}` : `${Math.max(0.1, Math.round(v * 10) / 10)}`)
-const zoomLabel = computed(() => {
+// Zoom readout: one % when both axes match, else per-axis (time · lanes).
+const zoomParts = computed(() => {
   const v = fmtPct((pxPerYear.value / BASE_PX) * 100)
   const h = fmtPct(laneScale.value * 100)
-  return v === h ? `${v}%` : `↕${v}% ↔${h}%`
+  return { v: `${v}%`, h: `${h}%`, same: v === h }
 })
 
 // ── Colors follow the graph settings so every view speaks the same language ─
@@ -758,7 +797,7 @@ function chronTipFor(hit, p) {
     if (!e) return null
     return {
       key: 'era:' + e.id,
-      icon: e.icon || '◆',
+      icon: hasIcon(e.icon) ? e.icon : 'diamond',
       title: e.name,
       color: e.color,
       when: `${fmtDate(e.start) || '…'} – ${fmtDate(e.end) || 'now'}`,
@@ -780,7 +819,7 @@ function chronTipFor(hit, p) {
   const era = erasAt(store.eras, toOrdinal(ev.date))[0]
   return {
     key: 'ev:' + ev.id,
-    icon: m?.icon || '✦',
+    icon: hasIcon(m?.icon) ? m.icon : m?.kindIcon || 'sparkle',
     title: ev.title,
     color: m?.color || 'var(--accent)',
     when: `${when}${ev.place ? ' · ' + ev.place : ''}${era ? ' · ' + era.name : ''}`,
@@ -1552,7 +1591,7 @@ function setTool(id) {
 const hudHint = computed(() => {
   const t = toolDef.value
   if (!t) return ''
-  if (t.id === 'link' && linkPick.value) return 'Pick what binds them (⇄ flips the direction)'
+  if (t.id === 'link' && linkPick.value) return 'Pick what binds them — swap flips the direction'
   if (t.id === 'link' && linkAnchor.value)
     return `Now click the life ${shortName(linkAnchor.value.id)} is bound to — at the year it began`
   return t.hint
@@ -1575,14 +1614,28 @@ function toolGhost(p) {
   const g = []
   switch (t.id) {
     case 'add':
-      g.push({ kind: 'yearline', y: yearY(year), label: `✚ born ${year}`, color: c, x0: GUTTER })
+      g.push({
+        kind: 'yearline',
+        y: yearY(year),
+        icon: 'user-plus',
+        label: `born ${year}`,
+        color: c,
+        x0: GUTTER
+      })
       g.push({ kind: 'ring', x: p.x, y: yearY(year), r: 15, color: c })
       break
     case 'child': {
       if (person) {
         const s = renderer.personScreen(person.id)
         const y = Math.max(year, Math.ceil(person.birthYear))
-        g.push({ kind: 'yearline', y: yearY(y), label: `👶 born ${y}`, color: c, x0: GUTTER })
+        g.push({
+          kind: 'yearline',
+          y: yearY(y),
+          icon: 'baby',
+          label: `born ${y}`,
+          color: c,
+          x0: GUTTER
+        })
         if (s) g.push({ kind: 'ring', x: s.x, y: yearY(y), r: 11, color: c })
       }
       break
@@ -1610,14 +1663,21 @@ function toolGhost(p) {
       break
     }
     case 'event':
-      g.push({ kind: 'yearline', y: yearY(year), label: `✦ ${year}`, color: c, x0: GUTTER })
+      g.push({
+        kind: 'yearline',
+        y: yearY(year),
+        icon: 'calendar-plus',
+        label: String(year),
+        color: c,
+        x0: GUTTER
+      })
       break
     case 'retime': {
       const h = retimeTarget(p)
       retimeHover.value = !!h
       if (h) {
         g.push({ kind: 'handle', x: h.x, y: h.y, color: c })
-        g.push({ kind: 'bubble', x: h.x, y: h.y - 16, text: h.label, color: c })
+        g.push({ kind: 'bubble', x: h.x, y: h.y - 16, text: h.label, icon: h.icon, color: c })
       }
       break
     }
@@ -1651,7 +1711,8 @@ function onToolClick(p) {
         y: yearY(year),
         year,
         worldX: (p.x - tx.value) / laneScale.value,
-        title: `✚ A new life · born ${year}`,
+        icon: 'user-plus',
+        title: `A new life · born ${year}`,
         color: t.color,
         coParents: []
       })
@@ -1670,7 +1731,8 @@ function onToolClick(p) {
         x: s ? s.x : p.x,
         y: yearY(y),
         year: y,
-        title: `👶 ${shortName(person.id)}'s child · born ${y}`,
+        icon: 'baby',
+        title: `${shortName(person.id)}'s child · born ${y}`,
         color: t.color,
         coParents,
         coParentId: coParents.find((c) => c.likely)?.id || null
@@ -1800,7 +1862,7 @@ async function commitLink(d) {
     return
   }
   fx?.spark({ id: L.a, year: L.ay }, { id: L.b, year: L.year }, relColor(d))
-  undoToast(`${d.glyph} ${shortName(L.a)} & ${shortName(L.b)} — ${d.label}`, 'relationships:create')
+  undoToast(`${shortName(L.a)} & ${shortName(L.b)} — ${d.label}`, 'relationships:create')
 }
 
 // ── Delete: lives, marriages, events ────────────────────────────────────────
@@ -1887,7 +1949,8 @@ function retimeTarget(p) {
       x: badge.x + badge.w / 2,
       y: badge.y + badge.h / 2,
       year: m.year,
-      label: m.realYear ? `⚭ ${m.realYear}` : '⚭ drag to date it'
+      icon: 'heart-handshake',
+      label: m.realYear ? String(m.realYear) : 'drag to date it'
     }
   }
   const ch = renderer.chronicleAt(p.x, p.y)
@@ -1901,7 +1964,8 @@ function retimeTarget(p) {
         x: ch.x + ch.h / 2,
         y: ch.y + ch.h / 2,
         year: y0,
-        label: `✦ ${fmtDate(ev.date)}`
+        icon: 'calendar',
+        label: fmtDate(ev.date)
       }
     }
   }
@@ -1933,7 +1997,8 @@ function retimeTarget(p) {
     x: s.x,
     y: p.y,
     year: yearAtY(p.y),
-    label: '⇕ shift the whole life'
+    icon: 'move-vertical',
+    label: 'shift the whole life'
   }
 }
 
@@ -2047,7 +2112,14 @@ function retimeGhost() {
     g.push({ kind: 'handle', x: s.x, y: hy, color: c, active: true })
   } else if (h.kind === 'marriage') {
     const y = yearY(r.year)
-    g.push({ kind: 'yearline', y, label: `⚭ ${r.year}`, color: c, x0: GUTTER })
+    g.push({
+      kind: 'yearline',
+      y,
+      icon: 'heart-handshake',
+      label: String(r.year),
+      color: c,
+      x0: GUTTER
+    })
     g.push({ kind: 'handle', x: h.x, y, color: c, active: true })
   } else if (h.kind === 'event') {
     const y = yearY(r.year)
@@ -2063,7 +2135,15 @@ function retimeGhost() {
         b: String(Math.floor(end) + r.delta),
         x0: GUTTER
       })
-    } else g.push({ kind: 'yearline', y, label: `✦ ${r.year}`, color: c, x0: GUTTER })
+    } else
+      g.push({
+        kind: 'yearline',
+        y,
+        icon: 'calendar',
+        label: String(r.year),
+        color: c,
+        x0: GUTTER
+      })
     g.push({ kind: 'handle', x: h.x, y, color: c, active: true })
   }
   fx.setGhost(g)
@@ -2131,7 +2211,14 @@ function spanGhost() {
   const sp = spanFromDrag(yearAtY(d.start.y), yearAtY(d.last.y))
   if (!d.moved || sp.end == null) {
     fx.setGhost([
-      { kind: 'yearline', y: yearY(sp.start), label: `✦ ${sp.start}`, color: c, x0: GUTTER }
+      {
+        kind: 'yearline',
+        y: yearY(sp.start),
+        icon: 'calendar-plus',
+        label: String(sp.start),
+        color: c,
+        x0: GUTTER
+      }
     ])
   } else {
     fx.setGhost([
@@ -2141,7 +2228,8 @@ function spanGhost() {
         y0: yearY(sp.start),
         y1: yearY(sp.end),
         color: c,
-        a: `✦ ${sp.start}`,
+        aIcon: 'calendar-plus',
+        a: String(sp.start),
         b: String(sp.end),
         x0: GUTTER
       }
@@ -2396,7 +2484,7 @@ onBeforeUnmount(() => {
   color: var(--t1);
 }
 .tl-count {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--accent);
   background: var(--adim);
@@ -2404,7 +2492,7 @@ onBeforeUnmount(() => {
   border-radius: 20px;
 }
 .tl-undated {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #f5a623;
   background: rgba(245, 166, 35, 0.12);
@@ -2419,7 +2507,7 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 .tl-hint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
   font-weight: 500;
 }
@@ -2529,8 +2617,7 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 .tl-hud-ic {
-  font-size: 14px;
-  line-height: 1;
+  color: var(--mc);
 }
 /* A comet orbiting the badge — "this tool is live". */
 .tl-hud-ring {
@@ -2564,17 +2651,17 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--t1);
   white-space: nowrap;
 }
 .tl-hud-label kbd {
-  font-size: 9.5px;
+  font-size: 10.5px;
   padding: 0 5px;
 }
 .tl-hud-hint {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
   white-space: nowrap;
   max-width: 380px;
@@ -2582,13 +2669,16 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
 }
 .tl-hud-btn {
-  width: 24px;
-  height: 24px;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: none;
   border-radius: 50%;
   background: transparent;
   color: var(--t3);
-  font-size: 12px;
   cursor: pointer;
   flex-shrink: 0;
   transition:
@@ -2662,7 +2752,10 @@ onBeforeUnmount(() => {
   }
 }
 .tl-bubble-head {
-  font-size: 10.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
   font-weight: 800;
   letter-spacing: 0.02em;
   color: var(--mc);
@@ -2694,7 +2787,7 @@ onBeforeUnmount(() => {
   gap: 4px;
 }
 .tl-bubble-co-label {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
   margin-right: 2px;
 }
@@ -2706,7 +2799,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 650;
   cursor: pointer;
   transition:
@@ -2759,17 +2852,20 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 12.5px;
+  font-size: 13px;
   margin-bottom: 8px;
 }
 .tl-lp-swap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--t2);
   border-radius: 50%;
-  width: 22px;
-  height: 22px;
-  font-size: 11px;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
   cursor: pointer;
   transition: transform 0.3s var(--ease-spring);
 }
@@ -2779,7 +2875,7 @@ onBeforeUnmount(() => {
 }
 .tl-lp-year {
   margin-left: auto;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--t3);
 }
@@ -2801,7 +2897,7 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--rc) 10%, transparent);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 650;
   cursor: pointer;
   animation: cp-row-in 0.36s var(--ease-out) backwards;
@@ -2817,7 +2913,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 5px 14px color-mix(in srgb, var(--rc) 30%, transparent);
 }
 .tl-lp-glyph {
-  font-size: 12px;
+  color: var(--rc);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2841,56 +2937,14 @@ onBeforeUnmount(() => {
   top: 14px;
   left: 50%;
   transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 7px 14px;
-  min-width: 260px;
+  width: 280px;
   z-index: 5;
+  border-radius: var(--r-md);
   box-shadow: var(--shadow);
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
   cursor: default;
 }
-.tl-search:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
-}
-.tl-search-icon {
-  font-size: 13px;
-  flex-shrink: 0;
-}
-.tl-search input {
-  background: none;
-  border: none;
-  outline: none;
-  font: inherit;
-  font-size: 13px;
-  color: var(--t1);
-  flex: 1;
-  padding: 0;
-  box-shadow: none;
-  width: auto;
-}
-.tl-search input::placeholder {
-  color: var(--t3);
-}
-.tl-search-clear {
-  border: none;
-  background: transparent;
-  color: var(--t3);
-  cursor: pointer;
-  font-size: 11px;
-  padding: 2px;
-  border-radius: 4px;
-  transition: color 0.12s;
-}
-.tl-search-clear:hover {
-  color: var(--t1);
+.tl-search-field :deep(.sf-input) {
+  background: var(--surface);
 }
 
 /* ── Zoom controls (tree-view control bar style) ─────────── */
@@ -2932,7 +2986,11 @@ onBeforeUnmount(() => {
   color: var(--t1);
 }
 .tl-zoom-label {
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t3);
   min-width: 42px;
@@ -2948,7 +3006,6 @@ onBeforeUnmount(() => {
   margin: 3px 2px;
 }
 .tl-ctrl-refresh .tl-refresh-icon {
-  display: inline-block;
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .tl-ctrl-refresh:hover .tl-refresh-icon {
@@ -2973,7 +3030,7 @@ onBeforeUnmount(() => {
 }
 .tl-legend-panel {
   padding: 12px 16px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t2);
   display: flex;
   flex-direction: column;
@@ -2996,7 +3053,7 @@ onBeforeUnmount(() => {
   opacity: 0.55;
 }
 .tl-focus-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t2);
   min-width: 46px;
@@ -3007,13 +3064,17 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 .tl-focus-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 0 10px;
   border-radius: 16px;
   cursor: pointer;
   transition:
@@ -3021,6 +3082,10 @@ onBeforeUnmount(() => {
     color 0.16s ease,
     border-color 0.16s ease,
     transform 0.16s cubic-bezier(0.34, 1.5, 0.5, 1);
+}
+.tl-focus-chip.is-icon {
+  width: 30px;
+  padding: 0;
 }
 .tl-focus-chip:hover:not(:disabled) {
   color: var(--t1);
@@ -3036,7 +3101,7 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 .tl-panel-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -3048,12 +3113,11 @@ onBeforeUnmount(() => {
   gap: 5px;
 }
 .tl-leg-label {
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--t3);
-  opacity: 0.7;
 }
 .tl-leg-row {
   display: flex;
@@ -3092,10 +3156,16 @@ onBeforeUnmount(() => {
   cursor: default;
 }
 .tl-medit-title {
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--t1);
   margin-bottom: 9px;
+}
+.tl-medit-title span {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3114,7 +3184,7 @@ onBeforeUnmount(() => {
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   outline: none;
   transition:
@@ -3134,7 +3204,7 @@ onBeforeUnmount(() => {
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   outline: none;
   cursor: pointer;
@@ -3149,7 +3219,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   padding: 5px 12px;
   border-radius: 8px;
@@ -3199,8 +3269,7 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 .tl-empty-icon {
-  font-size: 44px;
-  opacity: 0.6;
+  color: var(--t3);
 }
 .tl-empty-title {
   font-size: 16px;
@@ -3249,16 +3318,19 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 .tl-chtip-when {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 650;
   color: var(--c);
 }
 .tl-chtip-cast {
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
   color: var(--t2);
 }
 .tl-chtip-text {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
   line-height: 1.4;
   display: -webkit-box;
@@ -3267,7 +3339,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 .tl-chtip-hint {
-  font-size: 9.5px;
+  font-size: var(--fs-xs);
   color: var(--t3);
   text-transform: uppercase;
   letter-spacing: 0.06em;

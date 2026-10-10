@@ -36,8 +36,8 @@
       class="fi-clear"
       title="Clear"
       @click.stop="emit('update:modelValue', null)"
-      >✕</span
-    >
+      ><UiIcon name="x" :size="12"
+    /></span>
   </button>
 
   <!-- number -->
@@ -61,7 +61,7 @@
       class="fi fi-num"
       type="number"
       :value="rangeA"
-      placeholder="from"
+      placeholder="From"
       @input="emitRange('a', $event.target.value)"
     />
     <span class="fi-range-dash">–</span>
@@ -69,7 +69,7 @@
       class="fi fi-num"
       type="number"
       :value="rangeB"
-      placeholder="to"
+      placeholder="To"
       @input="emitRange('b', $event.target.value)"
     />
     <span v-if="def.unit" class="fi-unit">{{ def.unit }}</span>
@@ -123,9 +123,10 @@
       class="fi-clear"
       type="button"
       title="Clear"
+      aria-label="Clear"
       @click="emit('update:modelValue', null)"
     >
-      ✕
+      <UiIcon name="x" :size="12" />
     </button>
   </div>
 
@@ -135,7 +136,7 @@
       class="fi fi-num"
       type="number"
       :value="modelValue?.year ?? ''"
-      placeholder="year"
+      placeholder="Year"
       @input="emit('update:modelValue', yearDate($event.target.value))"
     />
   </div>
@@ -146,7 +147,7 @@
       class="fi fi-num"
       type="number"
       :value="modelValue?.from?.year ?? ''"
-      placeholder="from"
+      placeholder="From"
       @input="emitDateRange('from', $event.target.value)"
     />
     <span class="fi-range-dash">–</span>
@@ -154,7 +155,7 @@
       class="fi fi-num"
       type="number"
       :value="modelValue?.to?.year ?? ''"
-      placeholder="to"
+      placeholder="To"
       @input="emitDateRange('to', $event.target.value)"
     />
   </div>
@@ -166,6 +167,7 @@
 <script setup>
 import { computed } from 'vue'
 import { yearDate } from '../../../../shared/calendarMath'
+import UiIcon from '../ui/UiIcon.js'
 
 const props = defineProps({
   def: { type: Object, required: true },
@@ -241,7 +243,7 @@ function emitDateRange(side, raw) {
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   outline: none;
   transition:
     border-color 0.15s,
@@ -267,7 +269,7 @@ function emitDateRange(side, raw) {
   cursor: pointer;
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .fi-toggle-track {
   width: 34px;
@@ -311,14 +313,18 @@ function emitDateRange(side, raw) {
 }
 
 .fi-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
   border: none;
   background: transparent;
   color: var(--t3);
-  font-size: 10px;
   cursor: pointer;
-  padding: 2px;
+  padding: 0;
   border-radius: 4px;
-  line-height: 1;
 }
 .fi-clear:hover {
   color: var(--danger);
@@ -335,7 +341,7 @@ function emitDateRange(side, raw) {
   min-width: 0;
 }
 .fi-unit {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
   flex-shrink: 0;
 }
@@ -361,7 +367,7 @@ function emitDateRange(side, raw) {
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   cursor: pointer;
   transition:
     transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1),
@@ -396,7 +402,7 @@ function emitDateRange(side, raw) {
   width: 100%;
 }
 .fi-slider-end {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
   flex-shrink: 0;
   max-width: 72px;
@@ -439,7 +445,7 @@ function emitDateRange(side, raw) {
   position: absolute;
   top: -4px;
   transform: translateX(-50%);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--t2);
   background: var(--elevated);
@@ -452,7 +458,7 @@ function emitDateRange(side, raw) {
 }
 
 .fi-reserved {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t3);
   font-style: italic;
   padding: 6px 0;

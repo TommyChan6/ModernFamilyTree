@@ -11,9 +11,12 @@
 <template>
   <div class="auth-gate">
     <div class="auth-card">
-      <button class="back-btn" type="button" @click="emit('back')">← Back</button>
+      <button class="back-btn" type="button" @click="emit('back')">
+        <UiIcon name="arrow-left" :size="14" />
+        Back
+      </button>
       <div class="brand">
-        <span class="brand-mark">🌳</span>
+        <UiIcon class="brand-mark" name="tree-deciduous" :size="22" />
         <span class="brand-name">Family Tree</span>
       </div>
 
@@ -23,7 +26,10 @@
       </p>
 
       <!-- Sign-up confirmation notice (email confirmation is on) -->
-      <div v-if="notice" class="notice">✉️ {{ notice }}</div>
+      <div v-if="notice" class="notice">
+        <UiIcon class="notice-icon" name="mail" :size="16" />
+        <span>{{ notice }}</span>
+      </div>
 
       <form v-else class="form" @submit.prevent="submit">
         <label class="field">
@@ -71,6 +77,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useMainStore } from '../store/index.js'
+import UiIcon from './ui/UiIcon.js'
 
 // Same contract as the native AuthGate: the homepage's CTAs pick the starting
 // mode, and Back returns to the homepage.
@@ -140,14 +147,18 @@ async function submit() {
 }
 
 .back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: none;
   background: transparent;
   color: var(--t3);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  padding: 0 0 14px;
+  padding: 0;
+  margin-bottom: 14px;
   transition: color 0.15s ease;
 }
 
@@ -163,8 +174,8 @@ async function submit() {
 }
 
 .brand-mark {
-  font-size: 22px;
-  line-height: 1;
+  flex-shrink: 0;
+  color: var(--accent);
 }
 
 .brand-name {
@@ -200,7 +211,7 @@ async function submit() {
 }
 
 .field-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.6px;
@@ -238,10 +249,13 @@ async function submit() {
   background: rgba(var(--danger-rgb), 0.12);
   border: 1px solid rgba(var(--danger-rgb), 0.35);
   color: var(--danger);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   padding: 12px 14px;
   border-radius: 9px;
   background: var(--adim);
@@ -251,13 +265,19 @@ async function submit() {
   line-height: 1.5;
 }
 
+.notice-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent);
+}
+
 .btn-primary {
   margin-top: 4px;
   padding: 11px 14px;
   border: none;
   border-radius: 9px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-family: var(--font);
   font-size: 14px;
   font-weight: 700;
@@ -283,7 +303,7 @@ async function submit() {
 .toggle {
   margin: 20px 0 0;
   text-align: center;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
 }
 
@@ -292,7 +312,7 @@ async function submit() {
   background: transparent;
   color: var(--accent);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   padding: 0 2px;

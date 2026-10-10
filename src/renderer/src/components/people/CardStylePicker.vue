@@ -5,11 +5,12 @@
       class="csp-btn"
       :class="{ open }"
       :title="'Card style: ' + current.label"
-      @click="open = !open"
+      :aria-expanded="open"
+      @click="toggle"
     >
-      <span class="csp-btn-icon">🎴</span>
+      <UiIcon name="palette" :size="16" />
       {{ current.label }}
-      <span class="csp-caret" :class="{ open }">▾</span>
+      <UiIcon class="csp-caret" :class="{ open }" name="chevron-down" :size="14" />
     </button>
 
     <!-- Floating gallery -->
@@ -60,7 +61,7 @@
                 <i class="ma-frame"></i>
                 <i class="ma-arch"></i>
                 <i class="ma-line w1"></i>
-                <i class="ma-star">✦</i>
+                <i class="ma-star"><UiIcon name="sparkle" :size="10" /></i>
               </template>
               <template v-else-if="s.id === 'scroll'">
                 <i class="ms-cord"></i>
@@ -82,7 +83,9 @@
                 <i class="mf-handle"></i>
                 <i class="mf-tassel"></i>
               </template>
-              <span v-if="s.id === store.cardStyle" class="csp-check">✓</span>
+              <span v-if="s.id === store.cardStyle" class="csp-check">
+                <UiIcon name="check" :size="10" :stroke="3" />
+              </span>
             </span>
             <span class="csp-label">{{ s.label }}</span>
           </button>
@@ -95,6 +98,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMainStore } from '../../store/index.js'
+import UiIcon from '../ui/UiIcon.js'
 
 // The Directory's card-style selector: a toolbar chip that opens a small
 // gallery of miniature card faces. Picking one restyles the whole grid (the
@@ -125,6 +129,9 @@ const STYLES = [
 
 const current = computed(() => STYLES.find((s) => s.id === store.cardStyle) || STYLES[0])
 
+function toggle() {
+  open.value = !open.value
+}
 function pick(id) {
   store.setCardStyle(id)
   open.value = false
@@ -159,15 +166,16 @@ onUnmounted(() => {
 .csp-btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  height: 36px;
-  padding: 0 13px;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ctl-md);
+  padding: 0 11px 0 13px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -185,11 +193,7 @@ onUnmounted(() => {
   border-color: rgba(var(--accent-rgb), 0.5);
   box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.22);
 }
-.csp-btn-icon {
-  font-size: 14px;
-}
 .csp-caret {
-  font-size: 9px;
   color: var(--t3);
   transition: transform 0.3s cubic-bezier(0.34, 1.4, 0.5, 1);
 }
@@ -235,13 +239,13 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .csp-title {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 800;
   letter-spacing: 0.4px;
   color: var(--t1);
 }
 .csp-sub {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
 }
 
@@ -270,7 +274,7 @@ onUnmounted(() => {
   }
 }
 .csp-label {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--t3);
   transition: color 0.2s;
@@ -331,9 +335,7 @@ onUnmounted(() => {
   height: 14px;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
-  font-size: 9px;
-  font-weight: 800;
+  color: var(--on-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -549,11 +551,10 @@ onUnmounted(() => {
   bottom: 6px;
   left: 0;
   right: 0;
-  font-size: 8px;
-  font-style: normal;
+  display: flex;
+  justify-content: center;
   color: #d4af37;
-  text-align: center;
-  text-shadow: 0 0 6px rgba(212, 175, 55, 0.8);
+  filter: drop-shadow(0 0 3px rgba(212, 175, 55, 0.8));
 }
 .csp-item:hover .m-arcana .ma-star {
   animation: ma-star-spin 1.6s ease-in-out infinite;

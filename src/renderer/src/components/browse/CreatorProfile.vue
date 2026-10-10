@@ -9,8 +9,15 @@
     >
       <header class="cp-banner">
         <div class="cp-banner-sky"></div>
-        <button class="cp-close" :title="t('browse.detail.close')" @click="emit('close')">✕</button>
-        <div class="cp-avatar">{{ profile.avatar }}</div>
+        <button
+          class="cp-close"
+          :title="t('browse.detail.close')"
+          :aria-label="t('browse.detail.close')"
+          @click="emit('close')"
+        >
+          <UiIcon name="x" :size="18" />
+        </button>
+        <div class="cp-avatar"><UiIcon :name="profile.avatar" :size="38" :stroke="1.75" /></div>
       </header>
       <div class="cp-body">
         <div class="cp-id">
@@ -24,20 +31,23 @@
             @click="toggleFollow"
             @animationend="burst = false"
           >
+            <UiIcon :name="following ? 'check' : 'plus'" :size="16" />
             <span class="cp-follow-face">{{
-              following ? '✓ ' + t('browse.profile.following') : '＋ ' + t('browse.profile.follow')
+              following ? t('browse.profile.following') : t('browse.profile.follow')
             }}</span>
             <i v-for="n in 8" :key="n" class="cp-spark" :style="{ '--a': n * 45 + 'deg' }"></i>
           </button>
         </div>
         <div v-if="profile.badges.length" class="cp-badges">
           <span v-for="b in profile.badges" :key="b" class="cp-badge" :class="b">
-            {{ BADGE_ICON[b] }} {{ t('browse.profile.badges.' + b) }}
+            <UiIcon :name="BADGE_ICON[b]" :size="13" />
+            {{ t('browse.profile.badges.' + b) }}
           </span>
         </div>
         <p class="cp-bio">{{ profile.bio }}</p>
         <p class="cp-meta">
-          📍 {{ profile.location }} · {{ t('browse.profile.joined', { date: joined }) }}
+          <UiIcon name="map-pin" :size="14" />
+          <span>{{ profile.location }} · {{ t('browse.profile.joined', { date: joined }) }}</span>
         </p>
         <div class="cp-stats">
           <div>
@@ -82,6 +92,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from '../../i18n'
 import BrowseCard from './BrowseCard.vue'
+import UiIcon from '../ui/UiIcon.js'
 import { PROJECTS } from './browseData'
 
 const props = defineProps({
@@ -91,7 +102,13 @@ const props = defineProps({
 const emit = defineEmits(['close', 'open'])
 const { t, locale } = useI18n()
 
-const BADGE_ICON = { staff: '✦', historian: '🏛️', otaku: '🎌', critic: '🧐', pioneer: '🚀' }
+const BADGE_ICON = {
+  staff: 'badge-check',
+  historian: 'landmark',
+  otaku: 'tv',
+  critic: 'glasses',
+  pioneer: 'rocket'
+}
 
 const trees = computed(() => PROJECTS.filter((p) => p.authorId === props.profile.id))
 const totalLikes = computed(() => trees.value.reduce((s, p) => s + p.likes, 0))
@@ -149,8 +166,12 @@ function compactNum(n) {
   position: absolute;
   top: 12px;
   right: 12px;
-  width: 32px;
-  height: 32px;
+  width: var(--ctl-md);
+  height: var(--ctl-md);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.3);
   background: rgba(10, 12, 22, 0.4);
@@ -166,7 +187,7 @@ function compactNum(n) {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 40px;
+  color: hsl(var(--h) 60% 50%);
   background: var(--surface);
   border: 4px solid var(--bg);
   box-shadow:
@@ -201,7 +222,12 @@ function compactNum(n) {
 }
 .cp-follow {
   position: relative;
-  padding: 8px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ctl-md);
+  padding: 0 18px;
   border-radius: var(--r-pill);
   border: none;
   font-weight: 800;
@@ -261,7 +287,10 @@ function compactNum(n) {
   margin-top: 12px;
 }
 .cp-badge {
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
   font-weight: 800;
   padding: 3px 10px;
   border-radius: var(--r-pill);
@@ -279,8 +308,11 @@ function compactNum(n) {
   color: var(--t1);
 }
 .cp-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
 }
 .cp-stats {
@@ -303,7 +335,7 @@ function compactNum(n) {
   color: var(--t1);
 }
 .cp-stats span {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t2);
   text-align: center;
 }
@@ -353,6 +385,7 @@ function compactNum(n) {
   color: var(--t1);
 }
 :root[data-theme='ink'] .cp-avatar {
+  color: var(--t1);
   border-radius: 6px 9px 5px 10px / 9px 5px 10px 6px;
   border-color: var(--surface);
   box-shadow:

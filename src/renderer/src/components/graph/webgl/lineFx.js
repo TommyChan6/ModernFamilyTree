@@ -17,14 +17,14 @@
 
 /** The catalog — order is the Style panel's order. */
 export const LINE_FX = [
-  { id: 'none', n: 0, pad: 1, body: 0, label: 'Classic', icon: '／', hint: 'Plain lines' },
+  { id: 'none', n: 0, pad: 1, body: 0, label: 'Classic', icon: 'minus', hint: 'Plain lines' },
   {
     id: 'blood',
     n: 1,
     pad: 2.6,
     body: 7.5,
     label: 'Bloodstream',
-    icon: '🩸',
+    icon: 'droplet',
     hint: 'A living vessel — red cells drift down the generations on a heartbeat'
   },
   {
@@ -33,7 +33,7 @@ export const LINE_FX = [
     pad: 2.2,
     body: 9,
     label: 'River',
-    icon: '🌊',
+    icon: 'waves',
     hint: 'Flowing water — caustic light, current streaks, foam at the banks'
   },
   {
@@ -42,7 +42,7 @@ export const LINE_FX = [
     pad: 4.2,
     body: 4.5,
     label: 'Neon',
-    icon: '⚡',
+    icon: 'zap',
     hint: 'Cyber conduit — white-hot core, data packets racing, circuit ticks'
   },
   {
@@ -51,7 +51,7 @@ export const LINE_FX = [
     pad: 1.6,
     body: 11,
     label: 'Helix',
-    icon: '🧬',
+    icon: 'dna',
     hint: 'A DNA double helix twisting along the line, base pairs glowing'
   },
   {
@@ -60,7 +60,7 @@ export const LINE_FX = [
     pad: 2.8,
     body: 7,
     label: 'Ember',
-    icon: '🔥',
+    icon: 'flame',
     hint: 'A line of fire — licking flames and sparks thrown into the dark'
   },
   {
@@ -69,7 +69,7 @@ export const LINE_FX = [
     pad: 2.6,
     body: 10,
     label: 'Aurora',
-    icon: '🌌',
+    icon: 'rainbow',
     hint: 'Northern lights — shifting curtains of green and violet'
   },
   {
@@ -78,7 +78,7 @@ export const LINE_FX = [
     pad: 3.6,
     body: 6,
     label: 'Storm',
-    icon: '🌩',
+    icon: 'cloud-lightning',
     hint: 'Crackling lightning that re-strikes as you watch'
   },
   {
@@ -87,7 +87,7 @@ export const LINE_FX = [
     pad: 2.6,
     body: 8,
     label: 'Starlight',
-    icon: '✨',
+    icon: 'sparkles',
     hint: 'A constellation — twinkling stars strung on a silver thread'
   },
   {
@@ -96,7 +96,7 @@ export const LINE_FX = [
     pad: 2.4,
     body: 6.5,
     label: 'Gilded',
-    icon: '👑',
+    icon: 'crown',
     hint: 'A royal gold rope with a shine that travels its length'
   }
 ]

@@ -209,7 +209,7 @@ const seal = useInkSeal(
 }
 .hf-dates {
   font-family: var(--font-ink-serif);
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: #5d5246;
   white-space: nowrap;
   padding-top: 6px;

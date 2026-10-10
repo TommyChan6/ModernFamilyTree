@@ -8,7 +8,14 @@
               <h2 class="exp-h2">Export image</h2>
               <p class="exp-sub">Compose a picture of your project and save it anywhere</p>
             </div>
-            <button class="exp-close" title="Close (Esc)" @click="emit('close')">×</button>
+            <button
+              class="icon-btn exp-close"
+              title="Close (Esc)"
+              aria-label="Close"
+              @click="emit('close')"
+            >
+              <UiIcon name="x" :size="16" />
+            </button>
           </header>
 
           <div class="exp-body">
@@ -33,12 +40,12 @@
                   @pointercancel="onCropUp"
                 >
                   <div v-if="cropDraft" class="exp-crop-rect" :style="cropRectStyle">
-                    <span class="exp-crop-hint">drag to reframe</span>
+                    <span class="exp-crop-hint">Drag to reframe</span>
                   </div>
                   <div v-else class="exp-crop-cta">Drag to frame the part you want</div>
                 </div>
                 <div v-if="empty && !rendering" class="exp-empty">
-                  <span class="exp-empty-icon">{{ viewMeta[srcView].icon }}</span>
+                  <UiIcon class="exp-empty-icon" :name="viewMeta[srcView].icon" :size="34" />
                   <p>Nothing to picture in the {{ viewMeta[srcView].label }} view yet.</p>
                 </div>
                 <div v-if="rendering" class="exp-shimmer"></div>
@@ -46,8 +53,8 @@
               <div class="exp-preview-meta">
                 <span class="exp-dims">{{ exportW }} × {{ exportH }} px</span>
                 <span v-if="crop && !cropMode" class="exp-crop-tag">
-                  cropped
-                  <button class="exp-mini-btn" @click="resetCrop">reset</button>
+                  Cropped
+                  <button class="exp-mini-btn" @click="resetCrop">Reset</button>
                 </span>
               </div>
             </div>
@@ -64,7 +71,8 @@
                     :class="{ on: srcView === v }"
                     @click="srcView = v"
                   >
-                    {{ viewMeta[v].icon }} {{ viewMeta[v].label }}
+                    <UiIcon :name="viewMeta[v].icon" :size="14" />
+                    {{ viewMeta[v].label }}
                   </button>
                 </div>
               </section>
@@ -173,7 +181,8 @@
                     :class="{ 'exp-crop-on': cropMode }"
                     @click="toggleCropMode"
                   >
-                    {{ cropMode ? '✓ Done' : '✂ Crop' }}
+                    <UiIcon :name="cropMode ? 'check' : 'scissors'" :size="14" />
+                    {{ cropMode ? 'Done' : 'Crop' }}
                   </button>
                   <button v-if="crop" class="btn btn-ghost btn-sm" @click="resetCrop">Reset</button>
                 </div>
@@ -198,9 +207,15 @@
                 :disabled="empty || exporting"
                 @click="doExport"
               >
-                <span v-if="justSaved">✓ Saved</span>
-                <span v-else-if="exporting">Rendering…</span>
-                <span v-else>⬇ Download</span>
+                <template v-if="justSaved">
+                  <UiIcon name="check" :size="16" />
+                  Saved
+                </template>
+                <template v-else-if="exporting">Rendering…</template>
+                <template v-else>
+                  <UiIcon name="download" :size="16" />
+                  Download
+                </template>
               </button>
             </div>
           </footer>
@@ -213,6 +228,7 @@
 <script setup>
 import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useMainStore } from '../store/index.js'
+import UiIcon from './ui/UiIcon.js'
 import {
   RESOLUTION_PRESETS,
   EXPORT_FORMATS,
@@ -237,9 +253,9 @@ const emit = defineEmits(['close'])
 const store = useMainStore()
 
 const viewMeta = {
-  graph: { icon: '🕸', label: 'Graph' },
-  timeline: { icon: '📅', label: 'Timeline' },
-  groups: { icon: '⬡', label: 'Groups' }
+  graph: { icon: 'graph', label: 'Graph' },
+  timeline: { icon: 'timeline', label: 'Timeline' },
+  groups: { icon: 'groups', label: 'Groups' }
 }
 const exportableViews = computed(() =>
   ['graph', 'timeline', 'groups'].filter((v) => store.caps.views.includes(v))
@@ -706,27 +722,12 @@ onUnmounted(() => {
   margin: 0;
 }
 .exp-sub {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--t2);
   margin: 3px 0 0;
 }
 .exp-close {
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--t3);
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background 0.13s,
-    color 0.13s;
-}
-.exp-close:hover {
-  background: var(--hover);
-  color: var(--t1);
+  margin: -4px -6px 0 0;
 }
 
 /* ── Body ───────────────────────────────────────────────── */
@@ -815,8 +816,7 @@ onUnmounted(() => {
   padding: 24px;
 }
 .exp-empty-icon {
-  font-size: 34px;
-  opacity: 0.5;
+  color: var(--t3);
 }
 
 /* crop */
@@ -837,14 +837,13 @@ onUnmounted(() => {
   justify-content: center;
 }
 .exp-crop-hint {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--accent);
   background: var(--surface);
   border-radius: 6px;
   padding: 2px 7px;
   margin-bottom: 6px;
-  opacity: 0.9;
   pointer-events: none;
   white-space: nowrap;
 }
@@ -853,7 +852,7 @@ onUnmounted(() => {
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--t1);
   background: var(--glass-soft, rgba(24, 28, 39, 0.82));
@@ -868,7 +867,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t3);
   min-height: 18px;
 }
@@ -883,10 +882,10 @@ onUnmounted(() => {
   border: none;
   background: var(--adim);
   color: var(--accent);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
   border-radius: 6px;
-  padding: 1px 7px;
+  padding: 2px 8px;
   cursor: pointer;
 }
 .exp-mini-btn:hover {
@@ -909,7 +908,7 @@ onUnmounted(() => {
   gap: 8px;
 }
 .exp-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.7px;
@@ -927,13 +926,18 @@ onUnmounted(() => {
 }
 .exp-seg-btn {
   flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: var(--ctl-sm);
   border: none;
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
-  padding: 5px 4px;
+  padding: 0 4px;
   border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
@@ -967,7 +971,7 @@ onUnmounted(() => {
 }
 .exp-x,
 .exp-unit {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 
@@ -975,7 +979,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--t2);
 }
 .exp-slider-row input[type='range'] {
@@ -993,14 +997,14 @@ onUnmounted(() => {
   text-align: right;
   font-variant-numeric: tabular-nums;
   color: var(--t3);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .exp-check-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--t2);
   cursor: pointer;
 }
@@ -1037,7 +1041,7 @@ onUnmounted(() => {
   max-width: 320px;
 }
 .exp-ext {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 .exp-actions {

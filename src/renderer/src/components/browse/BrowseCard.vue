@@ -16,9 +16,9 @@
       <div class="bc-tree">
         <MiniTree :layout="tree" :highlight="hits" />
       </div>
-      <span class="bc-crest">{{ project.crest }}</span>
+      <UiIcon class="bc-crest" :name="project.crest" :size="40" :stroke="1.5" />
       <span class="bc-mode" :title="t('browse.modes.' + project.access + '.desc')">
-        <span class="bc-mode-icon">{{ ACCESS_ICONS[project.access] }}</span>
+        <UiIcon class="bc-mode-icon" :name="ACCESS_ICONS[project.access]" :size="12" />
         {{ t('browse.modes.' + project.access + '.name') }}
       </span>
       <span v-if="project.badge" class="bc-badge" :class="project.badge">
@@ -29,20 +29,22 @@
           class="bc-qbtn"
           :class="{ on: liked, pop: likePop }"
           :title="liked ? t('browse.card.unlike') : t('browse.card.like')"
+          :aria-label="liked ? t('browse.card.unlike') : t('browse.card.like')"
           :aria-pressed="liked"
           @click="like"
           @animationend="likePop = false"
         >
-          {{ liked ? '❤️' : '🤍' }}
+          <UiIcon name="heart" :size="14" />
         </button>
         <button
           class="bc-qbtn"
           :class="{ on: saved }"
           :title="saved ? t('browse.card.unsave') : t('browse.card.save')"
+          :aria-label="saved ? t('browse.card.unsave') : t('browse.card.save')"
           :aria-pressed="saved"
           @click="emit('save', project.id)"
         >
-          {{ saved ? '🔖' : '📑' }}
+          <UiIcon name="bookmark" :size="14" />
         </button>
       </div>
     </div>
@@ -50,23 +52,47 @@
     <div class="bc-body">
       <h3 class="bc-title">{{ project.title }}</h3>
       <button v-if="author" class="bc-author" @click.stop="emit('author', author.id)">
-        <span class="bc-avatar" :style="{ '--ah': author.hue }">{{ author.avatar }}</span>
+        <span class="bc-avatar" :style="{ '--ah': author.hue }">
+          <UiIcon :name="author.avatar" :size="12" />
+        </span>
         <span class="bc-author-name">{{ author.displayName }}</span>
-        <span v-if="author.badges.includes('staff')" class="bc-verified" title="Staff">✦</span>
+        <UiIcon
+          v-if="author.badges.includes('staff')"
+          class="bc-verified"
+          name="badge-check"
+          :size="14"
+          :label="t('browse.profile.badges.staff')"
+        />
       </button>
       <p v-if="!compact" class="bc-blurb">{{ project.blurb }}</p>
       <p v-if="hits.length" class="bc-hits">
-        <span class="bc-hits-label">🔎 {{ t('browse.card.found') }}</span>
+        <span class="bc-hits-label">
+          <UiIcon name="search" :size="12" />
+          {{ t('browse.card.found') }}
+        </span>
         {{ hits.join(' · ') }}
       </p>
-      <p v-if="reason" class="bc-reason">✨ {{ reason }}</p>
+      <p v-if="reason" class="bc-reason">
+        <UiIcon name="sparkles" :size="13" />
+        <span>{{ reason }}</span>
+      </p>
       <footer class="bc-stats">
-        <span :title="t('browse.stats.people')">👥 {{ project.people.length }}</span>
-        <span :title="t('browse.stats.gens')">🌿 {{ tree.generations }}</span>
-        <span :title="t('browse.stats.likes')">❤ {{ compactNum(likes) }}</span>
-        <span v-if="project.forks" :title="t('browse.stats.forks')"
-          >⑂ {{ compactNum(project.forks) }}</span
-        >
+        <span :title="t('browse.stats.people')">
+          <UiIcon name="users" :size="14" />
+          {{ project.people.length }}
+        </span>
+        <span :title="t('browse.stats.gens')">
+          <UiIcon name="tree-deciduous" :size="14" />
+          {{ tree.generations }}
+        </span>
+        <span :title="t('browse.stats.likes')">
+          <UiIcon name="heart" :size="14" />
+          {{ compactNum(likes) }}
+        </span>
+        <span v-if="project.forks" :title="t('browse.stats.forks')">
+          <UiIcon name="git-fork" :size="14" />
+          {{ compactNum(project.forks) }}
+        </span>
         <span class="bc-lang">{{ LANG_SHORT[project.lang] }}</span>
       </footer>
     </div>
@@ -77,6 +103,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from '../../i18n'
 import MiniTree from './MiniTree.vue'
+import UiIcon from '../ui/UiIcon.js'
 import { ACCESS_ICONS, treeOf } from './browseModel'
 
 const props = defineProps({
@@ -204,9 +231,8 @@ function untilt(e) {
 .bc-crest {
   position: absolute;
   right: 10px;
-  bottom: 4px;
-  font-size: 40px;
-  line-height: 1;
+  bottom: 8px;
+  color: hsl(var(--h) 70% 82%);
   opacity: 0.9;
   filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
   transform: rotate(-8deg);
@@ -225,16 +251,13 @@ function untilt(e) {
   gap: 5px;
   padding: 3px 9px 3px 6px;
   border-radius: var(--r-pill);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 800;
   letter-spacing: 0.02em;
   color: #fff;
   background: rgba(10, 12, 22, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.18);
   backdrop-filter: blur(6px);
-}
-.bc-mode-icon {
-  font-size: 12px;
 }
 .mode-glasshouse .bc-mode {
   box-shadow: inset 0 0 0 1px rgba(160, 200, 255, 0.35);
@@ -255,7 +278,7 @@ function untilt(e) {
   right: 10px;
   padding: 3px 8px;
   border-radius: var(--r-pill);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   color: #1a1d2e;
   background: #ffe27a;
@@ -287,20 +310,28 @@ function untilt(e) {
   transform: none;
 }
 .bc-qbtn {
-  width: 30px;
-  height: 30px;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.22);
   background: rgba(10, 12, 22, 0.55);
   backdrop-filter: blur(6px);
-  font-size: 14px;
+  color: #fff;
   cursor: pointer;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: transform 0.2s var(--ease-spring);
 }
 .bc-qbtn:hover {
   transform: scale(1.12);
+}
+.bc-qbtn.on .ui-icon {
+  fill: currentColor;
+}
+.bc-qbtn.on:first-child {
+  color: var(--danger);
 }
 .bc-qbtn.pop {
   animation: bc-pop 0.5s var(--ease-spring);
@@ -346,7 +377,7 @@ function untilt(e) {
   border-radius: var(--r-pill);
   background: transparent;
   color: var(--t2);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   max-width: 100%;
@@ -361,7 +392,7 @@ function untilt(e) {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 12px;
+  color: var(--t1);
   background: hsl(var(--ah) 60% 50% / 0.22);
   box-shadow: inset 0 0 0 1px hsl(var(--ah) 60% 55% / 0.45);
   flex-shrink: 0;
@@ -372,12 +403,12 @@ function untilt(e) {
   white-space: nowrap;
 }
 .bc-verified {
+  flex-shrink: 0;
   color: var(--accent);
-  font-size: 11px;
 }
 .bc-blurb {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
   line-height: 1.5;
   display: -webkit-box;
@@ -387,7 +418,7 @@ function untilt(e) {
 }
 .bc-hits {
   margin: 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t1);
   background: rgba(var(--accent-rgb), 0.1);
   border: 1px solid rgba(var(--accent-rgb), 0.25);
@@ -398,15 +429,28 @@ function untilt(e) {
   white-space: nowrap;
 }
 .bc-hits-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
   color: var(--accent);
   font-weight: 700;
   margin-right: 4px;
 }
 .bc-reason {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   margin: 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--accent);
+}
+.bc-reason .ui-icon {
+  flex-shrink: 0;
+}
+.bc-reason span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -416,13 +460,21 @@ function untilt(e) {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
   padding-top: 4px;
 }
+.bc-stats > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.bc-stats .ui-icon {
+  color: var(--t3);
+}
 .bc-lang {
   margin-left: auto;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   padding: 1px 6px;
   border-radius: var(--r-xs);
@@ -471,7 +523,8 @@ function untilt(e) {
   background: linear-gradient(180deg, transparent 30%, rgba(245, 239, 224, 0.35));
 }
 :root[data-theme='ink'] .bc-crest {
-  filter: grayscale(1) sepia(0.35) contrast(1.1) drop-shadow(0 2px 4px rgba(60, 40, 15, 0.25));
+  color: var(--t1);
+  filter: drop-shadow(0 2px 4px rgba(60, 40, 15, 0.25));
   opacity: 0.75;
 }
 :root[data-theme='ink'] .bc-mode {
@@ -482,9 +535,6 @@ function untilt(e) {
   backdrop-filter: none;
   font-family: var(--font-ink-label);
   font-weight: 600;
-}
-:root[data-theme='ink'] .bc-mode-icon {
-  filter: grayscale(1) sepia(0.4);
 }
 :root[data-theme='ink'] .bc-badge,
 :root[data-theme='ink'] .bc-badge.trending,
@@ -514,6 +564,9 @@ function untilt(e) {
   background: rgba(245, 239, 224, 0.9);
   border-color: var(--ink-mount-line);
   backdrop-filter: none;
-  filter: grayscale(0.6) sepia(0.3);
+  color: var(--t1);
+}
+:root[data-theme='ink'] .bc-qbtn.on:first-child {
+  color: var(--accent);
 }
 </style>

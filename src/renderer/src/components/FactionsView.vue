@@ -10,16 +10,20 @@
         <span class="fx-hint"
           >Drag people into rings · Drag rings to arrange · Click a person to manage</span
         >
-        <button class="btn btn-sm" @click="store.openForm()">＋ {{ store.noun }}</button>
+        <button class="btn btn-sm" @click="store.openForm()">
+          <UiIcon name="plus" :size="14" />{{ store.noun }}
+        </button>
         <button
           v-if="visibleFactions.length > 1"
           class="btn btn-sm"
           title="Arrange groups in a ring"
           @click="autoArrange"
         >
-          ✨ Arrange
+          <UiIcon name="sparkles" :size="14" />Arrange
         </button>
-        <button class="btn btn-primary btn-sm" @click="handleCreateFaction">＋ New Group</button>
+        <button class="btn btn-primary btn-sm" @click="handleCreateFaction">
+          <UiIcon name="plus" :size="14" />New group
+        </button>
         <CanvasToggles
           show-focus
           :focus="focusOpen"
@@ -55,7 +59,7 @@
 
       <!-- Empty state -->
       <div v-if="!activeFactions.length" class="fx-empty">
-        <div class="fx-empty-icon">⬡</div>
+        <UiIcon class="fx-empty-icon" name="groups" :size="44" :stroke="1.6" />
         <div class="fx-empty-title">
           {{ store.groupsScenes.length > 1 ? 'No groups in this scene' : 'No groups yet' }}
         </div>
@@ -64,7 +68,8 @@
           in several groups settle in the middle ground between them.
         </div>
         <button class="btn btn-primary" @click="handleCreateFaction">
-          ＋ Create {{ store.groupsScenes.length > 1 ? 'a' : 'your first' }} group
+          <UiIcon name="plus" :size="16" />Create
+          {{ store.groupsScenes.length > 1 ? 'a' : 'your first' }} group
         </button>
       </div>
 
@@ -84,10 +89,16 @@
         @pointerdown.stop
         @click.stop
       >
-        <button class="fx-ctrl-btn" title="Zoom in" @click="zoomBy(1.3333)">＋</button>
-        <button class="fx-ctrl-btn" title="Zoom out" @click="zoomBy(0.75)">－</button>
+        <button class="fx-ctrl-btn" title="Zoom in" aria-label="Zoom in" @click="zoomBy(1.3333)">
+          <UiIcon name="zoom-in" :size="16" />
+        </button>
+        <button class="fx-ctrl-btn" title="Zoom out" aria-label="Zoom out" @click="zoomBy(0.75)">
+          <UiIcon name="zoom-out" :size="16" />
+        </button>
         <div class="fx-ctrl-sep"></div>
-        <button class="fx-ctrl-btn" title="Fit all" @click="fitAll(true)">⊡</button>
+        <button class="fx-ctrl-btn" title="Fit all" aria-label="Fit all" @click="fitAll(true)">
+          <UiIcon name="maximize" :size="16" />
+        </button>
         <div class="fx-ctrl-sep"></div>
         <span class="fx-zoom-label">{{ Math.round(k * 100) }}%</span>
       </div>
@@ -114,10 +125,13 @@
                   v-for="o in genderFocusOpts"
                   :key="o.id"
                   class="fx-focus-chip"
-                  :class="{ on: focusGender === o.id }"
+                  :class="{ on: focusGender === o.id, 'is-icon': !!o.icon }"
+                  :title="o.icon ? o.label : undefined"
+                  :aria-label="o.label"
                   @click="focusGender = o.id"
                 >
-                  {{ o.label }}
+                  <UiIcon v-if="o.icon" :name="o.icon" :size="14" />
+                  <template v-else>{{ o.label }}</template>
                 </button>
               </div>
             </div>
@@ -162,12 +176,18 @@
               <button
                 class="fx-mbtn"
                 :title="f.visible === false ? 'Show group' : 'Hide group'"
+                :aria-label="f.visible === false ? 'Show group' : 'Hide group'"
                 @click="toggleVisible(f)"
               >
-                {{ f.visible === false ? '◌' : '👁' }}
+                <UiIcon :name="f.visible === false ? 'eye-off' : 'eye'" :size="14" />
               </button>
-              <button class="fx-mbtn" title="Edit group" @click="openFactionEdit(f.id, $event)">
-                ✎
+              <button
+                class="fx-mbtn"
+                title="Edit group"
+                aria-label="Edit group"
+                @click="openFactionEdit(f.id, $event)"
+              >
+                <UiIcon name="pencil" :size="14" />
               </button>
             </div>
             <div v-if="sharedCount" class="fx-mfoot">{{ sharedCount }} in multiple groups</div>
@@ -238,17 +258,7 @@
               @click="fEdit.color = c"
             ></button>
           </div>
-          <div class="fx-icon-row">
-            <button
-              v-for="ic in ICON_PRESETS"
-              :key="ic"
-              class="fx-icon-opt"
-              :class="{ active: fEdit.icon === ic }"
-              @click="fEdit.icon = ic"
-            >
-              {{ ic }}
-            </button>
-          </div>
+          <IconPicker v-model="fEdit.icon" :options="ICON_PRESETS" aria-label="Group icon" />
           <div class="fx-popup-actions">
             <button class="fx-pbtn danger" @click="handleDeleteFaction">Delete</button>
             <span class="fx-popup-spacer"></span>
@@ -284,17 +294,18 @@
               <button
                 class="fx-fchip-x"
                 title="Remove from group"
+                aria-label="Remove from group"
                 @click="store.removePersonFromGroup(pPop.id, f.id)"
               >
-                ✕
+                <UiIcon name="x" :size="12" />
               </button>
             </span>
             <span v-if="!pPopMemberships.length" class="fx-nochips">No groups yet</span>
           </div>
           <select v-if="pPopAddable.length" class="fx-select" @change="onAddToFaction($event)">
-            <option value="" disabled selected>＋ Add to group…</option>
+            <option value="" disabled selected>Add to group…</option>
             <option v-for="f in pPopAddable" :key="f.id" :value="f.id">
-              {{ f.icon }} {{ f.name }}
+              {{ f.name }}
             </option>
           </select>
           <div class="fx-popup-actions">
@@ -345,6 +356,8 @@ import { withAlpha } from './webgl/overlayUtils.js'
 import SceneTabs from './SceneTabs.vue'
 import MiniMap from './MiniMap.vue'
 import CanvasToggles from './CanvasToggles.vue'
+import UiIcon from './ui/UiIcon.js'
+import IconPicker from './ui/IconPicker.vue'
 import { confirmDialog } from '../lib/dialogs.js'
 import { translate as tr } from '../i18n'
 
@@ -367,7 +380,22 @@ const PRESET_COLORS = [
   '#ff8a65',
   '#7986cb'
 ]
-const ICON_PRESETS = ['⚑', '🏰', '🛡', '⚔', '👑', '🎓', '🏢', '⚡', '🔥', '💧', '🌿', '🌙']
+// Group icons (icon names, components/ui/icons.js) — the picker's search
+// reaches the full set; new groups cycle through these.
+const ICON_PRESETS = [
+  'flag',
+  'castle',
+  'shield',
+  'swords',
+  'crown',
+  'graduation-cap',
+  'building-2',
+  'zap',
+  'flame',
+  'droplet',
+  'leaf',
+  'moon'
+]
 const MIN_K = 0.2
 const MAX_K = 3
 const GLIDE_MS = 480
@@ -758,9 +786,9 @@ const focusGender = ref('all') // 'all' | 'male' | 'female' | 'unknown'
 const focusLife = ref('all') // 'all' | 'living' | 'deceased'
 const genderFocusOpts = [
   { id: 'all', label: 'All' },
-  { id: 'male', label: '♂' },
-  { id: 'female', label: '♀' },
-  { id: 'unknown', label: '?' }
+  { id: 'male', label: 'Male', icon: 'mars' },
+  { id: 'female', label: 'Female', icon: 'venus' },
+  { id: 'unknown', label: 'Unknown', icon: 'circle-help' }
 ]
 const lifeFocusOpts = [
   { id: 'all', label: 'All' },
@@ -1343,7 +1371,7 @@ function openFactionEdit(fid, e) {
   if (!f) return
   pPop.value = null
   const s = e ? toScreen(e) : { x: stageW.value / 2 - 130, y: stageH.value / 2 - 160 }
-  const { px, py } = clampPopup(s.x + 12, s.y + 12, 260, 320)
+  const { px, py } = clampPopup(s.x + 12, s.y + 12, 260, 400)
   fEdit.value = {
     id: f.id,
     name: f.name,
@@ -1651,7 +1679,7 @@ onBeforeUnmount(() => {
   color: var(--t1);
 }
 .fx-count {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--accent);
   background: var(--adim);
@@ -1665,7 +1693,7 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 .fx-hint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
   font-weight: 500;
 }
@@ -1733,7 +1761,6 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 15px;
   width: 30px;
   height: 30px;
   border-radius: 7px;
@@ -1750,7 +1777,7 @@ onBeforeUnmount(() => {
   color: var(--t1);
 }
 .fx-zoom-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t3);
   min-width: 42px;
@@ -1804,7 +1831,7 @@ onBeforeUnmount(() => {
   opacity: 0.55;
 }
 .fx-focus-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t2);
   min-width: 46px;
@@ -1815,13 +1842,17 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 .fx-focus-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 0 10px;
   border-radius: 16px;
   cursor: pointer;
   transition:
@@ -1829,6 +1860,10 @@ onBeforeUnmount(() => {
     color 0.16s ease,
     border-color 0.16s ease,
     transform 0.16s cubic-bezier(0.34, 1.5, 0.5, 1);
+}
+.fx-focus-chip.is-icon {
+  width: 30px;
+  padding: 0;
 }
 .fx-focus-chip:hover:not(:disabled) {
   color: var(--t1);
@@ -1844,7 +1879,7 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 .fx-panel-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -1876,7 +1911,7 @@ onBeforeUnmount(() => {
 .fx-mname {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--t1);
   white-space: nowrap;
@@ -1884,7 +1919,7 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
 }
 .fx-mcount {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--t3);
   font-variant-numeric: tabular-nums;
@@ -1897,7 +1932,6 @@ onBeforeUnmount(() => {
   height: 22px;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1909,7 +1943,8 @@ onBeforeUnmount(() => {
   opacity: 0;
 }
 .fx-mrow:hover .fx-mbtn,
-.fx-mrow.off .fx-mbtn:first-of-type {
+.fx-mrow.off .fx-mbtn:first-of-type,
+.fx-mbtn:focus-visible {
   opacity: 1;
 }
 .fx-mbtn:hover {
@@ -1917,7 +1952,7 @@ onBeforeUnmount(() => {
   color: var(--accent);
 }
 .fx-mfoot {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
   font-weight: 500;
   padding: 6px 4px 0;
@@ -1942,7 +1977,7 @@ onBeforeUnmount(() => {
   cursor: default;
 }
 .fx-tray-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -1952,7 +1987,7 @@ onBeforeUnmount(() => {
   gap: 6px;
 }
 .fx-tray-count {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--accent);
   background: var(--adim);
@@ -1960,9 +1995,8 @@ onBeforeUnmount(() => {
   border-radius: 8px;
 }
 .fx-tray-hint {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
-  opacity: 0.8;
   margin: 2px 0 7px;
 }
 .fx-tray-chips {
@@ -1980,7 +2014,7 @@ onBeforeUnmount(() => {
   background: var(--elevated);
   border: 1px solid var(--border);
   border-radius: 20px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--t2);
   cursor: grab;
@@ -2040,7 +2074,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--t1);
   white-space: nowrap;
@@ -2049,7 +2083,7 @@ onBeforeUnmount(() => {
 }
 .fx-input,
 .fx-select {
-  font-size: 12px;
+  font-size: 12.5px;
   padding: 7px 9px;
 }
 
@@ -2077,35 +2111,6 @@ onBeforeUnmount(() => {
   transform: scale(1.12);
 }
 
-.fx-icon-row {
-  display: flex;
-  gap: 3px;
-  flex-wrap: wrap;
-}
-.fx-icon-opt {
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-  border: 1px solid transparent;
-  background: transparent;
-  font-size: 13px;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    background 0.12s,
-    border-color 0.12s;
-}
-.fx-icon-opt:hover {
-  background: var(--hover);
-}
-.fx-icon-opt.active {
-  background: var(--adim);
-  border-color: var(--accent);
-}
-
 .fx-popup-actions {
   display: flex;
   align-items: center;
@@ -2119,7 +2124,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   padding: 5px 12px;
   border-radius: 8px;
@@ -2133,7 +2138,7 @@ onBeforeUnmount(() => {
 .fx-pbtn.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent, #fff);
 }
 .fx-pbtn.primary:hover {
   filter: brightness(1.1);
@@ -2159,17 +2164,21 @@ onBeforeUnmount(() => {
   background: var(--elevated);
   border: 1px solid;
   border-radius: 14px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t1);
 }
 .fx-fchip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
   border: none;
   background: transparent;
   color: var(--t3);
-  font-size: 9px;
   cursor: pointer;
-  padding: 1px 2px;
+  padding: 0;
   border-radius: 4px;
   transition: color 0.12s;
 }
@@ -2177,7 +2186,7 @@ onBeforeUnmount(() => {
   color: var(--danger);
 }
 .fx-nochips {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
   font-style: italic;
 }
@@ -2211,9 +2220,7 @@ onBeforeUnmount(() => {
   color: var(--t2);
 }
 .fx-empty-icon {
-  font-size: 44px;
-  opacity: 0.55;
-  color: var(--accent);
+  color: rgba(var(--accent-rgb), 0.6);
 }
 .fx-empty-title {
   font-size: 16px;

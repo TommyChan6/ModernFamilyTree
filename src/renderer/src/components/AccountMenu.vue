@@ -1,9 +1,16 @@
 <template>
   <div ref="rootRef" class="account">
-    <button class="account-chip" :class="{ open }" :title="store.authUser.username" @click="toggle">
+    <button
+      class="account-chip"
+      :class="{ open }"
+      :title="store.authUser.username"
+      aria-haspopup="menu"
+      :aria-expanded="open"
+      @click="toggle"
+    >
       <span class="account-avatar" :style="avatarStyle">{{ initial }}</span>
       <span class="account-name">{{ shownName }}</span>
-      <span class="account-caret" :class="{ flipped: open }">▾</span>
+      <UiIcon class="account-caret" :class="{ flipped: open }" name="chevron-down" :size="14" />
     </button>
 
     <Transition name="acct-menu">
@@ -35,21 +42,31 @@
         </div>
 
         <button v-if="!store.isPaid && !store.isGuest" class="menu-upsell" @click="upgrade">
-          <span class="menu-upsell-spark">✦</span>
+          <UiIcon class="menu-upsell-spark" name="sparkles" :size="18" />
           <span class="menu-upsell-text">
             <b>{{ t('billing.menu.title') }}</b>
             <span>{{ t('billing.menu.body') }}</span>
           </span>
-          <span class="menu-upsell-arrow">→</span>
+          <UiIcon class="menu-upsell-arrow" name="arrow-right" :size="16" />
         </button>
 
         <div class="menu-sep"></div>
         <button v-if="!store.isGuest" class="menu-item" @click="openBilling">
-          💳 {{ t('billing.menu.billing') }}
+          <UiIcon name="credit-card" :size="16" />
+          {{ t('billing.menu.billing') }}
         </button>
-        <button class="menu-item" @click="openProfile">👤 {{ t('account.myProfile') }}</button>
-        <button class="menu-item" @click="openLegal">📄 Terms &amp; Privacy</button>
-        <button class="menu-item danger" @click="signOut">↩ Sign out</button>
+        <button class="menu-item" @click="openProfile">
+          <UiIcon name="user" :size="16" />
+          {{ t('account.myProfile') }}
+        </button>
+        <button class="menu-item" @click="openLegal">
+          <UiIcon name="file-text" :size="16" />
+          Terms &amp; Privacy
+        </button>
+        <button class="menu-item danger" @click="signOut">
+          <UiIcon name="log-out" :size="16" />
+          Sign out
+        </button>
       </div>
     </Transition>
 
@@ -64,6 +81,7 @@ import { useI18n } from '../i18n'
 import { avatarStyleFor } from '../lib/avatar.js'
 import LegalModal from './LegalModal.vue'
 import PlanBadge from './billing/PlanBadge.vue'
+import UiIcon from './ui/UiIcon.js'
 
 const store = useMainStore()
 const { t } = useI18n()
@@ -136,13 +154,14 @@ onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 4px 9px 4px 4px;
+  height: var(--ctl-md);
+  padding: 0 9px 0 3px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -162,8 +181,8 @@ onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-size: 12px;
+  color: var(--on-accent);
+  font-size: 12.5px;
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -182,7 +201,7 @@ onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
 }
 
 .account-caret {
-  font-size: 9px;
+  flex-shrink: 0;
   color: var(--t3);
   transition: transform 0.25s ease;
 }
@@ -254,7 +273,7 @@ onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
 }
 
 .menu-upsell-spark {
-  font-size: 18px;
+  flex-shrink: 0;
   color: var(--accent);
 }
 
@@ -263,16 +282,17 @@ onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
   flex-direction: column;
   flex: 1;
   min-width: 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
 }
 
 .menu-upsell-text b {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t1);
 }
 
 .menu-upsell-arrow {
+  flex-shrink: 0;
   color: var(--accent);
   transition: transform 0.2s ease;
 }
@@ -295,13 +315,13 @@ onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
 }
 
 .usage-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t2);
 }
 
 .usage-count {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--t3);
   font-variant-numeric: tabular-nums;
 }
@@ -316,7 +336,7 @@ onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
 .usage-fill {
   height: 100%;
   border-radius: 3px;
-  background: linear-gradient(90deg, var(--accent), #8b6cc5);
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
   transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -331,14 +351,16 @@ onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
 }
 
 .menu-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
   text-align: left;
   border: none;
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   padding: 8px 10px;
   border-radius: 9px;
@@ -349,6 +371,15 @@ onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
 .menu-item:hover {
   background: var(--hover);
   color: var(--t1);
+}
+
+.menu-item .ui-icon {
+  flex-shrink: 0;
+  color: var(--t3);
+}
+
+.menu-item:hover .ui-icon {
+  color: inherit;
 }
 
 .menu-item.danger:hover {

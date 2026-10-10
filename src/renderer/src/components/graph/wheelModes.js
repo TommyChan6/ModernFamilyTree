@@ -17,6 +17,8 @@
 // types / tags still exist. Sector geometry helpers live here too so the wheel
 // and the config editor draw identical rings.
 
+import { hasIcon } from '../ui/icons.js'
+
 export const WHEEL_SLOT_COUNT = 8
 
 export const WHEEL_DIRECTIONS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
@@ -44,15 +46,22 @@ export const DEFAULT_WHEEL_SLOTS = [
   null // NW — an open invitation to customize
 ]
 
+// Icons are names from components/ui/icons.js (rendered by UiIcon / drawIcon).
 const KIND_META = {
-  add: { icon: '✚', color: '#4caf72' },
-  delete: { icon: '🗑', color: '#ef5350' },
-  pin: { icon: '📌', color: '#f5a623' },
-  paint: { icon: '🎨', color: '#a06cf5' },
-  tag: { icon: '🏷', color: '#26c6da' },
-  end: { icon: '⌛', color: '#8a93a6' },
-  swap: { icon: '⇄', color: '#26c6da' },
-  link: { icon: '∙', color: '#6c8ef5' }
+  add: { icon: 'plus', color: '#4caf72' },
+  delete: { icon: 'trash-2', color: '#ef5350' },
+  pin: { icon: 'pin', color: '#f5a623' },
+  paint: { icon: 'paintbrush', color: '#a06cf5' },
+  tag: { icon: 'tag', color: '#26c6da' },
+  end: { icon: 'hourglass', color: '#8a93a6' },
+  swap: { icon: 'arrow-right-left', color: '#26c6da' },
+  link: { icon: 'link', color: '#6c8ef5' }
+}
+
+/** A stored icon (tag icon / relationship glyph — a name or a legacy glyph)
+ *  when it resolves to a real icon, else the kind's fallback. */
+function iconOr(value, fallback) {
+  return value && hasIcon(value) ? value : fallback
 }
 
 /** The legacy trio reads its color from the Style panel; every other type
@@ -75,7 +84,7 @@ function linkTypeColor(def, graphSettings) {
 export function resolveWheelSlot(slot, env) {
   const noun = (env.noun || 'Person').toLowerCase()
   if (!slot || !slot.kind) {
-    return { id: 'empty', empty: true, slot: null, label: 'Add a mode…', icon: '+', color: null }
+    return { id: 'empty', empty: true, slot: null, label: 'Add a mode…', icon: 'plus', color: null }
   }
   const meta = KIND_META[slot.kind] || KIND_META.link
   const base = {
@@ -112,11 +121,11 @@ export function resolveWheelSlot(slot, env) {
     }
     case 'tag': {
       const tag = env.tagById?.get(slot.tagId)
-      if (!tag) return { id: 'empty', empty: true, slot: null, label: 'Add a mode…', icon: '+' }
+      if (!tag) return { id: 'empty', empty: true, slot: null, label: 'Add a mode…', icon: 'plus' }
       return {
         ...base,
         id: `tag:${tag.id}`,
-        icon: tag.icon || meta.icon,
+        icon: iconOr(tag.icon, meta.icon),
         color: tag.color || meta.color,
         label: tag.label,
         hint: `Click people to toggle “${tag.label}”`,
@@ -126,12 +135,12 @@ export function resolveWheelSlot(slot, env) {
     }
     case 'link': {
       const def = env.relTypeByKey?.get(slot.type)
-      if (!def) return { id: 'empty', empty: true, slot: null, label: 'Add a mode…', icon: '+' }
+      if (!def) return { id: 'empty', empty: true, slot: null, label: 'Add a mode…', icon: 'plus' }
       const gated = env.caps && !env.caps.relTypePicker && def.band !== 'family'
       return {
         ...base,
         id: `link:${def.key}`,
-        icon: def.glyph || meta.icon,
+        icon: iconOr(def.glyph, meta.icon),
         color: linkTypeColor(def, env.graphSettings),
         label: def.label,
         hint: `Click two people in a row to link them as ${def.label.toLowerCase()}`,
@@ -140,7 +149,7 @@ export function resolveWheelSlot(slot, env) {
       }
     }
     default:
-      return { id: 'empty', empty: true, slot: null, label: 'Add a mode…', icon: '+' }
+      return { id: 'empty', empty: true, slot: null, label: 'Add a mode…', icon: 'plus' }
   }
 }
 

@@ -23,7 +23,6 @@ import {
 export interface StyleInfo {
   id: string
   label: string
-  icon: string
   /** Strand budget at density 1 / quality high. */
   count: number
   /** Ribbon width (dm) at the root. */
@@ -32,30 +31,30 @@ export interface StyleInfo {
 }
 
 export const HAIR_STYLES: StyleInfo[] = [
-  { id: 'bald', label: 'Bald', icon: '🥚', count: 0, width: 0, points: 2 },
-  { id: 'buzz', label: 'Buzz cut', icon: '🪒', count: 26000, width: 0.0028, points: 3 },
-  { id: 'crew', label: 'Crew cut', icon: '💈', count: 26000, width: 0.0034, points: 6 },
-  { id: 'side-part', label: 'Side part', icon: '🧑‍💼', count: 24000, width: 0.0034, points: 12 },
-  { id: 'slick-back', label: 'Slicked back', icon: '🕴', count: 22000, width: 0.0032, points: 12 },
-  { id: 'pompadour', label: 'Pompadour', icon: '🎸', count: 24000, width: 0.0034, points: 14 },
-  { id: 'undercut', label: 'Undercut', icon: '✂️', count: 18000, width: 0.0034, points: 14 },
-  { id: 'messy', label: 'Messy', icon: '🌪', count: 24000, width: 0.0036, points: 10 },
-  { id: 'curly-short', label: 'Short curls', icon: '🌀', count: 22000, width: 0.004, points: 16 },
-  { id: 'mohawk', label: 'Mohawk', icon: '🦔', count: 9000, width: 0.0038, points: 10 },
-  { id: 'pixie', label: 'Pixie', icon: '🧚', count: 22000, width: 0.0032, points: 12 },
-  { id: 'bob', label: 'Bob', icon: '💇', count: 22000, width: 0.0032, points: 18 },
-  { id: 'shoulder', label: 'Shoulder length', icon: '🙎', count: 22000, width: 0.003, points: 22 },
-  { id: 'long', label: 'Long straight', icon: '👩', count: 22000, width: 0.003, points: 28 },
-  { id: 'long-wavy', label: 'Long waves', icon: '🌊', count: 22000, width: 0.003, points: 30 },
-  { id: 'curly-long', label: 'Long curls', icon: '🍝', count: 20000, width: 0.0034, points: 32 },
-  { id: 'hime', label: 'Hime cut', icon: '🎎', count: 24000, width: 0.003, points: 28 },
-  { id: 'afro', label: 'Afro', icon: '☁️', count: 18000, width: 0.0042, points: 18 },
-  { id: 'ponytail', label: 'High ponytail', icon: '🎀', count: 20000, width: 0.003, points: 26 },
-  { id: 'low-ponytail', label: 'Low ponytail', icon: '🎗', count: 20000, width: 0.003, points: 26 },
-  { id: 'twin-tails', label: 'Twin tails', icon: '🎏', count: 20000, width: 0.003, points: 28 },
-  { id: 'bun', label: 'Top bun', icon: '🍙', count: 20000, width: 0.003, points: 22 },
-  { id: 'man-bun', label: 'Man bun', icon: '🥟', count: 18000, width: 0.0032, points: 22 },
-  { id: 'braid', label: 'Braid', icon: '🪢', count: 20000, width: 0.003, points: 32 }
+  { id: 'bald', label: 'Bald', count: 0, width: 0, points: 2 },
+  { id: 'buzz', label: 'Buzz cut', count: 26000, width: 0.0028, points: 3 },
+  { id: 'crew', label: 'Crew cut', count: 26000, width: 0.0034, points: 6 },
+  { id: 'side-part', label: 'Side part', count: 24000, width: 0.0034, points: 12 },
+  { id: 'slick-back', label: 'Slicked back', count: 22000, width: 0.0032, points: 12 },
+  { id: 'pompadour', label: 'Pompadour', count: 24000, width: 0.0034, points: 14 },
+  { id: 'undercut', label: 'Undercut', count: 18000, width: 0.0034, points: 14 },
+  { id: 'messy', label: 'Messy', count: 24000, width: 0.0036, points: 10 },
+  { id: 'curly-short', label: 'Short curls', count: 22000, width: 0.004, points: 16 },
+  { id: 'mohawk', label: 'Mohawk', count: 9000, width: 0.0038, points: 10 },
+  { id: 'pixie', label: 'Pixie', count: 22000, width: 0.0032, points: 12 },
+  { id: 'bob', label: 'Bob', count: 22000, width: 0.0032, points: 18 },
+  { id: 'shoulder', label: 'Shoulder length', count: 22000, width: 0.003, points: 22 },
+  { id: 'long', label: 'Long straight', count: 22000, width: 0.003, points: 28 },
+  { id: 'long-wavy', label: 'Long waves', count: 22000, width: 0.003, points: 30 },
+  { id: 'curly-long', label: 'Long curls', count: 20000, width: 0.0034, points: 32 },
+  { id: 'hime', label: 'Hime cut', count: 24000, width: 0.003, points: 28 },
+  { id: 'afro', label: 'Afro', count: 18000, width: 0.0042, points: 18 },
+  { id: 'ponytail', label: 'High ponytail', count: 20000, width: 0.003, points: 26 },
+  { id: 'low-ponytail', label: 'Low ponytail', count: 20000, width: 0.003, points: 26 },
+  { id: 'twin-tails', label: 'Twin tails', count: 20000, width: 0.003, points: 28 },
+  { id: 'bun', label: 'Top bun', count: 20000, width: 0.003, points: 22 },
+  { id: 'man-bun', label: 'Man bun', count: 18000, width: 0.0032, points: 22 },
+  { id: 'braid', label: 'Braid', count: 20000, width: 0.003, points: 32 }
 ]
 export const HAIR_STYLE_BY_ID = new Map(HAIR_STYLES.map((s) => [s.id, s]))
 
@@ -78,17 +77,17 @@ export const BROW_STYLES = [
 ]
 
 export const BEARD_STYLES = [
-  { id: 'none', label: 'Clean shaven', icon: '🙂' },
-  { id: 'stubble', label: 'Stubble', icon: '🧔🏻' },
-  { id: 'short-beard', label: 'Short beard', icon: '🧔' },
-  { id: 'full-beard', label: 'Full beard', icon: '🧙' },
-  { id: 'goatee', label: 'Goatee', icon: '🐐' },
-  { id: 'van-dyke', label: 'Van Dyke', icon: '🎨' },
-  { id: 'mustache', label: 'Mustache', icon: '🥸' },
-  { id: 'chevron', label: 'Chevron', icon: '👨' },
-  { id: 'handlebar', label: 'Handlebar', icon: '🚲' },
-  { id: 'chin-strap', label: 'Chin strap', icon: '🪖' },
-  { id: 'mutton', label: 'Mutton chops', icon: '🐑' }
+  { id: 'none', label: 'Clean shaven' },
+  { id: 'stubble', label: 'Stubble' },
+  { id: 'short-beard', label: 'Short beard' },
+  { id: 'full-beard', label: 'Full beard' },
+  { id: 'goatee', label: 'Goatee' },
+  { id: 'van-dyke', label: 'Van Dyke' },
+  { id: 'mustache', label: 'Mustache' },
+  { id: 'chevron', label: 'Chevron' },
+  { id: 'handlebar', label: 'Handlebar' },
+  { id: 'chin-strap', label: 'Chin strap' },
+  { id: 'mutton', label: 'Mutton chops' }
 ]
 
 /** Beard style → zone weights (scripts/human3d/masks.py zones) + length (dm). */

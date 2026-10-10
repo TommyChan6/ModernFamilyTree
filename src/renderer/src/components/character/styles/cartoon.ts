@@ -2818,7 +2818,7 @@ const parts: StylePart[] = [
 export const cartoonPack: StylePack = {
   id: 'cartoon',
   name: 'Cartoon',
-  icon: '🧸',
+  icon: 'smile',
   width: 320,
   height: 480,
   ink: INK,
@@ -2828,7 +2828,7 @@ export const cartoonPack: StylePack = {
     // back slot's back band (straps, clasps) just over it.
     {
       id: 'back',
-      icon: '🎒',
+      icon: 'backpack',
       socket: { x: 160, y: 230 },
       z: 2,
       backZ: 32,
@@ -2837,7 +2837,7 @@ export const cartoonPack: StylePack = {
     },
     {
       id: 'head',
-      icon: '🙂',
+      icon: 'user-round',
       socket: { x: 160, y: 150 },
       z: 40,
       backZ: 28,
@@ -2845,7 +2845,7 @@ export const cartoonPack: StylePack = {
     },
     {
       id: 'hair',
-      icon: '💇',
+      icon: 'waves',
       socket: { x: 160, y: 108 },
       z: 60,
       backZ: 4,
@@ -2853,21 +2853,21 @@ export const cartoonPack: StylePack = {
     },
     {
       id: 'eyes',
-      icon: '👁',
+      icon: 'eye',
       socket: { x: 160, y: EYE_Y },
       z: 50,
       thumb: { cx: 160, cy: 150, span: 120 }
     },
     {
       id: 'brows',
-      icon: '🤨',
+      icon: 'spline',
       socket: { x: 160, y: 130 },
       z: 52,
       thumb: { cx: 160, cy: 136, span: 120 }
     },
     {
       id: 'nose',
-      icon: '👃',
+      icon: 'scan-face',
       socket: { x: 160, y: 170 },
       z: 45,
       optional: true,
@@ -2875,14 +2875,14 @@ export const cartoonPack: StylePack = {
     },
     {
       id: 'mouth',
-      icon: '👄',
+      icon: 'smile',
       socket: { x: 160, y: 188 },
       z: 51,
       thumb: { cx: 160, cy: 192, span: 100 }
     },
     {
       id: 'facialHair',
-      icon: '🧔',
+      icon: 'scissors',
       socket: { x: 160, y: 196 },
       z: 53,
       optional: true,
@@ -2890,7 +2890,7 @@ export const cartoonPack: StylePack = {
     },
     {
       id: 'marks',
-      icon: '✨',
+      icon: 'sparkles',
       socket: { x: 160, y: 160 },
       z: 42,
       optional: true,
@@ -2898,28 +2898,28 @@ export const cartoonPack: StylePack = {
     },
     {
       id: 'torso',
-      icon: '👕',
+      icon: 'shirt',
       socket: { x: 160, y: 238 },
       z: 30,
       thumb: { cx: 160, cy: 300, span: 260 }
     },
     {
       id: 'legs',
-      icon: '👖',
+      icon: 'person-standing',
       socket: { x: 160, y: 352 },
       z: 20,
       thumb: { cx: 160, cy: 392, span: 200 }
     },
     {
       id: 'feet',
-      icon: '👟',
+      icon: 'footprints',
       socket: { x: 160, y: 446 },
       z: 22,
       thumb: { cx: 160, cy: 446, span: 140 }
     },
     {
       id: 'headwear',
-      icon: '🎩',
+      icon: 'crown',
       socket: { x: 160, y: 86 },
       z: 70,
       optional: true,
@@ -2927,7 +2927,7 @@ export const cartoonPack: StylePack = {
     },
     {
       id: 'accessory',
-      icon: '👓',
+      icon: 'glasses',
       socket: { x: 160, y: 152 },
       z: 65,
       optional: true,

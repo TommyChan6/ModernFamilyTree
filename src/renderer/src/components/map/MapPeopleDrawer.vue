@@ -1,13 +1,24 @@
 <template>
   <aside class="mp" @pointerdown.stop @wheel.stop @keydown.stop>
     <header class="mp-head">
-      <div class="mp-title">👥 {{ t('map.people.title', { noun: noun }) }}</div>
-      <button class="mp-x" :title="t('map.inspector.close')" @click="emit('close')">✕</button>
+      <div class="mp-title">
+        <UiIcon name="users" :size="16" />
+        {{ t('map.people.title', { noun: noun }) }}
+      </div>
+      <button
+        class="mp-x"
+        :title="t('map.inspector.close')"
+        :aria-label="t('map.inspector.close')"
+        @click="emit('close')"
+      >
+        <UiIcon name="x" :size="16" />
+      </button>
     </header>
-    <input v-model="query" class="mp-search" :placeholder="t('map.people.search')" />
+    <SearchField v-model="query" size="sm" :placeholder="t('map.people.search')" />
     <p class="mp-hint">{{ t('map.people.hint') }}</p>
     <button v-if="autoCount" class="mp-auto" @click="emit('auto-place')">
-      ✨ {{ t('map.people.autoPlace', { n: autoCount }) }}
+      <UiIcon name="sparkles" :size="14" />
+      {{ t('map.people.autoPlace', { n: autoCount }) }}
     </button>
     <div class="mp-list">
       <div
@@ -26,8 +37,8 @@
           <span v-else>{{ p.initial }}</span>
         </span>
         <span class="mp-name">{{ p.name }}</span>
-        <span v-if="placedIds.has(p.id)" class="mp-pin">📍</span>
-        <span v-else class="mp-add">＋</span>
+        <UiIcon v-if="placedIds.has(p.id)" class="mp-pin" name="map-pin" :size="14" />
+        <UiIcon v-else class="mp-add" name="plus" :size="14" />
       </div>
       <div v-if="!shown.length" class="mp-empty">{{ t('map.people.none') }}</div>
     </div>
@@ -37,6 +48,8 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useI18n } from '../../i18n'
+import UiIcon from '../ui/UiIcon.js'
+import SearchField from '../ui/SearchField.vue'
 
 // The people drawer: every person in the project, draggable onto the map
 // (or tap to drop them at the view's centre). Placed people show a pin and
@@ -91,6 +104,10 @@ function onDragStart(e, p) {
   justify-content: space-between;
 }
 .mp-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
   font-weight: 700;
   color: var(--t1);
   font-size: 14px;
@@ -100,40 +117,37 @@ function onDragStart(e, p) {
   background: transparent;
   color: var(--t3);
   cursor: pointer;
-  width: 26px;
-  height: 26px;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
   border-radius: 7px;
 }
 .mp-x:hover {
   background: var(--hover);
   color: var(--t1);
 }
-.mp-search {
-  border: 1px solid var(--border);
-  background: var(--elevated);
-  color: var(--t1);
-  border-radius: 9px;
-  padding: 7px 10px;
-  font-family: var(--font);
-  font-size: 12.5px;
-  outline: none;
-}
-.mp-search:focus {
-  border-color: var(--accent);
-}
 .mp-hint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
   line-height: 1.4;
 }
 .mp-auto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--ctl-sm);
   border: 1px dashed var(--accent);
   background: var(--adim);
   color: var(--accent);
   border-radius: 9px;
   padding: 6px 8px;
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -175,8 +189,11 @@ function onDragStart(e, p) {
 .mp-row:active {
   cursor: grabbing;
 }
-.mp-row.gone {
+.mp-row.gone .mp-avatar {
   opacity: 0.55;
+}
+.mp-row.gone .mp-name {
+  color: var(--t3);
 }
 .mp-avatar {
   width: 28px;
@@ -187,7 +204,7 @@ function onDragStart(e, p) {
   place-items: center;
   color: #fff;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 12.5px;
   flex: 0 0 auto;
 }
 .mp-avatar img {
@@ -198,18 +215,19 @@ function onDragStart(e, p) {
 .mp-name {
   flex: 1;
   min-width: 0;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .mp-pin {
-  font-size: 12px;
+  flex: 0 0 auto;
+  color: var(--accent);
 }
 .mp-add {
+  flex: 0 0 auto;
   color: var(--accent);
-  font-weight: 700;
   opacity: 0;
   transition: opacity 0.12s;
 }
@@ -217,7 +235,7 @@ function onDragStart(e, p) {
   opacity: 1;
 }
 .mp-empty {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t3);
   text-align: center;
   padding: 16px 0;

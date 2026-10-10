@@ -1,10 +1,10 @@
 <template>
   <div class="cv-view">
     <ViewHeader
-      icon="🎭"
+      icon="character"
       :title="t('rail.character')"
       :count="store.persons.length ? personDocs.length : null"
-      :hint="`🧪 ${t('character.experimental')}`"
+      :hint="t('character.experimental')"
     />
 
     <!-- ── Top strip: who, which look, which style ─────────────────────────── -->
@@ -52,7 +52,7 @@
         >
           <span class="cv-style-thumb cv-3d-thumb">
             <img v-if="draft && thumb3d.get(draft.id)" :src="thumb3d.get(draft.id)" alt="" />
-            <span v-else>🧊</span>
+            <UiIcon v-else name="box" :size="16" />
           </span>
           <span class="cv-style-name">{{ styleName(HUMAN3D_STYLE) }}</span>
           <span class="cv-3d-badge">3D</span>
@@ -77,9 +77,9 @@
             :title="t('character.slots.' + slotId)"
             @click="selectSlot(slotId)"
           >
-            <span class="cv-slot-icon">{{ slotIcon(slotId) }}</span>
+            <UiIcon class="cv-slot-icon" :name="slotIcon(slotId)" :size="18" />
             <span class="cv-slot-name">{{ t('character.slots.' + slotId) }}</span>
-            <span v-if="locks.includes(slotId)" class="cv-slot-lock">🔒</span>
+            <UiIcon v-if="locks.includes(slotId)" class="cv-slot-lock" name="lock" :size="11" />
           </button>
         </div>
       </aside>
@@ -113,14 +113,22 @@
         <div v-else class="cv-stage-area">
           <template v-if="!store.persons.length">
             <div class="cv-empty">
-              <div class="cv-empty-mark">🎭</div>
+              <UiIcon class="cv-empty-mark" name="drama" :size="44" :stroke="1.5" />
               <p>{{ t('character.noPersons') }}</p>
             </div>
           </template>
 
           <!-- Style chooser: the "new game" screen for a look -->
           <div v-else-if="!draft || chooserOpen" class="cv-chooser">
-            <button v-if="draft" class="cv-chooser-close" @click="chooserOpen = false">✕</button>
+            <button
+              v-if="draft"
+              class="cv-chooser-close"
+              :title="t('character.photo.close')"
+              :aria-label="t('character.photo.close')"
+              @click="chooserOpen = false"
+            >
+              <UiIcon name="x" :size="16" />
+            </button>
             <p class="cv-chooser-kicker">{{ person?.name }}</p>
             <h2 class="cv-chooser-title">
               {{
@@ -131,10 +139,16 @@
             </h2>
             <p class="cv-chooser-hint">{{ t('character.chooseStyle') }}</p>
             <button class="cv-chooser-3d" @click="createLook(HUMAN3D_STYLE)">
-              <span class="cv-chooser-3d-art" aria-hidden="true">🧑‍🎨</span>
+              <UiIcon class="cv-chooser-3d-art" name="person-standing" :size="46" :stroke="1.5" />
               <span class="cv-chooser-3d-text">
-                <span class="cv-chooser-3d-kicker">✦ {{ t('character.new3d') }}</span>
-                <span class="cv-chooser-name">🧊 {{ styleName(HUMAN3D_STYLE) }}</span>
+                <span class="cv-chooser-3d-kicker">
+                  <UiIcon name="sparkles" :size="12" />
+                  {{ t('character.new3d') }}
+                </span>
+                <span class="cv-chooser-name">
+                  <UiIcon name="box" :size="16" />
+                  {{ styleName(HUMAN3D_STYLE) }}
+                </span>
                 <span class="cv-chooser-blurb">{{ styleBlurb(HUMAN3D_STYLE) }}</span>
               </span>
             </button>
@@ -147,18 +161,21 @@
                 @click="createLook(s.id)"
               >
                 <img class="cv-chooser-img" :src="chooserThumbs[s.id]" alt="" />
-                <span class="cv-chooser-name">{{ s.icon }} {{ styleName(s.id) }}</span>
+                <span class="cv-chooser-name">
+                  <UiIcon :name="s.icon" :size="16" />
+                  {{ styleName(s.id) }}
+                </span>
                 <span class="cv-chooser-blurb">{{ styleBlurb(s.id) }}</span>
               </button>
             </div>
             <div class="cv-chooser-extras">
               <label class="cv-check">
                 <input v-model="startRandom" type="checkbox" />
-                🎲 {{ t('character.startRandom') }}
+                {{ t('character.startRandom') }}
               </label>
               <label v-if="parentLooks.length" class="cv-check">
                 <input v-model="startInherit" type="checkbox" />
-                🧬 {{ t('character.startInherit') }}
+                {{ t('character.startInherit') }}
               </label>
             </div>
           </div>
@@ -186,7 +203,8 @@
                 :title="t('character.cams.' + c.id)"
                 @click="cameraMode = c.id"
               >
-                {{ c.icon }} <span>{{ t('character.cams.' + c.id) }}</span>
+                <UiIcon :name="c.icon" :size="14" />
+                <span>{{ t('character.cams.' + c.id) }}</span>
               </button>
             </div>
 
@@ -198,18 +216,20 @@
                 class="cv-bd"
                 :class="{ on: (draft.backdrop || 'studio') === b.id }"
                 :title="t('character.backdrops.' + b.id)"
+                :aria-label="t('character.backdrops.' + b.id)"
                 @click="setBackdrop(b.id)"
               >
-                {{ b.icon }}
+                <UiIcon :name="b.icon" :size="16" />
               </button>
               <div class="cv-bd-sep"></div>
               <button
                 class="cv-bd"
                 :class="{ on: fx }"
                 :title="t('character.fxToggle')"
+                :aria-label="t('character.fxToggle')"
                 @click="toggleFx"
               >
-                ✨
+                <UiIcon name="sparkles" :size="16" />
               </button>
             </div>
 
@@ -221,11 +241,12 @@
                 class="cv-emote"
                 :class="{ on: (draft.expression || 'neutral') === e.id }"
                 :title="t('character.expr.' + e.id)"
+                :aria-label="t('character.expr.' + e.id)"
                 @click="setExpression(e.id)"
                 @pointerenter="emote = e.id"
                 @pointerleave="emote = null"
               >
-                {{ e.icon }}
+                <UiIcon :name="e.icon" :size="18" />
               </button>
             </div>
 
@@ -234,59 +255,71 @@
               <button
                 class="cv-pill-btn cv-dice"
                 :title="t('character.randomize') + ' (R)'"
+                :aria-label="t('character.randomize')"
                 @click="shuffle"
               >
-                🎲
+                <UiIcon name="dices" :size="16" />
               </button>
-              <button class="cv-pill-btn" :title="t('character.mirror') + ' (M)'" @click="mirror">
-                ⇄
+              <button
+                class="cv-pill-btn"
+                :title="t('character.mirror') + ' (M)'"
+                :aria-label="t('character.mirror')"
+                @click="mirror"
+              >
+                <UiIcon name="arrow-left-right" :size="16" />
               </button>
               <div class="cv-pill-sep"></div>
               <button
                 class="cv-pill-btn"
                 :disabled="!undoStack.length"
                 :title="t('character.undo') + ' (Ctrl+Z)'"
+                :aria-label="t('character.undo')"
                 @click="undo"
               >
-                ↩
+                <UiIcon name="undo-2" :size="16" />
               </button>
               <button
                 class="cv-pill-btn"
                 :disabled="!redoStack.length"
                 :title="t('character.redo') + ' (Ctrl+X)'"
+                :aria-label="t('character.redo')"
                 @click="redo"
               >
-                ↪
+                <UiIcon name="redo-2" :size="16" />
               </button>
               <div class="cv-pill-sep"></div>
               <button
                 class="cv-pill-btn"
                 :title="t('character.zoomIn')"
+                :aria-label="t('character.zoomIn')"
                 @click="stageRef?.zoomBy(1.2)"
               >
-                ⊕
+                <UiIcon name="zoom-in" :size="16" />
               </button>
               <button
                 class="cv-pill-btn"
                 :title="t('character.zoomOut')"
+                :aria-label="t('character.zoomOut')"
                 @click="stageRef?.zoomBy(1 / 1.2)"
               >
-                ⊖
+                <UiIcon name="zoom-out" :size="16" />
               </button>
               <div class="cv-pill-sep"></div>
               <button
                 class="cv-pill-btn"
                 :title="t('character.photo.open') + ' (P)'"
+                :aria-label="t('character.photo.open')"
                 @click="photoOpen = true"
               >
-                📸
+                <UiIcon name="camera" :size="16" />
               </button>
               <button
                 class="cv-pill-btn cv-pill-primary"
                 :disabled="portraitBusy"
                 @click="setAsPortrait()"
               >
-                {{ portraitDone ? '✓ ' : '🖼 ' }}{{ t('character.setPortrait') }}
+                <UiIcon :name="portraitDone ? 'check' : 'image'" :size="16" />
+                {{ t('character.setPortrait') }}
               </button>
             </div>
           </template>
@@ -301,7 +334,7 @@
               :doc="draft"
               :pack="pack"
               :person="person"
-              :style-label="`${pack.icon} ${styleName(pack.id)}`"
+              :style-label="styleName(pack.id)"
               :stars="rarity"
               :busy="portraitBusy"
               @close="photoOpen = false"
@@ -326,18 +359,20 @@
                 v-if="doc.is_portrait"
                 class="cv-look-star"
                 :title="t('character.portraitBadge')"
-                >★</span
               >
-              <span class="cv-look-style">{{ packOf(doc.style_id).icon }}</span>
+                <UiIcon name="star" :size="12" :label="t('character.portraitBadge')" />
+              </span>
+              <UiIcon class="cv-look-style" :name="lookStyleIcon(doc)" :size="12" />
               <span v-if="ageLabel(doc)" class="cv-look-age">{{ ageLabel(doc) }}</span>
             </button>
           </TransitionGroup>
           <button
             class="cv-look cv-look-add"
             :title="t('character.addLook')"
+            :aria-label="t('character.addLook')"
             @click="chooserOpen = true"
           >
-            ＋
+            <UiIcon name="plus" :size="20" />
           </button>
         </div>
       </div>
@@ -352,7 +387,7 @@
             :class="{ on: inspectorTab === tab.id }"
             @click="inspectorTab = tab.id"
           >
-            <span>{{ tab.icon }}</span>
+            <UiIcon class="cv-tab-icon" :name="tab.icon" :size="18" />
             {{ t('character.tabs.' + tab.id) }}
           </button>
         </nav>
@@ -364,23 +399,29 @@
               <section class="cv-section">
                 <div class="cv-section-head">
                   <h4 class="cv-section-title">
-                    {{ slotDef?.icon }} {{ t('character.slots.' + selectedSlot) }}
+                    <UiIcon v-if="slotDef?.icon" :name="slotDef.icon" :size="15" />
+                    {{ t('character.slots.' + selectedSlot) }}
                   </h4>
                   <button
                     class="cv-mini"
                     :class="{ on: currentSlotState.flip }"
                     :title="t('character.flipPart')"
+                    :aria-label="t('character.flipPart')"
                     @click="flipSlot"
                   >
-                    ⇄
+                    <UiIcon name="arrow-left-right" :size="14" />
                   </button>
                   <button
                     class="cv-mini"
                     :class="{ on: locks.includes(selectedSlot) }"
                     :title="t('character.lockHint')"
+                    :aria-label="t('character.lockHint')"
                     @click="toggleLock(selectedSlot)"
                   >
-                    {{ locks.includes(selectedSlot) ? '🔒' : '🔓' }}
+                    <UiIcon
+                      :name="locks.includes(selectedSlot) ? 'lock' : 'lock-open'"
+                      :size="14"
+                    />
                   </button>
                 </div>
                 <PartGrid
@@ -405,7 +446,7 @@
                 </label>
               </section>
               <section v-for="ch in slotChannels" :key="ch" class="cv-section">
-                <h4 class="cv-section-title cv-sub">🎨 {{ t('character.palette.' + ch) }}</h4>
+                <h4 class="cv-section-title cv-sub">{{ t('character.palette.' + ch) }}</h4>
                 <SwatchRow
                   :model-value="draft.palette[ch]"
                   :colors="swatchesFor(pack, ch)"
@@ -420,14 +461,18 @@
             <div v-else-if="inspectorTab === 'colors'" key="colors" class="cv-pane">
               <section class="cv-section">
                 <div class="cv-section-head">
-                  <h4 class="cv-section-title">✨ {{ t('character.presets') }}</h4>
+                  <h4 class="cv-section-title">
+                    <UiIcon name="sparkles" :size="15" />
+                    {{ t('character.presets') }}
+                  </h4>
                   <button
                     class="cv-mini"
                     :class="{ on: locks.includes('palette') }"
                     :title="t('character.lockHint')"
+                    :aria-label="t('character.lockHint')"
                     @click="toggleLock('palette')"
                   >
-                    {{ locks.includes('palette') ? '🔒' : '🔓' }}
+                    <UiIcon :name="locks.includes('palette') ? 'lock' : 'lock-open'" :size="14" />
                   </button>
                 </div>
                 <div class="cv-presets">
@@ -457,7 +502,10 @@
                 />
               </section>
               <section class="cv-section">
-                <h4 class="cv-section-title">🌈 {{ t('character.harmony') }}</h4>
+                <h4 class="cv-section-title">
+                  <UiIcon name="rainbow" :size="15" />
+                  {{ t('character.harmony') }}
+                </h4>
                 <p class="cv-hint">{{ t('character.harmonyHint') }}</p>
                 <div class="cv-btn-row">
                   <button
@@ -471,7 +519,10 @@
                 </div>
               </section>
               <section v-if="personTags.length" class="cv-section">
-                <h4 class="cv-section-title">🏷 {{ t('character.groupColors') }}</h4>
+                <h4 class="cv-section-title">
+                  <UiIcon name="tag" :size="15" />
+                  {{ t('character.groupColors') }}
+                </h4>
                 <p class="cv-hint">{{ t('character.groupColorsHint') }}</p>
                 <div class="cv-btn-row">
                   <button
@@ -491,7 +542,10 @@
             <div v-else-if="inspectorTab === 'body'" key="body" class="cv-pane">
               <section class="cv-section">
                 <div class="cv-section-head">
-                  <h4 class="cv-section-title">⏳ {{ t('character.age') }}</h4>
+                  <h4 class="cv-section-title">
+                    <UiIcon name="hourglass" :size="15" />
+                    {{ t('character.age') }}
+                  </h4>
                   <span class="cv-age-badge">{{ ageStage }}</span>
                 </div>
                 <input
@@ -514,14 +568,18 @@
               </section>
               <section class="cv-section">
                 <div class="cv-section-head">
-                  <h4 class="cv-section-title">🧍 {{ t('character.body') }}</h4>
+                  <h4 class="cv-section-title">
+                    <UiIcon name="person-standing" :size="15" />
+                    {{ t('character.body') }}
+                  </h4>
                   <button
                     class="cv-mini"
                     :class="{ on: locks.includes('morph') }"
                     :title="t('character.lockHint')"
+                    :aria-label="t('character.lockHint')"
                     @click="toggleLock('morph')"
                   >
-                    {{ locks.includes('morph') ? '🔒' : '🔓' }}
+                    <UiIcon :name="locks.includes('morph') ? 'lock' : 'lock-open'" :size="14" />
                   </button>
                 </div>
                 <label v-for="m in ['height', 'build', 'headSize']" :key="m" class="cv-slider-row">
@@ -542,7 +600,10 @@
                 <p class="cv-hint">{{ t('character.resetHint') }}</p>
               </section>
               <section class="cv-section">
-                <h4 class="cv-section-title">📅 {{ t('character.ages') }}</h4>
+                <h4 class="cv-section-title">
+                  <UiIcon name="calendar-range" :size="15" />
+                  {{ t('character.ages') }}
+                </h4>
                 <p class="cv-hint">{{ t('character.ageHint') }}</p>
                 <div class="cv-ages">
                   <input
@@ -571,7 +632,10 @@
             <!-- Genes & sharing -->
             <div v-else key="genes" class="cv-pane">
               <section class="cv-section cv-gene-card">
-                <h4 class="cv-section-title">🧬 {{ t('character.inherit') }}</h4>
+                <h4 class="cv-section-title">
+                  <UiIcon name="dna" :size="15" />
+                  {{ t('character.inherit') }}
+                </h4>
                 <template v-if="parentLooks.length">
                   <div class="cv-parents">
                     <div v-for="pl in parentLooks" :key="pl.person.id" class="cv-parent">
@@ -584,7 +648,8 @@
                     <input v-model.number="resemblance" type="range" min="0" max="1" step="0.05" />
                   </label>
                   <button class="btn btn-primary btn-sm cv-wide" @click="inheritFromParents">
-                    🧬 {{ t('character.rollChild') }}
+                    <UiIcon name="dna" :size="14" />
+                    {{ t('character.rollChild') }}
                   </button>
                 </template>
                 <p v-else class="cv-hint">
@@ -592,21 +657,29 @@
                 </p>
               </section>
               <section class="cv-section">
-                <h4 class="cv-section-title">🌍 {{ t('character.genePool') }}</h4>
+                <h4 class="cv-section-title">
+                  <UiIcon name="earth" :size="15" />
+                  {{ t('character.genePool') }}
+                </h4>
                 <p class="cv-hint">{{ t('character.genePoolHint') }}</p>
                 <button
                   class="cv-soft-btn cv-wide"
                   :disabled="worldDocs.length < 2"
                   @click="genePool"
                 >
-                  🎲 {{ t('character.rollGenePool') }}
+                  <UiIcon name="dices" :size="14" />
+                  {{ t('character.rollGenePool') }}
                 </button>
               </section>
               <section class="cv-section">
-                <h4 class="cv-section-title">🔗 {{ t('character.dna') }}</h4>
+                <h4 class="cv-section-title">
+                  <UiIcon name="link" :size="15" />
+                  {{ t('character.dna') }}
+                </h4>
                 <p class="cv-hint">{{ t('character.dnaHint') }}</p>
                 <button class="cv-soft-btn cv-wide" @click="copyDNA">
-                  📋 {{ t('character.copyDna') }}
+                  <UiIcon name="copy" :size="14" />
+                  {{ t('character.copyDna') }}
                 </button>
                 <div class="cv-dna-row">
                   <input
@@ -620,7 +693,10 @@
                 </div>
               </section>
               <section class="cv-section">
-                <h4 class="cv-section-title">⬇ {{ t('character.export') }}</h4>
+                <h4 class="cv-section-title">
+                  <UiIcon name="download" :size="15" />
+                  {{ t('character.export') }}
+                </h4>
                 <div class="cv-btn-row">
                   <button class="cv-soft-btn" @click="exportPNG">PNG</button>
                   <button class="cv-soft-btn" @click="exportSVG">SVG</button>
@@ -647,6 +723,8 @@ import PartGrid from './PartGrid.vue'
 import SwatchRow from './SwatchRow.vue'
 import PhotoStudio from './PhotoStudio.vue'
 import ViewHeader from '../ViewHeader.vue'
+import UiIcon from '../ui/UiIcon.js'
+import { drawIcon } from '../../lib/canvasIcon.js'
 import { STYLE_LIST, stylePacks, packOf, DEFAULT_STYLE } from './styles'
 import {
   EXPRESSIONS,
@@ -696,16 +774,16 @@ const GROUPS = [
   { id: 'extras', slots: ['headwear', 'accessory', 'back'] }
 ]
 const TABS = [
-  { id: 'parts', icon: '🧩' },
-  { id: 'colors', icon: '🎨' },
-  { id: 'body', icon: '🧍' },
-  { id: 'genes', icon: '🧬' }
+  { id: 'parts', icon: 'puzzle' },
+  { id: 'colors', icon: 'palette' },
+  { id: 'body', icon: 'person-standing' },
+  { id: 'genes', icon: 'dna' }
 ]
 const CAMERAS = [
-  { id: 'auto', icon: '🎯' },
-  { id: 'full', icon: '🧍' },
-  { id: 'portrait', icon: '🖼' },
-  { id: 'face', icon: '🙂' }
+  { id: 'auto', icon: 'focus' },
+  { id: 'full', icon: 'person-standing' },
+  { id: 'portrait', icon: 'user-round' },
+  { id: 'face', icon: 'scan-face' }
 ]
 // Which palette channels a slot is painted with (the Parts tab's quick colors)
 const SLOT_CHANNELS = {
@@ -878,7 +956,12 @@ const currentSlotState = computed(() =>
 const slotChannels = computed(() => SLOT_CHANNELS[selectedSlot.value] || [])
 
 function slotIcon(id) {
-  return slotOf(pack.value, id)?.icon || '•'
+  return slotOf(pack.value, id)?.icon || 'dot'
+}
+
+/** The filmstrip's style badge: the pack's icon, or a cube for 3D looks. */
+function lookStyleIcon(doc) {
+  return doc.style_id === HUMAN3D_STYLE ? 'box' : packOf(doc.style_id).icon
 }
 function effectivePart(slotId) {
   return draft.value ? effectivePartId(draft.value, pack.value, slotId, 'neutral') : null
@@ -1496,10 +1579,7 @@ function thumbOf(doc) {
       grad.addColorStop(1, '#141820')
       g.fillStyle = grad
       g.fillRect(0, 0, 96, 96)
-      g.font = '44px serif'
-      g.textAlign = 'center'
-      g.textBaseline = 'middle'
-      g.fillText('🧊', 48, 52)
+      drawIcon(g, 'box', 48, 48, 40, { color: 'rgba(220, 228, 245, 0.75)', lineWidth: 1.5 })
       placeholder3d = cv.toDataURL()
     }
     return placeholder3d
@@ -1676,7 +1756,7 @@ watch(
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   outline: none;
 }
 
@@ -1714,7 +1794,7 @@ watch(
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1752,7 +1832,7 @@ watch(
   justify-content: center;
   overflow: hidden;
   background: radial-gradient(circle at 50% 35%, #3a4256, #141820);
-  font-size: 16px;
+  color: rgba(220, 228, 245, 0.8);
 }
 
 .cv-3d-thumb img {
@@ -1769,7 +1849,7 @@ watch(
   border-radius: 6px;
   background: linear-gradient(135deg, #7c5cff, #2bb8ff);
   color: #fff;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.04em;
   box-shadow: 0 2px 8px rgba(60, 80, 255, 0.4);
@@ -1812,7 +1892,8 @@ watch(
 }
 
 .cv-chooser-3d-art {
-  font-size: 46px;
+  flex: 0 0 auto;
+  color: #8fd8ff;
   filter: drop-shadow(0 4px 12px rgba(43, 184, 255, 0.5));
 }
 
@@ -1823,7 +1904,10 @@ watch(
 }
 
 .cv-chooser-3d-kicker {
-  font-size: 10.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1866,7 +1950,7 @@ watch(
 }
 
 .cv-group-label {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -1904,22 +1988,20 @@ watch(
 }
 
 .cv-slot-btn.empty .cv-slot-icon {
-  opacity: 0.45;
-  filter: grayscale(0.6);
+  color: var(--t3);
 }
 
 .cv-slot-icon {
-  font-size: 18px;
-  line-height: 1;
   transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.6);
 }
 
 .cv-slot-btn.active .cv-slot-icon {
+  color: var(--accent);
   transform: scale(1.15);
 }
 
 .cv-slot-name {
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -1929,9 +2011,9 @@ watch(
 
 .cv-slot-lock {
   position: absolute;
-  top: 2px;
+  top: 4px;
   right: 6px;
-  font-size: 9px;
+  color: var(--t3);
 }
 
 /* ── Center ── */
@@ -1964,7 +2046,7 @@ watch(
 }
 
 .cv-empty-mark {
-  font-size: 44px;
+  color: var(--accent);
   filter: drop-shadow(0 6px 18px var(--adim));
 }
 
@@ -1988,6 +2070,10 @@ watch(
   position: absolute;
   top: 12px;
   right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: none;
   background: var(--elevated);
   color: var(--t2);
@@ -1998,7 +2084,7 @@ watch(
 }
 
 .cv-chooser-kicker {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -2085,13 +2171,16 @@ watch(
 }
 
 .cv-chooser-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 15px;
   font-weight: 800;
   margin-top: 6px;
 }
 
 .cv-chooser-blurb {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
   line-height: 1.45;
 }
@@ -2108,7 +2197,7 @@ watch(
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
   cursor: pointer;
 }
@@ -2136,13 +2225,19 @@ watch(
 }
 
 .cv-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ctl-sm);
+  min-width: var(--ctl-sm);
   border: none;
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
-  padding: 5px 10px;
+  padding: 0 10px;
   border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
@@ -2175,12 +2270,16 @@ watch(
 }
 
 .cv-bd {
-  width: 30px;
-  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
   border: none;
   border-radius: 50%;
   background: transparent;
-  font-size: 14px;
+  color: var(--t2);
   cursor: pointer;
   transition:
     background 0.15s,
@@ -2189,11 +2288,13 @@ watch(
 
 .cv-bd:hover {
   background: var(--hover);
+  color: var(--t1);
   transform: scale(1.12);
 }
 
 .cv-bd.on {
   background: var(--adim);
+  color: var(--accent);
   box-shadow: inset 0 0 0 1.5px var(--accent);
 }
 
@@ -2220,12 +2321,16 @@ watch(
 }
 
 .cv-emote {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 34px;
   height: 34px;
+  padding: 0;
   border: none;
   border-radius: 50%;
   background: transparent;
-  font-size: 18px;
+  color: var(--t2);
   cursor: pointer;
   transition:
     transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.8),
@@ -2235,10 +2340,12 @@ watch(
 .cv-emote:hover {
   transform: scale(1.22) rotate(-6deg);
   background: var(--hover);
+  color: var(--t1);
 }
 
 .cv-emote.on {
   background: var(--adim);
+  color: var(--accent);
   box-shadow: inset 0 0 0 1.5px var(--accent);
 }
 
@@ -2260,12 +2367,17 @@ watch(
 }
 
 .cv-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ctl-md);
+  min-width: var(--ctl-md);
   border: none;
   background: transparent;
   color: var(--t2);
-  font-size: 15px;
   font-family: var(--font);
-  padding: 6px 9px;
+  padding: 0 8px;
   border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
@@ -2291,8 +2403,9 @@ watch(
 }
 
 .cv-pill-primary {
+  padding: 0 12px;
   color: var(--accent);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
 }
 
@@ -2312,7 +2425,7 @@ watch(
   border-radius: 999px;
   background: var(--accent);
   color: #fff;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   box-shadow: var(--shadow);
   z-index: 20;
@@ -2353,7 +2466,7 @@ watch(
   border-radius: 12px;
   background: var(--elevated);
   color: var(--t2);
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
   flex-shrink: 0;
   transition:
@@ -2391,27 +2504,30 @@ watch(
 
 .cv-look-star {
   position: absolute;
-  top: 2px;
+  top: 4px;
   right: 5px;
+  display: inline-flex;
   color: var(--amber);
-  font-size: 12px;
+}
+
+.cv-look-star :deep(.ui-icon) {
+  fill: currentColor;
 }
 
 .cv-look-style {
   position: absolute;
-  top: 3px;
+  top: 4px;
   left: 5px;
-  font-size: 10px;
+  color: var(--t3);
 }
 
 .cv-look-age {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--t3);
 }
 
 .cv-look-add {
   justify-content: center;
-  font-size: 20px;
   color: var(--t3);
   border-style: dashed;
   min-width: 60px;
@@ -2453,13 +2569,14 @@ watch(
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
+  justify-content: center;
+  gap: 3px;
   padding: 6px 2px 8px;
   border: none;
   background: transparent;
   color: var(--t3);
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   cursor: pointer;
   border-bottom: 2px solid transparent;
@@ -2468,8 +2585,7 @@ watch(
     border-color 0.2s;
 }
 
-.cv-tab span {
-  font-size: 16px;
+.cv-tab-icon {
   transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.6);
 }
 
@@ -2482,8 +2598,9 @@ watch(
   border-bottom-color: var(--accent);
 }
 
-.cv-tab.on span {
-  transform: translateY(-1px) scale(1.12);
+.cv-tab.on .cv-tab-icon {
+  color: var(--accent);
+  transform: scale(1.1);
 }
 
 .cv-tab-body {
@@ -2530,27 +2647,34 @@ watch(
 }
 
 .cv-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0 0 10px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 800;
   color: var(--t1);
 }
 
 .cv-section-title.cv-sub {
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--t2);
   margin-bottom: 8px;
 }
 
 .cv-mini {
-  width: 28px;
-  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--elevated);
   color: var(--t2);
-  font-size: 13px;
   cursor: pointer;
   transition:
     border-color 0.15s,
@@ -2572,7 +2696,7 @@ watch(
   align-items: center;
   gap: 10px;
   margin-top: 10px;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
 }
 
@@ -2633,7 +2757,7 @@ watch(
 }
 
 .cv-age-badge {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--accent);
   background: var(--adim);
@@ -2644,7 +2768,7 @@ watch(
 .cv-age-ticks {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
   margin-top: 2px;
 }
@@ -2682,13 +2806,14 @@ watch(
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px 11px;
+  min-height: var(--ctl-sm);
+  padding: 0 11px;
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -2720,7 +2845,7 @@ watch(
 
 .cv-hint {
   margin: 0 0 8px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
   line-height: 1.5;
 }
@@ -2742,7 +2867,7 @@ watch(
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t2);
   max-width: 80px;
   text-align: center;
@@ -2771,7 +2896,7 @@ watch(
   background: var(--elevated);
   color: var(--t1);
   font-family: ui-monospace, monospace;
-  font-size: 11px;
+  font-size: 12px;
   outline: none;
 }
 
@@ -2793,7 +2918,7 @@ watch(
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   outline: none;
 }
 
@@ -2895,7 +3020,7 @@ watch(
 :root[data-theme='ink'] .cv-group-label,
 :root[data-theme='ink'] .cv-chooser-kicker {
   font-family: var(--font-ink-label);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   font-variant: small-caps;
   text-transform: lowercase;
@@ -2914,11 +3039,6 @@ watch(
 :root[data-theme='ink'] .cv-label-input {
   border-radius: 3px 5px 4px 6px / 5px 3px 6px 4px;
 }
-:root[data-theme='ink'] .cv-slot-icon,
-:root[data-theme='ink'] .cv-tab span,
-:root[data-theme='ink'] .cv-empty-mark {
-  filter: grayscale(1) sepia(0.4) contrast(1.1);
-}
 :root[data-theme='ink'] .cv-slot-btn.active {
   background: rgba(179, 53, 42, 0.08);
   box-shadow: inset 3px 0 0 var(--accent);
@@ -2931,7 +3051,7 @@ watch(
   position: relative;
   border-bottom-color: transparent;
   font-family: var(--font-ink-label);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 :root[data-theme='ink'] .cv-tab::after {
   content: '';

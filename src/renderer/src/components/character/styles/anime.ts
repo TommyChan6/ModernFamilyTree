@@ -5817,14 +5817,14 @@ const parts: StylePart[] = [
 export const animePack: StylePack = {
   id: 'anime',
   name: 'Anime',
-  icon: '🌸',
+  icon: 'flower-2',
   width: 320,
   height: 560,
   ink: INK,
   slots: [
     {
       id: 'back',
-      icon: '🎒',
+      icon: 'backpack',
       socket: { x: 160, y: 210 },
       z: 31,
       backZ: 2,
@@ -5833,7 +5833,7 @@ export const animePack: StylePack = {
     },
     {
       id: 'head',
-      icon: '🙂',
+      icon: 'user-round',
       socket: { x: 160, y: 140 },
       z: 40,
       backZ: 26,
@@ -5841,7 +5841,7 @@ export const animePack: StylePack = {
     },
     {
       id: 'hair',
-      icon: '💇',
+      icon: 'waves',
       socket: { x: 160, y: 96 },
       z: 60,
       backZ: 4,
@@ -5849,21 +5849,21 @@ export const animePack: StylePack = {
     },
     {
       id: 'eyes',
-      icon: '👁',
+      icon: 'eye',
       socket: { x: 160, y: EYE_Y },
       z: 50,
       thumb: { cx: 160, cy: 140, span: 70 }
     },
     {
       id: 'brows',
-      icon: '🤨',
+      icon: 'spline',
       socket: { x: 160, y: BROW_Y },
       z: 61,
       thumb: { cx: 160, cy: 132, span: 70 }
     },
     {
       id: 'nose',
-      icon: '👃',
+      icon: 'scan-face',
       socket: { x: 160, y: 152 },
       z: 45,
       optional: true,
@@ -5871,14 +5871,14 @@ export const animePack: StylePack = {
     },
     {
       id: 'mouth',
-      icon: '👄',
+      icon: 'smile',
       socket: { x: 160, y: 165 },
       z: 51,
       thumb: { cx: 160, cy: 164, span: 44 }
     },
     {
       id: 'facialHair',
-      icon: '🧔',
+      icon: 'scissors',
       socket: { x: 160, y: 166 },
       z: 53,
       optional: true,
@@ -5886,7 +5886,7 @@ export const animePack: StylePack = {
     },
     {
       id: 'marks',
-      icon: '✨',
+      icon: 'sparkles',
       socket: { x: 160, y: 146 },
       z: 42,
       optional: true,
@@ -5894,7 +5894,7 @@ export const animePack: StylePack = {
     },
     {
       id: 'torso',
-      icon: '👕',
+      icon: 'shirt',
       socket: { x: 160, y: 240 },
       z: 30,
       backZ: 25,
@@ -5902,21 +5902,21 @@ export const animePack: StylePack = {
     },
     {
       id: 'legs',
-      icon: '👖',
+      icon: 'person-standing',
       socket: { x: 160, y: 310 },
       z: 20,
       thumb: { cx: 160, cy: 415, span: 270 }
     },
     {
       id: 'feet',
-      icon: '👟',
+      icon: 'footprints',
       socket: { x: 160, y: 530 },
       z: 22,
       thumb: { cx: 160, cy: 520, span: 80 }
     },
     {
       id: 'headwear',
-      icon: '🎩',
+      icon: 'crown',
       socket: { x: 160, y: 88 },
       z: 70,
       optional: true,
@@ -5924,7 +5924,7 @@ export const animePack: StylePack = {
     },
     {
       id: 'accessory',
-      icon: '👓',
+      icon: 'glasses',
       socket: { x: 160, y: 140 },
       z: 65,
       optional: true,

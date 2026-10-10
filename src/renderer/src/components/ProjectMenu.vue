@@ -1,14 +1,14 @@
 <template>
   <div class="pmenu-wrap">
     <button
-      class="btn btn-ghost btn-sm pmenu-btn"
+      class="btn btn-ghost pmenu-btn"
       :class="{ 'is-active': open }"
       aria-haspopup="menu"
       :aria-expanded="open"
       @click.stop="open = !open"
     >
       {{ t('projectMenu.button') }}
-      <span class="pmenu-caret" :class="{ open }" aria-hidden="true">▾</span>
+      <UiIcon class="pmenu-caret" :class="{ open }" name="chevron-down" :size="14" />
       <span
         v-if="store.hasUnsavedChanges"
         class="pmenu-dot"
@@ -25,7 +25,8 @@
           :title="t('projectMenu.saveHint')"
           @click="emitAnd('save')"
         >
-          <span class="pmenu-icon">💾</span> {{ t('projectMenu.save') }}
+          <UiIcon class="pmenu-icon" name="save" :size="16" />
+          {{ t('projectMenu.save') }}
           <span v-if="store.hasUnsavedChanges" class="pmenu-badge">{{
             t('projectMenu.unsaved')
           }}</span>
@@ -38,7 +39,8 @@
           :title="t('projectMenu.revertHint')"
           @click="emitAnd('revert')"
         >
-          <span class="pmenu-icon">↩</span> {{ t('projectMenu.revert') }}
+          <UiIcon class="pmenu-icon" name="undo-2" :size="16" />
+          {{ t('projectMenu.revert') }}
         </button>
 
         <div class="pmenu-sep"></div>
@@ -49,7 +51,8 @@
           :title="t('projectMenu.exportHint')"
           @click="emitAnd('export')"
         >
-          <span class="pmenu-icon">⬆</span> {{ t('projectMenu.exportJson') }}
+          <UiIcon class="pmenu-icon" name="file-down" :size="16" />
+          {{ t('projectMenu.exportJson') }}
         </button>
         <button
           class="pmenu-item"
@@ -57,7 +60,8 @@
           :title="t('projectMenu.importHint')"
           @click="emitAnd('import')"
         >
-          <span class="pmenu-icon">⬇</span> {{ t('projectMenu.importJson') }}
+          <UiIcon class="pmenu-icon" name="file-up" :size="16" />
+          {{ t('projectMenu.importJson') }}
         </button>
 
         <div class="pmenu-sep"></div>
@@ -79,9 +83,10 @@
               v-if="store.userCurrentYear"
               class="pmenu-date-clear"
               :title="t('projectMenu.presentReset')"
+              :aria-label="t('projectMenu.presentReset')"
               @click="store.setCurrentYear('')"
             >
-              ✕
+              <UiIcon name="x" :size="14" />
             </button>
           </div>
           <div v-if="!store.userCurrentYear && store.currentDate" class="pmenu-hint">
@@ -117,6 +122,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { useI18n } from '../i18n'
 import { generationCount } from './graph/graphInsights.js'
+import UiIcon from './ui/UiIcon.js'
 
 // The Project ▾ dropdown in the top bar: Save/Revert, project file
 // Export/Import, the Current Date (Present) input and the project statistics.
@@ -183,8 +189,7 @@ onUnmounted(() => {
 }
 
 .pmenu-caret {
-  font-size: 10px;
-  opacity: 0.7;
+  color: var(--t3);
   transition: transform var(--dur-slow) var(--ease-spring);
 }
 .pmenu-caret.open {
@@ -257,14 +262,16 @@ onUnmounted(() => {
 }
 
 .pmenu-icon {
-  width: 18px;
-  text-align: center;
   flex-shrink: 0;
+  color: var(--t3);
+}
+.pmenu-item:hover:not(:disabled) .pmenu-icon {
+  color: var(--accent);
 }
 
 .pmenu-badge {
   margin-left: auto;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.4px;
@@ -276,7 +283,7 @@ onUnmounted(() => {
 
 .pmenu-kbd {
   margin-left: auto;
-  font-size: 9.5px;
+  font-size: 11px;
   padding: 0 5px;
 }
 
@@ -308,7 +315,7 @@ onUnmounted(() => {
   border-radius: var(--r-md);
   background: var(--elevated);
   border: 1px solid var(--border);
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--t2);
   animation: pmenu-stat-in 0.4s var(--ease-out) backwards;
   animation-delay: calc(0.05s + var(--i, 0) * 0.05s);
@@ -337,19 +344,23 @@ onUnmounted(() => {
 .pmenu-date-input {
   flex: 1;
   min-width: 0;
-  padding: 6px 10px;
-  font-size: 12px;
+  height: var(--ctl-sm);
+  padding: 0 10px;
+  font-size: 13px;
   font-weight: 500;
 }
 
 .pmenu-date-clear {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
+  border-radius: var(--r-sm);
   border: none;
   background: transparent;
   color: var(--t3);
-  font-size: 11px;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -361,7 +372,7 @@ onUnmounted(() => {
 
 .pmenu-hint {
   padding-top: 4px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--t3);
 }
 
@@ -414,9 +425,6 @@ onUnmounted(() => {
 :root[data-theme='ink'] .pmenu-item:hover:not(:disabled) {
   background-color: transparent;
   background-size: 170% 300%;
-}
-:root[data-theme='ink'] .pmenu-icon {
-  filter: grayscale(1) sepia(0.4) contrast(1.1);
 }
 :root[data-theme='ink'] .pmenu-badge {
   border-radius: 2px;

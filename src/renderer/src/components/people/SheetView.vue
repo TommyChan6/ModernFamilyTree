@@ -41,7 +41,7 @@
       </label>
       <div class="sh-actions">
         <button class="sh-btn primary" title="Add a row (Enter on an empty sheet)" @click="addRow">
-          <span class="sh-btn-plus">＋</span>{{ store.noun }}
+          <UiIcon name="plus" :size="14" :stroke="2.4" />{{ store.noun }}
         </button>
         <button
           data-menu-toggle
@@ -50,7 +50,7 @@
           title="Add a trait column"
           @click="toggleMenu('addcol', $event)"
         >
-          <span class="sh-btn-plus">＋</span>Trait
+          <UiIcon name="plus" :size="14" :stroke="2.4" />Trait
         </button>
         <button
           class="sh-btn"
@@ -73,6 +73,7 @@
           class="sh-btn icon"
           :disabled="!canFill"
           title="Fill down (Ctrl+D)"
+          aria-label="Fill down"
           @click="fillDown"
         >
           <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -149,8 +150,8 @@
                 @pointerdown.prevent
                 @click="onHeaderClick(col)"
               >
-                <span class="sh-htype">{{ glyphOf(col) }}</span>
-                <span v-if="col.icon" class="sh-hicon">{{ col.icon }}</span>
+                <span class="sh-htype"><UiIcon :name="glyphOf(col)" :size="12" /></span>
+                <UiIcon v-if="col.icon" class="sh-hicon" :name="col.icon" :size="14" />
                 <span class="sh-htext">{{ col.label }}</span>
                 <span
                   class="sh-sort"
@@ -164,10 +165,11 @@
                 class="sh-hmenu"
                 data-menu-toggle
                 title="Column options"
+                aria-label="Column options"
                 @pointerdown.prevent
                 @click.stop="openHeadMenu(col, $event)"
               >
-                ⋯
+                <UiIcon name="ellipsis" :size="14" />
               </button>
             </template>
             <span
@@ -181,10 +183,11 @@
             class="sh-hadd"
             data-menu-toggle
             title="Add a trait column"
+            aria-label="Add a trait column"
             @pointerdown.prevent
             @click="toggleMenu('addcol', $event)"
           >
-            ＋
+            <UiIcon name="plus" :size="16" />
           </button>
         </div>
 
@@ -227,6 +230,7 @@
               <button
                 class="sh-open"
                 title="Open profile"
+                aria-label="Open profile"
                 @pointerdown.stop
                 @click.stop="openProfile(row.p.id)"
               >
@@ -313,8 +317,10 @@
                   :key="chip.id"
                   class="sh-chip"
                   :style="{ '--cc': chip.color }"
-                  >{{ chip.icon }}{{ chip.label }}</span
                 >
+                  <UiIcon v-if="chip.icon" :name="chip.icon" :size="12" />
+                  {{ chip.label }}
+                </span>
                 <span v-if="cv.more" class="sh-chip more">+{{ cv.more }}</span>
               </span>
             </div>
@@ -352,7 +358,8 @@
           @pointerdown.prevent
           @click="addRow"
         >
-          <span class="sh-addrow-plus">＋</span> Add {{ store.noun.toLowerCase() }}
+          <UiIcon name="plus" :size="14" :stroke="2.4" />
+          Add {{ store.noun.toLowerCase() }}
           <span class="sh-addrow-hint">or paste rows below the last one</span>
         </button>
       </div>
@@ -360,7 +367,9 @@
       <!-- Empty states -->
       <Transition name="sh-fade">
         <div v-if="!rows.length" class="sh-empty">
-          <div class="sh-empty-icon">{{ store.persons.length ? '🔍' : '🧾' }}</div>
+          <div class="sh-empty-icon">
+            <UiIcon :name="store.persons.length ? 'search' : 'sheet'" :size="42" :stroke="1.5" />
+          </div>
           <div class="sh-empty-title">
             {{ store.persons.length ? 'No matches' : 'An empty sheet' }}
           </div>
@@ -372,7 +381,7 @@
             }}
           </div>
           <button class="sh-btn primary sh-empty-btn" @click="addRow">
-            <span class="sh-btn-plus">＋</span>Add {{ store.noun.toLowerCase() }}
+            <UiIcon name="plus" :size="14" :stroke="2.4" />Add {{ store.noun.toLowerCase() }}
           </button>
         </div>
       </Transition>
@@ -390,7 +399,8 @@
           title="Values changed since the rows were ordered"
           @click="reorder"
         >
-          <span class="sh-resort-icon">↻</span> Re-sort
+          <UiIcon class="sh-resort-icon" name="refresh-cw" :size="12" :stroke="2.4" />
+          Re-sort
         </button>
       </Transition>
       <Transition name="sh-fade" mode="out-in">
@@ -398,7 +408,8 @@
           notice.text
         }}</span>
         <span v-else class="sh-hint">
-          ↵ edit · Tab next · Ctrl+C / Ctrl+V · Del clear · Ctrl+D fill down · right-click for more
+          Enter edit · Tab next · Ctrl+C / Ctrl+V · Del clear · Ctrl+D fill down · right-click for
+          more
         </span>
       </Transition>
       <span class="sh-st-right">
@@ -466,8 +477,8 @@
                 :style="{ '--i': i }"
                 @click="newCol.type = t.id"
               >
-                <span class="sh-type-glyph">{{ TYPE_GLYPH[t.id] }}</span
-                >{{ t.label }}
+                <UiIcon class="sh-type-glyph" :name="TYPE_GLYPH[t.id]" :size="14" />
+                {{ t.label }}
               </button>
             </div>
             <button
@@ -492,9 +503,9 @@
                 @click="toggleHidden(col.key)"
               >
                 <span class="sh-toggle"><span class="sh-toggle-knob"></span></span>
-                <span v-if="col.icon" class="sh-hicon">{{ col.icon }}</span>
+                <UiIcon v-if="col.icon" class="sh-hicon" :name="col.icon" :size="14" />
                 <span class="sh-colrow-label">{{ col.label }}</span>
-                <span class="sh-colrow-type">{{ glyphOf(col) }}</span>
+                <UiIcon class="sh-colrow-type" :name="glyphOf(col)" :size="12" />
               </button>
             </div>
             <button v-if="hiddenCount" class="sh-menu-link" @click="showAllColumns">
@@ -514,7 +525,7 @@
                 :style="{ '--i': i }"
                 @click="runItem(it)"
               >
-                <span class="sh-menu-icon">{{ it.icon }}</span>
+                <UiIcon class="sh-menu-icon" :name="it.icon" :size="14" />
                 <span class="sh-menu-label">{{
                   armed === it.id ? it.armedLabel || 'Click again to confirm' : it.label
                 }}</span>
@@ -544,6 +555,7 @@ import { useMainStore } from '../../store/index.js'
 import { useThumbnail } from './useThumbnail.js'
 import { ageOf } from './peopleLayout.js'
 import SheetPicker from './SheetPicker.vue'
+import UiIcon from '../ui/UiIcon.js'
 import {
   ROW_H,
   HEAD_H,
@@ -682,8 +694,10 @@ const cellClasses = computed(() =>
   ])
 )
 
+// Header type icon: the trait type's icon; derived columns get their own.
+const DERIVED_ICON = { age: 'hourglass', ties: 'link', groups: 'tags' }
 const glyphOf = (col) =>
-  col.kind === 'field' ? TYPE_GLYPH[col.def.type] || '·' : col.kind === 'groups' ? '🏷' : 'ƒ'
+  col.kind === 'field' ? TYPE_GLYPH[col.def.type] || 'type' : DERIVED_ICON[col.kind] || 'lock'
 function headTitle(col) {
   if (col.kind === 'age') return `Age in ${props.refYear} (calculated) — click to sort`
   if (col.kind === 'ties') return 'Number of relationships (calculated) — click to sort'
@@ -731,7 +745,7 @@ function cellView(p, col) {
       chips: tags.slice(0, 3).map((t) => ({
         id: t.id,
         label: t.label,
-        icon: t.icon ? t.icon + ' ' : '',
+        icon: t.icon || '',
         color: t.color || 'var(--accent)'
       })),
       more: Math.max(0, tags.length - 3)
@@ -2062,32 +2076,42 @@ const menuItems = computed(() => {
     const col = m.col
     const s = sortSpec.value
     const out = [
-      { id: 'sa', icon: '↑', label: 'Sort ascending', run: () => setSort(col.key, 1) },
-      { id: 'sd', icon: '↓', label: 'Sort descending', run: () => setSort(col.key, -1) }
+      { id: 'sa', icon: 'arrow-up', label: 'Sort ascending', run: () => setSort(col.key, 1) },
+      { id: 'sd', icon: 'arrow-down', label: 'Sort descending', run: () => setSort(col.key, -1) }
     ]
     if (s?.key === col.key)
-      out.push({ id: 'sx', icon: '✕', label: 'Clear sort', run: () => setSort(col.key, 0) })
+      out.push({ id: 'sx', icon: 'x', label: 'Clear sort', run: () => setSort(col.key, 0) })
     out.push(
       { sep: true },
-      { id: 'fit', icon: '↔', label: 'Fit width to content', run: () => autoFit(col) },
+      {
+        id: 'fit',
+        icon: 'move-horizontal',
+        label: 'Fit width to content',
+        run: () => autoFit(col)
+      },
       {
         id: 'sel',
-        icon: '▥',
+        icon: 'columns-3',
         label: 'Select column',
         hint: 'Ctrl+Space',
         run: () => selectColumn(col)
       }
     )
     if (col.kind === 'field') {
-      out.push({ id: 'ren', icon: '✎', label: 'Rename trait', run: () => startRename(col) })
+      out.push({ id: 'ren', icon: 'pencil', label: 'Rename trait', run: () => startRename(col) })
     }
-    out.push({ id: 'hide', icon: '◌', label: 'Hide column', run: () => toggleHidden(col.key) })
+    out.push({
+      id: 'hide',
+      icon: 'eye-off',
+      label: 'Hide column',
+      run: () => toggleHidden(col.key)
+    })
     if (col.kind === 'field' && !col.def.slot) {
       out.push(
         { sep: true },
         {
           id: 'deldef',
-          icon: '🗑',
+          icon: 'trash-2',
           label: 'Delete trait for everyone',
           armedLabel: 'Click again — removes every value',
           danger: true,
@@ -2102,12 +2126,12 @@ const menuItems = computed(() => {
   const ac = activeCell.value
   const n = touchedRowIds.value.length
   return [
-    { id: 'cp', icon: '⧉', label: 'Copy', hint: 'Ctrl+C', run: copyViaMenu },
-    { id: 'ps', icon: '📋', label: 'Paste', hint: 'Ctrl+V', run: pasteViaMenu },
-    { id: 'cl', icon: '⌫', label: 'Clear contents', hint: 'Del', run: clearSelection },
+    { id: 'cp', icon: 'copy', label: 'Copy', hint: 'Ctrl+C', run: copyViaMenu },
+    { id: 'ps', icon: 'clipboard-paste', label: 'Paste', hint: 'Ctrl+V', run: pasteViaMenu },
+    { id: 'cl', icon: 'eraser', label: 'Clear contents', hint: 'Del', run: clearSelection },
     {
       id: 'fd',
-      icon: '⤓',
+      icon: 'chevrons-down',
       label: 'Fill down',
       hint: 'Ctrl+D',
       disabled: !canFill.value,
@@ -2116,23 +2140,23 @@ const menuItems = computed(() => {
     { sep: true },
     {
       id: 'op',
-      icon: '↗',
+      icon: 'arrow-up-right',
       label: 'Open profile',
       disabled: !ac,
       run: () => openProfile(ac?.p.id)
     },
     {
       id: 'ed',
-      icon: '✎',
+      icon: 'square-pen',
       label: 'Edit in full form',
       disabled: !ac,
       run: () => ac && store.openForm(ac.p)
     },
-    { id: 'add', icon: '＋', label: `Add ${store.noun.toLowerCase()}`, run: addRow },
+    { id: 'add', icon: 'plus', label: `Add ${store.noun.toLowerCase()}`, run: addRow },
     { sep: true },
     {
       id: 'del',
-      icon: '🗑',
+      icon: 'trash-2',
       label: `Delete ${n} ${nounFor(n)}`,
       armedLabel: `Click again to delete ${n}`,
       danger: true,
@@ -2423,7 +2447,7 @@ watch(
   overflow: hidden;
 }
 .sh-ref-main {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--t1);
   white-space: nowrap;
@@ -2431,7 +2455,7 @@ watch(
   text-overflow: ellipsis;
 }
 .sh-ref-sub {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
   white-space: nowrap;
   overflow: hidden;
@@ -2462,11 +2486,10 @@ watch(
   cursor: default;
 }
 .sh-fx-icon {
-  font-size: 12px;
+  font-size: 12.5px;
   font-style: italic;
   font-weight: 700;
   color: var(--accent);
-  opacity: 0.85;
 }
 .sh-fx-input {
   flex: 1 1 auto;
@@ -2504,7 +2527,7 @@ watch(
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -2531,7 +2554,7 @@ watch(
   color: var(--t1);
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
-.sh-btn svg {
+.sh-btn svg:not(.ui-icon) {
   width: 14px;
   height: 14px;
   fill: currentColor;
@@ -2557,9 +2580,7 @@ watch(
   color: #fff;
   box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 45%, transparent);
 }
-.sh-btn-plus {
-  font-weight: 800;
-}
+
 .sh-btn.danger {
   color: var(--pink);
   border-color: color-mix(in srgb, var(--pink) 35%, transparent);
@@ -2579,7 +2600,7 @@ watch(
   border-radius: 10px;
   background: var(--adim);
   color: var(--accent);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
 }
 
@@ -2698,7 +2719,7 @@ watch(
   background: transparent;
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   text-align: left;
   cursor: pointer;
@@ -2708,17 +2729,18 @@ watch(
 }
 .sh-htype {
   flex: 0 0 auto;
-  min-width: 18px;
-  padding: 1px 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 18px;
   border-radius: 5px;
   background: var(--elevated);
   color: var(--t3);
-  font-size: 9.5px;
-  font-weight: 800;
-  text-align: center;
 }
 .sh-hicon {
-  font-size: 12px;
+  flex: 0 0 auto;
+  color: var(--t2);
 }
 .sh-htext {
   min-width: 0;
@@ -2756,15 +2778,17 @@ watch(
 }
 .sh-hmenu {
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
   margin-right: 6px;
+  padding: 0;
   border: none;
   border-radius: 6px;
   background: transparent;
   color: var(--t3);
-  font-size: 13px;
-  line-height: 1;
   cursor: pointer;
   opacity: 0;
   transition:
@@ -2814,7 +2838,7 @@ watch(
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   box-shadow: 0 0 0 3px var(--adim);
 }
@@ -2823,10 +2847,13 @@ watch(
 }
 .sh-hadd {
   flex: 0 0 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: none;
   background: transparent;
   color: var(--t3);
-  font-size: 15px;
   cursor: pointer;
   transition:
     color 0.15s,
@@ -2922,7 +2949,7 @@ watch(
 .sh-rownum {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--t3);
   font-variant-numeric: tabular-nums;
@@ -2945,7 +2972,7 @@ watch(
   justify-content: center;
   background: var(--adim);
   color: var(--accent);
-  font-size: 8.5px;
+  font-size: 9.5px;
   font-weight: 800;
 }
 .sh-open {
@@ -3044,7 +3071,7 @@ watch(
   color: var(--t3);
 }
 .sh-unit {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
 }
 
@@ -3094,7 +3121,7 @@ watch(
   background: color-mix(in srgb, var(--pc) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--pc) 40%, transparent);
   color: var(--t1);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3129,11 +3156,14 @@ watch(
 .sh-chip {
   --cc: var(--accent);
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 1px 8px;
   border-radius: 20px;
   background: color-mix(in srgb, var(--cc) 15%, transparent);
   border: 1px solid color-mix(in srgb, var(--cc) 38%, transparent);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -3240,7 +3270,7 @@ watch(
   border-radius: 7px;
   background: var(--pink);
   color: #fff;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   white-space: nowrap;
   box-shadow: var(--shadow);
@@ -3380,7 +3410,7 @@ watch(
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -3394,9 +3424,7 @@ watch(
   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
   background: var(--adim);
 }
-.sh-addrow-plus {
-  font-weight: 800;
-}
+
 .sh-addrow-hint {
   font-weight: 500;
   color: var(--t3);
@@ -3416,8 +3444,8 @@ watch(
   pointer-events: none;
 }
 .sh-empty-icon {
-  font-size: 42px;
-  opacity: 0.6;
+  display: flex;
+  color: var(--t3);
   animation: sh-bob 3s ease-in-out infinite;
 }
 @keyframes sh-bob {
@@ -3449,7 +3477,7 @@ watch(
   padding: 0 22px;
   border-top: 1px solid var(--border);
   background: var(--glass-soft);
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
   white-space: nowrap;
   overflow: hidden;
@@ -3470,12 +3498,11 @@ watch(
   background: color-mix(in srgb, var(--amber) 12%, transparent);
   color: var(--amber);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
 }
 .sh-resort-icon {
-  display: inline-block;
   transition: transform 0.4s cubic-bezier(0.34, 1.4, 0.5, 1);
 }
 .sh-resort:hover .sh-resort-icon {
@@ -3576,7 +3603,7 @@ watch(
 }
 .sh-menu-title {
   padding: 2px 4px 10px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 800;
   color: var(--t1);
 }
@@ -3592,7 +3619,7 @@ watch(
   background: transparent;
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   text-align: left;
   cursor: pointer;
   animation: sh-item-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--i, 0) * 0.015s) backwards;
@@ -3621,15 +3648,14 @@ watch(
   color: #fff;
 }
 .sh-menu-icon {
-  width: 16px;
-  text-align: center;
-  font-size: 12px;
+  flex: 0 0 auto;
+  color: var(--t2);
 }
 .sh-menu-label {
   flex: 1 1 auto;
 }
 .sh-menu-hint {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
 }
 .sh-menu-item.armed .sh-menu-hint {
@@ -3673,7 +3699,7 @@ watch(
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   animation: sh-item-in 0.24s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--i, 0) * 0.02s) backwards;
@@ -3693,9 +3719,6 @@ watch(
   background: var(--adim);
 }
 .sh-type-glyph {
-  min-width: 22px;
-  font-size: 10px;
-  font-weight: 800;
   color: var(--accent);
 }
 .sh-menu-go {
@@ -3720,7 +3743,7 @@ watch(
   background: transparent;
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   text-align: left;
   cursor: pointer;
   animation: sh-item-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--i, 0) * 0.015s) backwards;
@@ -3742,7 +3765,7 @@ watch(
   white-space: nowrap;
 }
 .sh-colrow-type {
-  font-size: 10px;
+  flex: 0 0 auto;
   color: var(--t3);
 }
 .sh-toggle {
@@ -3781,7 +3804,7 @@ watch(
   background: var(--adim);
   color: var(--accent);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
 }

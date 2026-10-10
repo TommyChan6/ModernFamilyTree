@@ -5,11 +5,12 @@
 
 import { X0, LANE_W } from './timelineLayout.js'
 
-/** The Timeline's edit tools (rendered in the canvas-toggle "Edit" rail). */
+/** The Timeline's edit tools (rendered in the canvas-toggle "Edit" rail);
+ *  `icon` is an icon name (components/ui/icons.js). */
 export const TIMELINE_TOOLS = [
   {
     id: 'add',
-    icon: '✚',
+    icon: 'user-plus',
     label: 'Add',
     color: '#4caf72',
     key: '1',
@@ -17,7 +18,7 @@ export const TIMELINE_TOOLS = [
   },
   {
     id: 'child',
-    icon: '👶',
+    icon: 'baby',
     label: 'Child',
     color: '#f5a623',
     key: '2',
@@ -25,7 +26,7 @@ export const TIMELINE_TOOLS = [
   },
   {
     id: 'link',
-    icon: '🔗',
+    icon: 'link',
     label: 'Link',
     color: '#f06292',
     key: '3',
@@ -33,7 +34,7 @@ export const TIMELINE_TOOLS = [
   },
   {
     id: 'event',
-    icon: '✦',
+    icon: 'calendar-plus',
     label: 'Event',
     color: '#a06cf5',
     key: '4',
@@ -41,7 +42,7 @@ export const TIMELINE_TOOLS = [
   },
   {
     id: 'retime',
-    icon: '⇕',
+    icon: 'move-vertical',
     label: 'Retime',
     color: '#26c6da',
     key: '5',
@@ -49,7 +50,7 @@ export const TIMELINE_TOOLS = [
   },
   {
     id: 'delete',
-    icon: '🗑',
+    icon: 'trash-2',
     label: 'Delete',
     color: '#ef5350',
     key: '6',

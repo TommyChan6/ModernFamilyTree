@@ -77,7 +77,7 @@
           <path :id="uid + '-' + i" fill="none" />
           <text :style="{ '--gc': g.color }" :class="{ focus: focusKey === g.key }">
             <textPath :href="'#' + uid + '-' + i" startOffset="50%" text-anchor="middle">
-              {{ g.icon ? g.icon + ' ' : '' }}{{ g.label }}
+              {{ g.label }}
               <tspan class="bb-lab-n">{{ g.count }}</tspan>
             </textPath>
           </text>
@@ -114,7 +114,7 @@
 
       <Transition name="bb-fade">
         <button v-if="focusGroup" class="bb-crumb" @pointerdown.stop @click="fitAll()">
-          <span class="bb-crumb-back">‹ Everyone</span>
+          <span class="bb-crumb-back"><UiIcon name="chevron-left" :size="14" />Everyone</span>
           <span class="bb-crumb-sep">/</span>
           <span class="bb-crumb-dot" :style="{ '--gc': focusGroup.color }"></span>
           {{ focusGroup.label }}
@@ -123,19 +123,19 @@
       </Transition>
 
       <div class="bb-zoom" @pointerdown.stop @wheel.stop>
-        <button class="bb-zoom-b" title="Zoom in" @click="zoomBy(1 / 1.6)">+</button>
-        <button class="bb-zoom-b" title="Zoom out" @click="zoomBy(1.6)">−</button>
-        <button class="bb-zoom-b bb-zoom-fit" title="Fit everyone (Esc)" @click="fitAll()">
-          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-            <path
-              d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+        <button class="bb-zoom-b" title="Zoom in" aria-label="Zoom in" @click="zoomBy(1 / 1.6)">
+          <UiIcon name="plus" :size="14" />
+        </button>
+        <button class="bb-zoom-b" title="Zoom out" aria-label="Zoom out" @click="zoomBy(1.6)">
+          <UiIcon name="minus" :size="14" />
+        </button>
+        <button
+          class="bb-zoom-b bb-zoom-fit"
+          title="Fit everyone (Esc)"
+          aria-label="Fit everyone"
+          @click="fitAll()"
+        >
+          <UiIcon name="maximize" :size="14" />
         </button>
       </div>
 
@@ -157,7 +157,13 @@
           :style="{ left: tip.x + 'px', top: tip.y + 'px', '--c': tip.color }"
         >
           <div class="bb-tip-name">{{ tip.name }}</div>
-          <div class="bb-tip-sub">{{ tip.years }}</div>
+          <div class="bb-tip-sub">
+            {{ tip.years
+            }}<template v-if="tip.dead">
+              ·
+              <UiIcon name="moon" :size="11" label="Deceased" />
+            </template>
+          </div>
           <div v-if="tip.metric || tip.group" class="bb-tip-row">
             <span v-if="tip.metric" class="bb-tip-metric">{{ tip.metric }}</span>
             <span v-if="tip.group" class="bb-tip-group" :style="{ '--gc': tip.groupColor }">
@@ -186,6 +192,7 @@ import { interpolateZoom } from 'd3'
 import { useMainStore } from '../../store/index.js'
 import { isDeceased, ageOf } from './peopleLayout.js'
 import { useThumbnail } from './useThumbnail.js'
+import UiIcon from '../ui/UiIcon.js'
 import {
   SIZE_MODES,
   GROUP_MODES,
@@ -877,7 +884,8 @@ function setHover(id) {
   tip.value = {
     id,
     name: n.p.name || 'Unnamed',
-    years: lifeText(n.p) + (m?.dead ? ' · ☾' : ''),
+    years: lifeText(n.p),
+    dead: !!m?.dead,
     metric: metricText(n.p),
     group: g ? g.label : '',
     groupColor: g ? g.color : '',
@@ -1365,7 +1373,7 @@ watch(
 }
 .bb-labels text {
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1410,7 +1418,7 @@ watch(
 }
 .bb-seg-k {
   padding: 0 7px 0 8px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1423,7 +1431,7 @@ watch(
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1456,7 +1464,7 @@ watch(
   box-shadow: var(--shadow);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -1464,6 +1472,9 @@ watch(
   color: var(--accent);
 }
 .bb-crumb-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   color: var(--t2);
   transition: color 0.15s;
 }
@@ -1498,18 +1509,16 @@ watch(
   animation: bb-ui-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.28s backwards;
 }
 .bb-zoom-b {
-  width: 28px;
-  height: 26px;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
   border: none;
   border-radius: 8px;
   background: transparent;
   color: var(--t2);
-  font-family: var(--font);
-  font-size: 16px;
-  line-height: 1;
   cursor: pointer;
   transition:
     background 0.15s,
@@ -1534,7 +1543,7 @@ watch(
   display: flex;
   align-items: baseline;
   gap: 5px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t3);
   pointer-events: none;
@@ -1579,7 +1588,7 @@ watch(
   text-overflow: ellipsis;
 }
 .bb-tip-sub {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t2);
   font-variant-numeric: tabular-nums;
@@ -1594,7 +1603,7 @@ watch(
 .bb-tip-group {
   padding: 2px 8px;
   border-radius: 10px;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   white-space: nowrap;
 }

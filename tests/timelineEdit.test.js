@@ -26,7 +26,7 @@ describe('timeline tools catalog', () => {
     const keys = new Set(TIMELINE_TOOLS.map((t) => t.key))
     expect(ids.size).toBe(TIMELINE_TOOLS.length)
     expect(keys.size).toBe(TIMELINE_TOOLS.length)
-    expect(timelineTool('retime').icon).toBe('⇕')
+    expect(timelineTool('retime').icon).toBe('move-vertical')
     expect(timelineTool('nope')).toBeNull()
   })
 })

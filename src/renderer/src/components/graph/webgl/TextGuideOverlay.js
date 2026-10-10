@@ -1,4 +1,5 @@
 import { worldToScreen } from './coords.js'
+import { drawIcon, iconPath } from '../../../lib/canvasIcon.js'
 import { INK_FONTS, inkFontsReady } from '../../../lib/inkArt'
 
 // A transparent 2D canvas layered over the WebGL canvas. It draws everything textual or
@@ -141,7 +142,7 @@ export class TextGuideOverlay {
       ctx.setLineDash([])
       if (label != null) {
         ctx.fillStyle = fill
-        ctx.font = this.ink ? `13px ${INK_FONTS.kai}` : `${weight} 10px system-ui, sans-serif`
+        ctx.font = this.ink ? `13px ${INK_FONTS.kai}` : `${weight} 11px system-ui, sans-serif`
         ctx.textAlign = 'right'
         ctx.textBaseline = 'middle'
         // Clamp into the viewport so the year stays readable when the line's
@@ -202,26 +203,37 @@ export class TextGuideOverlay {
     ctx.textBaseline = 'alphabetic'
     if (ink) return this._drawInkLabels(opts, c, fontPx)
     const margin = 60
+    const nameFont = `500 ${fontPx}px system-ui, sans-serif`
+    const ageFont = `600 ${fontPx}px system-ui, sans-serif`
     for (const n of opts.nodes) {
       const s = worldToScreen(n.x, n.y, t)
       if (s.x < -margin || s.x > this.w + margin || s.y < -margin || s.y > this.h + margin) continue
       const op = opts.labelOpacityOf ? opts.labelOpacityOf(n) : 1
       if (op <= 0.01) continue
-      const y = s.y + (gs.nodeRadius + 14) * t.k
+      // Sit below the node's drawn radius (per-node size + emphasis swell),
+      // not the global default, so enlarged nodes don't swallow their label.
+      const r = opts.radiusOf ? opts.radiusOf(n) : gs.nodeRadius
+      const y = s.y + (r + 14) * t.k
       // The trait system composes the full node label (name-slot words + any
       // "show in graph" values); pre-trait nodes fall back to the first name.
       const first = n.graph_label ?? (n.name ? n.name.split(' ')[0] : '')
       ctx.globalAlpha = op
-      ctx.font = `500 ${fontPx}px system-ui, sans-serif`
+      ctx.font = nameFont
       ctx.fillStyle = opts.selectedId === n.id ? c.sel : c.name
       const age = opts.showAge && opts.ageOf ? opts.ageOf(n) : null
       if (age != null) {
-        ctx.fillText(first, s.x, y)
-        ctx.font = `600 ${fontPx}px system-ui, sans-serif`
-        ctx.fillStyle = c.age
+        // Center the name + age pair as one unit under the node.
         const nameW = ctx.measureText(first).width
+        ctx.font = ageFont
+        const ageW = ctx.measureText(String(age)).width
+        const gap = 4 * t.k
+        const x0 = s.x - (nameW + gap + ageW) / 2
         ctx.textAlign = 'left'
-        ctx.fillText(String(age), s.x + nameW / 2 + 4 * t.k, y)
+        ctx.font = nameFont
+        ctx.fillText(first, x0, y)
+        ctx.font = ageFont
+        ctx.fillStyle = c.age
+        ctx.fillText(String(age), x0 + nameW + gap, y)
         ctx.textAlign = 'center'
       } else {
         ctx.fillText(first, s.x, y)
@@ -249,20 +261,29 @@ export class TextGuideOverlay {
       const op =
         (opts.labelOpacityOf ? opts.labelOpacityOf(n) : 1) * (opts.revealOf ? opts.revealOf(n) : 1)
       if (op <= 0.01) continue
-      const y = s.y + (gs.nodeRadius + 12) * t.k + fontPx * 0.7
+      const r = opts.radiusOf ? opts.radiusOf(n) : gs.nodeRadius
+      const y = s.y + (r + 12) * t.k + fontPx * 0.7
       const first = n.graph_label ?? (n.name ? n.name.split(' ')[0] : '')
       ctx.globalAlpha = op
       ctx.font = font
-      ctx.textAlign = 'center'
-      ctx.strokeText(first, s.x, y)
-      ctx.fillStyle = opts.selectedId === n.id ? c.sel : c.name
-      ctx.fillText(first, s.x, y)
       const age = opts.showAge && opts.ageOf ? opts.ageOf(n) : null
+      // Center the name (+ age annotation) as one unit under the node.
+      const nameW = ctx.measureText(first).width
+      let ageW = 0
+      const gap = 4 * t.k
       if (age != null) {
-        const nameW = ctx.measureText(first).width
         ctx.font = ageFont
-        ctx.textAlign = 'left'
-        const ax = s.x + nameW / 2 + 4 * t.k
+        ageW = ctx.measureText(String(age)).width + gap
+        ctx.font = font
+      }
+      const x0 = s.x - (nameW + ageW) / 2
+      ctx.textAlign = 'left'
+      ctx.strokeText(first, x0, y)
+      ctx.fillStyle = opts.selectedId === n.id ? c.sel : c.name
+      ctx.fillText(first, x0, y)
+      if (age != null) {
+        ctx.font = ageFont
+        const ax = x0 + nameW + gap
         ctx.strokeText(String(age), ax, y)
         ctx.fillStyle = c.age
         ctx.fillText(String(age), ax, y)
@@ -318,9 +339,13 @@ export class TextGuideOverlay {
       }
       ctx.setLineDash([])
       if (y1 - y0 < 26) continue
-      const label = `${e.icon ? e.icon + ' ' : ''}${e.name}`
-      ctx.font = `800 10.5px ${font}`
-      const w = ctx.measureText(label).width + 22
+      // Era icon: an icon name (or legacy glyph) drawn as an SVG icon; an
+      // unrecognised value is simply omitted (never drawn as emoji text).
+      const icon = e.icon && iconPath(e.icon) ? e.icon : ''
+      const label = e.name
+      ctx.font = `800 11px ${font}`
+      const iconW = icon ? 16 : 0
+      const w = ctx.measureText(label).width + 22 + iconW
       const h = 20
       const hy = Math.min(Math.max(y0 + 6, STICKY), y1 - h - 4)
       const hx = RAIL + e.lane * 12
@@ -334,9 +359,10 @@ export class TextGuideOverlay {
       ctx.fillStyle = col(1)
       ctx.fillRect(hx + 5, hy + 5, 3, h - 10)
       ctx.fillStyle = ch.light ? '#1a1d2e' : '#e8eaf6'
+      if (icon) drawIcon(ctx, icon, hx + 13 + 6, hy + h / 2, 12, { color: col(1) })
       ctx.textAlign = 'left'
       ctx.textBaseline = 'middle'
-      ctx.fillText(label, hx + 13, hy + h / 2 + 0.5)
+      ctx.fillText(label, hx + 13 + iconW, hy + h / 2 + 0.5)
       placed.push({ x: hx, y: hy, w, h })
     }
     const k = t.k * (t.sy ?? 1)
@@ -356,7 +382,7 @@ export class TextGuideOverlay {
       ctx.setLineDash([])
       const big = ev.importance === 3
       const title = ev.title.length > 26 ? ev.title.slice(0, 25) + '…' : ev.title
-      ctx.font = `${big ? 800 : 700} 10.5px ${font}`
+      ctx.font = `${big ? 800 : 700} 11px ${font}`
       const h = 19
       const w = ctx.measureText(title).width + h + 12
       let x = RAIL
@@ -387,11 +413,15 @@ export class TextGuideOverlay {
       ctx.fill()
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.font = `10.5px ${font}`
       ctx.fillStyle = ch.light ? '#1a1d2e' : '#e8eaf6'
-      ctx.fillText(ev.icon, x + h / 2, y + 0.5)
+      // Icon names (and legacy glyphs) draw as SVG icons; an unknown stored
+      // value falls back to the event kind's icon (as the Timeline does).
+      const iconOpts = { color: ctx.fillStyle, lineWidth: 2.2 }
+      if (!drawIcon(ctx, ev.icon, x + h / 2, y, 11, iconOpts)) {
+        drawIcon(ctx, ev.kindIcon || 'sparkle', x + h / 2, y, 11, iconOpts)
+      }
       ctx.textAlign = 'left'
-      ctx.font = `${big ? 800 : 700} 10.5px ${font}`
+      ctx.font = `${big ? 800 : 700} 11px ${font}`
       ctx.fillText(title, x + h + 3, y + 0.5)
     }
     ctx.restore()
@@ -420,7 +450,7 @@ export class TextGuideOverlay {
     ctx.fill()
 
     // Ring guides — alternate rings turn opposite ways.
-    ctx.font = '700 9.5px system-ui, sans-serif'
+    ctx.font = '700 10.5px system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     sp.rings.forEach((ring, i) => {
@@ -497,11 +527,17 @@ export class TextGuideOverlay {
       ctx.shadowBlur = 12
       ctx.stroke()
     }
-    // A small crown above the lead.
+    // A small crown above the lead (an SVG icon, so it centres exactly).
     ctx.shadowBlur = 0
-    ctx.font = `${Math.max(12, 15 * Math.min(1.4, k))}px system-ui, sans-serif`
     ctx.globalAlpha = 0.95
-    ctx.fillText('👑', s.x, s.y - nr * 1.55 - Math.sin(now * 2) * 2)
+    drawIcon(
+      ctx,
+      'crown',
+      s.x,
+      s.y - nr * 1.55 - Math.sin(now * 2) * 2,
+      Math.max(13, 16 * Math.min(1.4, k)),
+      { color: col, lineWidth: 2.2 }
+    )
     ctx.restore()
   }
 

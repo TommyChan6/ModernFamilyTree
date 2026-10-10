@@ -225,7 +225,7 @@ describe('view model + timeline range', () => {
       ]
     )
     expect(vm.eras[0]).toMatchObject({ a: 1900, b: Infinity, lane: 0 })
-    expect(vm.events[0]).toMatchObject({ icon: '⚔️', color: '#e5534b', a: 1916, importance: 3 })
+    expect(vm.events[0]).toMatchObject({ icon: 'swords', color: '#e5534b', a: 1916, importance: 3 })
     expect(Number.isNaN(vm.events[0].b)).toBe(true)
     const r = chronicleRange([{ birth: Y(1950), death: null }], [], [{ date: Y(1800) }], 2026)
     expect(r.min).toBe(1800)

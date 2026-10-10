@@ -53,7 +53,9 @@
             v-if="v.hover && !v.cls.lifted && lod !== 'far' && caseLines(v.p).length"
             class="pol-case"
           >
-            <div v-for="(l, i) in caseLines(v.p)" :key="i" class="pol-case-line">{{ l }}</div>
+            <div v-for="(l, i) in caseLines(v.p)" :key="i" class="pol-case-line">
+              <UiIcon v-if="l.icon" class="pol-case-icon" :name="l.icon" :size="11" />{{ l.text }}
+            </div>
           </div>
         </div>
       </div>
@@ -73,12 +75,17 @@
       </div>
 
       <div class="board-ui" @pointerdown.stop @wheel.stop.prevent>
-        <button class="bu-btn" title="Zoom out" @click="zoomOut">−</button>
+        <button class="bu-btn" title="Zoom out" aria-label="Zoom out" @click="zoomOut">
+          <UiIcon name="minus" :size="14" />
+        </button>
         <span ref="zoomText" class="bu-zoom">100%</span>
-        <button class="bu-btn" title="Zoom in" @click="zoomIn">+</button>
+        <button class="bu-btn" title="Zoom in" aria-label="Zoom in" @click="zoomIn">
+          <UiIcon name="plus" :size="14" />
+        </button>
         <span class="bu-sep"></span>
         <button class="bu-btn bu-wide" title="Fit everyone on screen" @click="fitAnimated">
-          ⤢ Fit
+          <UiIcon name="maximize" :size="14" />
+          Fit
         </button>
         <button
           class="bu-btn bu-wide"
@@ -86,7 +93,8 @@
           title="Put every photo back in its family spot"
           @click="tidyUp"
         >
-          ✦ Tidy up
+          <UiIcon name="sparkles" :size="14" />
+          Tidy up
         </button>
       </div>
 
@@ -102,6 +110,7 @@ import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick,
 import { useMainStore } from '../../store/index.js'
 import { isDeceased, ageOf } from './peopleLayout.js'
 import { useThumbnail } from './useThumbnail.js'
+import UiIcon from '../ui/UiIcon.js'
 import {
   POL_W,
   POL_H,
@@ -198,7 +207,9 @@ const PolaroidCard = {
               class: 'pc-note',
               style: { '--nc': t.color || 'var(--amber)', '--ni': i }
             },
-            (t.icon ? t.icon + ' ' : '') + (t.label || '')
+            t.icon
+              ? [h(UiIcon, { name: t.icon, size: 11, class: 'pc-note-icon' }), t.label || '']
+              : t.label || ''
           )
         ),
         h('div', { class: 'pc-pin' })
@@ -862,18 +873,20 @@ function markD(id) {
   }
   return d
 }
+// Case-file lines under a hovered polaroid: { text, icon? } (icon = UiIcon name).
 function caseLines(p) {
   const out = []
-  if (p.occupation) out.push(p.occupation)
-  if (p.location) out.push('⌖ ' + p.location)
+  if (p.occupation) out.push({ text: p.occupation })
+  if (p.location) out.push({ icon: 'map-pin', text: p.location })
   const age = ageOf(p, props.refYear)
-  if (age != null) out.push(isDeceased(p, props.refYear) ? `† at ${age}` : `Age ${age}`)
+  if (age != null) out.push({ text: isDeceased(p, props.refYear) ? `† at ${age}` : `Age ${age}` })
   const s = props.statsOf(p.id)
   if (s && (s.kin || s.children))
-    out.push(
-      `${s.kin || 0} kin` +
+    out.push({
+      text:
+        `${s.kin || 0} kin` +
         (s.children ? ` · ${s.children} ${s.children === 1 ? 'child' : 'children'}` : '')
-    )
+    })
   return out
 }
 
@@ -1319,7 +1332,7 @@ onBeforeUnmount(() => {
 }
 .pol :deep(.pc-name) {
   max-width: 100%;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -1327,7 +1340,7 @@ onBeforeUnmount(() => {
   transform: rotate(-1.2deg);
 }
 .pol :deep(.pc-year) {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
@@ -1337,6 +1350,9 @@ onBeforeUnmount(() => {
   text-decoration-thickness: 1.5px;
 }
 /* Tags: sticky notes stuck on the right edge */
+.pol :deep(.pc-note-icon) {
+  margin-right: 2px;
+}
 .pol :deep(.pc-note) {
   position: absolute;
   right: -30px;
@@ -1345,7 +1361,7 @@ onBeforeUnmount(() => {
   min-height: 30px;
   padding: 4px 4px 5px;
   font-family: var(--hand);
-  font-size: 8.5px;
+  font-size: 9.5px;
   font-weight: 700;
   line-height: 1.15;
   color: var(--ink);
@@ -1468,7 +1484,7 @@ onBeforeUnmount(() => {
   z-index: -1;
   padding: 14px 9px 7px;
   font-family: var(--type);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1.35;
   color: var(--ink);
@@ -1497,6 +1513,9 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.pol-case-icon {
+  margin-right: 3px;
 }
 @keyframes case-in {
   from {
@@ -1565,7 +1584,7 @@ onBeforeUnmount(() => {
   gap: 7px;
   padding: 6px 12px 6px 22px;
   font-family: var(--type);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink);
   background: color-mix(in srgb, #e9d3a3 86%, var(--amber));
   clip-path: polygon(10px 0, 100% 0, 100% 100%, 10px 100%, 0 50%);
@@ -1611,9 +1630,13 @@ onBeforeUnmount(() => {
   animation: chrome-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.6s backwards;
 }
 .bu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   height: 28px;
   min-width: 28px;
-  padding: 0 8px;
+  padding: 0 7px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--elevated);
@@ -1638,13 +1661,13 @@ onBeforeUnmount(() => {
   cursor: default;
 }
 .bu-wide {
-  font-size: 11.5px;
+  font-size: 12.5px;
   padding: 0 10px;
 }
 .bu-zoom {
   min-width: 46px;
   text-align: center;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--t2);
   font-variant-numeric: tabular-nums;
@@ -1666,7 +1689,7 @@ onBeforeUnmount(() => {
   border-radius: 20px;
   background: rgba(0, 0, 0, 0.45);
   color: rgba(255, 255, 255, 0.85);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   white-space: nowrap;
   pointer-events: none;
@@ -1725,7 +1748,7 @@ onBeforeUnmount(() => {
 }
 .board-empty-text {
   margin-top: 4px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--ink-soft);
 }
 

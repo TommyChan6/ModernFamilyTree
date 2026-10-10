@@ -10,7 +10,7 @@
         :title="L('cat.' + c.id, c.label)"
         @click="selectCategory(c.id)"
       >
-        <span class="h3e-cat-icon">{{ c.icon }}</span>
+        <UiIcon class="h3e-cat-icon" :name="c.icon" :size="20" />
         <span class="h3e-cat-label">{{ L('cat.' + c.id, c.label) }}</span>
       </button>
     </nav>
@@ -29,12 +29,12 @@
       <Transition name="h3e-fade">
         <div v-if="loading || error" class="h3e-loading">
           <div v-if="!error" class="h3e-loader">
-            <div class="h3e-silhouette">🧍</div>
+            <UiIcon class="h3e-silhouette" name="person-standing" :size="64" :stroke="1.25" />
             <div class="h3e-loader-bar"><span></span></div>
             <p>{{ L('loading', 'Sculpting your character…') }}</p>
           </div>
           <div v-else class="h3e-loader">
-            <div class="h3e-silhouette">⚠️</div>
+            <UiIcon class="h3e-silhouette" name="triangle-alert" :size="56" :stroke="1.5" />
             <p>{{ L('loadFailed', 'The 3D model could not be loaded.') }}</p>
             <code>{{ error }}</code>
           </div>
@@ -42,10 +42,10 @@
       </Transition>
 
       <div class="h3e-crumb">
-        <span class="h3e-crumb-icon">{{ currentCategory.icon }}</span>
+        <UiIcon class="h3e-crumb-icon" :name="currentCategory.icon" :size="15" />
         <span>{{ L('cat.' + category, currentCategory.label) }}</span>
         <template v-if="subLabel">
-          <span class="h3e-crumb-sep">›</span>
+          <UiIcon class="h3e-crumb-sep" name="chevron-right" :size="14" />
           <span class="h3e-crumb-sub">{{ subLabel }}</span>
         </template>
       </div>
@@ -57,9 +57,10 @@
             :key="cam.id"
             class="h3e-chip"
             :title="L('cam.' + cam.id, cam.label)"
+            :aria-label="L('cam.' + cam.id, cam.label)"
             @click="stage?.focus(cam.id)"
           >
-            {{ cam.icon }}
+            <UiIcon :name="cam.icon" :size="16" />
           </button>
         </div>
         <div class="h3e-chips" role="group" :aria-label="L('lighting', 'Lighting')">
@@ -69,9 +70,10 @@
             class="h3e-chip"
             :class="{ on: model.light === lp.id }"
             :title="L('light.' + lp.id, lp.label)"
+            :aria-label="L('light.' + lp.id, lp.label)"
             @click="setField('light', lp.id)"
           >
-            {{ lp.icon }}
+            <UiIcon :name="lp.icon" :size="16" />
           </button>
         </div>
       </div>
@@ -90,8 +92,14 @@
         </div>
       </Transition>
       <div v-if="drag" class="h3e-sculpt-hud">
-        <span>↔ {{ sliderLabel(drag.region.sculptX) }}</span>
-        <span>↕ {{ sliderLabel(drag.region.sculptY) }}</span>
+        <span>
+          <UiIcon name="move-horizontal" :size="14" />
+          {{ sliderLabel(drag.region.sculptX) }}
+        </span>
+        <span>
+          <UiIcon name="move-vertical" :size="14" />
+          {{ sliderLabel(drag.region.sculptY) }}
+        </span>
       </div>
 
       <div class="h3e-expr" role="group" :aria-label="L('expression', 'Expression')">
@@ -101,9 +109,10 @@
           class="h3e-expr-btn"
           :class="{ on: model.expression === e.id }"
           :title="L('expr.' + e.id, e.label)"
+          :aria-label="L('expr.' + e.id, e.label)"
           @click="setField('expression', e.id)"
         >
-          {{ e.icon }}
+          <UiIcon :name="e.icon" :size="18" />
         </button>
       </div>
 
@@ -112,60 +121,75 @@
           class="h3e-tool"
           :disabled="!canUndo"
           :title="L('undo', 'Undo') + ' (Ctrl+Z)'"
+          :aria-label="L('undo', 'Undo')"
           @click="undo"
         >
-          ↩
+          <UiIcon name="undo-2" :size="18" />
         </button>
         <button
           class="h3e-tool"
           :disabled="!canRedo"
           :title="L('redo', 'Redo') + ' (Ctrl+X)'"
+          :aria-label="L('redo', 'Redo')"
           @click="redo"
         >
-          ↪
+          <UiIcon name="redo-2" :size="18" />
         </button>
         <span class="h3e-tool-sep"></span>
         <button
           class="h3e-tool h3e-dice"
           :title="L('randomizeAll', 'Randomize everything') + ' (R)'"
+          :aria-label="L('randomizeAll', 'Randomize everything')"
           @click="randomize()"
         >
-          🎲
+          <UiIcon name="dices" :size="18" />
         </button>
         <button
           class="h3e-tool"
           :class="{ on: sculptMode }"
           :title="L('sculptMode', 'Sculpt mode: drag features on the face')"
+          :aria-label="L('sculptMode', 'Sculpt mode: drag features on the face')"
+          :aria-pressed="sculptMode"
           @click="sculptMode = !sculptMode"
         >
-          🗿
+          <UiIcon name="hand-grab" :size="18" />
         </button>
         <button
           class="h3e-tool"
           :class="{ on: turntable }"
           :title="L('turntable', 'Turntable')"
+          :aria-label="L('turntable', 'Turntable')"
+          :aria-pressed="turntable"
           @click="toggleTurntable"
         >
-          🔄
+          <UiIcon name="rotate-cw" :size="18" />
         </button>
         <button
           class="h3e-tool"
           :class="{ on: gaze }"
           :title="L('gaze', 'Eye contact')"
+          :aria-label="L('gaze', 'Eye contact')"
+          :aria-pressed="gaze"
           @click="toggleGaze"
         >
-          👀
+          <UiIcon name="eye" :size="18" />
         </button>
         <span class="h3e-tool-sep"></span>
-        <button class="h3e-tool" :title="L('photo', 'Save a photo')" @click="savePhoto('portrait')">
-          📸
+        <button
+          class="h3e-tool"
+          :title="L('photo', 'Save a photo')"
+          :aria-label="L('photo', 'Save a photo')"
+          @click="savePhoto('portrait')"
+        >
+          <UiIcon name="camera" :size="18" />
         </button>
         <button
           class="h3e-tool h3e-primary"
           :disabled="portraitBusy || loading"
           @click="emit('set-portrait')"
         >
-          {{ portraitDone ? '✓' : '🖼' }} {{ L('setPortrait', 'Set as portrait') }}
+          <UiIcon :name="portraitDone ? 'check' : 'image'" :size="18" />
+          {{ L('setPortrait', 'Set as portrait') }}
         </button>
       </div>
       <div v-if="flashOn" class="h3e-flash"></div>
@@ -175,7 +199,7 @@
     <aside class="h3e-panel">
       <header class="h3e-panel-head">
         <h3 class="h3e-title">
-          <span>{{ currentCategory.icon }}</span>
+          <UiIcon :name="currentCategory.icon" :size="18" />
           {{ L('cat.' + category, currentCategory.label) }}
         </h3>
         <div v-if="subTabs.length" class="h3e-subtabs" role="tablist">
@@ -187,15 +211,14 @@
             role="tab"
             @click="selectSub(st.id)"
           >
-            <span>{{ st.icon }}</span
-            >{{ st.label }}
+            {{ st.label }}
           </button>
         </div>
         <div v-if="category === 'face' || category === 'body'" class="h3e-search-row">
-          <input
+          <SearchField
             v-model="search"
             class="h3e-search"
-            type="search"
+            size="sm"
             :placeholder="L('searchSliders', 'Search sliders…')"
           />
           <button
@@ -203,19 +226,27 @@
             class="h3e-mini"
             :class="{ on: !symmetric }"
             :title="L('asymmetry', 'Edit left and right separately')"
+            :aria-label="L('asymmetry', 'Edit left and right separately')"
+            :aria-pressed="!symmetric"
             @click="symmetric = !symmetric"
           >
-            {{ symmetric ? '⇋' : '⇆' }}
+            <UiIcon name="split" :size="14" />
           </button>
-          <button class="h3e-mini" :title="L('resetGroup', 'Reset this group')" @click="resetGroup">
-            ↺
+          <button
+            class="h3e-mini"
+            :title="L('resetGroup', 'Reset this group')"
+            :aria-label="L('resetGroup', 'Reset this group')"
+            @click="resetGroup"
+          >
+            <UiIcon name="rotate-ccw" :size="14" />
           </button>
           <button
             class="h3e-mini"
             :title="L('randomizeGroup', 'Randomize this group')"
+            :aria-label="L('randomizeGroup', 'Randomize this group')"
             @click="randomizeGroup"
           >
-            🎲
+            <UiIcon name="dices" :size="14" />
           </button>
         </div>
       </header>
@@ -227,13 +258,13 @@
             <h4>{{ L('archetypes', 'Archetypes') }}</h4>
             <div class="h3e-cards">
               <button v-for="p in PRESETS_3D" :key="p.id" class="h3e-card" @click="applyPreset(p)">
-                <span class="h3e-card-icon">{{ p.icon }}</span>
+                <UiIcon class="h3e-card-icon" :name="p.icon" :size="22" :stroke="1.75" />
                 <span class="h3e-card-label">{{ L('preset.' + p.id, p.label) }}</span>
               </button>
             </div>
           </section>
           <section class="h3e-sec">
-            <h4>🧬 {{ L('family', 'Family resemblance') }}</h4>
+            <h4>{{ L('family', 'Family resemblance') }}</h4>
             <template v-if="parents.length">
               <p class="h3e-hint">
                 {{ L('familyHint', 'Blend this face from the parents’ 3D looks.') }}
@@ -250,7 +281,8 @@
                 @done="noop"
               />
               <button class="btn btn-soft btn-sm h3e-wide" @click="inherit">
-                🧬 {{ L('rollChild', 'Roll a family face') }}
+                <UiIcon name="dna" :size="14" />
+                {{ L('rollChild', 'Roll a family face') }}
               </button>
             </template>
             <p v-else class="h3e-hint">
@@ -275,11 +307,13 @@
                 :class="{ on: locks.includes(lk.id) }"
                 @click="toggleLock(lk.id)"
               >
-                {{ locks.includes(lk.id) ? '🔒' : '🔓' }} {{ L('lock.' + lk.id, lk.label) }}
+                <UiIcon :name="locks.includes(lk.id) ? 'lock' : 'lock-open'" :size="13" />
+                {{ L('lock.' + lk.id, lk.label) }}
               </button>
             </div>
             <button class="btn btn-primary btn-sm h3e-wide" @click="randomize()">
-              🎲 {{ L('randomizeAll', 'Randomize everything') }}
+              <UiIcon name="dices" :size="14" />
+              {{ L('randomizeAll', 'Randomize everything') }}
             </button>
           </section>
           <section class="h3e-sec">
@@ -344,7 +378,7 @@
           </template>
           <section v-for="g in visibleBodyGroups" :key="g.id" class="h3e-sec">
             <h4 v-if="search || visibleBodyGroups.length > 1">
-              {{ g.icon }} {{ L('group.' + g.id, g.label) }}
+              {{ L('group.' + g.id, g.label) }}
             </h4>
             <template v-for="s in g.sliders" :key="s.id">
               <H3Slider
@@ -367,7 +401,7 @@
         <!-- Face -->
         <template v-else-if="category === 'face'">
           <section v-for="g in visibleFaceGroups" :key="g.id" class="h3e-sec">
-            <h4 v-if="search">{{ g.icon }} {{ L('group.' + g.id, g.label) }}</h4>
+            <h4 v-if="search">{{ L('group.' + g.id, g.label) }}</h4>
             <template v-for="s in g.sliders" :key="s.id">
               <template v-if="!symmetric && s.sides">
                 <div class="h3e-pair">
@@ -449,7 +483,7 @@
         <!-- Makeup -->
         <template v-else-if="category === 'makeup'">
           <section v-for="grp in MAKEUP" :key="grp.id" class="h3e-sec">
-            <h4>{{ grp.icon }} {{ L('makeup.' + grp.id, grp.label) }}</h4>
+            <h4>{{ L('makeup.' + grp.id, grp.label) }}</h4>
             <SwatchRow
               v-if="grp.color"
               :model-value="model.makeup[grp.color]"
@@ -481,11 +515,10 @@
                 <button
                   v-for="h in HAIR_STYLES"
                   :key="h.id"
-                  class="h3e-card"
+                  class="h3e-card h3e-card-text"
                   :class="{ on: model.hair.style === h.id }"
                   @click="setIn('hair', 'style', h.id)"
                 >
-                  <span class="h3e-card-icon">{{ h.icon }}</span>
                   <span class="h3e-card-label">{{ L('hairStyle.' + h.id, h.label) }}</span>
                 </button>
               </div>
@@ -624,11 +657,10 @@
                 <button
                   v-for="b in BEARD_STYLES"
                   :key="b.id"
-                  class="h3e-card"
+                  class="h3e-card h3e-card-text"
                   :class="{ on: model.beard.style === b.id }"
                   @click="setIn('beard', 'style', b.id)"
                 >
-                  <span class="h3e-card-icon">{{ b.icon }}</span>
                   <span class="h3e-card-label">{{ L('beard.' + b.id, b.label) }}</span>
                 </button>
               </div>
@@ -732,11 +764,10 @@
                 <button
                   v-for="g in TOPS"
                   :key="g.id"
-                  class="h3e-card"
+                  class="h3e-card h3e-card-text"
                   :class="{ on: model.outfit.top === g.id }"
                   @click="setIn('outfit', 'top', g.id)"
                 >
-                  <span class="h3e-card-icon">{{ g.icon }}</span>
                   <span class="h3e-card-label">{{ L('top.' + g.id, g.label) }}</span>
                 </button>
               </div>
@@ -778,11 +809,10 @@
                 <button
                   v-for="g in BOTTOMS"
                   :key="g.id"
-                  class="h3e-card"
+                  class="h3e-card h3e-card-text"
                   :class="{ on: model.outfit.bottom === g.id }"
                   @click="setIn('outfit', 'bottom', g.id)"
                 >
-                  <span class="h3e-card-icon">{{ g.icon }}</span>
                   <span class="h3e-card-label">{{ L('bottom.' + g.id, g.label) }}</span>
                 </button>
               </div>
@@ -803,11 +833,10 @@
                 <button
                   v-for="g in SHOES"
                   :key="g.id"
-                  class="h3e-card"
+                  class="h3e-card h3e-card-text"
                   :class="{ on: model.outfit.shoes === g.id }"
                   @click="setIn('outfit', 'shoes', g.id)"
                 >
-                  <span class="h3e-card-icon">{{ g.icon }}</span>
                   <span class="h3e-card-label">{{ L('shoes.' + g.id, g.label) }}</span>
                 </button>
               </div>
@@ -828,11 +857,10 @@
                 <button
                   v-for="g in ACCESSORIES"
                   :key="g.id"
-                  class="h3e-card"
+                  class="h3e-card h3e-card-text"
                   :class="{ on: model.outfit.accessories.includes(g.id) }"
                   @click="toggleAccessory(g.id)"
                 >
-                  <span class="h3e-card-icon">{{ g.icon }}</span>
                   <span class="h3e-card-label">{{ L('acc.' + g.id, g.label) }}</span>
                 </button>
               </div>
@@ -862,7 +890,7 @@
                 :class="{ on: model.pose === p.id }"
                 @click="setField('pose', p.id)"
               >
-                <span class="h3e-card-icon">{{ p.icon }}</span>
+                <UiIcon class="h3e-card-icon" :name="p.icon" :size="22" :stroke="1.75" />
                 <span class="h3e-card-label">{{ L('pose.' + p.id, p.label) }}</span>
               </button>
             </div>
@@ -877,7 +905,7 @@
                 :class="{ on: model.expression === e.id }"
                 @click="setField('expression', e.id)"
               >
-                <span class="h3e-card-icon">{{ e.icon }}</span>
+                <UiIcon class="h3e-card-icon" :name="e.icon" :size="22" :stroke="1.75" />
                 <span class="h3e-card-label">{{ L('expr.' + e.id, e.label) }}</span>
               </button>
             </div>
@@ -897,7 +925,7 @@
                 :style="{ '--bg1': lp.bg[0], '--bg2': lp.bg[1] }"
                 @click="setField('light', lp.id)"
               >
-                <span class="h3e-card-icon">{{ lp.icon }}</span>
+                <UiIcon class="h3e-card-icon" :name="lp.icon" :size="22" :stroke="1.75" />
                 <span class="h3e-card-label">{{ L('light.' + lp.id, lp.label) }}</span>
               </button>
             </div>
@@ -928,13 +956,16 @@
             <h4>{{ L('photo', 'Save a photo') }}</h4>
             <div class="h3e-row">
               <button class="btn btn-soft btn-sm" @click="savePhoto('portrait')">
-                🖼 {{ L('photoPortrait', 'Portrait') }}
+                <UiIcon name="user-round" :size="14" />
+                {{ L('photoPortrait', 'Portrait') }}
               </button>
               <button class="btn btn-soft btn-sm" @click="savePhoto('full')">
-                🧍 {{ L('photoFull', 'Full body') }}
+                <UiIcon name="person-standing" :size="14" />
+                {{ L('photoFull', 'Full body') }}
               </button>
               <button class="btn btn-soft btn-sm" @click="savePhoto('current')">
-                🎥 {{ L('photoView', 'This view') }}
+                <UiIcon name="scan" :size="14" />
+                {{ L('photoView', 'This view') }}
               </button>
             </div>
             <label class="h3e-toggle">
@@ -965,6 +996,8 @@ import { useI18n } from '../../../i18n'
 import { HumanStage } from './HumanStage'
 import H3Slider from './H3Slider.vue'
 import SwatchRow from '../SwatchRow.vue'
+import UiIcon from '../../ui/UiIcon.js'
+import SearchField from '../../ui/SearchField.vue'
 import { BODY_GROUPS, FACE_GROUPS, MACRO_SLIDERS, SLIDER_BY_ID } from './catalog'
 import { HAIR_STYLES, FRINGES, BROW_STYLES, BEARD_STYLES } from './hairStyles'
 import { TOPS, BOTTOMS, SHOES, ACCESSORIES } from './wardrobe'
@@ -1022,22 +1055,22 @@ function L(key, fallback) {
 }
 
 const CATEGORIES = [
-  { id: 'presets', icon: '✨', label: 'Presets' },
-  { id: 'body', icon: '🧍', label: 'Body' },
-  { id: 'face', icon: '🙂', label: 'Face' },
-  { id: 'skin', icon: '🎨', label: 'Skin' },
-  { id: 'makeup', icon: '💄', label: 'Makeup' },
-  { id: 'hair', icon: '💇', label: 'Hair' },
-  { id: 'eyes', icon: '👁', label: 'Eyes' },
-  { id: 'outfit', icon: '👕', label: 'Outfit' },
-  { id: 'pose', icon: '🎭', label: 'Pose' },
-  { id: 'studio', icon: '💡', label: 'Studio' }
+  { id: 'presets', icon: 'sparkles', label: 'Presets' },
+  { id: 'body', icon: 'person-standing', label: 'Body' },
+  { id: 'face', icon: 'smile', label: 'Face' },
+  { id: 'skin', icon: 'palette', label: 'Skin' },
+  { id: 'makeup', icon: 'brush', label: 'Makeup' },
+  { id: 'hair', icon: 'scissors', label: 'Hair' },
+  { id: 'eyes', icon: 'eye', label: 'Eyes' },
+  { id: 'outfit', icon: 'shirt', label: 'Outfit' },
+  { id: 'pose', icon: 'drama', label: 'Pose' },
+  { id: 'studio', icon: 'lightbulb', label: 'Studio' }
 ]
 const CAMERAS = [
-  { id: 'full', icon: '🧍', label: 'Full body' },
-  { id: 'torso', icon: '👕', label: 'Upper body' },
-  { id: 'portrait', icon: '🖼', label: 'Portrait' },
-  { id: 'eyes', icon: '👁', label: 'Close-up' }
+  { id: 'full', icon: 'person-standing', label: 'Full body' },
+  { id: 'torso', icon: 'shirt', label: 'Upper body' },
+  { id: 'portrait', icon: 'user-round', label: 'Portrait' },
+  { id: 'eyes', icon: 'scan-face', label: 'Close-up' }
 ]
 const QUALITIES = [
   { id: 'high', label: 'High' },
@@ -1062,7 +1095,6 @@ const SKIN_SLIDERS = [
 const MAKEUP = [
   {
     id: 'lips',
-    icon: '💋',
     label: 'Lips',
     color: 'lipColor',
     palette: LIP_COLORS,
@@ -1073,7 +1105,6 @@ const MAKEUP = [
   },
   {
     id: 'eyes',
-    icon: '✨',
     label: 'Eyes',
     color: 'shadowColor',
     palette: SHADOW_COLORS,
@@ -1085,7 +1116,6 @@ const MAKEUP = [
   },
   {
     id: 'cheeks',
-    icon: '🌸',
     label: 'Cheeks',
     color: 'blushColor',
     palette: BLUSH_COLORS,
@@ -1142,27 +1172,23 @@ const currentCategory = computed(
 const subTabs = computed(() => {
   switch (category.value) {
     case 'face':
-      return FACE_GROUPS.map((g) => ({
-        id: g.id,
-        icon: g.icon,
-        label: L('group.' + g.id, g.label)
-      }))
+      return FACE_GROUPS.map((g) => ({ id: g.id, label: L('group.' + g.id, g.label) }))
     case 'body':
-      return [{ id: 'shape', icon: '📐', label: L('group.shape', 'Proportions') }].concat(
-        BODY_GROUPS.map((g) => ({ id: g.id, icon: g.icon, label: L('group.' + g.id, g.label) }))
+      return [{ id: 'shape', label: L('group.shape', 'Proportions') }].concat(
+        BODY_GROUPS.map((g) => ({ id: g.id, label: L('group.' + g.id, g.label) }))
       )
     case 'hair':
       return [
-        { id: 'hair', icon: '💇', label: L('sub.hair', 'Hair') },
-        { id: 'brows', icon: '〰', label: L('sub.brows', 'Brows') },
-        { id: 'beard', icon: '🧔', label: L('sub.beard', 'Beard') }
+        { id: 'hair', label: L('sub.hair', 'Hair') },
+        { id: 'brows', label: L('sub.brows', 'Brows') },
+        { id: 'beard', label: L('sub.beard', 'Beard') }
       ]
     case 'outfit':
       return [
-        { id: 'top', icon: '👕', label: L('sub.top', 'Top') },
-        { id: 'bottom', icon: '👖', label: L('sub.bottom', 'Bottom') },
-        { id: 'shoes', icon: '👟', label: L('sub.shoes', 'Shoes') },
-        { id: 'acc', icon: '👓', label: L('sub.acc', 'Accessories') }
+        { id: 'top', label: L('sub.top', 'Top') },
+        { id: 'bottom', label: L('sub.bottom', 'Bottom') },
+        { id: 'shoes', label: L('sub.shoes', 'Shoes') },
+        { id: 'acc', label: L('sub.acc', 'Accessories') }
       ]
     default:
       return []
@@ -1646,14 +1672,15 @@ defineExpose({ snapshot, randomize, flash, onKey })
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  justify-content: center;
+  gap: 4px;
   padding: 8px 2px 7px;
   border: none;
   border-radius: 12px;
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
   position: relative;
@@ -1684,9 +1711,7 @@ defineExpose({ snapshot, randomize, flash, onKey })
 }
 
 .h3e-cat-icon {
-  font-size: 20px;
-  line-height: 1;
-  filter: saturate(0.9);
+  flex: 0 0 auto;
 }
 
 /* ── Stage ── */
@@ -1739,20 +1764,19 @@ defineExpose({ snapshot, randomize, flash, onKey })
 }
 
 .h3e-loader code {
-  font-size: 11px;
-  opacity: 0.7;
+  font-size: 12px;
+  color: #aeb6c6;
 }
 
 .h3e-silhouette {
-  font-size: 64px;
-  filter: grayscale(1) brightness(0.6);
+  color: #aeb6c6;
   animation: h3e-breathe 2.4s ease-in-out infinite;
 }
 
 @keyframes h3e-breathe {
   50% {
     transform: scale(1.06);
-    filter: grayscale(1) brightness(0.9);
+    color: #e8ecf4;
   }
 }
 
@@ -1795,14 +1819,14 @@ defineExpose({ snapshot, randomize, flash, onKey })
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #e8ecf4;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   pointer-events: none;
   letter-spacing: 0.01em;
 }
 
 .h3e-crumb-sep {
-  opacity: 0.4;
+  color: #aeb6c6;
 }
 
 .h3e-crumb-sub {
@@ -1828,12 +1852,16 @@ defineExpose({ snapshot, randomize, flash, onKey })
 }
 
 .h3e-chip {
-  width: 30px;
-  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
   border: none;
   border-radius: 9px;
   background: transparent;
-  font-size: 14px;
+  color: #c9cfdb;
   cursor: pointer;
   transition:
     background 0.15s,
@@ -1842,10 +1870,12 @@ defineExpose({ snapshot, randomize, flash, onKey })
 
 .h3e-chip:hover {
   background: rgba(255, 255, 255, 0.1);
+  color: #fff;
   transform: translateY(-1px);
 }
 
 .h3e-chip.on {
+  color: #fff;
   background: rgba(var(--accent-rgb), 0.35);
   box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.8);
 }
@@ -1862,13 +1892,13 @@ defineExpose({ snapshot, randomize, flash, onKey })
   backdrop-filter: blur(8px);
   border: 1px solid rgba(var(--accent-rgb), 0.5);
   color: #fff;
-  font-size: 12px;
+  font-size: 12.5px;
   pointer-events: none;
   white-space: nowrap;
 }
 
 .h3e-hover-tag span {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: #aeb6c6;
 }
 
@@ -1878,12 +1908,13 @@ defineExpose({ snapshot, randomize, flash, onKey })
   left: 50%;
   transform: translateX(-50%);
   display: flex;
+  align-items: center;
   gap: 14px;
   padding: 7px 14px;
   border-radius: 12px;
   background: rgba(var(--accent-rgb), 0.85);
   color: #fff;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   pointer-events: none;
   box-shadow: 0 6px 24px rgba(var(--accent-rgb), 0.4);
@@ -1906,22 +1937,35 @@ defineExpose({ snapshot, randomize, flash, onKey })
   scrollbar-width: none;
 }
 
+.h3e-sculpt-hud span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .h3e-expr-btn {
-  width: 34px;
-  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--ctl-md);
+  height: var(--ctl-md);
+  padding: 0;
   border: none;
   border-radius: 10px;
   background: transparent;
-  font-size: 17px;
+  color: #c9cfdb;
   cursor: pointer;
   transition: transform 0.15s cubic-bezier(0.2, 0.9, 0.3, 1.4);
 }
 
 .h3e-expr-btn:hover {
+  color: #fff;
   transform: scale(1.2);
 }
 
 .h3e-expr-btn.on {
+  color: #fff;
   background: rgba(var(--accent-rgb), 0.35);
 }
 
@@ -1942,15 +1986,18 @@ defineExpose({ snapshot, randomize, flash, onKey })
 }
 
 .h3e-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-width: 36px;
-  height: 34px;
-  padding: 0 8px;
+  height: 36px;
+  padding: 0 9px;
   border: none;
   border-radius: 11px;
   background: transparent;
   color: #e8ecf4;
   font-family: var(--font);
-  font-size: 15px;
   cursor: pointer;
   transition:
     background 0.15s,
@@ -1978,7 +2025,7 @@ defineExpose({ snapshot, randomize, flash, onKey })
   white-space: nowrap;
   background: var(--accent);
   color: #fff;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   padding: 0 14px;
   margin-left: 2px;
@@ -2047,14 +2094,15 @@ defineExpose({ snapshot, randomize, flash, onKey })
 .h3e-subtab {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 5px 9px;
+  justify-content: center;
+  min-height: var(--ctl-sm);
+  padding: 0 11px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -2076,34 +2124,28 @@ defineExpose({ snapshot, randomize, flash, onKey })
 
 .h3e-search-row {
   display: flex;
+  align-items: center;
   gap: 4px;
 }
 
 .h3e-search {
   flex: 1 1 auto;
   min-width: 0;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--elevated);
-  color: var(--t1);
-  font-family: var(--font);
-  font-size: 12px;
-  outline: none;
-}
-
-.h3e-search:focus {
-  border-color: var(--accent);
 }
 
 .h3e-mini {
-  width: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--elevated);
   color: var(--t2);
   cursor: pointer;
-  font-size: 13px;
 }
 
 .h3e-mini:hover,
@@ -2130,7 +2172,7 @@ defineExpose({ snapshot, randomize, flash, onKey })
 
 .h3e-sec h4 {
   margin: 6px 6px 8px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -2139,7 +2181,7 @@ defineExpose({ snapshot, randomize, flash, onKey })
 
 .h3e-hint {
   margin: 0 6px 8px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   line-height: 1.45;
   color: var(--t3);
 }
@@ -2188,12 +2230,22 @@ defineExpose({ snapshot, randomize, flash, onKey })
 }
 
 .h3e-card-icon {
-  font-size: 22px;
-  line-height: 1.1;
+  flex: 0 0 auto;
+}
+
+/* label-only tiles (hair, beard, wardrobe): same grid, no icon row */
+.h3e-card-text {
+  justify-content: center;
+  min-height: 46px;
+  padding: 6px 4px;
+}
+
+.h3e-card-text .h3e-card-label {
+  font-size: 12px;
 }
 
 .h3e-card-label {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   text-align: center;
   line-height: 1.2;
@@ -2217,13 +2269,17 @@ defineExpose({ snapshot, randomize, flash, onKey })
 }
 
 .h3e-pill {
-  padding: 5px 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--ctl-sm);
+  padding: 0 11px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -2285,7 +2341,7 @@ defineExpose({ snapshot, randomize, flash, onKey })
 
 .h3e-pair-label {
   padding: 2px 10px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--t1);
 }
@@ -2295,7 +2351,7 @@ defineExpose({ snapshot, randomize, flash, onKey })
   align-items: center;
   gap: 8px;
   padding: 8px 8px 4px;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
   cursor: pointer;
 }
@@ -2308,13 +2364,17 @@ defineExpose({ snapshot, randomize, flash, onKey })
 }
 
 .h3e-lock {
-  padding: 4px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: var(--ctl-xs);
+  padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
 }
 

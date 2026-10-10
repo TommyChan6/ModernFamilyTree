@@ -4,9 +4,15 @@
        (and the graph's, for the Birth layout). -->
   <div class="chp canvas-pane" @pointerdown.stop @wheel.stop @click.stop>
     <div class="chp-head">
-      <span class="chp-title"><span class="chp-title-ic">📜</span>Chronicle</span>
-      <button class="chp-new" title="New era" @click="newEra">＋ Era</button>
-      <button class="chp-new chp-new-ev" title="New event" @click="newEvent">＋ Event</button>
+      <span class="chp-title">
+        <UiIcon class="chp-title-ic" name="scroll-text" :size="14" />Chronicle
+      </span>
+      <button class="chp-new" title="New era" @click="newEra">
+        <UiIcon name="plus" :size="14" />Era
+      </button>
+      <button class="chp-new chp-new-ev" title="New event" @click="newEvent">
+        <UiIcon name="plus" :size="14" />Event
+      </button>
     </div>
 
     <div class="chp-tabs" role="tablist">
@@ -35,13 +41,12 @@
             :title="p.hint"
             @click="applyPack(p)"
           >
-            <span class="chp-pack-ic">{{ p.icon }}</span
-            >{{ p.label }}
+            <UiIcon class="chp-pack-ic" :name="p.icon" :size="14" />{{ p.label }}
           </button>
         </div>
       </div>
       <div v-if="!eraRows.length" class="chp-empty">
-        <div class="chp-empty-ic">🕰️</div>
+        <UiIcon class="chp-empty-ic" name="hourglass" :size="24" :stroke="1.7" />
         Name the stretches of your story — a war, a reign, a golden age — and they'll band the
         Timeline and the Birth graph.
       </div>
@@ -53,7 +58,7 @@
           :style="{ '--i': i, '--c': e.color }"
           @click="$emit('jump', e.jumpYear)"
         >
-          <span class="chp-era-ic">{{ e.icon || '◆' }}</span>
+          <UiIcon class="chp-era-ic" :name="hasIcon(e.icon) ? e.icon : 'diamond'" :size="16" />
           <span class="chp-era-text">
             <span class="chp-era-name">{{ e.name }}</span>
             <span class="chp-era-span">{{ e.span }}</span>
@@ -61,8 +66,13 @@
               <span :style="{ left: e.l + '%', width: e.w + '%' }"></span>
             </span>
           </span>
-          <button class="chp-edit" title="Edit" @click.stop="store.openEraEditor({ id: e.id })">
-            ✎
+          <button
+            class="chp-edit"
+            title="Edit era"
+            aria-label="Edit era"
+            @click.stop="store.openEraEditor({ id: e.id })"
+          >
+            <UiIcon name="pencil" :size="14" />
           </button>
         </div>
       </div>
@@ -70,14 +80,14 @@
 
     <!-- ── Events ── -->
     <div v-else class="chp-body">
-      <input
+      <SearchField
         v-if="store.events.length > 5"
         v-model="q"
-        class="chp-search"
+        size="sm"
         placeholder="Search events…"
       />
       <div v-if="!eventRows.length" class="chp-empty">
-        <div class="chp-empty-ic">⚔️</div>
+        <UiIcon class="chp-empty-ic" name="swords" :size="24" :stroke="1.7" />
         {{
           store.events.length
             ? 'Nothing matches.'
@@ -94,15 +104,20 @@
           @pointerenter="$emit('hover', ev.id)"
           @pointerleave="$emit('hover', null)"
         >
-          <span class="chp-ev-disc">{{ ev.icon }}</span>
+          <span class="chp-ev-disc"><UiIcon :name="ev.icon" :size="14" /></span>
           <span class="chp-ev-text">
             <span class="chp-ev-title" :class="'imp-' + ev.importance">{{ ev.title }}</span>
             <span class="chp-ev-meta">
               {{ ev.when }}<template v-if="ev.cast"> · {{ ev.cast }}</template>
             </span>
           </span>
-          <button class="chp-edit" title="Edit" @click.stop="store.openEventEditor({ id: ev.id })">
-            ✎
+          <button
+            class="chp-edit"
+            title="Edit event"
+            aria-label="Edit event"
+            @click.stop="store.openEventEditor({ id: ev.id })"
+          >
+            <UiIcon name="pencil" :size="14" />
           </button>
         </div>
       </div>
@@ -119,6 +134,9 @@ import { chronicleRange } from './chronicleModel.js'
 import { toast } from '../../lib/dialogs.js'
 import { undoToast } from '../../lib/undoToast.js'
 import { useKinship } from '../kinship/useKinship'
+import UiIcon from '../ui/UiIcon.js'
+import SearchField from '../ui/SearchField.vue'
+import { hasIcon } from '../ui/icons.js'
 
 defineEmits(['jump', 'hover'])
 const store = useMainStore()
@@ -165,7 +183,7 @@ const eventRows = computed(() => {
       return {
         id: ev.id,
         title: ev.title,
-        icon: ev.icon || k.icon,
+        icon: hasIcon(ev.icon) ? ev.icon : k.icon,
         color: ev.color || k.color,
         importance: ev.importance,
         year: toOrdinal(ev.date),
@@ -205,12 +223,12 @@ async function applyPack(p) {
   const have = new Set(store.eras.map((e) => e.name.toLowerCase()))
   const seeds = presetEras(p.id, min, max).filter((s) => !have.has(s.name.toLowerCase()))
   if (!seeds.length) {
-    toast(`${p.icon} Nothing new from “${p.label}” for ${min}–${max}`)
+    toast(`Nothing new from “${p.label}” for ${min}–${max}`)
     return
   }
   const res = await store.saveEras(seeds)
   if (res.success)
-    undoToast(`${p.icon} Added ${seeds.length} era${seeds.length > 1 ? 's' : ''}`, 'eras:saveMany')
+    undoToast(`Added ${seeds.length} era${seeds.length > 1 ? 's' : ''}`, 'eras:saveMany')
   else toast(res.error || 'Could not add the eras', { tone: 'danger' })
 }
 </script>
@@ -231,7 +249,7 @@ async function applyPack(p) {
   gap: 5px;
 }
 .chp-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.09em;
@@ -242,8 +260,6 @@ async function applyPack(p) {
   gap: 6px;
 }
 .chp-title-ic {
-  font-size: 13px;
-  display: inline-block;
   animation: chp-unroll 4s ease-in-out infinite;
 }
 @keyframes chp-unroll {
@@ -252,13 +268,18 @@ async function applyPack(p) {
   }
 }
 .chp-new {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: var(--ctl-xs);
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--t1);
   border-radius: var(--r-pill);
-  padding: 2px 9px;
+  padding: 0 10px 0 7px;
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.2s var(--ease-spring);
@@ -296,7 +317,7 @@ async function applyPack(p) {
   background: transparent;
   color: var(--t3);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   padding: 5px 0;
   cursor: pointer;
@@ -319,7 +340,7 @@ async function applyPack(p) {
   animation: cp-row-in 0.36s var(--ease-out);
 }
 .chp-sub {
-  font-size: 9.5px;
+  font-size: var(--fs-xs);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -343,9 +364,10 @@ async function applyPack(p) {
   background: transparent;
   color: var(--t2);
   border-radius: var(--r-pill);
-  padding: 2px 9px;
+  height: var(--ctl-xs);
+  padding: 0 10px 0 8px;
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 650;
   cursor: pointer;
   animation: cp-row-in 0.4s var(--ease-out) backwards;
@@ -359,18 +381,18 @@ async function applyPack(p) {
   color: var(--t1);
 }
 .chp-pack-ic {
-  font-size: 12px;
+  flex-shrink: 0;
 }
 .chp-empty {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t3);
   line-height: 1.45;
   text-align: center;
   padding: 8px 6px;
 }
 .chp-empty-ic {
-  font-size: 22px;
-  margin-bottom: 4px;
+  display: block;
+  margin: 0 auto 6px;
 }
 .chp-list {
   display: flex;
@@ -399,9 +421,9 @@ async function applyPack(p) {
   border-left: 3px solid var(--c);
 }
 .chp-era-ic {
-  font-size: 16px;
-  width: 22px;
-  text-align: center;
+  flex-shrink: 0;
+  margin: 0 3px;
+  color: var(--c);
 }
 .chp-era-text,
 .chp-ev-text {
@@ -412,7 +434,7 @@ async function applyPack(p) {
 }
 .chp-era-name,
 .chp-ev-title {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--t1);
   white-space: nowrap;
@@ -428,7 +450,7 @@ async function applyPack(p) {
 }
 .chp-era-span,
 .chp-ev-meta {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
   white-space: nowrap;
   overflow: hidden;
@@ -462,33 +484,35 @@ async function applyPack(p) {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 13px;
+  color: var(--t1);
   background: color-mix(in srgb, var(--c) 22%, transparent);
   box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--c) 70%, transparent);
   flex-shrink: 0;
 }
 .chp-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
+  padding: 0;
   border: none;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--t3);
   cursor: pointer;
-  font-size: 12px;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease;
+}
+.chp-edit:hover {
+  color: var(--t1);
 }
 .chp-era:hover .chp-edit,
-.chp-ev:hover .chp-edit {
+.chp-ev:hover .chp-edit,
+.chp-edit:focus-visible {
   opacity: 1;
-}
-.chp-search {
-  height: 28px;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--border);
-  background: var(--elevated);
-  color: var(--t1);
-  font-family: var(--font);
-  font-size: 12px;
-  padding: 0 9px;
-  outline: none;
 }
 </style>

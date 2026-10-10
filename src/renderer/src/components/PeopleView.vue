@@ -15,9 +15,7 @@
         </Transition>
 
         <div class="pv-search">
-          <span class="pv-search-icon">🔍</span>
-          <input v-model="query" class="pv-search-input" placeholder="Search people…" />
-          <button v-if="query" class="pv-search-clear" title="Clear" @click="query = ''">✕</button>
+          <SearchField v-model="query" placeholder="Search people…" />
         </div>
 
         <!-- The Sheet sorts by its own column headers; the Handscroll is
@@ -47,7 +45,7 @@
           :class="{ active: filtersOpen || activeFilterCount > 0 }"
           @click="filtersOpen = !filtersOpen"
         >
-          <span class="pv-filter-icon" :class="{ open: filtersOpen }">⚙</span>
+          <UiIcon name="sliders-horizontal" :size="16" />
           Filters
           <Transition name="pv-badge">
             <span v-if="activeFilterCount" class="pv-filter-badge">{{ activeFilterCount }}</span>
@@ -99,7 +97,7 @@
               :style="{ '--chip-c': g.color }"
               @click="toggleSet(genderSel, g.key)"
             >
-              <span class="pv-chip-glyph" :style="{ color: g.color }">{{ g.glyph }}</span>
+              <UiIcon :name="g.icon" :size="14" :style="{ color: g.color }" />
               {{ g.label }}
               <span class="pv-chip-n">{{ g.count }}</span>
             </button>
@@ -121,14 +119,16 @@
               :class="{ on: connFilter === 'connected' }"
               @click="connFilter = connFilter === 'connected' ? 'all' : 'connected'"
             >
-              🔗 Connected
+              <UiIcon name="link" :size="14" />
+              Connected
             </button>
             <button
               class="pv-chip"
               :class="{ on: connFilter === 'isolated' }"
               @click="connFilter = connFilter === 'isolated' ? 'all' : 'isolated'"
             >
-              🌱 Unlinked
+              <UiIcon name="unlink" :size="14" />
+              Unlinked
             </button>
           </div>
         </div>
@@ -145,8 +145,8 @@
               @click="toggleSet(tagSel, t.id)"
             >
               <span class="pv-chip-dot" :style="{ background: t.color }"></span>
-              <span v-if="t.icon" class="pv-chip-emoji">{{ t.icon }}</span
-              >{{ t.label }}
+              <UiIcon v-if="t.icon" class="pv-chip-icon" :name="t.icon" :size="14" />
+              {{ t.label }}
               <span class="pv-chip-n">{{ t.count }}</span>
             </button>
           </div>
@@ -154,7 +154,8 @@
 
         <Transition name="pv-clear">
           <button v-if="activeFilterCount" class="pv-clear" @click="clearFilters">
-            ✕ Clear {{ activeFilterCount }} filter{{ activeFilterCount > 1 ? 's' : '' }}
+            <UiIcon name="x" :size="14" />
+            Clear {{ activeFilterCount }} filter{{ activeFilterCount > 1 ? 's' : '' }}
           </button>
         </Transition>
       </div>
@@ -174,7 +175,9 @@
       @pointerdown="onPointerDown"
     >
       <div v-if="displayed.length === 0" class="pv-empty">
-        <div class="pv-empty-icon">{{ store.persons.length ? '🔍' : '👥' }}</div>
+        <div class="pv-empty-icon">
+          <UiIcon :name="store.persons.length ? 'search' : 'users'" :size="44" :stroke="1.5" />
+        </div>
         <div class="pv-empty-title">
           {{ store.persons.length ? 'No matches' : 'No people yet' }}
         </div>
@@ -237,7 +240,7 @@
     />
 
     <!-- Showcase mediums: each draws the same filtered, sorted roster its own
-         way (see the ✦ gallery in ViewModeSwitch). One mounts at a time. -->
+         way (see the showcase gallery in ViewModeSwitch). One mounts at a time. -->
     <Transition name="pv-medium" mode="out-in">
       <component
         :is="showcaseView"
@@ -268,6 +271,8 @@ import ElementsView from './people/ElementsView.vue'
 import RanksView from './people/RanksView.vue'
 import BubblesView from './people/BubblesView.vue'
 import HandscrollView from './people/HandscrollView.vue'
+import UiIcon from './ui/UiIcon.js'
+import SearchField from './ui/SearchField.vue'
 import { useVirtualGrid } from './people/useVirtualGrid.js'
 import { useDragScroll } from './people/useDragScroll.js'
 import { ageOf, CARD_W, CARD_H, GAP, PAD } from './people/peopleLayout.js'
@@ -316,13 +321,16 @@ const isDeceased = (p) => !!(p.death && (p.death.year != null || p.death.precisi
 
 const genderKey = (p) => (p.gender || '').trim().toLowerCase()
 function genderMeta(k) {
-  if (k === 'male') return { label: 'Male', color: store.graphSettings.maleColor, glyph: '♂' }
-  if (k === 'female') return { label: 'Female', color: store.graphSettings.femaleColor, glyph: '♀' }
-  if (k === '') return { label: 'Unknown', color: store.graphSettings.unknownColor, glyph: '?' }
+  if (k === 'male') return { label: 'Male', color: store.graphSettings.maleColor, icon: 'mars' }
+  if (k === 'female')
+    return { label: 'Female', color: store.graphSettings.femaleColor, icon: 'venus' }
+  if (k === '') {
+    return { label: 'Unknown', color: store.graphSettings.unknownColor, icon: 'circle-help' }
+  }
   return {
     label: k[0].toUpperCase() + k.slice(1),
     color: store.graphSettings.unknownColor,
-    glyph: '⚧'
+    icon: 'non-binary'
   }
 }
 // Distinct genders present, ordered male → female → others → unknown, each with a count.
@@ -599,7 +607,7 @@ onBeforeUnmount(() => {
   color: var(--t1);
 }
 .pv-count {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--accent);
   background: var(--adim);
@@ -613,53 +621,14 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
+/* Every toolbar control (mode switch, card style, search, sort, filters)
+   shares one height: --ctl-md. */
 .pv-search {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  background: var(--elevated);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0 10px;
-  height: 36px;
-  min-width: 220px;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
+  width: 240px;
+  min-width: 200px;
 }
-.pv-search:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
-}
-.pv-search-icon {
-  font-size: 13px;
-  opacity: 0.7;
-}
-.pv-search-input {
-  border: none;
-  background: transparent;
-  padding: 0;
-  height: 100%;
-  font-size: 13px;
-  color: var(--t1);
-  width: 100%;
-  box-shadow: none;
-}
-.pv-search-input:focus {
-  box-shadow: none;
-}
-.pv-search-clear {
-  border: none;
-  background: transparent;
-  color: var(--t3);
-  cursor: pointer;
-  font-size: 11px;
-  padding: 2px;
-  border-radius: 4px;
-  transition: color 0.12s;
-}
-.pv-search-clear:hover {
-  color: var(--t1);
+.pv-search .search-field {
+  --sf-h: var(--ctl-md);
 }
 
 .pv-sort {
@@ -669,7 +638,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 3px;
-  height: 36px;
+  height: var(--ctl-md);
 }
 .pv-sort-track {
   position: absolute;
@@ -694,7 +663,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   padding: 0 16px;
@@ -702,7 +671,7 @@ onBeforeUnmount(() => {
   transition: color 0.2s;
 }
 .pv-sort-opt.active {
-  color: #fff;
+  color: var(--on-accent);
 }
 
 /* ── Filter toggle button ────────────────────────────────── */
@@ -710,15 +679,16 @@ onBeforeUnmount(() => {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  height: 36px;
-  padding: 0 14px;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ctl-md);
+  padding: 0 13px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -734,13 +704,6 @@ onBeforeUnmount(() => {
   color: var(--t1);
   border-color: rgba(var(--accent-rgb), 0.45);
 }
-.pv-filter-icon {
-  font-size: 13px;
-  transition: transform 0.4s cubic-bezier(0.34, 1.4, 0.5, 1);
-}
-.pv-filter-icon.open {
-  transform: rotate(90deg);
-}
 .pv-filter-badge {
   min-width: 17px;
   height: 17px;
@@ -750,8 +713,8 @@ onBeforeUnmount(() => {
   justify-content: center;
   border-radius: 9px;
   background: var(--accent);
-  color: #fff;
-  font-size: 10.5px;
+  color: var(--on-accent);
+  font-size: 11.5px;
   font-weight: 800;
 }
 .pv-badge-enter-active,
@@ -819,7 +782,7 @@ onBeforeUnmount(() => {
   gap: 9px;
 }
 .pv-facet-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.7px;
   text-transform: uppercase;
@@ -843,7 +806,7 @@ onBeforeUnmount(() => {
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -872,16 +835,11 @@ onBeforeUnmount(() => {
 .pv-chip.on .pv-chip-dot {
   transform: scale(1.25);
 }
-.pv-chip-glyph {
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1;
-}
-.pv-chip-emoji {
-  font-size: 12px;
+.pv-chip-icon {
+  color: var(--chip-c);
 }
 .pv-chip-n {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--t3);
   font-variant-numeric: tabular-nums;
@@ -899,6 +857,7 @@ onBeforeUnmount(() => {
 .pv-clear {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   height: 28px;
   padding: 0 12px;
   border: 1px solid transparent;
@@ -906,7 +865,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--t3);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1017,8 +976,8 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 .pv-empty-icon {
-  font-size: 44px;
-  opacity: 0.6;
+  display: flex;
+  color: var(--t3);
 }
 .pv-empty-title {
   font-size: 16px;

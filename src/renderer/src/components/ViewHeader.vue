@@ -1,7 +1,7 @@
 <template>
   <header class="vh">
     <div class="vh-heading">
-      <span class="vh-icon" aria-hidden="true">{{ icon }}</span>
+      <UiIcon v-if="icon" class="vh-icon" :name="icon" :size="20" />
       <span class="vh-title">{{ title }}</span>
       <Transition name="vh-count" mode="out-in">
         <span v-if="count !== null" :key="count" class="vh-count">{{ count }}</span>
@@ -23,7 +23,10 @@
 // mirroring the DOM views' toolbars so every view reads the same. Left: a
 // breathing view glyph + title + an animated count pill. Right: a slot for the
 // shared CanvasToggles cluster (or any per-view controls).
+import UiIcon from './ui/UiIcon.js'
+
 defineProps({
+  /** An icon name (components/ui/icons.js); legacy emoji still resolve. */
   icon: { type: String, default: '' },
   title: { type: String, required: true },
   /** null = no count pill. */
@@ -55,8 +58,7 @@ defineProps({
   min-width: 0;
 }
 .vh-icon {
-  font-size: 19px;
-  line-height: 1;
+  color: var(--accent);
   transform-origin: 50% 60%;
   animation: vh-breathe 5.5s ease-in-out infinite;
   filter: drop-shadow(0 2px 6px rgba(var(--accent-rgb), 0.35));
@@ -85,7 +87,7 @@ defineProps({
   }
 }
 .vh-count {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--accent);
   background: var(--adim);
@@ -115,7 +117,7 @@ defineProps({
   opacity: 0;
 }
 .vh-hint {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t3);
   white-space: nowrap;
   overflow: hidden;
@@ -170,7 +172,7 @@ defineProps({
   border-bottom-color: rgba(48, 36, 20, 0.14);
 }
 :root[data-theme='ink'] .vh-icon {
-  filter: grayscale(1) sepia(0.4) contrast(1.15);
+  filter: none;
   animation: none;
 }
 :root[data-theme='ink'] .vh-title {
@@ -210,7 +212,7 @@ defineProps({
 }
 :root[data-theme='ink'] .vh-hint {
   font-style: italic;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 /* the flowing hairline becomes a dry brush stroke */
 :root[data-theme='ink'] .vh-rule {

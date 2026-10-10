@@ -72,7 +72,7 @@ export interface StylePart {
 
 export interface StyleSlot {
   id: string
-  /** Emoji for the wardrobe rail. */
+  /** Icon name (components/ui/icons.js) for the wardrobe rail. */
   icon: string
   /** Anchor the slot's scale/flip/pop pivots around, in character space. */
   socket: { x: number; y: number }
@@ -112,7 +112,7 @@ export interface StylePack {
   id: string
   /** Display name fallback (the UI prefers i18n `character.styleNames.<id>`). */
   name: string
-  /** Emoji badge for the style picker. */
+  /** Icon name (components/ui/icons.js) for the style picker badge. */
   icon: string
   /** Character-space dimensions all part paths are authored in. */
   width: number

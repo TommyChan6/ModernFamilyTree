@@ -14,6 +14,7 @@ import { InkMistLayer } from '../../webgl/InkMistLayer.js'
 import { hexToRgb01, PAPER_RGB } from '../../webgl/inkMath'
 import { INK, inkFontsReady, paperCanvas, hashStr } from '../../../lib/inkArt'
 import { drawInkOverlay, inkNodePigment, CINNABAR } from './FactionsInk.js'
+import { drawIcon, iconPath } from '../../../lib/canvasIcon.js'
 
 const NODE_R = 17
 const ARC_R = 22.5
@@ -632,8 +633,21 @@ export class FactionsRenderer {
       const a = this._zAnim.get(z.id)
       if (!a || a.op <= 0.02) continue
       const ps = a.ps
-      const w = z.headerW * k * ps,
-        h = 26 * k * ps
+      const h = 26 * k * ps
+      // Pill content: [icon] label … count, measured so the pill hugs it and
+      // stays centred over the ring (falls back to the estimate when tiny).
+      const showText = 12 * k >= 5.5
+      const pad = 12 * k * ps
+      const isz = 13 * k * ps
+      const iconW = iconPath(z.icon) ? isz + 6 * k * ps : 0
+      let w = z.headerW * k * ps
+      if (showText) {
+        ctx.font = `700 ${12 * k * ps}px ${font}`
+        const lw = ctx.measureText(z.label).width
+        ctx.font = `700 ${11 * k * ps}px ${font}`
+        const cw = ctx.measureText(String(z.count)).width
+        w = pad + iconW + lw + 10 * k * ps + cw + pad
+      }
       const cs = worldToScreen(z.x, z.y - z.r - 30 + 13, t) // pill centre
       const x = cs.x - w / 2,
         y = cs.y - h / 2
@@ -651,15 +665,16 @@ export class FactionsRenderer {
       ctx.lineWidth = 1.4 * k
       roundRect(ctx, x, y, w, h, 13 * k * ps)
       ctx.stroke()
-      if (12 * k >= 5.5) {
+      if (showText) {
+        if (iconW) drawIcon(ctx, z.icon, x + pad + isz / 2, cs.y, isz, { color: z.color })
         ctx.font = `700 ${12 * k * ps}px ${font}`
         ctx.fillStyle = c.t1
         ctx.textAlign = 'left'
-        ctx.fillText(`${z.icon} ${z.label}`, x + 12 * k, cs.y + 0.5)
+        ctx.fillText(z.label, x + pad + iconW, cs.y + 0.5)
         ctx.font = `700 ${11 * k * ps}px ${font}`
         ctx.fillStyle = z.color
         ctx.textAlign = 'right'
-        ctx.fillText(String(z.count), x + w - 12 * k, cs.y + 0.5)
+        ctx.fillText(String(z.count), x + w - pad, cs.y + 0.5)
       }
       ctx.globalAlpha = 1
       this._pillRects.push({ x, y, w, h, id: z.id })

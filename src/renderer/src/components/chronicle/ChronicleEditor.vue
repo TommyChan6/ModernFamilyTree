@@ -16,7 +16,7 @@
           <div v-if="isEra" class="ce-prev-era" :style="{ '--c': draft.color || '#6c8ef5' }">
             <span class="ce-prev-band"></span>
             <span class="ce-prev-era-label">
-              <span class="ce-prev-icon">{{ draft.icon || '◆' }}</span>
+              <UiIcon class="ce-prev-icon" :name="eraIcon" :size="16" />
               <b>{{ draft.name || 'Untitled era' }}</b>
               <span class="ce-prev-span">{{ spanText(draft.start, draft.end) }}</span>
             </span>
@@ -24,7 +24,7 @@
           <div v-else class="ce-prev-ev" :style="{ '--c': evColor }">
             <span class="ce-prev-line"></span>
             <span class="ce-prev-pill" :class="'imp-' + (draft.importance || 2)">
-              <span class="ce-prev-disc">{{ evIcon }}</span>
+              <span class="ce-prev-disc"><UiIcon :name="evIcon" :size="14" /></span>
               <b>{{ draft.title || 'Untitled event' }}</b>
               <span class="ce-prev-span">{{ spanText(draft.date, draft.end, true) }}</span>
             </span>
@@ -40,7 +40,9 @@
             <span class="ce-kicker"
               >{{ isNew ? 'New' : 'Edit' }} {{ isEra ? 'era' : 'event' }}</span
             >
-            <button class="ce-x" title="Close (Esc)" @click="close">✕</button>
+            <button class="ce-x" title="Close (Esc)" aria-label="Close" @click="close">
+              <UiIcon name="x" :size="16" />
+            </button>
           </div>
 
           <!-- ── Era form ── -->
@@ -80,18 +82,13 @@
             </div>
             <div class="ce-row">
               <label class="ce-label">Icon</label>
-              <div class="ce-icons">
-                <input v-model="draft.icon" class="ce-icon-input" maxlength="8" placeholder="🙂" />
-                <button
-                  v-for="ic in ERA_ICONS"
-                  :key="ic"
-                  class="ce-icon-btn"
-                  :class="{ on: draft.icon === ic }"
-                  @click="draft.icon = ic"
-                >
-                  {{ ic }}
-                </button>
-              </div>
+              <IconPicker
+                v-model="draft.icon"
+                class="ce-icons"
+                :options="ERA_ICONS"
+                allow-none
+                aria-label="Era icon"
+              />
             </div>
           </template>
 
@@ -114,7 +111,7 @@
                 :title="k.label"
                 @click="pickKind(k)"
               >
-                <span class="ce-kind-ic">{{ k.icon }}</span>
+                <UiIcon class="ce-kind-ic" :name="k.icon" :size="14" />
                 <span class="ce-kind-l">{{ k.label }}</span>
               </button>
             </div>
@@ -141,6 +138,9 @@
                   :title="o.hint"
                   @click="draft.importance = o.v"
                 >
+                  <span v-if="o.stars" class="ce-stars">
+                    <UiIcon v-for="n in o.stars" :key="n" name="star" :size="12" />
+                  </span>
                   {{ o.label }}
                 </button>
               </div>
@@ -156,13 +156,18 @@
                     :style="{ '--pc': p.color }"
                   >
                     <span class="ce-person-dot"></span>{{ p.name }}
-                    <button class="ce-person-x" title="Remove" @click="removePerson(p.id)">
-                      ×
+                    <button
+                      class="ce-person-x"
+                      title="Remove"
+                      :aria-label="'Remove ' + p.name"
+                      @click="removePerson(p.id)"
+                    >
+                      <UiIcon name="x" :size="12" />
                     </button>
                   </span>
                 </TransitionGroup>
                 <button v-if="!picking" class="ce-add" @click="picking = true">
-                  ＋ Add {{ store.noun.toLowerCase() }}
+                  <UiIcon name="plus" :size="14" />Add {{ store.noun.toLowerCase() }}
                 </button>
                 <div v-else class="ce-picker">
                   <PersonPicker
@@ -214,6 +219,9 @@ import { useMainStore } from '../../store/index.js'
 import { EVENT_KINDS, ERA_COLORS, eventKind } from '../../../../shared/chronicle'
 import { format } from '../../../../shared/calendarMath'
 import DateInput from './DateInput.vue'
+import UiIcon from '../ui/UiIcon.js'
+import IconPicker from '../ui/IconPicker.vue'
+import { hasIcon } from '../ui/icons.js'
 import PersonPicker from '../personForm/PersonPicker.vue'
 import { confirmDialog, toast } from '../../lib/dialogs.js'
 import { undoToast } from '../../lib/undoToast.js'
@@ -225,11 +233,29 @@ const ed = computed(() => store.chronicleEditor)
 const isEra = computed(() => ed.value?.kind === 'era')
 const isNew = computed(() => !ed.value?.data?.id)
 
-const ERA_ICONS = ['👑', '⚔️', '🕊️', '🏰', '🌾', '🏭', '🚂', '🌋', '🐉', '🌒', '🎩', '🚀']
+// Curated era icons (icon names); the picker's search reaches the full set.
+const ERA_ICONS = [
+  'crown',
+  'swords',
+  'shield',
+  'bird',
+  'castle',
+  'landmark',
+  'wheat',
+  'factory',
+  'train-front',
+  'mountain',
+  'flame',
+  'moon',
+  'sun',
+  'rocket',
+  'scroll',
+  'wand-sparkles'
+]
 const IMPORTANCE = [
-  { v: 1, label: '· Minor', hint: 'Shown when zoomed in' },
-  { v: 2, label: '★ Notable', hint: 'Shown at most zoom levels' },
-  { v: 3, label: '★★★ Major', hint: 'Always shown, bold' }
+  { v: 1, label: 'Minor', stars: 0, hint: 'Shown when zoomed in' },
+  { v: 2, label: 'Notable', stars: 1, hint: 'Shown at most zoom levels' },
+  { v: 3, label: 'Major', stars: 3, hint: 'Always shown, bold' }
 ]
 
 const draft = reactive({})
@@ -282,7 +308,8 @@ watch(
 )
 
 const evColor = computed(() => draft.color || eventKind(draft.kind).color)
-const evIcon = computed(() => draft.icon || eventKind(draft.kind).icon)
+const evIcon = computed(() => (hasIcon(draft.icon) ? draft.icon : eventKind(draft.kind).icon))
+const eraIcon = computed(() => (hasIcon(draft.icon) ? draft.icon : 'diamond'))
 const castPreview = computed(() =>
   (draft.person_ids || []).map((id) => ({
     id,
@@ -339,18 +366,11 @@ async function save() {
         end: openEnd.value ? null : draft.end
       })
       if (!res.success) return toast(res.error || 'Could not save the era', { tone: 'danger' })
-      toast(`${res.data.icon || '◆'} ${res.data.name} ${isNew.value ? 'added' : 'saved'}`, {
-        tone: 'success'
-      })
+      toast(`${res.data.name} ${isNew.value ? 'added' : 'saved'}`, { tone: 'success' })
     } else {
       const res = await store.saveEvent({ ...draft, end: lasts.value ? draft.end : null })
       if (!res.success) return toast(res.error || 'Could not save the event', { tone: 'danger' })
-      toast(
-        `${res.data.icon || eventKind(res.data.kind).icon} ${res.data.title} ${isNew.value ? 'added' : 'saved'}`,
-        {
-          tone: 'success'
-        }
-      )
+      toast(`${res.data.title} ${isNew.value ? 'added' : 'saved'}`, { tone: 'success' })
     }
     close()
   } finally {
@@ -458,10 +478,10 @@ async function remove() {
   animation: ce-pop 0.5s var(--ease-spring) 0.1s backwards;
 }
 .ce-prev-icon {
-  font-size: 15px;
+  color: var(--c);
 }
 .ce-prev-span {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t3);
 }
@@ -485,7 +505,7 @@ async function remove() {
   background: var(--surface);
   border: 1px solid var(--c);
   box-shadow: 0 0 18px color-mix(in srgb, var(--c) 45%, transparent);
-  font-size: 12.5px;
+  font-size: 13px;
   animation:
     ce-pop 0.5s var(--ease-spring) 0.1s backwards,
     ce-glow 2.4s ease-in-out infinite;
@@ -494,7 +514,7 @@ async function remove() {
   font-size: 14px;
 }
 .ce-prev-pill.imp-1 {
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.85;
 }
 .ce-prev-disc {
@@ -503,6 +523,7 @@ async function remove() {
   border-radius: 50%;
   display: grid;
   place-items: center;
+  color: var(--t1);
   background: color-mix(in srgb, var(--c) 30%, transparent);
 }
 .ce-prev-ring {
@@ -535,7 +556,7 @@ async function remove() {
   margin-top: 4px;
 }
 .ce-kicker {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -543,11 +564,21 @@ async function remove() {
 }
 .ce-x {
   margin-left: auto;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: none;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--t3);
   cursor: pointer;
-  font-size: 14px;
+}
+.ce-x:hover {
+  background: var(--hover);
+  color: var(--t1);
 }
 .ce-title {
   border: none;
@@ -576,7 +607,7 @@ async function remove() {
 .ce-label {
   width: 52px;
   flex-shrink: 0;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -584,7 +615,7 @@ async function remove() {
   padding-top: 2px;
 }
 .ce-open {
-  font-size: 12.5px;
+  font-size: 13px;
   font-style: italic;
   color: var(--t2);
   min-width: 150px;
@@ -593,12 +624,15 @@ async function remove() {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
   cursor: pointer;
 }
-.ce-swatches,
 .ce-icons {
+  flex: 1;
+  min-width: 0;
+}
+.ce-swatches {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
@@ -629,33 +663,6 @@ async function remove() {
   padding: 0;
   cursor: pointer;
 }
-.ce-icon-input {
-  width: 44px;
-  height: 28px;
-  text-align: center;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--border);
-  background: var(--elevated);
-  color: var(--t1);
-  font-size: 15px;
-}
-.ce-icon-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--r-sm);
-  border: 1px solid transparent;
-  background: transparent;
-  cursor: pointer;
-  font-size: 15px;
-  transition: transform 0.2s var(--ease-spring);
-}
-.ce-icon-btn:hover {
-  transform: scale(1.18);
-}
-.ce-icon-btn.on {
-  border-color: var(--accent);
-  background: var(--adim);
-}
 .ce-kinds {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
@@ -671,7 +678,7 @@ async function remove() {
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 650;
   cursor: pointer;
   text-align: left;
@@ -691,7 +698,8 @@ async function remove() {
   color: var(--t1);
 }
 .ce-kind-ic {
-  font-size: 14px;
+  flex-shrink: 0;
+  color: var(--kc);
 }
 .ce-kind-l {
   white-space: nowrap;
@@ -706,15 +714,24 @@ async function remove() {
   background: var(--elevated);
 }
 .ce-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--ctl-xs);
   border: none;
   background: transparent;
   color: var(--t3);
   border-radius: 6px;
-  padding: 4px 10px;
+  padding: 0 10px;
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
+}
+.ce-stars {
+  display: inline-flex;
+  gap: 1px;
+  color: var(--accent);
 }
 .ce-seg button.on {
   background: var(--surface);
@@ -738,7 +755,7 @@ async function remove() {
   border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--pc) 16%, var(--elevated));
   border: 1px solid color-mix(in srgb, var(--pc) 40%, transparent);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 650;
   color: var(--t1);
 }
@@ -749,21 +766,34 @@ async function remove() {
   background: var(--pc);
 }
 .ce-person-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
   border: none;
+  border-radius: 50%;
   background: transparent;
   color: var(--t3);
   cursor: pointer;
-  font-size: 13px;
-  line-height: 1;
+}
+.ce-person-x:hover {
+  background: var(--hover);
+  color: var(--t1);
 }
 .ce-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--ctl-sm);
   border: 1px dashed var(--border-strong);
   background: transparent;
   color: var(--accent);
   border-radius: var(--r-pill);
-  padding: 3px 10px;
+  padding: 0 12px 0 9px;
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -779,7 +809,7 @@ async function remove() {
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   padding: 6px 9px;
   outline: none;
 }
@@ -805,7 +835,7 @@ async function remove() {
   flex: 1;
 }
 .ce-hint {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
 }
 

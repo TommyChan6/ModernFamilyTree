@@ -8,6 +8,7 @@
         class="vms-btn"
         :class="{ active: store.viewMode === m.id }"
         :title="m.label + ' — ' + m.blurb"
+        :aria-label="m.label"
         @click="store.setViewMode(m.id)"
       >
         <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -95,19 +96,20 @@
       class="vms-btn vms-show"
       :class="{ active: !!activeShowcase, open: galleryOpen }"
       :title="showTitle"
+      aria-label="Showcase views"
       :aria-expanded="galleryOpen"
       @click="toggleGallery"
     >
       <svg v-if="activeShowcase" viewBox="0 0 16 16" aria-hidden="true">
         <ShowcaseGlyph :id="activeShowcase.id" />
       </svg>
-      <span v-else class="vms-spark">✦</span>
+      <UiIcon v-else class="vms-spark" name="sparkles" :size="16" />
     </button>
 
     <Transition name="vms-gal">
       <div v-if="galleryOpen" ref="galleryEl" class="vms-gallery" role="menu">
         <div class="vms-gal-head">
-          <span class="vms-gal-title">✦ Showcase</span>
+          <span class="vms-gal-title"><UiIcon name="sparkles" :size="14" />Showcase</span>
           <span class="vms-gal-sub">Other ways to meet everyone</span>
         </div>
         <div class="vms-gal-grid">
@@ -148,6 +150,7 @@
 import { computed, ref, watch, onBeforeUnmount, h } from 'vue'
 import { useMainStore } from '../../store/index.js'
 import { landscapeDataUrl } from '../../lib/inkArt'
+import UiIcon from '../ui/UiIcon.js'
 
 // Segmented switch for the Directory's viewing modes — the card modes (grid +
 // the CardStage layouts) and, past the divider, the non-card mediums (Hive's
@@ -310,7 +313,7 @@ const thumbX = computed(() => {
 .vms {
   position: relative;
   display: flex;
-  height: 36px;
+  height: var(--ctl-md);
   padding: 3px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -332,9 +335,10 @@ const thumbX = computed(() => {
   position: relative;
   z-index: 1;
   width: 34px;
+  padding: 0;
   border: none;
   background: transparent;
-  color: var(--t3);
+  color: var(--t2);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -349,10 +353,10 @@ const thumbX = computed(() => {
   transform: translateY(-1px);
 }
 .vms-btn.active {
-  color: #fff;
+  color: var(--on-accent);
   transform: none;
 }
-.vms-btn svg {
+.vms-btn svg:not(.ui-icon) {
   width: 16px;
   height: 16px;
   fill: currentColor;
@@ -369,12 +373,7 @@ const thumbX = computed(() => {
 
 /* ── ✦ Showcase button + gallery ── */
 .vms-spark {
-  font-size: 14px;
-  line-height: 1;
-  background: linear-gradient(135deg, #ff9a8b, var(--amber) 40%, var(--accent) 80%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--amber);
   animation: vms-spark 3.2s ease-in-out infinite;
 }
 @keyframes vms-spark {
@@ -396,7 +395,7 @@ const thumbX = computed(() => {
   top: calc(100% + 8px);
   /* Opens rightward from the switch's left edge (the Directory sits beside
      the icon rail, so growing leftward would be clipped); it pops out of the
-     ✦ button: 8 mode buttons × 34px + 2 dividers + half a button. */
+     gallery button: 8 mode buttons × 34px + 2 dividers + half a button. */
   left: 0;
   z-index: 60;
   width: 372px;
@@ -410,17 +409,24 @@ const thumbX = computed(() => {
 }
 .vms-gal-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   padding: 0 4px 10px;
 }
 .vms-gal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
   font-size: 13px;
   font-weight: 800;
   color: var(--t1);
 }
+.vms-gal-title .ui-icon {
+  color: var(--amber);
+}
 .vms-gal-sub {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t2);
 }
 .vms-gal-grid {
@@ -493,7 +499,7 @@ const thumbX = computed(() => {
   gap: 4px;
 }
 .vms-tile-label {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
 }
 
@@ -564,7 +570,7 @@ const thumbX = computed(() => {
   right: calc(100% - 9px);
 }
 .vms-tile-blurb {
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.3;
   color: var(--t2);
 }

@@ -9,11 +9,17 @@
       >
         <div class="kq" role="dialog" aria-modal="true" aria-label="Kinship quiz">
           <header class="kq-head">
-            <span class="kq-title">🎲 Kinship quiz</span>
+            <span class="kq-title"><UiIcon name="dices" :size="16" />Kinship quiz</span>
             <KinLangPicker />
-            <span :key="score" class="kq-score" title="Score">★ {{ score }}</span>
-            <span v-if="streak >= 2" :key="'s' + streak" class="kq-streak">🔥 {{ streak }}</span>
-            <button class="kq-x" title="Close (Esc)" @click="$emit('close')">✕</button>
+            <span :key="score" class="kq-score" title="Score">
+              <UiIcon name="star" :size="14" />{{ score }}
+            </span>
+            <span v-if="streak >= 2" :key="'s' + streak" class="kq-streak" title="Streak">
+              <UiIcon name="flame" :size="14" />{{ streak }}
+            </span>
+            <button class="kq-x" title="Close (Esc)" aria-label="Close" @click="$emit('close')">
+              <UiIcon name="x" :size="16" />
+            </button>
           </header>
 
           <div class="kq-dots">
@@ -27,7 +33,7 @@
 
           <!-- Not enough family to quiz on -->
           <div v-if="!questions.length" class="kq-empty">
-            <div class="kq-empty-ic">🌱</div>
+            <UiIcon class="kq-empty-ic" name="sprout" :size="34" :stroke="1.7" />
             <b>Grow the tree a little first</b>
             <p>The quiz needs a few parents, children and spouses to ask about.</p>
           </div>
@@ -51,7 +57,9 @@
             </svg>
             <div class="kq-grade">{{ grade.title }}</div>
             <div class="kq-grade-sub">{{ grade.sub }}</div>
-            <div class="kq-best">Best streak: 🔥 {{ bestStreak }}</div>
+            <div class="kq-best">
+              Best streak: <UiIcon class="kq-best-ic" name="flame" :size="14" />{{ bestStreak }}
+            </div>
             <button class="btn btn-primary" @click="start">Play again</button>
           </div>
 
@@ -108,7 +116,7 @@
                     graph to see the chain.
                   </div>
                   <button class="btn btn-primary kq-next" @click="next">
-                    {{ qi === questions.length - 1 ? 'See results' : 'Next' }} <kbd>↵</kbd>
+                    {{ qi === questions.length - 1 ? 'See results' : 'Next' }} <kbd>Enter</kbd>
                   </button>
                 </div>
               </Transition>
@@ -126,6 +134,7 @@ import { useKinship } from './useKinship'
 import { makeQuiz, makeRng } from './kinshipQuiz'
 import KinshipCard from './KinshipCard.vue'
 import KinLangPicker from './KinLangPicker.vue'
+import UiIcon from '../ui/UiIcon.js'
 
 const props = defineProps({ open: { type: Boolean, default: false } })
 defineEmits(['close'])
@@ -300,10 +309,19 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   gap: 10px;
 }
 .kq-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-size: 13px;
   font-weight: 800;
   color: var(--t1);
   margin-right: auto;
+}
+.kq-score,
+.kq-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .kq-score {
   font-weight: 800;
@@ -322,13 +340,21 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   }
 }
 .kq-x {
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
   color: var(--t3);
-  font-size: 14px;
   cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 6px;
+  padding: 0;
+  border-radius: var(--r-sm);
+}
+.kq-x:hover {
+  background: var(--hover);
+  color: var(--t1);
 }
 .kq-dots {
   display: flex;
@@ -363,7 +389,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   gap: 12px;
 }
 .kq-kind {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -433,7 +459,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   place-items: center;
   background: var(--pc);
   color: #fff;
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 800;
   flex-shrink: 0;
 }
@@ -442,7 +468,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   min-width: 0;
 }
 .kq-opt-k {
-  font-size: 9.5px;
+  font-size: var(--fs-xs);
   font-weight: 800;
   color: var(--t3);
   border: 1px solid var(--border);
@@ -501,7 +527,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   color: var(--danger);
 }
 .kq-hops-note {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
 }
 .kq-next {
@@ -521,11 +547,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   position: relative;
 }
 .kq-empty-ic {
-  font-size: 34px;
+  color: var(--t3);
 }
 .kq-empty p {
   color: var(--t3);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 .kq-ring {
   width: 132px;
@@ -558,7 +584,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   text-anchor: middle;
 }
 .kq-ring-k {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   fill: var(--t3);
   text-anchor: middle;
@@ -575,8 +601,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 }
 .kq-grade-sub,
 .kq-best {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
+}
+.kq-best-ic {
+  color: var(--danger);
+  margin-right: 2px;
 }
 .kq-confetti {
   position: absolute;

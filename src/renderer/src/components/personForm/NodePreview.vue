@@ -96,7 +96,7 @@ const initial = computed(() => {
   }
 }
 .np-label {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--t1);
   text-align: center;

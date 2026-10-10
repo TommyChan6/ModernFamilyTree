@@ -3,17 +3,26 @@
     <Transition name="pm">
       <div v-if="store.pricingOpen && store.authUser" class="pm-backdrop" @click.self="close">
         <div class="pm-panel" role="dialog" aria-modal="true" :aria-label="t('billing.title')">
-          <button class="pm-close" :title="t('billing.close')" :disabled="busy" @click="close">
-            ✕
+          <button
+            class="pm-close"
+            :title="t('billing.close')"
+            :aria-label="t('billing.close')"
+            :disabled="busy"
+            @click="close"
+          >
+            <UiIcon name="x" :size="16" />
           </button>
 
           <!-- ══ Step 1: choose a plan ═══════════════════════════════════ -->
           <div v-if="step === 'plans'" class="pm-scroll">
             <div class="pm-sparkles" aria-hidden="true">
-              <span v-for="n in 12" :key="n" :style="{ '--n': n }">✦</span>
+              <UiIcon v-for="n in 12" :key="n" name="sparkle" :size="8 + n" :style="{ '--n': n }" />
             </div>
             <header class="pm-head">
-              <p v-if="reasonText" class="pm-reason">{{ reasonText }}</p>
+              <p v-if="reason" class="pm-reason">
+                <UiIcon :name="reason.icon" :size="16" />
+                <span>{{ reason.text }}</span>
+              </p>
               <p class="pm-eyebrow">{{ t('billing.eyebrow') }}</p>
               <h2 class="pm-title">{{ t('billing.title') }}</h2>
               <p class="pm-sub">{{ t('billing.subtitle') }}</p>
@@ -74,14 +83,17 @@
                   </li>
                 </ul>
                 <ul class="pm-perks">
-                  <li v-if="o.id === 'free'" class="pm-perk">🌱 {{ t('billing.freeIncludes') }}</li>
+                  <li v-if="o.id === 'free'" class="pm-perk">
+                    <UiIcon class="pm-perk-icon" name="sprout" :size="16" />
+                    <span>{{ t('billing.freeIncludes') }}</span>
+                  </li>
                   <li
                     v-for="p in o.perks"
                     :key="p"
                     class="pm-perk"
                     :class="{ soon: !PERKS[p].live }"
                   >
-                    <span class="pm-perk-icon">{{ PERKS[p].icon }}</span>
+                    <UiIcon class="pm-perk-icon" :name="PERKS[p].icon" :size="16" />
                     <span>{{ t('billing.perks.' + p) }}</span>
                     <span v-if="!PERKS[p].live" class="pm-soon">{{ t('billing.soon') }}</span>
                   </li>
@@ -107,11 +119,21 @@
                   </tr>
                   <tr v-for="p in ALL_PERKS" :key="p">
                     <td>
-                      {{ PERKS[p].icon }} {{ t('billing.perks.' + p) }}
-                      <span v-if="!PERKS[p].live" class="pm-soon">{{ t('billing.soon') }}</span>
+                      <span class="pm-compare-perk">
+                        <UiIcon :name="PERKS[p].icon" :size="14" />
+                        {{ t('billing.perks.' + p) }}
+                        <span v-if="!PERKS[p].live" class="pm-soon">{{ t('billing.soon') }}</span>
+                      </span>
                     </td>
                     <td v-for="o in PLAN_CATALOG" :key="o.id" :class="{ yes: o.perks.includes(p) }">
-                      {{ o.perks.includes(p) ? '✓' : '—' }}
+                      <UiIcon
+                        v-if="o.perks.includes(p)"
+                        class="pm-compare-check"
+                        name="check"
+                        :size="16"
+                        :stroke="2.6"
+                      />
+                      <template v-else>—</template>
                     </td>
                   </tr>
                 </tbody>
@@ -128,17 +150,22 @@
 
             <p class="pm-fine">
               {{ t('billing.fine') }}
-              <span v-if="provider === 'sandbox'" class="pm-sandbox-chip"
-                >🧪 {{ t('billing.sandboxChip') }}</span
-              >
-              <span v-else class="pm-sandbox-chip off">⏳ {{ t('billing.notLiveChip') }}</span>
+              <span v-if="provider === 'sandbox'" class="pm-sandbox-chip">
+                <UiIcon name="flask-conical" :size="13" />
+                {{ t('billing.sandboxChip') }}
+              </span>
+              <span v-else class="pm-sandbox-chip off">
+                <UiIcon name="hourglass" :size="13" />
+                {{ t('billing.notLiveChip') }}
+              </span>
             </p>
           </div>
 
           <!-- ══ Step 2: review order ═══════════════════════════════════ -->
           <div v-else-if="step === 'review'" class="pm-scroll pm-narrow">
             <button class="pm-back" :disabled="busy" @click="step = 'plans'">
-              ← {{ t('billing.backToPlans') }}
+              <UiIcon name="arrow-left" :size="16" />
+              {{ t('billing.backToPlans') }}
             </button>
             <h2 class="pm-title sm">{{ t('billing.reviewTitle') }}</h2>
             <div class="pm-order" :class="'tier-' + plan">
@@ -156,7 +183,8 @@
               </div>
               <ul class="pm-order-perks">
                 <li v-for="p in livePerks(plan)" :key="p">
-                  {{ PERKS[p].icon }} {{ t('billing.perks.' + p) }}
+                  <UiIcon :name="PERKS[p].icon" :size="13" />
+                  {{ t('billing.perks.' + p) }}
                 </li>
               </ul>
               <form class="pm-coupon" @submit.prevent="applyCoupon">
@@ -183,7 +211,10 @@
                   <dd>{{ money(q.subtotal) }}</dd>
                 </div>
                 <div v-if="q.discount" class="disc">
-                  <dt>🎟 {{ q.coupon }}</dt>
+                  <dt class="pm-coupon-line">
+                    <UiIcon name="ticket" :size="14" />
+                    {{ q.coupon }}
+                  </dt>
                   <dd>−{{ money(q.discount) }}</dd>
                 </div>
                 <div v-if="q.annualSavings" class="save">
@@ -213,7 +244,8 @@
               @click="checkout"
             >
               <span v-if="busy" class="pm-spin"></span>
-              🔒 {{ t('billing.continue') }}
+              <UiIcon v-else name="lock" :size="16" />
+              {{ t('billing.continue') }}
             </button>
             <template v-else>
               <button
@@ -221,15 +253,15 @@
                 :disabled="waitlisted === plan"
                 @click="joinWaitlist"
               >
-                {{
-                  waitlisted === plan
-                    ? '✓ ' + t('billing.waitlisted')
-                    : '🔔 ' + t('billing.notifyMe')
-                }}
+                <UiIcon :name="waitlisted === plan ? 'check' : 'bell'" :size="16" />
+                {{ waitlisted === plan ? t('billing.waitlisted') : t('billing.notifyMe') }}
               </button>
               <p class="pm-muted center">{{ t('billing.notLiveBody') }}</p>
             </template>
-            <p class="pm-secure">🛡️ {{ t('billing.secureNote') }}</p>
+            <p class="pm-secure">
+              <UiIcon name="shield-check" :size="14" />
+              <span>{{ t('billing.secureNote') }}</span>
+            </p>
           </div>
 
           <!-- ══ Step 3: the payment partner (sandbox stand-in) ══════════ -->
@@ -243,7 +275,10 @@
                 </div>
               </template>
               <template v-else>
-                <p class="pm-provider-brand">🧪 {{ t('billing.sandboxBrand') }}</p>
+                <p class="pm-provider-brand">
+                  <UiIcon name="flask-conical" :size="16" />
+                  {{ t('billing.sandboxBrand') }}
+                </p>
                 <p class="pm-provider-amount">{{ money(checkoutSession?.quote.total ?? 0) }}</p>
                 <p class="pm-muted center">
                   {{ t('billing.plans.' + plan + '.name') }} ·
@@ -252,13 +287,16 @@
                 <p class="pm-provider-note">{{ t('billing.sandboxBody') }}</p>
                 <div class="pm-provider-actions">
                   <button class="pm-cta primary wide" :disabled="busy" @click="finish('success')">
-                    ✓ {{ t('billing.simSuccess') }}
+                    <UiIcon name="check" :size="16" />
+                    {{ t('billing.simSuccess') }}
                   </button>
                   <button class="pm-cta danger wide" :disabled="busy" @click="finish('fail')">
-                    ✕ {{ t('billing.simFail') }}
+                    <UiIcon name="x" :size="16" />
+                    {{ t('billing.simFail') }}
                   </button>
                   <button class="pm-ghost wide" :disabled="busy" @click="finish('cancel')">
-                    ↩ {{ t('billing.simCancel') }}
+                    <UiIcon name="undo-2" :size="16" />
+                    {{ t('billing.simCancel') }}
                   </button>
                 </div>
               </template>
@@ -271,7 +309,7 @@
               <i v-for="n in 36" :key="n" :style="confettiStyle(n)"></i>
             </div>
             <div class="pm-done-badge" :class="'tier-' + plan">
-              {{ plan === 'pro' ? '◆' : '✦' }}
+              <UiIcon :name="plan === 'pro' ? 'gem' : 'sparkles'" :size="40" :stroke="1.8" />
             </div>
             <h2 class="pm-title sm">
               {{ t('billing.welcome', { plan: t('billing.plans.' + plan + '.name') }) }}
@@ -279,7 +317,8 @@
             <p class="pm-sub">{{ t('billing.welcomeBody') }}</p>
             <ul class="pm-unlocked">
               <li v-for="(p, i) in livePerks(plan)" :key="p" :style="{ '--i': i }">
-                {{ PERKS[p].icon }} {{ t('billing.perks.' + p) }}
+                <UiIcon :name="PERKS[p].icon" :size="14" />
+                {{ t('billing.perks.' + p) }}
               </li>
             </ul>
             <button class="pm-cta primary wide" @click="close">
@@ -289,7 +328,9 @@
 
           <!-- ══ Step 4b: declined ══════════════════════════════════════ -->
           <div v-else-if="step === 'failed'" class="pm-scroll pm-narrow pm-done">
-            <div class="pm-done-badge failed">!</div>
+            <div class="pm-done-badge failed">
+              <UiIcon name="circle-alert" :size="40" :stroke="1.8" />
+            </div>
             <h2 class="pm-title sm">{{ t('billing.declined') }}</h2>
             <p class="pm-sub">{{ t('billing.declinedBody') }}</p>
             <button class="pm-cta primary wide" @click="step = 'review'">
@@ -309,6 +350,7 @@ import { useMainStore } from '../../store/index.js'
 import { useI18n } from '../../i18n'
 import { toast } from '../../lib/dialogs.js'
 import PlanBadge from './PlanBadge.vue'
+import UiIcon from '../ui/UiIcon.js'
 import {
   PERKS,
   PLAN_CATALOG,
@@ -348,16 +390,20 @@ const yearlyPct = computed(() => {
   return Math.round((1 - o.price.year / (o.price.month * 12)) * 100)
 })
 
-const reasonText = computed(() => {
+// Why the plans opened (quota hit, ad dismissed, locked feature) — icon + text.
+const reason = computed(() => {
   const ctx = store.pricingContext || {}
   if (ctx.reason === 'quota') {
     // "Free plan limit reached: 10 projects" → "10 projects"
     const detail = String(ctx.detail || '').replace(/^.*limit reached:\s*/i, '')
-    return `⚠️ ${t('billing.reason.quota')}${detail ? ' · ' + detail : ''}`
+    return {
+      icon: 'triangle-alert',
+      text: `${t('billing.reason.quota')}${detail ? ' · ' + detail : ''}`
+    }
   }
-  if (ctx.reason === 'ads') return `🚫 ${t('billing.reason.ads')}`
-  if (ctx.reason === 'feature') return `🔒 ${t('billing.reason.feature')}`
-  return ''
+  if (ctx.reason === 'ads') return { icon: 'ban', text: t('billing.reason.ads') }
+  if (ctx.reason === 'feature') return { icon: 'lock', text: t('billing.reason.feature') }
+  return null
 })
 
 // ── Formatting ───────────────────────────────────────────────────────────────
@@ -484,7 +530,7 @@ function joinWaitlist() {
     /* ignore */
   }
   waitlisted.value = plan.value
-  toast(t('billing.waitlistToast'), { tone: 'success', icon: '🔔' })
+  toast(t('billing.waitlistToast'), { tone: 'success', icon: 'bell' })
 }
 
 function confettiStyle(n) {
@@ -559,13 +605,21 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   top: 14px;
   right: 14px;
   z-index: 3;
-  width: 34px;
-  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-md);
+  height: var(--ctl-md);
+  padding: 0;
   border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--t2);
   cursor: pointer;
+}
+.pm-close:hover:not(:disabled) {
+  color: var(--t1);
+  background: var(--hover);
 }
 .pm-scroll {
   position: relative;
@@ -581,13 +635,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 }
 
 /* ── Head ─────────────────────────────────────────────────────────────────── */
-.pm-sparkles span {
+.pm-sparkles .ui-icon {
   position: absolute;
   top: calc(4% + (var(--n) * 37 % 30) * 1%);
   left: calc(var(--n) * 8%);
   color: var(--accent);
   opacity: 0.25;
-  font-size: calc(8px + var(--n) * 1px);
   animation: pm-twinkle 3.4s ease-in-out infinite;
   animation-delay: calc(var(--n) * -0.4s);
   pointer-events: none;
@@ -603,11 +656,13 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   text-align: center;
 }
 .pm-reason {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   margin: 0 0 12px;
   padding: 6px 14px;
   border-radius: var(--r-pill);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--t1);
   background: rgba(var(--accent-rgb), 0.12);
@@ -615,7 +670,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 }
 .pm-eyebrow {
   margin: 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 900;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -687,12 +742,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 }
 .pm-interval.mini button {
   padding: 5px 12px;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 .pm-save {
   padding: 1px 7px;
   border-radius: var(--r-pill);
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: #fff;
   background: var(--green);
 }
@@ -778,7 +833,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   transform: translateX(-50%);
   padding: 3px 12px;
   border-radius: var(--r-pill);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 900;
   color: var(--on-accent);
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
@@ -792,7 +847,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 }
 .pm-tagline {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
   min-height: 2.8em;
   line-height: 1.4;
@@ -810,7 +865,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   color: var(--t1);
 }
 .pm-per {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
 }
 .pm-num-enter-active,
@@ -829,7 +884,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 }
 .pm-billed {
   margin: -6px 0 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t3);
   min-height: 1.4em;
 }
@@ -838,7 +893,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 16px;
+  min-height: var(--ctl-lg);
+  padding: 0 16px;
   border-radius: var(--r-md);
   border: 1px solid var(--border-strong);
   background: var(--elevated);
@@ -876,7 +932,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   width: 100%;
 }
 .pm-ghost {
-  padding: 9px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--ctl-lg);
+  padding: 0 14px;
   border-radius: var(--r-md);
   border: 1px solid var(--border);
   background: transparent;
@@ -897,7 +958,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
 }
 .pm-limits {
@@ -918,14 +979,17 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   color: var(--t3);
 }
 .pm-perk-icon {
-  width: 18px;
-  text-align: center;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.pm-perk.soon .pm-perk-icon {
+  color: var(--t3);
 }
 .pm-soon {
   margin-left: auto;
   padding: 1px 6px;
   border-radius: var(--r-xs);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -952,7 +1016,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 .pm-compare table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .pm-compare th,
 .pm-compare td {
@@ -969,6 +1033,24 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 .pm-compare td.yes {
   color: var(--green);
   font-weight: 900;
+}
+.pm-compare-check {
+  display: inline-block;
+  vertical-align: middle;
+}
+.pm-compare-perk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pm-compare-perk .ui-icon {
+  flex-shrink: 0;
+  color: var(--t3);
+}
+.pm-coupon-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .pm-compare .pm-soon {
   margin-left: 6px;
@@ -995,10 +1077,14 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 .pm-fine {
   margin: 20px 0 0;
   text-align: center;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 .pm-sandbox-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  vertical-align: middle;
   margin-left: 8px;
   padding: 2px 8px;
   border-radius: var(--r-pill);
@@ -1014,6 +1100,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 /* ── Review ───────────────────────────────────────────────────────────────── */
 .pm-back {
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: none;
   background: none;
   color: var(--t2);
@@ -1047,9 +1136,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 .pm-order-perks li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 3px 9px;
   border-radius: var(--r-pill);
   background: var(--elevated);
@@ -1077,7 +1169,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 }
 .pm-coupon-msg {
   margin: -4px 0 0;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
 }
 .pm-coupon-msg.good {
@@ -1115,26 +1207,26 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 }
 .pm-renew {
   margin: 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 .pm-agree {
   display: flex;
   gap: 8px;
   align-items: flex-start;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
   cursor: pointer;
 }
 .pm-error {
   margin: 0;
   color: var(--danger);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
 }
 .pm-muted {
   margin: 0;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
   line-height: 1.5;
 }
@@ -1142,9 +1234,13 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   text-align: center;
 }
 .pm-secure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   margin: 0;
   text-align: center;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 .pm-spin {
@@ -1186,13 +1282,17 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   inset: 0 0 auto 0;
   padding: 6px;
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 900;
   letter-spacing: 0.1em;
   color: #1a1d2e;
   background: var(--amber);
 }
 .pm-provider-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   margin: 0;
   text-align: center;
   font-weight: 900;
@@ -1207,7 +1307,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 }
 .pm-provider-note {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--t2);
   text-align: center;
@@ -1260,8 +1360,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 40px;
-  font-weight: 900;
   color: var(--on-accent);
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   box-shadow: var(--glow);
@@ -1291,9 +1389,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   gap: 8px;
 }
 .pm-unlocked li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 12px;
   border-radius: var(--r-pill);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--t1);
   background: var(--adim);

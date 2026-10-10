@@ -6,7 +6,7 @@
     <!-- ── Nav ─────────────────────────────────────────────────────────── -->
     <header class="nav" :class="{ scrolled }" :style="{ '--progress': scrollProgress }">
       <button class="nav-logo" type="button" @click="scrollTo('top')">
-        <span class="nav-logo-mark">🌳</span>
+        <span class="nav-logo-mark"><UiIcon name="tree-deciduous" :size="18" /></span>
         <span class="nav-logo-name">Family Tree</span>
       </button>
       <nav class="nav-links">
@@ -30,14 +30,18 @@
           class="icon-btn"
           type="button"
           :title="store.isLightTheme ? 'Dark mode' : 'Light mode'"
+          :aria-label="store.isLightTheme ? 'Dark mode' : 'Light mode'"
           @click="store.setTheme(store.isLightTheme ? 'dark' : 'light')"
         >
-          {{ store.isLightTheme ? '🌙' : '☀' }}
+          <UiIcon :name="store.isLightTheme ? 'moon' : 'sun'" :size="16" />
         </button>
         <!-- Signed in (visiting from the editor): editor shortcut + the same
              account chip as the editor topbar. Signed out: the auth CTAs. -->
         <template v-if="isAuthed">
-          <button class="nav-signin" type="button" @click="emit('close')">✦ Open editor</button>
+          <button class="nav-signin" type="button" @click="emit('close')">
+            <UiIcon name="square-pen" :size="14" />
+            Open editor
+          </button>
           <AccountMenu />
         </template>
         <template v-else>
@@ -61,7 +65,11 @@
       <div class="hero-grain" aria-hidden="true"></div>
 
       <div class="hero-content" :style="heroParallax">
-        <p class="hero-eyebrow">✦ &nbsp;EVERY FAMILY IS A UNIVERSE&nbsp; ✦</p>
+        <p class="hero-eyebrow">
+          <UiIcon name="sparkle" :size="12" />
+          Every family is a universe
+          <UiIcon name="sparkle" :size="12" />
+        </p>
         <h1 class="hero-title" aria-label="Turn your family into a living constellation.">
           <span
             v-for="(word, i) in TITLE_WORDS"
@@ -79,7 +87,8 @@
         </p>
         <div class="hero-ctas">
           <button class="cta-primary magnetic" type="button" @click="primaryAction">
-            {{ isAuthed ? '🌳 Open your tree' : '🌳 Start your tree — free' }}
+            <UiIcon name="tree-deciduous" :size="18" />
+            {{ isAuthed ? 'Open your tree' : 'Start your tree — free' }}
           </button>
           <button
             v-if="!isAuthed"
@@ -88,7 +97,10 @@
             :disabled="guestBusy"
             @click="tryDemo"
           >
-            <span v-if="!guestBusy">▶ Try the live demo</span>
+            <template v-if="!guestBusy">
+              <UiIcon name="play" :size="16" />
+              Try the live demo
+            </template>
             <span v-else class="demo-spinner"></span>
           </button>
         </div>
@@ -103,7 +115,10 @@
       </button>
 
       <Transition name="hint">
-        <span v-if="!skyClicked" class="hero-hint">✨ psst — click the sky</span>
+        <span v-if="!skyClicked" class="hero-hint">
+          <UiIcon name="sparkles" :size="14" />
+          Psst — click the sky
+        </span>
       </Transition>
     </section>
 
@@ -126,7 +141,7 @@
           :style="{ '--reveal-delay': (i % 3) * 90 + 'ms' }"
           @mousemove="featureGlow"
         >
-          <div class="feature-icon">{{ f.icon }}</div>
+          <div class="feature-icon"><UiIcon :name="f.icon" :size="22" /></div>
           <h3>{{ f.title }}</h3>
           <p>{{ f.text }}</p>
         </article>
@@ -199,10 +214,10 @@
           <div class="about-orbit orbit-1"><span class="orbit-dot"></span></div>
           <div class="about-orbit orbit-2"><span class="orbit-dot pink"></span></div>
           <div class="about-orbit orbit-3"><span class="orbit-dot green"></span></div>
-          <div class="about-core">🌳</div>
-          <span class="emblem-twinkle tw-1">✦</span>
-          <span class="emblem-twinkle tw-2">✦</span>
-          <span class="emblem-twinkle tw-3">✦</span>
+          <div class="about-core"><UiIcon name="tree-deciduous" :size="40" :stroke="1.75" /></div>
+          <UiIcon class="emblem-twinkle tw-1" name="sparkle" :size="13" />
+          <UiIcon class="emblem-twinkle tw-2" name="sparkle" :size="13" />
+          <UiIcon class="emblem-twinkle tw-3" name="sparkle" :size="10" />
         </div>
         <div class="about-text">
           <p class="kicker">About the maker</p>
@@ -215,8 +230,14 @@
             job.
           </p>
           <div class="about-actions">
-            <a class="about-btn primary" :href="mailtoHello">✉️ Say hello</a>
-            <a class="about-btn" :href="mailtoIdea">💡 Suggest a feature</a>
+            <a class="about-btn primary" :href="mailtoHello">
+              <UiIcon name="mail" :size="16" />
+              Say hello
+            </a>
+            <a class="about-btn" :href="mailtoIdea">
+              <UiIcon name="lightbulb" :size="16" />
+              Suggest a feature
+            </a>
           </div>
         </div>
       </div>
@@ -240,7 +261,8 @@
           }}
         </p>
         <button class="cta-primary big magnetic" type="button" @click="primaryAction">
-          {{ isAuthed ? 'Back to your tree →' : "Start your tree — it's free" }}
+          {{ isAuthed ? 'Back to your tree' : "Start your tree — it's free" }}
+          <UiIcon name="arrow-right" :size="18" />
         </button>
         <p class="final-note">No downloads required · No credit card · Just your people</p>
       </div>
@@ -250,7 +272,7 @@
     <footer class="footer">
       <div class="footer-top">
         <div class="footer-brand">
-          <span class="nav-logo-mark">🌳</span>
+          <span class="nav-logo-mark"><UiIcon name="tree-deciduous" :size="18" /></span>
           <div>
             <div class="footer-name">Family Tree</div>
             <div class="footer-tag">Every family is a constellation.</div>
@@ -277,7 +299,7 @@
       </div>
       <div class="footer-bottom">
         © {{ new Date().getFullYear() }} Family Tree · Made with
-        <span class="heartbeat">♥</span> and zero venture capital
+        <UiIcon class="heartbeat" name="heart" :size="13" label="love" /> and zero venture capital
       </div>
     </footer>
 
@@ -294,6 +316,7 @@ import CommunityGallery from './CommunityGallery.vue'
 import LegalModal from '../LegalModal.vue'
 import AccountMenu from '../AccountMenu.vue'
 import InkBackdrop from '../ui/InkBackdrop.vue'
+import UiIcon from '../ui/UiIcon.js'
 
 const emit = defineEmits(['signin', 'register', 'close'])
 const store = useMainStore()
@@ -324,32 +347,32 @@ const TITLE_WORDS = [
 
 const FEATURES = [
   {
-    icon: '🕸',
+    icon: 'network',
     title: 'A tree that breathes',
     text: 'Physics-driven graphs: drag a grandparent and the whole family sways. Five layouts, from strict generations to free-floating space.'
   },
   {
-    icon: '⏳',
+    icon: 'hourglass',
     title: 'Time travel',
     text: 'Scrub the time slider and watch people appear, marry and grow old. Lifelines, marriage ribbons and birth sparks — all animated.'
   },
   {
-    icon: '🫧',
+    icon: 'groups',
     title: 'Houses & clans',
     text: 'Tag anyone into groups — farms, dynasties, ship crews — and watch them gather into glowing clusters you can rearrange.'
   },
   {
-    icon: '🖼',
+    icon: 'image',
     title: 'Faces & stories',
     text: 'Portraits, photos, dates and notes on every person. Build the full cast of your family, not just a chart of names.'
   },
   {
-    icon: '⚡',
+    icon: 'zap',
     title: 'Absurdly smooth',
     text: 'Everything is WebGL. Ten thousand relatives glide at 60fps, ambient animations idle at 0% CPU, and views switch like scenes in a film.'
   },
   {
-    icon: '🔒',
+    icon: 'lock',
     title: 'Yours, full stop',
     text: 'Private by default and works offline. Your data lives with you and exports to a plain file. No ads, no mining, no credit card.'
   }
@@ -378,7 +401,7 @@ const DYNASTIES = [
   'Slekta på Vestlandet',
   'House Targaryen',
   'The Kennedys',
-  'Din slekt her 🌱'
+  'Din slekt her'
 ]
 // Duplicate each row so the CSS loop (translateX −50%) is seamless.
 const marqueeRow1 = [...DYNASTIES, ...DYNASTIES]
@@ -670,7 +693,7 @@ onUnmounted(() => {
   justify-content: center;
   width: 34px;
   height: 34px;
-  font-size: 17px;
+  color: var(--accent);
   border-radius: 11px;
   background: linear-gradient(135deg, var(--adim), rgba(var(--accent-rgb), 0.32));
   border: 1px solid rgba(var(--accent-rgb), 0.35);
@@ -725,10 +748,15 @@ onUnmounted(() => {
 }
 
 .nav-signin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ctl-md);
   border: 1px solid var(--border);
   background: transparent;
   color: var(--t1);
-  padding: 8px 16px;
+  padding: 0 16px;
   border-radius: 10px;
   font-family: var(--font);
   font-size: 13px;
@@ -745,10 +773,14 @@ onUnmounted(() => {
 }
 
 .nav-start {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--ctl-md);
   border: none;
-  background: linear-gradient(135deg, var(--accent), #8b6cc5);
-  color: #fff;
-  padding: 9px 18px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--on-accent);
+  padding: 0 18px;
   border-radius: 10px;
   font-family: var(--font);
   font-size: 13px;
@@ -870,6 +902,9 @@ onUnmounted(() => {
 
 /* Invitation to play with the constellation */
 .hero-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   position: absolute;
   right: clamp(16px, 4vw, 44px);
   bottom: 28px;
@@ -880,7 +915,7 @@ onUnmounted(() => {
   background: var(--glass-strong);
   backdrop-filter: blur(8px);
   color: var(--t2);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   pointer-events: none;
   animation:
@@ -930,7 +965,12 @@ onUnmounted(() => {
 }
 
 .hero-eyebrow {
-  font-size: 11.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-transform: uppercase;
+  font-size: 12.5px;
   font-weight: 800;
   letter-spacing: 3.5px;
   color: var(--accent);
@@ -1004,11 +1044,16 @@ onUnmounted(() => {
 
 .cta-primary {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 50px;
   border: none;
   border-radius: 14px;
-  padding: 15px 30px;
-  background: linear-gradient(135deg, var(--accent), #8b6cc5);
-  color: #fff;
+  padding: 0 30px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--on-accent);
   font-family: var(--font);
   font-size: 15px;
   font-weight: 800;
@@ -1072,14 +1117,20 @@ onUnmounted(() => {
 }
 
 .cta-primary.big {
-  padding: 17px 38px;
+  height: 56px;
+  padding: 0 38px;
   font-size: 16px;
 }
 
 .cta-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 50px;
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 15px 26px;
+  padding: 0 26px;
   background: var(--glass-strong);
   backdrop-filter: blur(10px);
   color: var(--t1);
@@ -1123,7 +1174,7 @@ onUnmounted(() => {
 
 .hero-error {
   margin: 12px 0 0;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--danger);
 }
@@ -1141,7 +1192,7 @@ onUnmounted(() => {
 
 .hero-trust {
   margin: 20px 0 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.4px;
   color: var(--t3);
@@ -1265,7 +1316,7 @@ onUnmounted(() => {
 }
 
 .kicker {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 2.6px;
   text-transform: uppercase;
@@ -1394,7 +1445,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  color: var(--accent);
   border-radius: 14px;
   background: linear-gradient(
     135deg,
@@ -1419,7 +1470,7 @@ onUnmounted(() => {
 
 .feature p {
   margin: 0;
-  font-size: 12.8px;
+  font-size: 13.3px;
   line-height: 1.65;
   color: var(--t2);
 }
@@ -1504,7 +1555,7 @@ onUnmounted(() => {
 
 .stat-label {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--t3);
   max-width: 180px;
@@ -1523,7 +1574,7 @@ onUnmounted(() => {
 .marquee-title {
   text-align: center;
   margin: 0 0 24px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 800;
   letter-spacing: 2.4px;
   text-transform: uppercase;
@@ -1636,7 +1687,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 40px;
+  color: var(--accent);
   border-radius: 26px;
   background: linear-gradient(135deg, var(--adim), rgba(var(--accent-rgb), 0.3));
   border: 1px solid rgba(var(--accent-rgb), 0.35);
@@ -1699,7 +1750,6 @@ onUnmounted(() => {
 
 .emblem-twinkle {
   position: absolute;
-  font-size: 12px;
   color: var(--amber);
   animation: twinkle 2.8s ease-in-out infinite;
   pointer-events: none;
@@ -1721,7 +1771,6 @@ onUnmounted(() => {
   top: 42%;
   right: -8px;
   color: var(--accent);
-  font-size: 9px;
   animation-delay: 1.7s;
 }
 
@@ -1759,8 +1808,10 @@ onUnmounted(() => {
 .about-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
-  padding: 11px 20px;
+  height: var(--ctl-lg);
+  padding: 0 20px;
   border-radius: 11px;
   border: 1px solid var(--border);
   background: var(--elevated);
@@ -1782,8 +1833,8 @@ onUnmounted(() => {
 
 .about-btn.primary {
   border: none;
-  background: linear-gradient(135deg, var(--accent), #8b6cc5);
-  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--on-accent);
 }
 
 .about-btn.primary:hover {
@@ -1962,7 +2013,7 @@ onUnmounted(() => {
 
 .final-note {
   margin: 18px 0 0 !important;
-  font-size: 11.5px !important;
+  font-size: 12.5px !important;
   font-weight: 600;
   letter-spacing: 0.4px;
   color: var(--t3) !important;
@@ -1996,7 +2047,7 @@ onUnmounted(() => {
 }
 
 .footer-tag {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 
@@ -2014,7 +2065,7 @@ onUnmounted(() => {
 
 .footer-col h4 {
   margin: 0 0 4px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 1.6px;
   text-transform: uppercase;
@@ -2046,12 +2097,14 @@ onUnmounted(() => {
   padding-top: 18px;
   border-top: 1px solid var(--border);
   text-align: center;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 
 .heartbeat {
   display: inline-block;
+  vertical-align: -2px;
+  fill: currentColor;
   color: var(--pink);
   animation: heart-thump 1.7s ease-in-out infinite;
 }
@@ -2164,9 +2217,11 @@ onUnmounted(() => {
   border-radius: 3px;
   background: var(--ink-seal, var(--accent)) center / contain no-repeat;
   mix-blend-mode: multiply;
-  font-size: 0;
   border: none;
   box-shadow: none;
+}
+:root[data-theme='ink'] .nav-logo-mark .ui-icon {
+  display: none;
 }
 :root[data-theme='ink'] .nav-logo-name {
   font-family: var(--font-brush);
@@ -2273,7 +2328,6 @@ onUnmounted(() => {
 }
 :root[data-theme='ink'] .feature-icon {
   border-radius: 3px;
-  filter: grayscale(1) sepia(0.4) contrast(1.1);
 }
 :root[data-theme='ink'] .feature h3 {
   font-size: 21px;

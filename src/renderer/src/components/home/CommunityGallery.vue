@@ -10,6 +10,7 @@
         type="button"
         @click="filter = f.id"
       >
+        <UiIcon :name="f.icon" :size="14" />
         {{ f.label }}
       </button>
     </div>
@@ -28,7 +29,8 @@
           <div class="cover">
             <canvas :ref="(el) => setCover(el, p)" class="cover-canvas"></canvas>
             <span v-if="p.badge" class="badge-pill" :class="'badge-' + p.badge.replace(' ', '')">
-              {{ badgeIcon(p.badge) }} {{ p.badge }}
+              <UiIcon :name="badgeIcon(p.badge)" :size="12" />
+              {{ p.badge }}
             </span>
             <span class="cover-meta">{{ p.people }} people · {{ p.generations }} generations</span>
             <div class="cover-glare"></div>
@@ -50,14 +52,21 @@
                 :title="liked.has(p.id) ? 'Liked! (community sync coming soon)' : 'Like'"
                 @click.stop="toggleLike(p)"
               >
-                <span :key="likeBurst[p.id] || 0" class="heart">{{
-                  liked.has(p.id) ? '❤️' : '🤍'
-                }}</span>
+                <UiIcon :key="likeBurst[p.id] || 0" class="heart" name="heart" :size="14" />
                 {{ fmt(p.likes + (liked.has(p.id) ? 1 : 0)) }}
               </button>
-              <span class="stat">💬 {{ fmt(p.comments) }}</span>
-              <span class="stat">⭐ {{ fmt(p.stars) }}</span>
-              <span class="stat followers">👥 {{ fmt(p.followers) }}</span>
+              <span class="stat" title="Comments">
+                <UiIcon name="message-circle" :size="14" />
+                {{ fmt(p.comments) }}
+              </span>
+              <span class="stat" title="Favorites">
+                <UiIcon name="star" :size="14" />
+                {{ fmt(p.stars) }}
+              </span>
+              <span class="stat followers" title="Followers">
+                <UiIcon name="users" :size="14" />
+                {{ fmt(p.followers) }}
+              </span>
             </div>
           </div>
         </div>
@@ -68,7 +77,15 @@
     <Transition name="peek">
       <div v-if="peek" class="peek-backdrop" @click.self="peek = null">
         <div class="peek-card">
-          <button class="peek-close" type="button" title="Close" @click="peek = null">×</button>
+          <button
+            class="peek-close"
+            type="button"
+            title="Close"
+            aria-label="Close"
+            @click="peek = null"
+          >
+            <UiIcon name="x" :size="16" />
+          </button>
           <div class="peek-cover">
             <canvas :ref="(el) => paintPeek(el)" class="cover-canvas"></canvas>
             <div class="peek-cover-shade"></div>
@@ -78,20 +95,21 @@
             </div>
           </div>
           <div class="peek-body">
-            <div class="peek-lock">🔭</div>
+            <UiIcon class="peek-lock" name="telescope" :size="30" :stroke="1.75" />
             <h4>Community browsing is almost here</h4>
             <p>
               Soon you'll be able to step inside trees like this one — explore them view by view,
               follow the makers, leave comments, and favorite the families you love.
             </p>
             <div class="peek-soon">
-              <span>👣 Follow</span>
-              <span>💬 Comment</span>
-              <span>❤️ Like</span>
-              <span>⭐ Favorite</span>
+              <span><UiIcon name="user-plus" :size="14" />Follow</span>
+              <span><UiIcon name="message-circle" :size="14" />Comment</span>
+              <span><UiIcon name="heart" :size="14" />Like</span>
+              <span><UiIcon name="star" :size="14" />Favorite</span>
             </div>
             <button class="peek-cta" type="button" @click="startFromPeek">
-              Start your own tree instead →
+              Start your own tree instead
+              <UiIcon name="arrow-right" :size="16" />
             </button>
           </div>
         </div>
@@ -103,15 +121,16 @@
 <script setup>
 import { ref, computed, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { MOCK_PROJECTS, drawProjectCover } from './mockProjects'
+import UiIcon from '../ui/UiIcon.js'
 
 const emit = defineEmits(['start'])
 
 const FILTERS = [
-  { id: 'all', label: '✨ All' },
-  { id: 'trending', label: '🔥 Trending' },
-  { id: 'fictional', label: '🐉 Fictional' },
-  { id: 'historical', label: '🏛 Historical' },
-  { id: 'personal', label: '🏡 Personal' }
+  { id: 'all', icon: 'sparkles', label: 'All' },
+  { id: 'trending', icon: 'flame', label: 'Trending' },
+  { id: 'fictional', icon: 'wand-sparkles', label: 'Fictional' },
+  { id: 'historical', icon: 'landmark', label: 'Historical' },
+  { id: 'personal', icon: 'house', label: 'Personal' }
 ]
 
 const filter = ref('all')
@@ -203,7 +222,7 @@ function fmt(n) {
 }
 
 function badgeIcon(badge) {
-  return badge === 'Trending' ? '🔥' : badge === 'Staff pick' ? '🏅' : '🌱'
+  return badge === 'Trending' ? 'flame' : badge === 'Staff pick' ? 'award' : 'sprout'
 }
 
 function avatarStyle(p) {
@@ -227,13 +246,18 @@ function avatarStyle(p) {
 }
 
 .chip {
-  padding: 7px 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ctl-md);
+  padding: 0 15px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -386,9 +410,12 @@ function avatarStyle(p) {
   position: absolute;
   top: 10px;
   left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 4px 11px;
   border-radius: 999px;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 800;
   letter-spacing: 0.3px;
   color: #fff;
@@ -402,7 +429,11 @@ function avatarStyle(p) {
 }
 
 .badge-Staffpick {
-  background: linear-gradient(120deg, rgba(var(--accent-rgb), 0.75), rgba(139, 108, 197, 0.75));
+  background: linear-gradient(
+    120deg,
+    rgba(var(--accent-rgb), 0.75),
+    color-mix(in srgb, var(--accent-2) 75%, transparent)
+  );
 }
 
 .badge-New {
@@ -413,7 +444,7 @@ function avatarStyle(p) {
   position: absolute;
   bottom: 9px;
   right: 11px;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.85);
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
@@ -438,7 +469,7 @@ function avatarStyle(p) {
 
 .blurb {
   margin: 0;
-  font-size: 12px;
+  font-size: 12.5px;
   line-height: 1.5;
   color: var(--t2);
   flex: 1;
@@ -448,7 +479,7 @@ function avatarStyle(p) {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
 }
 
@@ -459,7 +490,7 @@ function avatarStyle(p) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   color: #fff;
   flex-shrink: 0;
@@ -481,7 +512,7 @@ function avatarStyle(p) {
   gap: 13px;
   padding-top: 9px;
   border-top: 1px solid var(--border);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--t2);
 }
@@ -510,6 +541,10 @@ function avatarStyle(p) {
 
 .stat.like.liked {
   color: var(--pink);
+}
+
+.stat.like.liked .heart {
+  fill: currentColor;
 }
 
 .heart {
@@ -561,13 +596,16 @@ function avatarStyle(p) {
   top: 10px;
   right: 10px;
   z-index: 2;
-  width: 30px;
-  height: 30px;
+  width: var(--ctl-md);
+  height: var(--ctl-md);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 50%;
   background: rgba(10, 12, 20, 0.55);
   color: #fff;
-  font-size: 17px;
   cursor: pointer;
   transition: background 0.15s ease;
 }
@@ -601,8 +639,8 @@ function avatarStyle(p) {
 }
 
 .peek-headline span {
-  font-size: 12px;
-  opacity: 0.85;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .peek-body {
@@ -611,7 +649,9 @@ function avatarStyle(p) {
 }
 
 .peek-lock {
-  font-size: 30px;
+  display: block;
+  margin: 0 auto;
+  color: var(--accent);
   animation: peek-bob 2.8s ease-in-out infinite;
 }
 
@@ -630,7 +670,7 @@ function avatarStyle(p) {
 .peek-body p {
   margin: 0 auto;
   max-width: 340px;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--t2);
 }
@@ -644,21 +684,30 @@ function avatarStyle(p) {
 }
 
 .peek-soon span {
-  padding: 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--ctl-sm);
+  padding: 0 12px;
   border-radius: 999px;
   border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
   background: var(--adim);
   color: var(--t1);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
 }
 
 .peek-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--ctl-lg);
   border: none;
   border-radius: 11px;
-  padding: 11px 22px;
-  background: linear-gradient(135deg, var(--accent), #8b6cc5);
-  color: #fff;
+  padding: 0 22px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--on-accent);
   font-family: var(--font);
   font-size: 13px;
   font-weight: 700;
@@ -776,6 +825,9 @@ function avatarStyle(p) {
 }
 :root[data-theme='ink'] .peek-headline {
   color: var(--t1);
+}
+:root[data-theme='ink'] .peek-headline span {
+  color: var(--t2);
 }
 :root[data-theme='ink'] .peek-headline h3 {
   font-family: var(--font-brush);

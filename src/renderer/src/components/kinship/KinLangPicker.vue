@@ -57,12 +57,12 @@ const idx = computed(() =>
 .klp-btn {
   position: relative;
   z-index: 1;
-  height: 20px;
+  height: calc(var(--ctl-xs) - 6px);
   border: none;
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   cursor: pointer;
   border-radius: var(--r-pill);

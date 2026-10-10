@@ -1,6 +1,6 @@
 <template>
   <div class="graph-view">
-    <ViewHeader icon="🕸" title="Graph" :count="store.persons.length">
+    <ViewHeader icon="graph" title="Graph" :count="store.persons.length">
       <CanvasToggles
         :show-focus="store.caps.focus && !spaceActive"
         show-rel-types
@@ -61,12 +61,7 @@
         @persist="(id) => schedulePersist(id || activeSceneId)"
       />
       <div class="graph-search" :class="{ 'clean-hide-up': store.cleanView }">
-        <span class="search-icon">🔍</span>
-        <input
-          v-model="searchQuery"
-          placeholder="Search family members…"
-          @input="highlightSearch"
-        />
+        <SearchField v-model="searchQuery" size="md" placeholder="Search family members…" />
       </div>
       <!-- Spotlight: who holds the stage, and the switch to recast it -->
       <Transition name="spothud">
@@ -75,7 +70,7 @@
           class="spot-hud"
           :class="{ 'clean-hide-up': store.cleanView }"
         >
-          <span class="spot-star">🌟</span>
+          <UiIcon class="spot-star" name="star" :size="14" />
           <span class="spot-k">Spotlight on</span>
           <button
             class="spot-name"
@@ -84,7 +79,7 @@
             @click="spotPickerOpen = !spotPickerOpen"
           >
             <span class="spot-dot"></span>{{ kinship.personName(spotlightMain) }}
-            <span class="spot-caret">▾</span>
+            <UiIcon class="spot-caret" name="chevron-down" :size="14" />
           </button>
           <button
             v-if="store.selectedPersonId && store.selectedPersonId !== spotlightMain"
@@ -92,15 +87,18 @@
             :title="`Put ${kinship.personName(store.selectedPersonId)} in the spotlight`"
             @click="setMainCharacter(store.selectedPersonId)"
           >
-            ⤓ {{ kinship.personName(store.selectedPersonId).split(' ')[0] }}
+            <UiIcon name="arrow-right-left" :size="14" />
+            {{ kinship.personName(store.selectedPersonId).split(' ')[0] }}
           </button>
           <button
-            class="spot-btn"
+            class="spot-btn spot-btn-icon"
             :class="{ on: spotlightTitles }"
             title="Titles — what everyone is to the main character"
+            aria-label="Show titles"
+            :aria-pressed="spotlightTitles"
             @click="spotlightTitles = !spotlightTitles"
           >
-            🏷
+            <UiIcon name="tag" :size="14" />
           </button>
           <div v-if="spotPickerOpen" class="spot-picker" @pointerdown.stop>
             <PersonPicker
@@ -125,62 +123,70 @@
           <button
             class="ctrl-btn"
             title="Zoom in"
+            aria-label="Zoom in"
             @click="spaceActive ? graph3dRef?.dollyIn() : zoomIn()"
           >
-            ＋
+            <UiIcon name="zoom-in" :size="16" />
           </button>
           <button
             class="ctrl-btn"
             title="Zoom out"
+            aria-label="Zoom out"
             @click="spaceActive ? graph3dRef?.dollyOut() : zoomOut()"
           >
-            －
+            <UiIcon name="zoom-out" :size="16" />
           </button>
           <template v-if="!spaceActive">
             <div class="ctrl-sep"></div>
             <button
-              class="ctrl-btn ctrl-btn-axis"
+              class="ctrl-btn"
               title="Horizontal zoom in — stretch the layout wider (or hold X and scroll)"
+              aria-label="Stretch wider"
               @click="stretchBy('x', 1.3)"
             >
-              <span class="axis-arrow">↔</span><span class="axis-sign">＋</span>
+              <UiIcon name="unfold-horizontal" :size="16" />
             </button>
             <button
-              class="ctrl-btn ctrl-btn-axis"
+              class="ctrl-btn"
               title="Horizontal zoom out — squeeze the layout narrower"
+              aria-label="Squeeze narrower"
               @click="stretchBy('x', 1 / 1.3)"
             >
-              <span class="axis-arrow">↔</span><span class="axis-sign">－</span>
+              <UiIcon name="fold-horizontal" :size="16" />
             </button>
             <button
-              class="ctrl-btn ctrl-btn-axis"
+              class="ctrl-btn"
               title="Vertical zoom in — stretch the layout taller (or hold Z and scroll)"
+              aria-label="Stretch taller"
               @click="stretchBy('y', 1.3)"
             >
-              <span class="axis-arrow">↕</span><span class="axis-sign">＋</span>
+              <UiIcon name="unfold-vertical" :size="16" />
             </button>
             <button
-              class="ctrl-btn ctrl-btn-axis"
+              class="ctrl-btn"
               title="Vertical zoom out — squeeze the layout shorter"
+              aria-label="Squeeze shorter"
               @click="stretchBy('y', 1 / 1.3)"
             >
-              <span class="axis-arrow">↕</span><span class="axis-sign">－</span>
+              <UiIcon name="fold-vertical" :size="16" />
             </button>
           </template>
           <div class="ctrl-sep"></div>
           <button
             class="ctrl-btn"
             title="Fit all"
+            aria-label="Fit all"
             @click="spaceActive ? graph3dRef?.fitAll() : fitAll()"
           >
-            ⊡
+            <UiIcon name="maximize" :size="16" />
           </button>
           <button
             class="ctrl-btn"
             title="Reset view"
+            aria-label="Reset view"
             @click="spaceActive ? graph3dRef?.resetView() : resetZoom()"
           >
-            ⊕
+            <UiIcon name="crosshair" :size="16" />
           </button>
           <div class="ctrl-sep"></div>
           <button
@@ -191,33 +197,38 @@
             :title="m.title"
             @click="switchMode(m.id)"
           >
-            {{ m.label }}
+            <UiIcon :name="m.icon" :size="16" />{{ m.label }}
           </button>
           <div class="ctrl-sep"></div>
           <button
             class="ctrl-btn ctrl-btn-refresh"
             :class="{ 'ctrl-btn-refreshing': refreshSpinning }"
             title="Refresh layout — re-run the family tree algorithm"
+            aria-label="Refresh layout"
             @click="spaceActive ? graph3dRef?.refreshLayout() : refreshLayout()"
           >
-            <span class="refresh-icon">⟳</span>
+            <UiIcon class="refresh-icon" name="refresh-cw" :size="16" />
           </button>
           <div class="ctrl-sep"></div>
           <button
             class="ctrl-btn"
             :class="{ 'ctrl-btn-lock': store.lockNodes }"
-            title="Lock/unlock node clicks"
+            :title="store.lockNodes ? 'Unlock node clicks' : 'Lock node clicks'"
+            :aria-label="store.lockNodes ? 'Unlock node clicks' : 'Lock node clicks'"
+            :aria-pressed="store.lockNodes"
             @click="store.lockNodes = !store.lockNodes"
           >
-            {{ store.lockNodes ? '🔒' : '👤' }}
+            <UiIcon :name="store.lockNodes ? 'lock' : 'user'" :size="16" />
           </button>
           <button
             class="ctrl-btn"
             :class="{ 'ctrl-btn-lock': store.lockLines }"
-            title="Lock/unlock line clicks"
+            :title="store.lockLines ? 'Unlock line clicks' : 'Lock line clicks'"
+            :aria-label="store.lockLines ? 'Unlock line clicks' : 'Lock line clicks'"
+            :aria-pressed="store.lockLines"
             @click="store.lockLines = !store.lockLines"
           >
-            {{ store.lockLines ? '🔒' : '🔗' }}
+            <UiIcon :name="store.lockLines ? 'lock' : 'link'" :size="16" />
           </button>
           <template v-if="spaceActive">
             <div class="ctrl-sep"></div>
@@ -225,24 +236,27 @@
               class="ctrl-btn"
               :class="{ 'ctrl-btn-active': graph3dRef?.autoRotateOn }"
               title="Auto-rotate (R)"
+              aria-label="Auto-rotate"
               @click="graph3dRef?.toggleAutoRotate()"
             >
-              🌀
+              <UiIcon name="rotate-cw" :size="16" />
             </button>
             <button
               class="ctrl-btn"
               :class="{ 'ctrl-btn-active': graph3dRef?.layeredOn }"
               title="Generation layers (G)"
+              aria-label="Generation layers"
               @click="graph3dRef?.toggleLayers()"
             >
-              ≡
+              <UiIcon name="layers" :size="16" />
             </button>
             <button
-              class="ctrl-btn ctrl-btn-help"
+              class="ctrl-btn"
               title="How to navigate in 3D (?)"
+              aria-label="How to navigate in 3D"
               @click="graph3dRef?.openHelp()"
             >
-              ?
+              <UiIcon name="circle-help" :size="16" />
             </button>
           </template>
         </div>
@@ -349,24 +363,33 @@
         >
           <span class="wheel-hud-badge">
             <span class="wheel-hud-ring"></span>
-            <span class="wheel-hud-ic">{{ editMode.icon }}</span>
+            <UiIcon class="wheel-hud-ic" :name="editMode.icon" :size="16" />
           </span>
           <div class="wheel-hud-text">
             <div class="wheel-hud-label">{{ editMode.label }}</div>
             <div class="wheel-hud-hint">{{ hudHint }}</div>
           </div>
-          <button class="wheel-hud-btn" title="Customize the wheel" @click="openWheelConfig()">
-            ⚙
+          <button
+            class="wheel-hud-btn"
+            title="Customize the wheel"
+            aria-label="Customize the wheel"
+            @click="openWheelConfig()"
+          >
+            <UiIcon name="settings" :size="14" />
           </button>
-          <button class="wheel-hud-btn" title="Exit edit mode (Esc)" @click="exitEditMode">
-            ✕
+          <button
+            class="wheel-hud-btn"
+            title="Exit edit mode (Esc)"
+            aria-label="Exit edit mode"
+            @click="exitEditMode"
+          >
+            <UiIcon name="x" :size="14" />
           </button>
         </div>
       </Transition>
       <Transition name="wflash">
         <div v-if="wheelFlash" :key="wheelFlash.key" class="wheel-flash">
-          <span class="wheel-flash-ic">{{ wheelFlash.icon }}</span
-          >{{ wheelFlash.text }}
+          <UiIcon class="wheel-flash-ic" :name="wheelFlash.icon" :size="14" />{{ wheelFlash.text }}
         </div>
       </Transition>
 
@@ -383,16 +406,20 @@
         <div v-if="pathAnchor && !pathInfo" key="armed" class="path-card path-armed">
           <span class="path-armed-beacon"></span>
           <span class="path-armed-name">{{ personName(pathAnchor) }}</span>
-          <span class="path-armed-hint">ctrl-click another person to trace the connection</span>
-          <button class="path-close" title="Cancel (Esc)" @click="clearPath">✕</button>
+          <span class="path-armed-hint">Ctrl-click another person to trace the connection</span>
+          <button class="path-close" title="Cancel (Esc)" aria-label="Cancel" @click="clearPath">
+            <UiIcon name="x" :size="14" />
+          </button>
         </div>
         <div v-else-if="pathInfo && pathInfo.none" key="none" class="path-card path-none">
-          <span class="path-none-icon">🛰</span>
+          <UiIcon class="path-none-icon" name="satellite" :size="16" />
           <span>
             No connection between <b>{{ personName(pathInfo.fromId) }}</b> and
             <b>{{ personName(pathInfo.toId) }}</b>
           </span>
-          <button class="path-close" title="Dismiss (Esc)" @click="clearPath">✕</button>
+          <button class="path-close" title="Dismiss (Esc)" aria-label="Dismiss" @click="clearPath">
+            <UiIcon name="x" :size="14" />
+          </button>
         </div>
         <div v-else-if="pathActive" key="path" class="path-card path-card-kin">
           <!-- What the chain MEANS: the kinship name, arch, DNA & bloodline -->
@@ -404,7 +431,7 @@
           />
           <div class="path-row">
             <div class="path-title">
-              <span class="path-title-icon">🧭</span>
+              <UiIcon class="path-title-icon" name="route" :size="14" />
               Connection
               <span class="path-count">
                 {{ pathHops.length - 1 }} hop{{ pathHops.length > 2 ? 's' : '' }}
@@ -413,7 +440,9 @@
             <div class="path-chain">
               <template v-for="(hop, i) in pathHops" :key="hop.id">
                 <div v-if="hop.via" class="path-via" :style="{ '--i': i * 2 - 1 }">
-                  <span class="path-via-label">{{ hop.via.glyph }} {{ hop.via.text }}</span>
+                  <span class="path-via-label">
+                    <UiIcon :name="iconOr(hop.via.glyph, 'link')" :size="12" />{{ hop.via.text }}
+                  </span>
                   <span class="path-via-line"></span>
                 </div>
                 <button
@@ -428,7 +457,9 @@
               </template>
             </div>
           </div>
-          <button class="path-close" title="Clear (Esc)" @click="clearPath">✕</button>
+          <button class="path-close" title="Clear (Esc)" aria-label="Clear" @click="clearPath">
+            <UiIcon name="x" :size="14" />
+          </button>
         </div>
       </Transition>
       <!-- Right-docked overlay panes: Focus, Relationships, Legend. They stack and
@@ -579,10 +610,10 @@
                 :title="`${row.count} in use — click to isolate on the canvas`"
                 @click="toggleSolo(row.key)"
               >
-                <span class="rtl-glyph">{{ row.glyph }}</span>
+                <UiIcon class="rtl-glyph" :name="iconOr(row.glyph, 'link')" :size="14" />
                 <span class="rtl-name">{{ row.label }}</span>
                 <span class="rtl-count">{{ row.count }}</span>
-                <span class="rtl-meter" title="structural ← → affinity / repel">
+                <span class="rtl-meter" title="Weight — structural to the right, repel to the left">
                   <span class="rtl-meter-axis"></span>
                   <span
                     class="rtl-meter-fill"
@@ -601,9 +632,11 @@
                 class="rtl-rom-row cp-stagger"
                 :style="{ '--i': i }"
               >
-                <span class="rtl-rom-icon rom-beat">💞</span>
+                <UiIcon class="rtl-rom-icon rom-beat" name="heart" :size="14" />
                 <span class="rtl-rom-text">
-                  <b>{{ personName(m.a) }}</b> ⇆ <b>{{ personName(m.b) }}</b>
+                  <b>{{ personName(m.a) }}</b>
+                  <UiIcon class="rtl-rom-mutual" name="arrow-left-right" :size="12" />
+                  <b>{{ personName(m.b) }}</b>
                 </span>
               </div>
               <div
@@ -612,7 +645,7 @@
                 class="rtl-rom-row cp-stagger"
                 :style="{ '--i': romance.mutual.length + i }"
               >
-                <span class="rtl-rom-icon rom-drift">💘</span>
+                <UiIcon class="rtl-rom-icon rom-drift" name="heart-crack" :size="14" />
                 <span class="rtl-rom-text">
                   <b>{{ personName(u.from) }}</b> pines for <b>{{ personName(u.to) }}</b>
                 </span>
@@ -623,7 +656,7 @@
                 class="rtl-rom-row rtl-rom-triangle cp-stagger"
                 :style="{ '--i': romance.mutual.length + romance.unrequited.length + i }"
               >
-                <span class="rtl-rom-icon rom-spin">🔺</span>
+                <UiIcon class="rtl-rom-icon rom-spin" name="triangle" :size="14" />
                 <span class="rtl-rom-text">
                   {{ t.map((id) => personName(id)).join(' → ') }} → …
                 </span>
@@ -637,7 +670,7 @@
                     romance.mutual.length + romance.unrequited.length + romance.triangles.length + i
                 }"
               >
-                <span class="rtl-rom-icon rom-clash">⚔</span>
+                <UiIcon class="rtl-rom-icon rom-clash" name="swords" :size="14" />
                 <span class="rtl-rom-text">
                   {{ rv.admirers.map((id) => personName(id)).join(' & ') }} vie for
                   <b>{{ personName(rv.crush) }}</b>
@@ -647,7 +680,12 @@
 
             <!-- Social gravity: pull friend/crush clusters together (organic layout) -->
             <div class="rtl-gravity" :title="'Boosts social-edge springs in the Organic layout'">
-              <span class="rtl-gravity-icon" :class="{ pulling: socialPull > 1 }">🪐</span>
+              <UiIcon
+                class="rtl-gravity-icon"
+                :class="{ pulling: socialPull > 1 }"
+                name="orbit"
+                :size="14"
+              />
               <span class="rtl-gravity-label">Social gravity</span>
               <input
                 v-model.number="socialPull"
@@ -663,7 +701,7 @@
             <div class="rtl-hint">
               {{
                 soloType
-                  ? '✦ Isolating one type — click again to reset'
+                  ? 'Isolating one type — click it again to reset'
                   : 'Click a type to isolate · Ctrl-click two people to trace their connection'
               }}
             </div>
@@ -689,7 +727,7 @@
               <div class="leg-section-label">Lines</div>
               <div class="leg-row cp-stagger" :style="{ '--i': 2 }">
                 <div class="leg-line" :style="{ background: legendColors.parentChild }"></div>
-                Parent / Child
+                Parent / child
               </div>
               <div class="leg-row cp-stagger" :style="{ '--i': 3 }">
                 <div
@@ -775,6 +813,8 @@ import { Graph3DView } from '../paid'
 import MiniMap from './MiniMap.vue'
 import ViewHeader from './ViewHeader.vue'
 import CanvasToggles from './CanvasToggles.vue'
+import UiIcon, { hasIcon } from './ui/UiIcon.js'
+import SearchField from './ui/SearchField.vue'
 import { lineFxSpec, lineFxApplies } from './graph/webgl/lineFx.js'
 import { computeSpotlightLayout, defaultMainCharacter } from './graph/spotlightLayout'
 import { chronicleViewModel } from './chronicle/chronicleModel.js'
@@ -819,16 +859,32 @@ const egoDepth = ref(0) // Orbit rings: 0 = off, 1..3 = hops kept lit around the
 const socialPull = ref(1) // Social gravity ×1..×4 — boosts affinity-edge springs (organic)
 
 const modes = [
-  { id: 'custom', label: '✋ Free', title: 'Free — nodes stay where you put them' },
-  { id: 'auto', label: '⚡ Organic', title: 'Organic — force-directed layout' },
-  { id: 'age', label: '📅 Birth', title: 'Birth — vertical position by birth date' },
-  { id: 'generation', label: '🏛 Generations', title: 'Generations — top-down hierarchy' },
+  { id: 'custom', icon: 'hand', label: 'Free', title: 'Free — nodes stay where you put them' },
+  { id: 'auto', icon: 'atom', label: 'Organic', title: 'Organic — force-directed layout' },
+  {
+    id: 'age',
+    icon: 'calendar',
+    label: 'Birth',
+    title: 'Birth — vertical position by birth date'
+  },
+  {
+    id: 'generation',
+    icon: 'network',
+    label: 'Generations',
+    title: 'Generations — top-down hierarchy'
+  },
   {
     id: 'spotlight',
-    label: '🌟 Spotlight',
+    icon: 'star',
+    label: 'Spotlight',
     title: 'Spotlight — a main character at centre stage, everyone else in rings by closeness'
   },
-  { id: 'space', label: '🪐 Space', title: 'Space — experimental 3D layout (Labs)' }
+  {
+    id: 'space',
+    icon: 'orbit',
+    label: 'Space',
+    title: 'Space — experimental 3D layout (Labs)'
+  }
 ]
 
 // Program-mode gating: Simple offers the Organic type only; the experimental
@@ -1206,8 +1262,8 @@ const pathHops = computed(() => {
     if (i > 0) {
       const r = info.rels[i - 1]
       const def = store.relTypeByKey.get(r.type)
-      if (r.label) via = { text: r.label, glyph: def?.glyph || '·' }
-      else if (!def) via = { text: r.type, glyph: '·' }
+      if (r.label) via = { text: r.label, glyph: def?.glyph || 'link' }
+      else if (!def) via = { text: r.type, glyph: 'link' }
       else if (def.directed) {
         // rels[i-1] joins ids[i-1] → ids[i]; name the PREVIOUS person's role.
         const prevIsA = r.person_a_id === info.ids[i - 1]
@@ -1723,7 +1779,7 @@ function resetCurveAt(e, w) {
     d._curve = null
     schedulePersist(activeSceneId.value)
     ticked()
-    showWheelFlash('↺', 'Curve reset')
+    showWheelFlash('rotate-ccw', 'Curve reset')
   }
   return true
 }
@@ -1875,7 +1931,7 @@ const pillModes = computed(() => {
 
 function pickPillMode(s) {
   if (s.disabled) {
-    showWheelFlash('🔒', s.disabledHint || 'Not available right now')
+    showWheelFlash('lock', s.disabledHint || 'Not available right now')
     return
   }
   activateEditMode(s)
@@ -1965,7 +2021,7 @@ function commitWheel(idx) {
     return
   }
   if (s.disabled) {
-    showWheelFlash('🔒', s.disabledHint || 'Not available right now')
+    showWheelFlash('lock', s.disabledHint || 'Not available right now')
     return
   }
   spawnWheelBurst(pos, s.color)
@@ -2032,7 +2088,7 @@ function handleModeClick(w, node) {
   const m = editMode.value
   if (!m) return
   if (m.kind === 'add') {
-    if (node) showWheelFlash('✚', 'Click an empty spot')
+    if (node) showWheelFlash('plus', 'Click an empty spot')
     else addPersonAt(w)
     return
   }
@@ -2082,11 +2138,11 @@ function armOrDelete(target) {
 async function doWheelDelete(target) {
   if (target.isRel) {
     const res = await store.deleteRelationship(target.id)
-    if (res?.success) showWheelFlash('🗑', 'Bond deleted')
+    if (res?.success) showWheelFlash('trash-2', 'Bond deleted')
   } else {
     const name = personName(target.id)
     const res = await store.deletePerson(target.id)
-    if (res?.success) showWheelFlash('🗑', `${name} deleted`)
+    if (res?.success) showWheelFlash('trash-2', `${name} deleted`)
   }
   markNodeStyles()
   markLinkStyles()
@@ -2097,7 +2153,7 @@ async function doWheelDelete(target) {
 async function linkClick(node) {
   const m = editMode.value
   if (!store.relTypeByKey.has(m.slot.type)) {
-    showWheelFlash('⚠️', 'That bond type no longer exists')
+    showWheelFlash('triangle-alert', 'That bond type no longer exists')
     exitEditMode()
     return
   }
@@ -2126,7 +2182,7 @@ async function linkClick(node) {
       person_b_id: b,
       type: m.slot.type
     })
-    if (res?.success) showWheelFlash('✨', `Linked — ${m.label}`)
+    if (res?.success) showWheelFlash('check', `Linked — ${m.label}`)
   }
   linkAnchorId.value = b
   markNodeStyles()
@@ -2138,11 +2194,11 @@ function pinClick(node) {
     node.fx = null
     node.fy = null
     if (currentMode.value === 'auto') ctx.simulation?.alpha(0.15).restart()
-    showWheelFlash('📌', `${node.name || 'Node'} released`)
+    showWheelFlash('pin-off', `${node.name || 'Node'} released`)
   } else {
     node.fx = node.x
     node.fy = node.y
-    showWheelFlash('📌', `${node.name || 'Node'} pinned`)
+    showWheelFlash('pin', `${node.name || 'Node'} pinned`)
   }
   uiTick.value++
 }
@@ -2170,27 +2226,27 @@ async function tagClick(node, m) {
   const res = has
     ? await store.removeEntityTag(node.id, tagId)
     : await store.addEntityTag(node.id, tagId)
-  if (res?.success) showWheelFlash(m.icon, `${has ? '−' : '+'} ${m.label}`)
+  if (res?.success) showWheelFlash(m.icon, `${has ? 'Removed' : 'Added'} “${m.label}”`)
 }
 
 async function endBondClick(link) {
   if (link.ended?.year) {
-    showWheelFlash('⌛', 'Already ended')
+    showWheelFlash('hourglass', 'Already ended')
     return
   }
   const year = store.currentDate?.year
   if (!year) {
-    showWheelFlash('⌛', 'Set a current year first')
+    showWheelFlash('hourglass', 'Set a current year first')
     return
   }
   const res = await store.updateRelationship({ id: link.id, ended: { year } })
-  if (res?.success) showWheelFlash('⌛', `Ended ${year}`)
+  if (res?.success) showWheelFlash('hourglass', `Ended ${year}`)
 }
 
 async function swapBondClick(link) {
   const def = store.relTypeByKey.get(link.type)
   if (!def?.directed) {
-    showWheelFlash('⇄', 'That bond has no direction')
+    showWheelFlash('arrow-right-left', 'That bond has no direction')
     return
   }
   const res = await store.updateRelationship({
@@ -2198,7 +2254,7 @@ async function swapBondClick(link) {
     person_a_id: link.person_b_id,
     person_b_id: link.person_a_id
   })
-  if (res?.success) showWheelFlash('⇄', 'Direction flipped')
+  if (res?.success) showWheelFlash('arrow-right-left', 'Direction flipped')
 }
 
 // Add mode: drop a new person where the click landed, then christen them via
@@ -2361,7 +2417,7 @@ function restoreLayoutState(state) {
     // that type's own arrangement (visible when the user switches back).
     refreshActiveStyles()
     markNodeStyles()
-    showWheelFlash('↺', `Restored the ${state.type} arrangement`)
+    showWheelFlash('rotate-ccw', `Restored the ${state.type} arrangement`)
   }
   schedulePersist(state.sceneId)
   return inverse
@@ -2998,6 +3054,7 @@ function initGraph() {
       showAge: store.graphSettings.showAge,
       selectedId: store.selectedPersonId,
       labelOpacityOf: (n) => Math.min(1, nodeVisual(n).opacity),
+      radiusOf: (n) => nodeVisual(n).radius,
       ageOf,
       curveHandles: curveHandlesOpts(),
       kinLens: kinOverlay(),
@@ -4161,7 +4218,7 @@ function setMainCharacter(id) {
   w.positions = {} // a new lead → a fresh arrangement around them
   if (!spotlightActive.value) switchMode('spotlight')
   else layoutSpotlight()
-  showWheelFlash('🌟', `${kinship.personName(id)} takes the spotlight`)
+  showWheelFlash('star', `${kinship.personName(id)} takes the spotlight`)
 }
 function onSpotPick(p) {
   if (p?.id) setMainCharacter(p.id)
@@ -4449,6 +4506,13 @@ function fitAll() {
 function highlightSearch() {
   markNodeStyles()
 }
+// The SearchField's v-model also changes on clear / Esc (no input event).
+watch(searchQuery, highlightSearch)
+
+/** A stored icon (name or legacy glyph) when it resolves, else a fallback. */
+function iconOr(value, fallback) {
+  return value && hasIcon(value) ? value : fallback
+}
 
 // ── Lifecycle & watchers ────────────────────────────────────────────────────
 // ── Save / restore (scenes are the source of truth) ─────────────────────────
@@ -4621,7 +4685,7 @@ watch(
   (id) => {
     curveHot = null
     if (id && curveEditLink()) {
-      showWheelFlash('〰', 'Drag the line or its handles · double-click to reset')
+      showWheelFlash('spline', 'Drag the line or its handles · double-click to reset')
     }
   }
 )
@@ -4779,38 +4843,14 @@ watch(
   top: 14px;
   left: 50%;
   transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 7px 14px;
-  min-width: 260px;
+  width: 280px;
+  max-width: calc(100% - 32px);
+  border-radius: var(--r-md);
   z-index: 5;
   box-shadow: var(--shadow);
   transition:
     transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
     opacity 0.3s ease;
-}
-.graph-search input {
-  background: none;
-  border: none;
-  outline: none;
-  font: inherit;
-  font-size: 13px;
-  color: var(--t1);
-  flex: 1;
-  padding: 0;
-  box-shadow: none;
-  width: auto;
-}
-.graph-search input::placeholder {
-  color: var(--t3);
-}
-.search-icon {
-  font-size: 13px;
-  flex-shrink: 0;
 }
 .bottom-bars {
   position: absolute;
@@ -4835,14 +4875,15 @@ watch(
   box-shadow: var(--shadow);
 }
 .ctrl-btn {
-  width: 30px;
-  height: 30px;
+  flex: none;
+  width: var(--ctl-md);
+  height: var(--ctl-md);
+  padding: 0;
   border-radius: 7px;
-  border: none;
+  border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
   color: var(--t2);
-  font-size: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4856,8 +4897,8 @@ watch(
 .ctrl-btn-wide {
   width: auto;
   padding: 0 10px;
-  gap: 4px;
-  font-size: 11px;
+  gap: 6px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   position: relative;
 }
@@ -4871,26 +4912,7 @@ watch(
   background: var(--border);
   margin: 3px 2px;
 }
-.ctrl-btn-help {
-  font-weight: 700;
-  font-size: 13px;
-}
-/* Per-axis zoom: arrow glyph + a tiny sign, reads as one compact control */
-.ctrl-btn-axis {
-  gap: 0;
-}
-.ctrl-btn-axis .axis-arrow {
-  font-size: 13px;
-  line-height: 1;
-}
-.ctrl-btn-axis .axis-sign {
-  font-size: 8px;
-  font-weight: 800;
-  line-height: 1;
-  margin-top: -8px;
-}
 .ctrl-btn-refresh .refresh-icon {
-  display: inline-block;
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .ctrl-btn-refresh:hover .refresh-icon {
@@ -4911,7 +4933,7 @@ watch(
    the glass card chrome + spring-in; these classes only set inner layout. */
 .graph-legend {
   padding: 12px 16px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t2);
   display: flex;
   flex-direction: column;
@@ -4919,7 +4941,7 @@ watch(
   min-width: 150px;
 }
 .panel-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -4931,12 +4953,11 @@ watch(
   gap: 5px;
 }
 .leg-section-label {
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--t3);
-  opacity: 0.7;
 }
 .leg-row {
   display: flex;
@@ -5065,7 +5086,7 @@ watch(
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   text-align: left;
   cursor: pointer;
   transition:
@@ -5092,9 +5113,8 @@ watch(
 }
 .rtl-glyph {
   grid-area: glyph;
+  justify-self: center;
   color: var(--rc);
-  font-size: 13px;
-  text-align: center;
 }
 .rtl-name {
   grid-area: name;
@@ -5106,7 +5126,7 @@ watch(
 }
 .rtl-count {
   grid-area: count;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--t3);
   font-variant-numeric: tabular-nums;
@@ -5155,7 +5175,7 @@ watch(
   transform-origin: right center;
 }
 .rtl-hint {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
   padding-top: 4px;
   border-top: 1px solid var(--border);
@@ -5173,7 +5193,7 @@ watch(
   overflow-y: auto;
 }
 .rtl-romance-title {
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.09em;
@@ -5183,7 +5203,7 @@ watch(
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t2);
   line-height: 1.35;
 }
@@ -5193,8 +5213,14 @@ watch(
 }
 .rtl-rom-icon {
   flex-shrink: 0;
-  font-size: 12px;
-  line-height: 1;
+  color: var(--pink);
+}
+.rtl-rom-text {
+  min-width: 0;
+}
+.rtl-rom-mutual {
+  margin: 0 3px;
+  color: var(--t3);
 }
 /* Each romance glyph gets its own idle life */
 .rom-beat {
@@ -5268,8 +5294,8 @@ watch(
   padding-top: 8px;
 }
 .rtl-gravity-icon {
-  font-size: 12px;
-  line-height: 1;
+  flex: none;
+  color: var(--t2);
 }
 .rtl-gravity-icon.pulling {
   animation: gravity-wobble 2.4s ease-in-out infinite;
@@ -5284,7 +5310,7 @@ watch(
   }
 }
 .rtl-gravity-label {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--t2);
   white-space: nowrap;
@@ -5300,7 +5326,7 @@ watch(
   box-shadow: none;
 }
 .rtl-gravity-val {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--accent);
   width: 32px;
@@ -5326,7 +5352,7 @@ watch(
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   cursor: pointer;
   overflow: hidden;
@@ -5427,7 +5453,7 @@ watch(
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.09em;
@@ -5435,7 +5461,7 @@ watch(
   white-space: nowrap;
 }
 .path-title-icon {
-  font-size: 14px;
+  color: var(--accent);
   animation: compass-wander 5s ease-in-out infinite;
 }
 @keyframes compass-wander {
@@ -5451,7 +5477,7 @@ watch(
   }
 }
 .path-count {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--accent);
   background: var(--adim);
@@ -5478,7 +5504,7 @@ watch(
   background: color-mix(in srgb, var(--pc) 12%, transparent);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -5515,7 +5541,10 @@ watch(
   animation-delay: calc(var(--i) * 0.09s);
 }
 .path-via-label {
-  font-size: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   color: var(--t3);
   white-space: nowrap;
@@ -5547,12 +5576,16 @@ watch(
   position: absolute;
   top: 7px;
   right: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
   border: none;
   background: transparent;
   color: var(--t3);
-  font-size: 12px;
   cursor: pointer;
-  padding: 3px 5px;
+  padding: 0;
   border-radius: 6px;
   transition:
     color 0.15s,
@@ -5584,17 +5617,17 @@ watch(
   }
 }
 .path-armed-name {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--t1);
   white-space: nowrap;
 }
 .path-armed-hint {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
 }
 .path-none {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
   padding-right: 40px;
 }
@@ -5602,7 +5635,7 @@ watch(
   color: var(--t1);
 }
 .path-none-icon {
-  font-size: 15px;
+  color: var(--t3);
   animation: satellite-drift 4s ease-in-out infinite;
 }
 @keyframes satellite-drift {
@@ -5655,7 +5688,7 @@ watch(
 }
 
 .highlights-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -5669,7 +5702,7 @@ watch(
 }
 
 .highlight-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t2);
   min-width: 52px;
@@ -5788,7 +5821,7 @@ watch(
   border: none;
   background: transparent;
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--t3);
   cursor: pointer;
@@ -5921,7 +5954,7 @@ watch(
   background: transparent;
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
 }
 .name-bubble-input::placeholder {
@@ -5962,8 +5995,7 @@ watch(
   flex-shrink: 0;
 }
 .wheel-hud-ic {
-  font-size: 14px;
-  line-height: 1;
+  color: var(--mc);
 }
 /* A comet orbiting the badge — "this mode is live". */
 .wheel-hud-ring {
@@ -5994,13 +6026,13 @@ watch(
   padding-right: 2px;
 }
 .wheel-hud-label {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--t1);
   white-space: nowrap;
 }
 .wheel-hud-hint {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
   white-space: nowrap;
   max-width: 340px;
@@ -6008,13 +6040,13 @@ watch(
   text-overflow: ellipsis;
 }
 .wheel-hud-btn {
-  width: 24px;
-  height: 24px;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
+  padding: 0;
   border: none;
   border-radius: 50%;
   background: transparent;
   color: var(--t3);
-  font-size: 12px;
   cursor: pointer;
   flex-shrink: 0;
   display: flex;
@@ -6065,7 +6097,7 @@ watch(
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t1);
   box-shadow: var(--shadow);
@@ -6073,7 +6105,8 @@ watch(
   white-space: nowrap;
 }
 .wheel-flash-ic {
-  font-size: 12px;
+  flex: none;
+  color: var(--accent);
 }
 .wflash-enter-active {
   transition:
@@ -6128,7 +6161,8 @@ watch(
     opacity 0.3s ease;
 }
 .spot-star {
-  display: inline-block;
+  flex: none;
+  color: var(--amber);
   animation: spot-twinkle 2.6s ease-in-out infinite;
 }
 @keyframes spot-twinkle {
@@ -6138,7 +6172,7 @@ watch(
   }
 }
 .spot-k {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -6153,9 +6187,10 @@ watch(
   background: rgba(245, 197, 66, 0.14);
   color: var(--t1);
   border-radius: var(--r-pill);
-  padding: 3px 10px 3px 6px;
+  height: var(--ctl-sm);
+  padding: 0 8px 0 8px;
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 750;
   cursor: pointer;
   transition: background var(--dur) ease;
@@ -6173,22 +6208,30 @@ watch(
     0 0 10px rgba(245, 197, 66, 0.6);
 }
 .spot-caret {
-  font-size: 9px;
   color: var(--t3);
 }
 .spot-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: var(--ctl-sm);
   border: 1px solid var(--border);
   background: transparent;
   color: var(--t2);
   border-radius: var(--r-pill);
-  padding: 2px 9px;
+  padding: 0 10px;
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 650;
   cursor: pointer;
   transition:
     background var(--dur) ease,
     color var(--dur) ease;
+}
+.spot-btn-icon {
+  width: var(--ctl-sm);
+  padding: 0;
 }
 .spot-btn.on {
   background: rgba(245, 197, 66, 0.18);

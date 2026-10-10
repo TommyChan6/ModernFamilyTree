@@ -15,11 +15,20 @@
           title="Tag color"
           @input="store.updateTag({ id: tag.id, color: $event.target.value })"
         />
-        <span class="chip-label">{{ tag.icon ? tag.icon + ' ' : '' }}{{ tag.label }}</span>
+        <UiIcon v-if="tag.icon" class="chip-icon" :name="tag.icon" :size="13" />
+        <span class="chip-label">{{ tag.label }}</span>
         <span v-if="tag.type" class="chip-type" :title="`Tag type: ${tag.type}`">{{
           tag.type
         }}</span>
-        <button class="chip-remove" title="Remove tag" @click="removeTag(tag.id)">✕</button>
+        <button
+          type="button"
+          class="chip-remove"
+          title="Remove tag"
+          aria-label="Remove tag"
+          @click="removeTag(tag.id)"
+        >
+          <UiIcon name="x" :size="12" :stroke="2.4" />
+        </button>
       </span>
     </div>
     <div v-else class="tag-empty">No tags yet.</div>
@@ -48,7 +57,7 @@
       <input
         v-model="newType"
         class="tag-new-input tag-type-input"
-        placeholder="type (optional)"
+        placeholder="Type (optional)"
         list="tag-type-suggestions"
         title="Tags with the same type can be compared in the Groups view (e.g. 'family')"
         @keydown.enter="createAndAssign"
@@ -58,7 +67,8 @@
       </datalist>
       <input v-model="newColor" type="color" class="tag-new-color" title="Tag color" />
       <button class="btn btn-ghost btn-sm" :disabled="!newLabel.trim()" @click="createAndAssign">
-        ＋ Add
+        <UiIcon name="plus" :size="14" />
+        Add
       </button>
     </div>
   </div>
@@ -67,6 +77,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useMainStore } from '../store/index.js'
+import UiIcon from './ui/UiIcon.js'
 
 const props = defineProps({
   entityId: { type: String, required: true }
@@ -134,7 +145,7 @@ function removeTag(tagId) {
   border: 1px solid var(--chip-c);
   background: color-mix(in srgb, var(--chip-c) 14%, transparent);
   color: var(--t1);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
 }
 
@@ -165,7 +176,7 @@ function removeTag(tagId) {
 }
 
 .chip-type {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.4px;
@@ -179,12 +190,20 @@ function removeTag(tagId) {
   flex: 0 1 120px;
 }
 
+.chip-icon {
+  flex-shrink: 0;
+}
+
 .chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
   border: none;
+  border-radius: 50%;
   background: transparent;
   color: var(--t3);
-  font-size: 11px;
-  line-height: 1;
   cursor: pointer;
   padding: 0;
 }
@@ -194,7 +213,7 @@ function removeTag(tagId) {
 }
 
 .tag-empty {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 
@@ -208,13 +227,14 @@ function removeTag(tagId) {
 .tag-new-input {
   flex: 1;
   min-width: 0;
-  padding: 6px 10px;
+  height: var(--ctl-sm);
+  padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   outline: none;
 }
 

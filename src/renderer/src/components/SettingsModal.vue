@@ -18,19 +18,26 @@
               :class="{ active: active === tab.id }"
               @click="active = tab.id"
             >
-              <span class="sm-nav-icon">{{ tab.icon }}</span>
+              <UiIcon class="sm-nav-icon" :name="tab.icon" :size="16" />
               <span>{{ t(tab.labelKey) }}</span>
             </button>
           </nav>
 
           <div class="sm-panel">
-            <button class="sm-close" :title="t('settings.close')" @click="close">×</button>
+            <button
+              class="icon-btn sm-close"
+              :title="t('settings.close')"
+              :aria-label="t('settings.close')"
+              @click="close"
+            >
+              <UiIcon name="x" :size="16" />
+            </button>
 
             <!-- ── General ─────────────────────────────────────────────── -->
             <section v-if="active === 'general'" class="sm-section">
               <div class="sm-field">
                 <div class="sm-field-head">
-                  <span class="sm-field-icon">🌐</span>
+                  <UiIcon class="sm-field-icon" name="globe" :size="18" />
                   <div>
                     <div class="sm-field-title">{{ t('settings.language.title') }}</div>
                     <p class="sm-field-desc">{{ t('settings.language.desc') }}</p>
@@ -46,14 +53,19 @@
                   >
                     <span class="sm-lang-native">{{ loc.native }}</span>
                     <span class="sm-lang-label">{{ loc.label }}</span>
-                    <span v-if="store.language === loc.code" class="sm-lang-check">✓</span>
+                    <UiIcon
+                      v-if="store.language === loc.code"
+                      class="sm-lang-check"
+                      name="check"
+                      :size="16"
+                    />
                   </button>
                 </div>
               </div>
 
               <div class="sm-field">
                 <div class="sm-field-head">
-                  <span class="sm-field-icon">🎨</span>
+                  <UiIcon class="sm-field-icon" name="palette" :size="18" />
                   <div>
                     <div class="sm-field-title">{{ t('settings.theme.title') }}</div>
                     <p class="sm-field-desc">{{ t('settings.theme.desc') }}</p>
@@ -65,14 +77,16 @@
                     :class="{ active: store.theme === 'light' }"
                     @click="store.setTheme('light')"
                   >
-                    ☀ {{ t('settings.theme.light') }}
+                    <UiIcon name="sun" :size="16" />
+                    {{ t('settings.theme.light') }}
                   </button>
                   <button
                     class="sm-seg-btn"
                     :class="{ active: store.theme === 'dark' }"
                     @click="store.setTheme('dark')"
                   >
-                    🌙 {{ t('settings.theme.dark') }}
+                    <UiIcon name="moon" :size="16" />
+                    {{ t('settings.theme.dark') }}
                   </button>
                   <button
                     class="sm-seg-btn sm-seg-ink"
@@ -86,7 +100,7 @@
 
               <div class="sm-field">
                 <div class="sm-field-head">
-                  <span class="sm-field-icon">✨</span>
+                  <UiIcon class="sm-field-icon" name="sparkles" :size="18" />
                   <div>
                     <div class="sm-field-title">{{ t('settings.accent.title') }}</div>
                     <p class="sm-field-desc">{{ t('settings.accent.desc') }}</p>
@@ -107,7 +121,7 @@
                     :aria-pressed="store.accent === a.hex"
                     @click="pickAccent(a.hex)"
                   >
-                    <span class="sm-accent-check" aria-hidden="true">✓</span>
+                    <UiIcon class="sm-accent-check" name="check" :size="15" :stroke="3" />
                   </button>
                   <label
                     class="sm-accent sm-accent-custom"
@@ -122,21 +136,22 @@
                       @input="onCustomAccent"
                       @change="onCustomAccent"
                     />
-                    <span class="sm-accent-plus" aria-hidden="true">+</span>
+                    <UiIcon class="sm-accent-plus" name="plus" :size="16" :stroke="2.5" />
                   </label>
                   <button
                     v-if="store.accent !== DEFAULT_ACCENT"
                     class="btn btn-ghost btn-xs sm-accent-reset"
                     @click="pickAccent(DEFAULT_ACCENT)"
                   >
-                    ↺ {{ t('settings.accent.reset') }}
+                    <UiIcon name="rotate-ccw" :size="14" />
+                    {{ t('settings.accent.reset') }}
                   </button>
                 </div>
               </div>
 
               <div class="sm-field">
                 <div class="sm-field-head">
-                  <span class="sm-field-icon">🏷️</span>
+                  <UiIcon class="sm-field-icon" name="tag" :size="18" />
                   <div>
                     <div class="sm-field-title">{{ t('settings.noun.title') }}</div>
                     <p class="sm-field-desc">{{ t('settings.noun.desc') }}</p>
@@ -154,7 +169,7 @@
 
               <div class="sm-field">
                 <div class="sm-field-head">
-                  <span class="sm-field-icon">🧩</span>
+                  <UiIcon class="sm-field-icon" name="puzzle" :size="18" />
                   <div>
                     <div class="sm-field-title">{{ t('settings.programMode.title') }}</div>
                     <p class="sm-field-desc">{{ t('settings.programMode.desc') }}</p>
@@ -228,8 +243,9 @@
               ></textarea>
 
               <div class="sm-actions">
-                <button class="sm-primary" :disabled="!fbMessage.trim()" @click="sendFeedback">
-                  ✉ {{ t('feedback.send') }}
+                <button class="btn btn-primary" :disabled="!fbMessage.trim()" @click="sendFeedback">
+                  <UiIcon name="send" :size="16" />
+                  {{ t('feedback.send') }}
                 </button>
               </div>
               <p class="sm-note">{{ t('feedback.note') }}</p>
@@ -237,7 +253,9 @@
 
             <!-- ── About ───────────────────────────────────────────────── -->
             <section v-else class="sm-section sm-about">
-              <div class="sm-about-badge">🌳</div>
+              <div class="sm-about-badge">
+                <UiIcon name="tree-deciduous" :size="40" />
+              </div>
               <h3 class="sm-h">{{ t('about.title') }}</h3>
               <p class="sm-intro">{{ t('about.tagline') }}</p>
               <dl class="sm-meta">
@@ -271,6 +289,7 @@ import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { useI18n } from '../i18n'
 import { ACCENT_PRESETS, DEFAULT_ACCENT } from '../lib/accent.js'
+import UiIcon from './ui/UiIcon.js'
 
 const store = useMainStore()
 const { t, SUPPORTED_LOCALES } = useI18n()
@@ -281,10 +300,10 @@ const CREATOR_NAME = 'Tommy Chan'
 const CREATOR_EMAIL = 'timmy.chan@helthjem.no'
 
 const tabs = [
-  { id: 'general', icon: '⚙', labelKey: 'settings.tabs.general' },
-  { id: 'help', icon: '❔', labelKey: 'settings.tabs.help' },
-  { id: 'feedback', icon: '✉', labelKey: 'settings.tabs.feedback' },
-  { id: 'about', icon: 'ℹ', labelKey: 'settings.tabs.about' }
+  { id: 'general', icon: 'settings', labelKey: 'settings.tabs.general' },
+  { id: 'help', icon: 'circle-help', labelKey: 'settings.tabs.help' },
+  { id: 'feedback', icon: 'mail', labelKey: 'settings.tabs.feedback' },
+  { id: 'about', icon: 'info', labelKey: 'settings.tabs.about' }
 ]
 const active = ref('general')
 
@@ -370,7 +389,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .sm-nav-title {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.7px;
@@ -406,9 +425,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .sm-nav-icon {
-  font-size: 15px;
-  width: 18px;
-  text-align: center;
+  flex-shrink: 0;
 }
 
 /* Panel */
@@ -423,20 +440,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   position: absolute;
   top: 14px;
   right: 16px;
-  width: 30px;
-  height: 30px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--t3);
-  font-size: 20px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.sm-close:hover {
-  background: var(--hover);
-  color: var(--t1);
 }
 
 .sm-section {
@@ -459,8 +462,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .sm-field-icon {
-  font-size: 18px;
-  line-height: 1.3;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent);
 }
 
 .sm-field-title {
@@ -471,7 +475,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 .sm-field-desc {
   color: var(--t3);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
   margin: 2px 0 0;
 }
@@ -515,7 +519,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .sm-lang-label {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 
@@ -524,7 +528,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   top: 10px;
   right: 12px;
   color: var(--accent);
-  font-weight: 700;
 }
 
 /* Segmented controls */
@@ -557,13 +560,18 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .sm-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--ctl-md);
   border: none;
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 7px 14px;
+  padding: 0 14px;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -589,14 +597,14 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 .sm-sub {
   color: var(--t1);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   margin: 6px 0 0;
 }
 
 .sm-intro {
   color: var(--t2);
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.6;
   margin: 0;
 }
@@ -624,14 +632,14 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 .sm-def dt {
   color: var(--t1);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .sm-def dd {
   margin: 0;
-  color: var(--t3);
-  font-size: 12.5px;
+  color: var(--t2);
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -663,14 +671,14 @@ kbd {
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
 }
 
 /* Feedback */
 .sm-label {
   color: var(--t2);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -699,33 +707,9 @@ kbd {
   display: flex;
 }
 
-.sm-primary {
-  border: none;
-  border-radius: 10px;
-  background: var(--accent);
-  color: #fff;
-  font-family: var(--font);
-  font-size: 13px;
-  font-weight: 700;
-  padding: 9px 18px;
-  cursor: pointer;
-  transition:
-    filter 0.15s,
-    opacity 0.15s;
-}
-
-.sm-primary:hover:not(:disabled) {
-  filter: brightness(1.08);
-}
-
-.sm-primary:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 .sm-note {
   color: var(--t3);
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.5;
   margin: 0;
 }
@@ -737,8 +721,15 @@ kbd {
 }
 
 .sm-about-badge {
-  font-size: 44px;
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
   margin-top: 8px;
+  border-radius: 22px;
+  color: var(--accent);
+  background: var(--adim);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
 }
 
 .sm-meta {
@@ -756,7 +747,7 @@ kbd {
   gap: 12px;
   padding: 7px 0;
   border-bottom: 1px solid var(--border);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .sm-meta-row dt {
@@ -863,9 +854,7 @@ kbd {
 
 .sm-accent-check {
   color: #fff;
-  font-size: 13px;
-  font-weight: 800;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
   transform: scale(0);
   transition: transform var(--dur-slow) var(--ease-spring);
 }
@@ -892,9 +881,7 @@ kbd {
 }
 .sm-accent-plus {
   color: #fff;
-  font-size: 16px;
-  font-weight: 700;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
   pointer-events: none;
 }
 
@@ -906,14 +893,12 @@ kbd {
   place-items: center;
   width: 16px;
   height: 16px;
-  margin-right: 2px;
   font-family: var(--font-brush);
-  font-size: 12px;
+  font-size: 12.5px;
   line-height: 1;
   color: #fbf4e6;
   background: #b3352a;
   border-radius: 2px 3px 2px 4px;
-  vertical-align: -3px;
 }
 
 /* ── 水墨 ink theme: a hanging scroll (.ink-mount/.ink-unroll/.ink-rollers
@@ -965,14 +950,8 @@ kbd {
   mix-blend-mode: multiply;
   animation: ink-stamp 0.45s var(--ease-spring) both;
 }
-:root[data-theme='ink'] .sm-nav-icon,
-:root[data-theme='ink'] .sm-field-icon {
-  filter: grayscale(1) sepia(0.4) contrast(1.1);
-}
 :root[data-theme='ink'] .sm-close {
   border-radius: 3px;
-  font-family: var(--font-brush);
-  font-size: 24px;
 }
 :root[data-theme='ink'] .sm-field-title {
   font-family: var(--font-brush);
@@ -1006,9 +985,6 @@ kbd {
   font-size: 18px;
   font-weight: 400;
 }
-:root[data-theme='ink'] .sm-lang-check {
-  font-family: var(--font-brush);
-}
 :root[data-theme='ink'] .sm-segment,
 :root[data-theme='ink'] .sm-noun-input,
 :root[data-theme='ink'] .sm-textarea {
@@ -1040,7 +1016,7 @@ kbd {
   font-size: 17px;
   font-weight: 400;
 }
-:root[data-theme='ink'] .sm-primary {
+:root[data-theme='ink'] .sm-actions .btn-primary {
   border-radius: 2px 4px 3px 5px;
   font-family: var(--font-ink-label);
   background:

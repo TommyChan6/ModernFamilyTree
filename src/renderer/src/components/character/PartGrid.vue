@@ -10,7 +10,7 @@
       @pointerenter="$emit('hover', null, true)"
       @pointerleave="$emit('hover', undefined)"
     >
-      <span class="part-none">∅</span>
+      <UiIcon class="part-none" name="ban" :size="24" :stroke="1.75" />
       <span class="part-name">{{ t('character.none') }}</span>
     </button>
     <button
@@ -35,6 +35,7 @@ import { computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useI18n } from '../../i18n'
 import { partsFor, resolveLayers, slotOf, slotState } from './characterModel'
 import { drawLayers, fitRegion } from './render/SpriteCompositor2D'
+import UiIcon from '../ui/UiIcon.js'
 
 // The active slot's catalog as in-context previews: each tile renders the
 // CURRENT look with the candidate part swapped in, cropped to the slot's
@@ -171,7 +172,7 @@ watch(
   right: 0;
   bottom: 0;
   padding: 10px 4px 3px;
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--t2);
   text-align: center;
@@ -194,7 +195,6 @@ watch(
 }
 
 .part-none {
-  font-size: 24px;
   color: var(--t3);
 }
 

@@ -5,15 +5,16 @@
        couple who share blood — the Bloodline meter. -->
   <div class="kc" :style="{ '--kc': relColor }">
     <div class="kc-top">
-      <span class="kc-eyebrow"><span class="kc-helix">🧬</span> Kinship</span>
+      <span class="kc-eyebrow"><UiIcon class="kc-helix" name="dna" :size="14" />Kinship</span>
       <KinLangPicker />
       <button
         class="kc-swap"
         :class="{ spun: flipped }"
         title="Flip the question"
+        aria-label="Flip the question"
         @click="flipped = !flipped"
       >
-        ⇄
+        <UiIcon name="arrow-right-left" :size="14" />
       </button>
     </div>
 
@@ -30,7 +31,7 @@
             </template>
           </div>
           <div v-if="revName" class="kc-reverse">
-            <span class="kc-rev-ic">↺</span>
+            <UiIcon class="kc-rev-ic" name="rotate-ccw" :size="12" />
             <template v-for="(part, i) in sentence(A, B, revName)" :key="i">
               <b v-if="part.who" :style="{ color: personColor(part.who) }">{{
                 personName(part.who)
@@ -111,6 +112,7 @@ import { civilDegree } from './kinshipNames'
 import KinArch from './KinArch.vue'
 import BloodMeter from './BloodMeter.vue'
 import KinLangPicker from './KinLangPicker.vue'
+import UiIcon from '../ui/UiIcon.js'
 
 const props = defineProps({
   a: { type: String, required: true },
@@ -250,7 +252,7 @@ function ordinalNum(n) {
   gap: 8px;
 }
 .kc-eyebrow {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.09em;
@@ -261,7 +263,6 @@ function ordinalNum(n) {
   gap: 5px;
 }
 .kc-helix {
-  display: inline-block;
   animation: kc-twist 4s ease-in-out infinite;
 }
 @keyframes kc-twist {
@@ -270,14 +271,17 @@ function ordinalNum(n) {
   }
 }
 .kc-swap {
-  width: 24px;
-  height: 24px;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--t2);
   cursor: pointer;
-  font-size: 12px;
   transition:
     transform 0.45s var(--ease-spring),
     color 0.2s ease;
@@ -312,7 +316,7 @@ function ordinalNum(n) {
   filter: drop-shadow(0 0 10px color-mix(in srgb, var(--kc) 35%, transparent));
 }
 .kc-reverse {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
 }
 .kc-rev-ic {
@@ -351,14 +355,14 @@ function ordinalNum(n) {
   animation-delay: calc(0.5s + var(--i) * 0.08s);
 }
 .kc-fact-k {
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--t3);
 }
 .kc-fact-v {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--t1);
   display: flex;
@@ -400,7 +404,7 @@ function ordinalNum(n) {
   }
 }
 .kc-also-chip {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   padding: 1px 8px;
   border-radius: var(--r-pill);

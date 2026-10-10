@@ -3,7 +3,9 @@
     <div class="rtp ink-mount ink-unroll">
       <div class="rtp-head">
         <div class="rtp-title">Relationship types</div>
-        <button class="rtp-x" @click="$emit('close')">✕</button>
+        <button class="icon-btn sm rtp-x" title="Close" aria-label="Close" @click="$emit('close')">
+          <UiIcon name="x" :size="16" />
+        </button>
       </div>
       <div class="rtp-hint">
         Every relationship points at a type. Tune a type's look here
@@ -17,9 +19,10 @@
       <div class="rtp-list">
         <div v-for="def in store.relTypes" :key="def.id" class="rtp-row">
           <div class="rtp-row-main">
-            <span class="rtp-glyph" :style="{ color: swatchOf(def), '--rel-c': glyphColor(def) }">{{
-              glyphOf(def)
-            }}</span>
+            <span class="rtp-glyph" :style="{ color: swatchOf(def), '--rel-c': glyphColor(def) }">
+              <template v-if="inkGlyphOf(def)">{{ inkGlyphOf(def) }}</template>
+              <UiIcon v-else :name="def.glyph || 'diamond'" :size="16" />
+            </span>
             <input
               class="rtp-label"
               :value="def.label"
@@ -38,13 +41,16 @@
             />
             <button
               v-if="!def.builtin"
-              class="rtp-del"
+              class="icon-btn sm rtp-del"
               title="Delete this type (removes its relationships)"
+              aria-label="Delete type"
               @click="removeDef(def)"
             >
-              ✕
+              <UiIcon name="trash-2" :size="14" />
             </button>
-            <span v-else class="rtp-builtin" title="Built-in — tunable, not deletable">●</span>
+            <span v-else class="rtp-builtin" title="Built-in — tunable, not deletable">
+              <UiIcon name="lock" :size="14" label="Built-in" />
+            </span>
           </div>
           <div class="rtp-row-gen">
             <span class="rtp-w-label" title="How the generations layout treats this type's edges">
@@ -59,7 +65,8 @@
                 :title="opt.hint"
                 @click="patch(def, { symmetryRole: opt.role })"
               >
-                {{ opt.glyph }} {{ opt.label }}
+                <UiIcon :name="opt.icon" :size="14" />
+                {{ opt.label }}
               </button>
             </div>
           </div>
@@ -85,8 +92,19 @@
         <div class="rtp-new-title">New custom type</div>
         <div class="rtp-new-grid">
           <input v-model="draft.label" class="rtp-input" placeholder="Label (e.g. Sworn enemies)" />
-          <input v-model="draft.glyph" class="rtp-input rtp-input-glyph" placeholder="◆" />
-          <input v-model="draft.color" type="color" class="rtp-color" />
+          <button
+            type="button"
+            class="rtp-icon-btn"
+            :class="{ open: iconPickerOpen }"
+            :title="iconPickerOpen ? 'Hide icons' : 'Choose an icon'"
+            aria-label="Choose an icon"
+            :aria-expanded="iconPickerOpen"
+            @click="toggleIconPicker"
+          >
+            <UiIcon :name="draft.glyph || 'diamond'" :size="16" :style="{ color: draft.color }" />
+            <UiIcon name="chevron-down" :size="14" class="rtp-icon-caret" />
+          </button>
+          <input v-model="draft.color" type="color" class="rtp-color" title="Type color" />
           <label class="rtp-check">
             <input v-model="draft.directed" type="checkbox" />
             Directed
@@ -96,9 +114,17 @@
             <input v-model="draft.role_b" class="rtp-input" placeholder="Role B (e.g. Servant)" />
           </template>
           <button class="btn btn-primary btn-sm" :disabled="!draft.label.trim()" @click="create">
-            ＋ Add type
+            <UiIcon name="plus" :size="14" />
+            Add type
           </button>
         </div>
+        <IconPicker
+          v-if="iconPickerOpen"
+          v-model="draft.glyph"
+          class="rtp-icon-picker"
+          :options="REL_ICON_OPTIONS"
+          aria-label="Type icon"
+        />
         <div class="rtp-row-gen rtp-new-gen">
           <span class="rtp-w-label" title="How the generations layout treats this type's edges">
             Generations
@@ -112,7 +138,8 @@
               :title="opt.hint"
               @click="draft.symmetryRole = opt.role"
             >
-              {{ opt.glyph }} {{ opt.label }}
+              <UiIcon :name="opt.icon" :size="14" />
+              {{ opt.label }}
             </button>
           </div>
         </div>
@@ -135,19 +162,60 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { inkRelColor, inkRelGlyph } from './ui/inkChrome'
 import { confirmDialog } from '../lib/dialogs.js'
 import { translate as tr } from '../i18n'
+import UiIcon from './ui/UiIcon.js'
+import IconPicker from './ui/IconPicker.vue'
 
 defineEmits(['close'])
 const store = useMainStore()
 
 // Ink theme: each type is stamped with its brushed character (the same one the
-// Relationships view shows); otherwise its own glyph.
-function glyphOf(def) {
-  return (store.isInk && inkRelGlyph(def.key, def.label)) || def.glyph
+// Relationships view shows) — calligraphy, drawn as text; otherwise its own
+// icon (def.glyph is an icon name, or a legacy glyph UiIcon still resolves).
+function inkGlyphOf(def) {
+  return store.isInk ? inkRelGlyph(def.key, def.label) : ''
+}
+
+// Curated icons offered for a custom type (search widens to the full set).
+const REL_ICON_OPTIONS = [
+  'diamond',
+  'heart',
+  'heart-handshake',
+  'heart-crack',
+  'heart-pulse',
+  'handshake',
+  'users',
+  'user',
+  'baby',
+  'hand-heart',
+  'swords',
+  'sword',
+  'shield',
+  'crown',
+  'graduation-cap',
+  'briefcase',
+  'star',
+  'sparkles',
+  'flame',
+  'skull',
+  'ghost',
+  'eye',
+  'link',
+  'key',
+  'lock',
+  'anchor',
+  'gem',
+  'arrow-right',
+  'arrow-down',
+  'corner-down-right'
+]
+const iconPickerOpen = ref(false)
+function toggleIconPicker() {
+  iconPickerOpen.value = !iconPickerOpen.value
 }
 function glyphColor(def) {
   return inkRelColor(def.key, swatchOf(def), store.isInk)
@@ -158,19 +226,19 @@ function glyphColor(def) {
 const GEN_ROLES = [
   {
     role: 'vertical',
-    glyph: '↓',
+    icon: 'arrow-down',
     label: 'Generational',
     hint: 'Parent → child — the child sits one generation below.'
   },
   {
     role: 'horizontal',
-    glyph: '⚭',
+    icon: 'arrow-left-right',
     label: 'Same generation',
     hint: 'A couple — both partners share a row, side by side.'
   },
   {
     role: 'none',
-    glyph: '—',
+    icon: 'minus',
     label: 'Non-generational',
     hint: 'Ignored by the generations layout (still drawn and pulls in force layouts).'
   }
@@ -215,7 +283,7 @@ async function removeDef(def) {
 
 const draft = reactive({
   label: '',
-  glyph: '◆',
+  glyph: 'diamond',
   color: '#8a93a6',
   directed: false,
   role_a: '',
@@ -228,7 +296,7 @@ async function create() {
   if (!draft.label.trim()) return
   const res = await store.createRelType({
     label: draft.label,
-    glyph: draft.glyph || '◆',
+    glyph: draft.glyph || 'diamond',
     color: draft.color,
     directed: draft.directed,
     role_a: draft.directed ? draft.role_a : '',
@@ -279,20 +347,10 @@ async function create() {
   color: var(--t1);
 }
 .rtp-x {
-  border: none;
-  background: transparent;
   color: var(--t3);
-  font-size: 14px;
-  cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 6px;
-}
-.rtp-x:hover {
-  color: var(--t1);
-  background: var(--hover);
 }
 .rtp-hint {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
   margin-bottom: 14px;
   line-height: 1.5;
@@ -314,8 +372,11 @@ async function create() {
   gap: 8px;
 }
 .rtp-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 22px;
-  text-align: center;
+  height: 22px;
   font-size: 15px;
   flex-shrink: 0;
 }
@@ -324,7 +385,7 @@ async function create() {
   min-width: 0;
   height: 28px;
   padding: 0 8px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--t1);
   background: transparent;
@@ -339,7 +400,7 @@ async function create() {
   background: var(--surface);
 }
 .rtp-badge {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--t3);
   background: var(--surface);
@@ -349,11 +410,11 @@ async function create() {
   white-space: nowrap;
 }
 .rtp-badge-sym {
-  opacity: 0.7;
+  font-weight: 600;
 }
 .rtp-color {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -362,23 +423,20 @@ async function create() {
   flex-shrink: 0;
 }
 .rtp-del {
-  border: none;
-  background: transparent;
   color: var(--t3);
-  font-size: 12px;
-  cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 6px;
 }
-.rtp-del:hover {
+.rtp-del:hover:not(:disabled) {
   color: var(--danger);
   background: rgba(var(--danger-rgb), 0.12);
 }
 .rtp-builtin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  flex-shrink: 0;
   color: var(--t3);
-  font-size: 8px;
-  padding: 0 7px;
-  opacity: 0.6;
 }
 .rtp-row-weight {
   display: flex;
@@ -402,13 +460,18 @@ async function create() {
   background: var(--surface);
 }
 .rtp-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ctl-sm);
   border: none;
   border-left: 1px solid var(--border);
   background: transparent;
   color: var(--t2);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 5px 10px;
+  padding: 0 10px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -421,10 +484,10 @@ async function create() {
 }
 .rtp-seg-btn.is-on {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .rtp-w-label {
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -442,7 +505,7 @@ async function create() {
   box-shadow: none;
 }
 .rtp-w-val {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--t2);
   width: 40px;
@@ -455,7 +518,7 @@ async function create() {
   padding-top: 12px;
 }
 .rtp-new-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -469,23 +532,47 @@ async function create() {
   flex-wrap: wrap;
 }
 .rtp-input {
-  height: 30px;
+  height: var(--ctl-sm);
   padding: 0 9px;
-  font-size: 12.5px;
+  font-size: 13px;
   border-radius: 8px;
   flex: 1;
   min-width: 130px;
 }
-.rtp-input-glyph {
-  flex: 0 0 44px;
-  min-width: 44px;
-  text-align: center;
+.rtp-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: var(--ctl-sm);
+  padding: 0 8px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--t2);
+  cursor: pointer;
+}
+.rtp-icon-btn:hover,
+.rtp-icon-btn.open {
+  border-color: var(--border-strong);
+  color: var(--t1);
+}
+.rtp-icon-caret {
+  color: var(--t3);
+  transition: transform var(--dur-fast) var(--ease-std);
+}
+.rtp-icon-btn.open .rtp-icon-caret {
+  transform: rotate(180deg);
+}
+.rtp-icon-picker {
+  margin-top: 10px;
 }
 .rtp-check {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
   white-space: nowrap;
   cursor: pointer;
@@ -536,7 +623,8 @@ async function create() {
 :root[data-theme='ink'] .rtp-seg,
 :root[data-theme='ink'] .rtp-seg-btn,
 :root[data-theme='ink'] .rtp-x,
-:root[data-theme='ink'] .rtp-del {
+:root[data-theme='ink'] .rtp-del,
+:root[data-theme='ink'] .rtp-icon-btn {
   border-radius: 2px;
 }
 :root[data-theme='ink'] .rtp-label {

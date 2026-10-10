@@ -111,29 +111,39 @@ export class Overlay3D {
       const y = p.y + (gs.nodeRadius + 14) * f
       const first = n.name ? n.name.split(' ')[0] : ''
       ctx.globalAlpha = op
-      ctx.font = this.ink
+      const nameFont = this.ink
         ? `${Math.min(fontPx * 1.15, 19)}px ${INK_FONTS.kai}`
         : `500 ${Math.min(fontPx, 18)}px system-ui, sans-serif`
+      const ageFont = `600 ${Math.min(fontPx, 18)}px system-ui, sans-serif`
+      const age = opts.showAge && opts.ageOf ? opts.ageOf(n) : null
+      // Name + age are centred under the node as ONE unit: measure each part
+      // in its own font, then draw both left-aligned from the shared start.
+      ctx.font = nameFont
+      const nameW = ctx.measureText(first).width
+      let ageW = 0
+      const gap = 4
+      if (age != null) {
+        ctx.font = ageFont
+        ageW = ctx.measureText(String(age)).width
+        ctx.font = nameFont
+      }
+      const x0 = age != null ? p.x - (nameW + gap + ageW) / 2 : p.x - nameW / 2
+      ctx.textAlign = 'left'
       if (this.ink) {
         // calligraphy names get a soft paper halo, like the 2D graph
         ctx.lineJoin = 'round'
         ctx.lineWidth = 3
         ctx.strokeStyle = c.halo
-        ctx.strokeText(first, p.x, y)
+        ctx.strokeText(first, x0, y)
       }
       ctx.fillStyle = opts.selectedId === n.id ? c.sel : c.name
-      const age = opts.showAge && opts.ageOf ? opts.ageOf(n) : null
+      ctx.fillText(first, x0, y)
       if (age != null) {
-        ctx.fillText(first, p.x, y)
-        ctx.font = `600 ${Math.min(fontPx, 18)}px system-ui, sans-serif`
+        ctx.font = ageFont
         ctx.fillStyle = c.age
-        const nameW = ctx.measureText(first).width
-        ctx.textAlign = 'left'
-        ctx.fillText(String(age), p.x + nameW / 2 + 4, y)
-        ctx.textAlign = 'center'
-      } else {
-        ctx.fillText(first, p.x, y)
+        ctx.fillText(String(age), x0 + nameW + gap, y)
       }
+      ctx.textAlign = 'center'
     }
     ctx.globalAlpha = 1
   }

@@ -244,7 +244,7 @@ onUnmounted(() => cancelAnimationFrame(raf))
 .fs-role {
   top: 33px;
   font-family: var(--font-ink-serif);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-style: italic;
   color: var(--ps-ink-soft);
 }

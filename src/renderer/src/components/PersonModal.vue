@@ -62,7 +62,10 @@
                         </div>
                         <div class="pv-card-glare"></div>
                         <div class="pv-card-rim"></div>
-                        <div v-if="deceased" class="pv-memoriam">🕊 In memoriam</div>
+                        <div v-if="deceased" class="pv-memoriam">
+                          <UiIcon name="bird" :size="13" />
+                          In memoriam
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -85,7 +88,7 @@
                         <span class="pv-life-dot" :class="{ 'pv-alive': !deceased }"></span>
                       </span>
                       <span class="pv-year">{{
-                        deceased ? fmtDate(person.death) || '?' : 'present'
+                        deceased ? fmtDate(person.death) || '?' : 'Present'
                       }}</span>
                       <span v-if="age !== null" class="pv-age">{{ age }} yrs</span>
                     </template>
@@ -94,10 +97,17 @@
 
                   <div class="pv-chips">
                     <span v-if="person.gender && person.gender !== 'unknown'" class="pv-chip">
-                      {{ genderGlyph }} {{ person.gender }}
+                      <UiIcon :name="genderIcon" :size="14" />
+                      {{ person.gender }}
                     </span>
-                    <span v-if="person.occupation" class="pv-chip">💼 {{ person.occupation }}</span>
-                    <span v-if="person.location" class="pv-chip">📍 {{ person.location }}</span>
+                    <span v-if="person.occupation" class="pv-chip">
+                      <UiIcon name="briefcase" :size="14" />
+                      {{ person.occupation }}
+                    </span>
+                    <span v-if="person.location" class="pv-chip">
+                      <UiIcon name="map-pin" :size="14" />
+                      {{ person.location }}
+                    </span>
                   </div>
 
                   <div v-if="personTags.length" class="pv-tags">
@@ -107,8 +117,9 @@
                       class="pv-tag"
                       :style="{ '--tc': tag.color || 'var(--pa)' }"
                     >
-                      <span class="pv-tag-dot"></span>{{ tag.icon ? tag.icon + ' ' : ''
-                      }}{{ tag.label }}
+                      <span class="pv-tag-dot"></span>
+                      <UiIcon v-if="tag.icon" :name="tag.icon" :size="13" />
+                      {{ tag.label }}
                     </span>
                   </div>
 
@@ -238,7 +249,7 @@
                         :style="{ '--i': i }"
                       >
                         <div class="pv-trait-head">
-                          <span v-if="t.icon" class="pv-trait-icon">{{ t.icon }}</span>
+                          <UiIcon v-if="t.icon" class="pv-trait-icon" :name="t.icon" :size="14" />
                           {{ t.label }}
                         </div>
                         <div v-if="t.kind === 'slider'" class="pv-trait-slider">
@@ -264,7 +275,8 @@
                           class="pv-trait-value"
                           :class="t.bool ? 'pv-bool-yes' : 'pv-bool-no'"
                         >
-                          {{ t.bool ? '✓ Yes' : '✕ No' }}
+                          <UiIcon :name="t.bool ? 'check' : 'x'" :size="16" :stroke="2.4" />
+                          {{ t.bool ? 'Yes' : 'No' }}
                         </div>
                         <div v-else-if="t.kind === 'para'" class="pv-trait-para">{{ t.text }}</div>
                         <div v-else class="pv-trait-value">{{ t.text }}</div>
@@ -282,10 +294,12 @@
                       Chronicle
                       <button
                         class="pv-chron-add"
+                        type="button"
                         title="Add a story event they took part in"
                         @click="addStoryEvent"
                       >
-                        ＋ Event
+                        <UiIcon name="plus" :size="14" />
+                        Add event
                       </button>
                     </h2>
                     <div v-if="livedEras.length" class="pv-eras">
@@ -298,8 +312,8 @@
                         :title="e.description || e.name"
                         @click="store.openEraEditor({ id: e.id })"
                       >
-                        <span class="pv-era-ic">{{ e.icon || '◆' }}</span
-                        >{{ e.name }}
+                        <UiIcon class="pv-era-ic" :name="e.icon || 'diamond'" :size="13" />
+                        {{ e.name }}
                       </button>
                     </div>
                     <div class="pv-chron">
@@ -316,7 +330,7 @@
                           <span class="pv-ev-dot" :class="'pv-ev-' + ev.kind"></span>
                         </div>
                         <div class="pv-ev-body">
-                          <span v-if="ev.glyph" class="pv-ev-glyph">{{ ev.glyph }}</span>
+                          <UiIcon v-if="ev.icon" class="pv-ev-glyph" :name="ev.icon" :size="14" />
                           <span class="pv-ev-title">{{ ev.title }}</span>
                           <span v-if="ev.sub" class="pv-ev-sub">{{ ev.sub }}</span>
                         </div>
@@ -345,11 +359,14 @@
                             <span v-else>{{ initialsOf(c.name) }}</span>
                           </span>
                           <span class="pv-bond-text">
-                            <span class="pv-bond-role">{{ c.glyph }} {{ c.role }}</span>
+                            <span class="pv-bond-role">
+                              <UiIcon v-if="c.icon" :name="c.icon" :size="12" />
+                              {{ c.role }}
+                            </span>
                             <span class="pv-bond-name">{{ c.name }}</span>
                           </span>
                           <span v-if="c.endedYear" class="pv-bond-endtag"
-                            >ended {{ c.endedYear }}</span
+                            >Ended {{ c.endedYear }}</span
                           >
                         </button>
                       </div>
@@ -376,21 +393,26 @@
                           decoding="async"
                         />
                         <span v-if="img.role" class="pv-photo-role">{{ img.role }}</span>
-                        <span v-if="img.is_primary" class="pv-photo-star">★</span>
+                        <span v-if="img.is_primary" class="pv-photo-star" title="Primary photo">
+                          <UiIcon name="star" :size="13" />
+                        </span>
                       </button>
                     </div>
                   </section>
 
                   <!-- Blank slate -->
                   <section v-if="isBlank" class="pv-section pv-empty" style="--i: 0">
-                    <div class="pv-empty-mark">✦</div>
+                    <div class="pv-empty-mark">
+                      <UiIcon name="sparkles" :size="34" :stroke="1.6" />
+                    </div>
                     <div class="pv-empty-title">A story waiting to be written</div>
                     <div class="pv-empty-text">
                       No traits, bonds, or photos yet — open the editor to bring
                       {{ person.name || 'them' }} to life.
                     </div>
                     <button class="pv-act pv-empty-cta" @click="store.openForm(person)">
-                      ✎ Start editing
+                      <UiIcon name="pencil" :size="16" />
+                      Start editing
                     </button>
                   </section>
 
@@ -413,7 +435,7 @@
       <!-- ── Chrome ── -->
       <header class="pv-chrome">
         <button class="pv-back" @click="goBack">
-          <span class="pv-back-arrow">←</span>
+          <UiIcon class="pv-back-arrow" name="arrow-left" :size="16" />
           <span class="pv-back-label">{{ backLabel }}</span>
           <kbd class="pv-kbd">Esc</kbd>
         </button>
@@ -435,17 +457,34 @@
             :title="s.title"
             @click="store.setProfileStyle(s.id)"
           >
-            <span class="pv-style-glyph">{{ s.glyph }}</span>
+            <UiIcon class="pv-style-glyph" :name="s.icon" :size="16" />
             <span class="pv-style-label">{{ s.label }}</span>
           </button>
         </div>
-        <button class="pv-act" @click="store.openForm(person)">
-          <span>✎</span><span class="pv-act-label"> Edit</span>
+        <button
+          class="pv-act"
+          :title="`Edit ${store.noun.toLowerCase()}`"
+          @click="store.openForm(person)"
+        >
+          <UiIcon name="pencil" :size="16" />
+          <span class="pv-act-label">Edit</span>
         </button>
-        <button class="pv-act pv-act-danger" title="Delete" @click="handleDelete">
-          <span>🗑</span><span class="pv-act-label"> Delete</span>
+        <button
+          class="pv-act pv-act-danger"
+          :title="`Delete ${store.noun.toLowerCase()}`"
+          @click="handleDelete"
+        >
+          <UiIcon name="trash-2" :size="16" />
+          <span class="pv-act-label">Delete</span>
         </button>
-        <button class="pv-x" title="Close profile" @click="store.closeModal()">✕</button>
+        <button
+          class="pv-x"
+          title="Close profile"
+          aria-label="Close profile"
+          @click="store.closeModal()"
+        >
+          <UiIcon name="x" :size="18" />
+        </button>
       </header>
 
       <!-- ── Lightbox ── -->
@@ -456,8 +495,14 @@
           :class="{ 'pv-lb-ink': isScroll || store.isInk }"
           @click.self="lightbox = null"
         >
-          <button v-if="images.length > 1" class="pv-lb-nav pv-lb-prev" @click="stepLightbox(-1)">
-            ‹
+          <button
+            v-if="images.length > 1"
+            class="pv-lb-nav pv-lb-prev"
+            title="Previous photo"
+            aria-label="Previous photo"
+            @click="stepLightbox(-1)"
+          >
+            <UiIcon name="chevron-left" :size="24" />
           </button>
           <div class="pv-lb-frame">
             <img :key="images[lightbox].id" :src="imageUrl(images[lightbox].file_path)" alt="" />
@@ -469,10 +514,18 @@
               <span class="pv-lb-count">{{ lightbox + 1 }} / {{ images.length }}</span>
             </div>
           </div>
-          <button v-if="images.length > 1" class="pv-lb-nav pv-lb-next" @click="stepLightbox(1)">
-            ›
+          <button
+            v-if="images.length > 1"
+            class="pv-lb-nav pv-lb-next"
+            title="Next photo"
+            aria-label="Next photo"
+            @click="stepLightbox(1)"
+          >
+            <UiIcon name="chevron-right" :size="24" />
           </button>
-          <button class="pv-lb-x" @click="lightbox = null">✕</button>
+          <button class="pv-lb-x" title="Close" aria-label="Close" @click="lightbox = null">
+            <UiIcon name="x" :size="18" />
+          </button>
         </div>
       </Transition>
     </div>
@@ -494,6 +547,7 @@ import KinLangPicker from './kinship/KinLangPicker.vue'
 import ProfileScroll from './profile/ProfileScroll.vue'
 import { fmtDate, dateOrd, initialsOf } from './profile/profileFormat'
 import { INK, inkBlotMaskUrl } from '../lib/inkArt'
+import UiIcon from './ui/UiIcon.js'
 
 // The full-canvas person profile: takes over the whole workspace like a view
 // of its own (Esc / ← steps back through visited people, then closes back to
@@ -514,8 +568,8 @@ const reduceMotion =
 // ── Presentation style ──────────────────────────────────────────────────────
 // Both styles render the same state below; only the template differs.
 const PROFILE_STYLE_META = [
-  { id: 'cinematic', glyph: '✦', label: 'Cinematic', title: 'Cinematic profile' },
-  { id: 'scroll', glyph: '卷', label: 'Scroll', title: 'Handscroll — an ink-painting profile' }
+  { id: 'cinematic', icon: 'clapperboard', label: 'Cinematic', title: 'Cinematic profile' },
+  { id: 'scroll', icon: 'scroll', label: 'Scroll', title: 'Handscroll — an ink-painting profile' }
 ]
 const isScroll = computed(() => store.profileStyle === 'scroll')
 const styleIndex = computed(() =>
@@ -545,8 +599,12 @@ const age = computed(() => (person.value ? ageOf(person.value, refYear.value) : 
 const nameChars = computed(() =>
   (person.value?.name || 'Unnamed').split('').map((ch) => (ch === ' ' ? ' ' : ch))
 )
-const genderGlyph = computed(() =>
-  person.value?.gender === 'male' ? '♂' : person.value?.gender === 'female' ? '♀' : '⚧'
+const genderIcon = computed(() =>
+  person.value?.gender === 'male'
+    ? 'mars'
+    : person.value?.gender === 'female'
+      ? 'venus'
+      : 'non-binary'
 )
 
 // The profile's signature color: the same male↔female gradient position the
@@ -671,7 +729,7 @@ const relationshipChips = computed(() => {
       name: other.name || 'Unnamed',
       img: other.primary_image || null,
       role,
-      glyph: def?.glyph || '∙',
+      icon: def?.glyph || '',
       band: def?.band || 'custom',
       color: def?.color || legacyColor[r.type] || personAccent.value,
       formed: r.formed,
@@ -704,7 +762,7 @@ const relationshipChips = computed(() => {
       name: other.name || 'Unnamed',
       img: other.primary_image || null,
       role,
-      glyph: sibDef?.glyph || '⁘',
+      icon: sibDef?.glyph || '',
       band: 'family',
       color: sibDef?.color || personAccent.value,
       formed: null,
@@ -855,7 +913,7 @@ const lifeEvents = computed(() => {
     evs.push({ ord, when: fmtDate(dv), ...ev })
   }
 
-  push(p.birth, { title: 'Born', sub: p.location || '', kind: 'birth', glyph: '☀' })
+  push(p.birth, { title: 'Born', sub: p.location || '', kind: 'birth', icon: 'sun' })
 
   for (const c of relationshipChips.value) {
     if (c.type === 'spouse') {
@@ -863,7 +921,7 @@ const lifeEvents = computed(() => {
         title: `Married ${c.name}`,
         sub: '',
         kind: 'union',
-        glyph: c.glyph,
+        icon: c.icon,
         personId: c.otherId
       })
     } else if (c.isParentOfOther) {
@@ -873,7 +931,7 @@ const lifeEvents = computed(() => {
         title: `${c.name} born`,
         sub: c.role,
         kind: 'child',
-        glyph: '✧',
+        icon: 'baby',
         personId: c.otherId
       })
     } else {
@@ -881,7 +939,7 @@ const lifeEvents = computed(() => {
         title: `${c.role} — ${c.name}`,
         sub: '',
         kind: 'bond',
-        glyph: c.glyph,
+        icon: c.icon,
         personId: c.otherId
       })
     }
@@ -892,7 +950,7 @@ const lifeEvents = computed(() => {
           title: `${c.role} ended — ${c.name}`,
           sub: '',
           kind: 'ended',
-          glyph: '⌁',
+          icon: 'unlink',
           personId: c.otherId
         }
       )
@@ -915,7 +973,7 @@ const lifeEvents = computed(() => {
         .filter(Boolean)
         .join(' · '),
       kind: 'story',
-      glyph: ev.icon || k.icon,
+      icon: ev.icon || k.icon,
       color: ev.color || k.color,
       eventId: ev.id
     })
@@ -931,7 +989,7 @@ const lifeEvents = computed(() => {
       title: `${e.name} begins`,
       sub: at != null ? `aged ${at}` : '',
       kind: 'era',
-      glyph: e.icon || '◆',
+      icon: e.icon || 'diamond',
       color: e.color,
       eraId: e.id
     })
@@ -943,7 +1001,7 @@ const lifeEvents = computed(() => {
       title: 'Died',
       sub: at != null ? `at ${at}` : '',
       kind: 'death',
-      glyph: '☾'
+      icon: 'moon'
     })
   }
 
@@ -1415,13 +1473,14 @@ const profile = reactive({
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 5px 12px;
+  height: 28px;
+  padding: 0 12px;
   border: none;
   border-radius: 9px;
   background: none;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: color 0.25s;
@@ -1433,9 +1492,7 @@ const profile = reactive({
   color: var(--t1);
 }
 .pv-style-glyph {
-  font-family: var(--font-brush);
-  font-size: 15px;
-  line-height: 1;
+  flex-shrink: 0;
   transition: transform 0.4s cubic-bezier(0.3, 1.5, 0.5, 1);
 }
 .pv-style-on .pv-style-glyph {
@@ -1532,7 +1589,8 @@ const profile = reactive({
   align-items: center;
   gap: 9px;
   max-width: 340px;
-  padding: 8px 14px 8px 11px;
+  height: 36px;
+  padding: 0 14px 0 11px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--glass-strong);
@@ -1553,7 +1611,7 @@ const profile = reactive({
   transform: translateX(-2px);
 }
 .pv-back-arrow {
-  font-size: 15px;
+  flex-shrink: 0;
   transition: transform 0.2s;
 }
 .pv-back:hover .pv-back-arrow {
@@ -1570,7 +1628,7 @@ const profile = reactive({
   border-radius: 5px;
   background: var(--elevated);
   color: var(--t3);
-  font-size: 10px;
+  font-size: 11px;
   font-family: var(--font);
 }
 
@@ -1581,8 +1639,10 @@ const profile = reactive({
 .pv-act {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 15px;
+  justify-content: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 15px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--glass-strong);
@@ -1610,14 +1670,18 @@ const profile = reactive({
 }
 
 .pv-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   width: 36px;
   height: 36px;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--glass-strong);
   backdrop-filter: blur(12px);
   color: var(--t2);
-  font-size: 14px;
   cursor: pointer;
   transition:
     color 0.2s,
@@ -1817,13 +1881,16 @@ const profile = reactive({
   position: absolute;
   left: 12px;
   bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 11px;
   border-radius: 20px;
   background: rgba(10, 12, 20, 0.55);
   backdrop-filter: blur(6px);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 11px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.4px;
 }
@@ -1920,7 +1987,7 @@ const profile = reactive({
   border-radius: 12px;
   background: color-mix(in srgb, var(--pa) 16%, transparent);
   color: color-mix(in srgb, var(--pa) 75%, var(--t1));
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 .pv-dim {
@@ -1936,12 +2003,15 @@ const profile = reactive({
   animation: pv-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.5s backwards;
 }
 .pv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 5px 12px;
   border-radius: 20px;
   border: 1px solid var(--border);
   background: var(--glass-soft);
   color: var(--t2);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
   text-transform: capitalize;
 }
@@ -1962,7 +2032,7 @@ const profile = reactive({
   border: 1px solid color-mix(in srgb, var(--tc) 40%, transparent);
   background: color-mix(in srgb, var(--tc) 12%, transparent);
   color: var(--t1);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
 }
 .pv-tag-dot {
@@ -2008,7 +2078,7 @@ const profile = reactive({
 .pv-stat-key {
   display: block;
   margin-top: 1px;
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.9px;
   text-transform: uppercase;
@@ -2050,7 +2120,7 @@ const profile = reactive({
   align-items: baseline;
   gap: 10px;
   margin-bottom: 16px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 800;
   letter-spacing: 2.2px;
   text-transform: uppercase;
@@ -2072,7 +2142,7 @@ const profile = reactive({
   text-transform: none;
 }
 .pv-h-sub {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.4px;
   text-transform: none;
@@ -2261,7 +2331,7 @@ const profile = reactive({
 .pv-sat-2 .pv-sat-avatar {
   width: 38px;
   height: 38px;
-  font-size: 12px;
+  font-size: 12.5px;
   opacity: 0.85;
   border-color: var(--border);
 }
@@ -2286,7 +2356,7 @@ const profile = reactive({
   backdrop-filter: blur(8px);
   border: 1px solid var(--border);
   color: var(--t1);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   line-height: 1.25;
   text-align: center;
@@ -2295,9 +2365,9 @@ const profile = reactive({
   text-overflow: ellipsis;
 }
 .pv-sat-label b {
-  font-size: 8.5px;
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.4px;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--pa) 75%, var(--t2));
   max-width: 100px;
@@ -2364,7 +2434,7 @@ const profile = reactive({
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -2372,7 +2442,7 @@ const profile = reactive({
   margin-bottom: 7px;
 }
 .pv-trait-icon {
-  font-size: 13px;
+  flex-shrink: 0;
 }
 .pv-trait-value {
   font-size: 15px;
@@ -2438,7 +2508,7 @@ const profile = reactive({
   display: flex;
   justify-content: space-between;
   margin-top: 7px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
   font-weight: 600;
 }
@@ -2472,7 +2542,7 @@ const profile = reactive({
   background: color-mix(in srgb, var(--pa) 7%, transparent);
 }
 .pv-ev-year {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--t2);
   text-align: right;
@@ -2529,13 +2599,14 @@ const profile = reactive({
 }
 .pv-ev-body {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   min-width: 0;
   flex-wrap: wrap;
 }
 .pv-ev-glyph {
-  font-size: 12px;
+  flex-shrink: 0;
+  color: var(--ec, var(--t2));
 }
 .pv-ev-title {
   font-size: 13.5px;
@@ -2543,7 +2614,7 @@ const profile = reactive({
   color: var(--t1);
 }
 .pv-ev-sub {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 
@@ -2552,7 +2623,7 @@ const profile = reactive({
   margin-bottom: 18px;
 }
 .pv-band-name {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 1.4px;
   text-transform: uppercase;
@@ -2596,7 +2667,7 @@ const profile = reactive({
   justify-content: center;
   background: var(--elevated);
   color: var(--t2);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -2612,26 +2683,33 @@ const profile = reactive({
   line-height: 1.25;
 }
 .pv-bond-role {
-  font-size: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.7px;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--bc, var(--pa)) 80%, var(--t2));
 }
 .pv-bond-name {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--t1);
 }
-.pv-bond-ended {
+.pv-bond-ended .pv-bond-avatar {
   opacity: 0.55;
 }
+.pv-bond-ended .pv-bond-role {
+  color: var(--t3);
+}
 .pv-bond-ended .pv-bond-name {
+  color: var(--t2);
   text-decoration: line-through;
   text-decoration-color: var(--t3);
 }
 .pv-bond-endtag {
-  font-size: 9.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--t3);
   padding-left: 2px;
@@ -2688,7 +2766,7 @@ const profile = reactive({
   background: rgba(10, 12, 20, 0.6);
   backdrop-filter: blur(6px);
   color: rgba(255, 255, 255, 0.9);
-  font-size: 9.5px;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: capitalize;
@@ -2701,8 +2779,7 @@ const profile = reactive({
   height: 22px;
   border-radius: 50%;
   background: rgba(10, 12, 20, 0.55);
-  color: #ffd76a;
-  font-size: 12px;
+  color: var(--amber);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2718,7 +2795,7 @@ const profile = reactive({
   text-align: center;
 }
 .pv-empty-mark {
-  font-size: 34px;
+  display: flex;
   color: var(--pa);
   animation: pv-pulse 2.4s ease-in-out infinite;
   border-radius: 50%;
@@ -2786,24 +2863,26 @@ const profile = reactive({
   padding: 2px 10px;
   border-radius: 12px;
   background: color-mix(in srgb, var(--pa) 30%, transparent);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   text-transform: capitalize;
 }
 .pv-lb-count {
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 11px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 .pv-lb-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 46px;
   height: 46px;
+  padding: 0;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.07);
   color: #fff;
-  font-size: 24px;
-  line-height: 1;
   cursor: pointer;
   transition:
     background 0.2s,
@@ -2818,13 +2897,16 @@ const profile = reactive({
   position: absolute;
   top: 18px;
   right: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 38px;
   height: 38px;
+  padding: 0;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.07);
   color: #fff;
-  font-size: 14px;
   cursor: pointer;
   transition:
     background 0.2s,
@@ -3032,7 +3114,7 @@ const profile = reactive({
     padding: 10px 10px 6px;
   }
   .pv-back {
-    padding: 8px 10px;
+    padding: 0 10px;
     min-width: 0;
   }
   .pv-back-label {
@@ -3044,10 +3126,11 @@ const profile = reactive({
     display: none;
   }
   .pv-style-btn {
-    padding: 5px 10px;
+    padding: 0 10px;
   }
-  .pv-act {
-    padding: 8px 11px;
+  .pv-chrome .pv-act {
+    width: 36px;
+    padding: 0;
   }
   .pv-cine {
     padding-top: 52px;
@@ -3121,13 +3204,17 @@ const profile = reactive({
 .pv-chron-add {
   order: 2;
   align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--ctl-xs);
   border: 1px dashed color-mix(in srgb, var(--pa) 50%, var(--border));
   background: transparent;
   color: var(--t2);
   border-radius: var(--r-pill);
-  padding: 2px 10px;
+  padding: 0 10px 0 8px;
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0;
   text-transform: none;
@@ -3148,7 +3235,7 @@ const profile = reactive({
   margin-bottom: 14px;
 }
 .pv-eras-k {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -3166,7 +3253,7 @@ const profile = reactive({
   background: color-mix(in srgb, var(--ec) 14%, transparent);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 650;
   cursor: pointer;
   animation: cp-row-in 0.45s var(--ease-out) backwards;
@@ -3180,7 +3267,8 @@ const profile = reactive({
   box-shadow: 0 4px 16px color-mix(in srgb, var(--ec) 30%, transparent);
 }
 .pv-era-ic {
-  font-size: 13px;
+  flex-shrink: 0;
+  color: var(--ec);
 }
 .pv-ev-story {
   background: var(--ec, var(--pa));

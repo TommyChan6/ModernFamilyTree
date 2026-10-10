@@ -10,25 +10,25 @@ import { toOrdinal } from './calendarMath'
 
 // ── Catalogs ──────────────────────────────────────────────────────────────────
 
-/** Event kinds: an icon + colour pair the marker uses unless overridden. */
+/** Event kinds: an icon name (components/ui/icons.js) + colour pair the marker uses unless overridden. */
 export const EVENT_KINDS = [
-  { id: 'milestone', label: 'Milestone', icon: '⭐', color: '#f5c542' },
-  { id: 'battle', label: 'Battle', icon: '⚔️', color: '#e5534b' },
-  { id: 'war', label: 'War', icon: '🛡️', color: '#b5413a' },
-  { id: 'coronation', label: 'Coronation', icon: '👑', color: '#d4af37' },
-  { id: 'founding', label: 'Founding', icon: '🏰', color: '#8b6cc5' },
-  { id: 'migration', label: 'Migration', icon: '🧭', color: '#3fa7d6' },
-  { id: 'journey', label: 'Journey', icon: '⛵', color: '#2bb3a3' },
-  { id: 'meeting', label: 'First meeting', icon: '🤝', color: '#e98fb3' },
-  { id: 'wedding', label: 'Wedding', icon: '💍', color: '#f0a8c8' },
-  { id: 'treaty', label: 'Treaty', icon: '📜', color: '#c9a66b' },
-  { id: 'discovery', label: 'Discovery', icon: '💡', color: '#f2d15c' },
-  { id: 'disaster', label: 'Disaster', icon: '🌋', color: '#e0703a' },
-  { id: 'betrayal', label: 'Betrayal', icon: '🗡️', color: '#9a3b4a' },
-  { id: 'prophecy', label: 'Prophecy', icon: '🔮', color: '#9d7ff0' },
-  { id: 'celebration', label: 'Celebration', icon: '🎉', color: '#5cc98a' },
-  { id: 'loss', label: 'Loss', icon: '🕯️', color: '#8a93a6' },
-  { id: 'custom', label: 'Other', icon: '✦', color: '#6c8ef5' }
+  { id: 'milestone', label: 'Milestone', icon: 'star', color: '#f5c542' },
+  { id: 'battle', label: 'Battle', icon: 'swords', color: '#e5534b' },
+  { id: 'war', label: 'War', icon: 'shield', color: '#b5413a' },
+  { id: 'coronation', label: 'Coronation', icon: 'crown', color: '#d4af37' },
+  { id: 'founding', label: 'Founding', icon: 'castle', color: '#8b6cc5' },
+  { id: 'migration', label: 'Migration', icon: 'compass', color: '#3fa7d6' },
+  { id: 'journey', label: 'Journey', icon: 'sailboat', color: '#2bb3a3' },
+  { id: 'meeting', label: 'First meeting', icon: 'handshake', color: '#e98fb3' },
+  { id: 'wedding', label: 'Wedding', icon: 'gem', color: '#f0a8c8' },
+  { id: 'treaty', label: 'Treaty', icon: 'scroll', color: '#c9a66b' },
+  { id: 'discovery', label: 'Discovery', icon: 'lightbulb', color: '#f2d15c' },
+  { id: 'disaster', label: 'Disaster', icon: 'tornado', color: '#e0703a' },
+  { id: 'betrayal', label: 'Betrayal', icon: 'sword', color: '#9a3b4a' },
+  { id: 'prophecy', label: 'Prophecy', icon: 'eye', color: '#9d7ff0' },
+  { id: 'celebration', label: 'Celebration', icon: 'party-popper', color: '#5cc98a' },
+  { id: 'loss', label: 'Loss', icon: 'heart-crack', color: '#8a93a6' },
+  { id: 'custom', label: 'Other', icon: 'sparkle', color: '#6c8ef5' }
 ] as const
 export type EventKindId = (typeof EVENT_KINDS)[number]['id']
 const KIND_BY_ID = new Map<string, (typeof EVENT_KINDS)[number]>(EVENT_KINDS.map((k) => [k.id, k]))
@@ -99,7 +99,7 @@ export function applyEraPatch(era: Era, data: Record<string, unknown>): Era {
   if ('end' in data) era.end = sanitizeDate(data.end)
   ;[era.start, era.end] = ordered(era.start, era.end)
   if ('color' in data && HEX.test(String(data.color))) era.color = String(data.color)
-  if ('icon' in data) era.icon = str(data.icon, 8)
+  if ('icon' in data) era.icon = str(data.icon, 40)
   if ('description' in data) era.description = str(data.description, 2000)
   return era
 }
@@ -113,7 +113,7 @@ export function applyEventPatch(
 ): StoryEvent {
   if ('title' in data) ev.title = str(data.title, 120) || 'Untitled event'
   if ('kind' in data) ev.kind = KIND_BY_ID.has(String(data.kind)) ? String(data.kind) : 'custom'
-  if ('icon' in data) ev.icon = str(data.icon, 8)
+  if ('icon' in data) ev.icon = str(data.icon, 40)
   if ('color' in data) ev.color = HEX.test(String(data.color)) ? String(data.color) : ''
   if ('date' in data) ev.date = sanitizeDate(data.date)
   if ('end' in data) ev.end = sanitizeDate(data.end)
@@ -211,20 +211,20 @@ export const ERA_PACKS = [
   {
     id: 'world',
     label: 'World history',
-    icon: '🌍',
+    icon: 'earth',
     hint: 'Wars, reigns and revolutions, 1700 → today'
   },
-  { id: 'generations', label: 'Generations', icon: '👪', hint: 'Lost Generation → Gen Alpha' },
+  { id: 'generations', label: 'Generations', icon: 'users', hint: 'Lost Generation → Gen Alpha' },
   {
     id: 'centuries',
     label: 'Centuries',
-    icon: '🕰️',
+    icon: 'hourglass',
     hint: 'One band per century across your project'
   },
   {
     id: 'fantasy',
     label: 'Fantasy ages',
-    icon: '🐉',
+    icon: 'wand-sparkles',
     hint: 'Myth → Kings → Iron → Twilight, fitted to your years'
   }
 ] as const
@@ -235,7 +235,7 @@ const WORLD: EraSeed[] = [
     start: 1685,
     end: 1789,
     color: '#d4af37',
-    icon: '💡',
+    icon: 'lightbulb',
     description: 'Reason, science and the rights of man.'
   },
   {
@@ -243,7 +243,7 @@ const WORLD: EraSeed[] = [
     start: 1760,
     end: 1840,
     color: '#8a93a6',
-    icon: '🏭',
+    icon: 'factory',
     description: 'Steam, mills and the move to the cities.'
   },
   {
@@ -251,7 +251,7 @@ const WORLD: EraSeed[] = [
     start: 1803,
     end: 1815,
     color: '#e5534b',
-    icon: '⚔️',
+    icon: 'swords',
     description: 'Europe at war with — and for — Napoleon.'
   },
   {
@@ -259,7 +259,7 @@ const WORLD: EraSeed[] = [
     start: 1837,
     end: 1901,
     color: '#8b6cc5',
-    icon: '🎩',
+    icon: 'crown',
     description: 'The reign of Queen Victoria.'
   },
   {
@@ -267,7 +267,7 @@ const WORLD: EraSeed[] = [
     start: 1870,
     end: 1900,
     color: '#e0903a',
-    icon: '🚂',
+    icon: 'train-front',
     description: 'Railroads, fortunes and rapid change.'
   },
   {
@@ -275,7 +275,7 @@ const WORLD: EraSeed[] = [
     start: 1914,
     end: 1918,
     color: '#b5413a',
-    icon: '🪖',
+    icon: 'shield',
     description: 'The Great War.'
   },
   {
@@ -283,7 +283,7 @@ const WORLD: EraSeed[] = [
     start: 1920,
     end: 1929,
     color: '#e98fb3',
-    icon: '🎷',
+    icon: 'music',
     description: 'Jazz, prosperity and new freedoms.'
   },
   {
@@ -291,7 +291,7 @@ const WORLD: EraSeed[] = [
     start: 1929,
     end: 1939,
     color: '#6b7186',
-    icon: '📉',
+    icon: 'trending-down',
     description: 'Hard times across the world.'
   },
   {
@@ -299,7 +299,7 @@ const WORLD: EraSeed[] = [
     start: 1939,
     end: 1945,
     color: '#c0392b',
-    icon: '✈️',
+    icon: 'plane',
     description: 'The Second World War.'
   },
   {
@@ -307,7 +307,7 @@ const WORLD: EraSeed[] = [
     start: 1947,
     end: 1991,
     color: '#3fa7d6',
-    icon: '🧊',
+    icon: 'snowflake',
     description: 'East against West, under the shadow of the bomb.'
   },
   {
@@ -315,7 +315,7 @@ const WORLD: EraSeed[] = [
     start: 1957,
     end: 1975,
     color: '#2bb3a3',
-    icon: '🚀',
+    icon: 'rocket',
     description: 'Sputnik to the Moon landings.'
   },
   {
@@ -323,7 +323,7 @@ const WORLD: EraSeed[] = [
     start: 1990,
     end: null,
     color: '#5cc98a',
-    icon: '💻',
+    icon: 'laptop',
     description: 'The internet changes everything.'
   }
 ]
@@ -334,7 +334,7 @@ const GENERATIONS: EraSeed[] = [
     start: 1883,
     end: 1901,
     color: '#8a93a6',
-    icon: '🎖️',
+    icon: 'medal',
     description: 'Came of age in World War I.'
   },
   {
@@ -342,7 +342,7 @@ const GENERATIONS: EraSeed[] = [
     start: 1901,
     end: 1928,
     color: '#d4af37',
-    icon: '🏅',
+    icon: 'award',
     description: 'Grew up in the Depression, fought World War II.'
   },
   {
@@ -350,7 +350,7 @@ const GENERATIONS: EraSeed[] = [
     start: 1928,
     end: 1946,
     color: '#8b6cc5',
-    icon: '📻',
+    icon: 'radio',
     description: 'Children of the Depression and the war.'
   },
   {
@@ -358,7 +358,7 @@ const GENERATIONS: EraSeed[] = [
     start: 1946,
     end: 1965,
     color: '#e0903a',
-    icon: '📺',
+    icon: 'tv',
     description: 'The post-war baby boom.'
   },
   {
@@ -366,7 +366,7 @@ const GENERATIONS: EraSeed[] = [
     start: 1965,
     end: 1981,
     color: '#e5534b',
-    icon: '📼',
+    icon: 'video',
     description: 'Latchkey kids of the late Cold War.'
   },
   {
@@ -374,7 +374,7 @@ const GENERATIONS: EraSeed[] = [
     start: 1981,
     end: 1997,
     color: '#3fa7d6',
-    icon: '💿',
+    icon: 'disc',
     description: 'Came of age with the internet.'
   },
   {
@@ -382,7 +382,7 @@ const GENERATIONS: EraSeed[] = [
     start: 1997,
     end: 2013,
     color: '#2bb3a3',
-    icon: '📱',
+    icon: 'smartphone',
     description: 'The first truly digital natives.'
   },
   {
@@ -390,7 +390,7 @@ const GENERATIONS: EraSeed[] = [
     start: 2013,
     end: 2026,
     color: '#5cc98a',
-    icon: '🤖',
+    icon: 'bot',
     description: 'Born into smartphones and AI.'
   }
 ]
@@ -398,18 +398,23 @@ const GENERATIONS: EraSeed[] = [
 const FANTASY = [
   {
     name: 'Age of Myth',
-    icon: '🐉',
+    icon: 'wand-sparkles',
     color: '#9d7ff0',
     description: 'When legends walked the land.'
   },
   {
     name: 'Age of Kings',
-    icon: '👑',
+    icon: 'crown',
     color: '#d4af37',
     description: 'Crowns rise; houses are founded.'
   },
-  { name: 'Age of Iron', icon: '⚔️', color: '#e5534b', description: 'War, conquest and steel.' },
-  { name: 'Age of Twilight', icon: '🌒', color: '#3fa7d6', description: 'The old powers fade.' }
+  {
+    name: 'Age of Iron',
+    icon: 'swords',
+    color: '#e5534b',
+    description: 'War, conquest and steel.'
+  },
+  { name: 'Age of Twilight', icon: 'moon', color: '#3fa7d6', description: 'The old powers fade.' }
 ]
 
 /** The eras a pack contributes to a project spanning [minYear, maxYear]:
@@ -435,7 +440,7 @@ export function presetEras(packId: string, minYear: number, maxYear: number): Er
         start: c,
         end: c + 100,
         color: ERA_COLORS[(n - 1) % ERA_COLORS.length],
-        icon: '🕰️',
+        icon: 'hourglass',
         description: `${c}–${c + 99}`
       })
     }

@@ -12,6 +12,7 @@ import {
   quote,
   settleSubscription
 } from '../src/shared/billing'
+import { ICON_NAMES } from '../src/renderer/src/components/ui/icons.js'
 
 // Monetization core: catalog, quotes and the SANDBOX checkout flow. No real
 // provider exists yet (docs/MONETIZATION.md) — these pin the client contract
@@ -50,6 +51,12 @@ async function buy(plan = 'plus', interval = 'month', coupon) {
 }
 
 describe('catalog', () => {
+  it('every perk icon is a registered UiIcon name (no emoji)', () => {
+    for (const [key, perk] of Object.entries(PERKS)) {
+      expect(ICON_NAMES, key).toContain(perk.icon)
+    }
+  })
+
   it('every paid plan has limits, prices and only known perks', () => {
     for (const offer of PLAN_CATALOG) {
       expect(PLAN_LIMITS[offer.id], offer.id).toBeDefined()

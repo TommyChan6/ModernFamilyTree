@@ -84,7 +84,7 @@
             <circle class="core" cx="110" cy="110" r="20" />
           </svg>
 
-          <span class="glyph">{{ glyph }}</span>
+          <span class="glyph"><UiIcon :name="glyph" :size="26" :stroke="2.2" /></span>
         </div>
 
         <div class="caption">
@@ -101,6 +101,7 @@
 import { computed } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { inkBlotMaskUrl } from '../lib/inkArt'
+import UiIcon from './ui/UiIcon.js'
 
 const store = useMainStore()
 
@@ -130,8 +131,8 @@ const chords = [
   [5, 0]
 ]
 
-const GLYPHS = { login: '🌳', logout: '👋', profile: '👤', switch: '🗂️' }
-const glyph = computed(() => GLYPHS[props.kind] || '🌳')
+const GLYPHS = { login: 'tree-deciduous', logout: 'hand', profile: 'user', switch: 'folder-open' }
+const glyph = computed(() => GLYPHS[props.kind] || 'tree-deciduous')
 
 // Ink theme: the brushed character per kind — 家 home (signing in), 别
 // farewell, 吾 oneself (profile), 迁 moving house (switching project).
@@ -385,12 +386,13 @@ function blotUrl(seed) {
   }
 }
 
-/* Emoji sits dead-centre, held steady while the graph spins under it */
+/* The icon sits dead-centre, held steady while the graph spins under it */
 .glyph {
   position: absolute;
-  font-size: 30px;
-  line-height: 1;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+  display: grid;
+  place-items: center;
+  color: var(--on-accent);
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
   animation: glyph-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 .kind-logout .glyph {

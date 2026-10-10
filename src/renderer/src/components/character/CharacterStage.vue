@@ -18,7 +18,8 @@
         class="stage-tip"
         :style="{ left: tipX + 'px', top: tipY + 'px' }"
       >
-        {{ slotIcon(hoverSlot) }} {{ t('character.slots.' + hoverSlot) }}
+        <UiIcon v-if="slotIcon(hoverSlot)" :name="slotIcon(hoverSlot)" :size="14" />
+        {{ t('character.slots.' + hoverSlot) }}
       </div>
     </Transition>
   </div>
@@ -31,6 +32,7 @@ import { resolveLayers, fullRegion, slotOf } from './characterModel'
 import { drawLayers, fitRegion, hitTest, outlineSlot } from './render/SpriteCompositor2D'
 import { paintBackdrop, backdropOf } from './render/backdrops'
 import { paperCanvas } from '../../lib/inkArt'
+import UiIcon from '../ui/UiIcon.js'
 
 // The live editing stage — the "character select screen". Draws the doc
 // through the 2D compositor over an animated backdrop and runs everything
@@ -582,13 +584,16 @@ watch(
 
 .stage-tip {
   position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   pointer-events: none;
   padding: 4px 10px;
   border-radius: 999px;
   background: var(--glass-strong);
   border: 1px solid var(--border);
   color: var(--t1);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   box-shadow: var(--shadow);
@@ -619,6 +624,6 @@ watch(
     0 0 0 2px var(--ink-silk),
     var(--shadow-sm);
   font-family: var(--font-ink-label);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 </style>

@@ -414,7 +414,7 @@ function zoomCenter(f) {
 }
 .mt-name {
   fill: #f4f6ff;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 700;
   text-anchor: middle;
   paint-order: stroke;
@@ -423,8 +423,8 @@ function zoomCenter(f) {
   pointer-events: none;
 }
 .mt-role {
-  fill: rgba(235, 240, 255, 0.72);
-  font-size: 9.5px;
+  fill: rgba(235, 240, 255, 0.82);
+  font-size: 11px;
   text-anchor: middle;
   paint-order: stroke;
   stroke: rgba(8, 10, 20, 0.7);

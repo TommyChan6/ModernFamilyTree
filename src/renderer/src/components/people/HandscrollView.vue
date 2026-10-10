@@ -153,7 +153,7 @@
           <span class="hs-era-cjk">{{ era.cjk }}</span>
           <span class="hs-era-lat">{{ era.lat }}</span>
         </div>
-        <span class="hs-hud-hint">drag · wheel · ← →</span>
+        <span class="hs-hud-hint">drag · wheel · arrow keys</span>
       </div>
     </template>
   </div>
@@ -757,7 +757,7 @@ watch(bandW, () => kick())
 }
 .hs-mark-lat {
   font-family: var(--font-ink-serif);
-  font-size: 10.5px;
+  font-size: 11.5px;
   letter-spacing: 0.4px;
   color: #6b5f50;
 }
@@ -776,7 +776,7 @@ watch(bandW, () => kick())
   writing-mode: vertical-rl;
   font-family: var(--font-ink-serif);
   font-style: italic;
-  font-size: 11.5px;
+  font-size: 12.5px;
   letter-spacing: 0.6px;
   color: #6b5f50;
   white-space: nowrap;
@@ -975,7 +975,7 @@ watch(bandW, () => kick())
 }
 .hs-end-sub {
   font-family: var(--font-ink-serif);
-  font-size: 12px;
+  font-size: 12.5px;
   color: #6b5f50;
   letter-spacing: 0.5px;
 }
@@ -1092,7 +1092,7 @@ watch(bandW, () => kick())
   color: var(--t1);
 }
 .hs-hud-sub {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 .hs-strip {
@@ -1145,11 +1145,11 @@ watch(bandW, () => kick())
   color: var(--t1);
 }
 .hs-era-lat {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 .hs-hud-hint {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
   white-space: nowrap;
 }

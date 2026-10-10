@@ -5,17 +5,25 @@
         <!-- ══ Relationship line selected ═══════════════════════════════════ -->
         <div v-if="mode === 'rel'" key="rel" class="ap-inner">
           <div class="ap-header">
-            <span class="ap-glyph" :style="{ '--pc': relColor }">{{ relDef?.glyph || '·' }}</span>
+            <span class="ap-glyph" :style="{ '--pc': relColor }">
+              <UiIcon :name="iconOr(relDef?.glyph, 'link')" :size="16" />
+            </span>
             <div class="ap-title-wrap">
               <div class="ap-title">{{ relTitle }}</div>
               <div class="ap-sub">
                 <b :style="{ color: colorOf(rel.person_a_id) }">{{ nameOf(rel.person_a_id) }}</b>
-                <span class="ap-dir">{{ relDef?.directed ? '→' : '—' }}</span>
+                <UiIcon
+                  class="ap-dir"
+                  :name="relDef?.directed ? 'arrow-right' : 'minus'"
+                  :size="12"
+                />
                 <b :style="{ color: colorOf(rel.person_b_id) }">{{ nameOf(rel.person_b_id) }}</b>
               </div>
               <div v-if="relDates" class="ap-dates">{{ relDates }}</div>
             </div>
-            <button class="ap-close" title="Dismiss (Esc)" @click="close">✕</button>
+            <button class="ap-close" title="Dismiss (Esc)" aria-label="Dismiss" @click="close">
+              <UiIcon name="x" :size="14" />
+            </button>
           </div>
 
           <div v-if="relStatuses.length > 1" class="ap-row ap-stagger" style="--i: 0">
@@ -40,7 +48,7 @@
               title="Reverse who is who in this bond"
               @click="swapRel"
             >
-              <span class="ap-ic">⇄</span>Swap
+              <UiIcon name="arrow-right-left" :size="14" />Swap
             </button>
             <button
               class="ap-btn"
@@ -48,20 +56,20 @@
               title="Isolate this relationship type on the canvas"
               @click="$emit('solo', rel.type)"
             >
-              <span class="ap-ic">✦</span>Isolate
+              <UiIcon name="filter" :size="14" />Isolate
             </button>
             <button
               class="ap-btn"
               title="Open the Relationships view"
               @click="store.activeView = 'relationships'"
             >
-              <span class="ap-ic">↗</span>All bonds
+              <UiIcon name="relationships" :size="14" />All bonds
             </button>
           </div>
 
           <div class="ap-danger-row ap-stagger" style="--i: 2">
             <button class="ap-btn ap-btn-danger" @click="deleteRel">
-              <span class="ap-ic">🗑</span>Delete bond
+              <UiIcon name="trash-2" :size="14" />Delete bond
             </button>
           </div>
         </div>
@@ -69,12 +77,21 @@
         <!-- ══ Marquee selection (nodes + bonds, with a type filter) ═══════════ -->
         <div v-else-if="mode === 'marquee'" key="marquee" class="ap-inner">
           <div class="ap-header">
-            <span class="ap-glyph ap-glyph-marquee">◧</span>
+            <span class="ap-glyph ap-glyph-marquee"
+              ><UiIcon name="square-dashed" :size="16"
+            /></span>
             <div class="ap-title-wrap">
               <div class="ap-title">{{ marqueeTitle }}</div>
               <div class="ap-sub">{{ marqueeSub }}</div>
             </div>
-            <button class="ap-close" title="Clear selection (Esc)" @click="close">✕</button>
+            <button
+              class="ap-close"
+              title="Clear selection (Esc)"
+              aria-label="Clear selection"
+              @click="close"
+            >
+              <UiIcon name="x" :size="14" />
+            </button>
           </div>
 
           <div class="ap-row ap-stagger" style="--i: 0">
@@ -154,7 +171,7 @@
 
           <div class="ap-danger-row ap-stagger" style="--i: 3">
             <button class="ap-btn ap-btn-danger" :disabled="!total" @click="deleteMarquee">
-              <span class="ap-ic">🗑</span>Delete{{ total ? ` ${total}` : '' }}
+              <UiIcon name="trash-2" :size="14" />Delete{{ total ? ` ${total}` : '' }}
             </button>
             <button class="ap-btn" title="Keep everything, drop the selection" @click="close">
               Clear
@@ -178,20 +195,27 @@
               <div class="ap-title">{{ peopleTitle }}</div>
               <div class="ap-sub">{{ peopleSub }}</div>
             </div>
-            <button class="ap-close" title="Clear selection (Esc)" @click="close">✕</button>
+            <button
+              class="ap-close"
+              title="Clear selection (Esc)"
+              aria-label="Clear selection"
+              @click="close"
+            >
+              <UiIcon name="x" :size="14" />
+            </button>
           </div>
 
           <!-- Single person: the verb row -->
           <div v-if="n === 1" class="ap-actions ap-stagger" style="--i: 0">
             <button class="ap-btn" title="Open the profile card" @click="openDetails">
-              <span class="ap-ic">👁</span>Details
+              <UiIcon name="eye" :size="14" />Details
             </button>
             <button
               class="ap-btn"
               :title="`Edit this ${store.noun.toLowerCase()}`"
               @click="openEdit"
             >
-              <span class="ap-ic">✏️</span>Edit
+              <UiIcon name="pencil" :size="14" />Edit
             </button>
             <button
               v-if="!mode3d"
@@ -199,7 +223,7 @@
               title="Glide the camera to this node"
               @click="$emit('focus-person', ids[0])"
             >
-              <span class="ap-ic">🎯</span>Focus
+              <UiIcon name="locate-fixed" :size="14" />Focus
             </button>
             <button
               v-if="!mode3d"
@@ -207,7 +231,7 @@
               title="Trace a connection — then click another person"
               @click="$emit('trace', ids[0])"
             >
-              <span class="ap-ic">🧭</span>Trace
+              <UiIcon name="route" :size="14" />Trace
             </button>
             <button
               v-if="!mode3d"
@@ -215,7 +239,7 @@
               title="Kinship lens — label everyone by what they are to this person"
               @click="$emit('kin-lens', ids[0])"
             >
-              <span class="ap-ic">🧬</span>Kin
+              <UiIcon name="dna" :size="14" />Kin
             </button>
             <button
               v-if="!mode3d && spotlight"
@@ -223,7 +247,7 @@
               title="Spotlight — make this the main character, everyone else in rings around them"
               @click="$emit('spotlight', ids[0])"
             >
-              <span class="ap-ic">🌟</span>Spotlight
+              <UiIcon name="star" :size="14" />Spotlight
             </button>
             <button
               v-if="canPin"
@@ -232,7 +256,7 @@
               :title="pinned ? 'Release the node back to the simulation' : 'Pin the node in place'"
               @click="$emit('toggle-pin')"
             >
-              <span class="ap-ic">📌</span>{{ pinned ? 'Unpin' : 'Pin' }}
+              <UiIcon :name="pinned ? 'pin-off' : 'pin'" :size="14" />{{ pinned ? 'Unpin' : 'Pin' }}
             </button>
           </div>
 
@@ -246,10 +270,10 @@
               title="Show how they're related"
               @click="$emit('trace-pair', [pairA, pairB])"
             >
-              <span class="ap-kin-ic">🧬</span>
+              <UiIcon class="ap-kin-ic" name="dna" :size="14" />
               <span class="ap-kin-text">
                 <b :style="{ color: colorOf(pairB) }">{{ shortName(pairB) }}</b>
-                <span class="ap-kin-arrow">→</span>
+                <UiIcon class="ap-kin-arrow" name="arrow-right" :size="12" />
                 <b :style="{ color: colorOf(pairA) }">{{ shortName(pairA) }}</b>
               </span>
               <span class="ap-kin-rel">{{ pairKin.text }}</span>
@@ -262,9 +286,9 @@
                 @click="flipped = !flipped"
               >
                 <b :style="{ color: colorOf(pairA) }">{{ shortName(pairA) }}</b>
-                <span class="ap-swap-arrow">→</span>
+                <UiIcon class="ap-swap-arrow" name="arrow-right" :size="12" />
                 <b :style="{ color: colorOf(pairB) }">{{ shortName(pairB) }}</b>
-                <span class="ap-swap-ic">⇄</span>
+                <UiIcon class="ap-swap-ic" name="arrow-right-left" :size="14" />
               </button>
             </div>
             <div class="ap-chips">
@@ -278,13 +302,20 @@
                 :title="chipTitle(d)"
                 @click="link(d)"
               >
-                <span class="ap-chip-glyph">{{ d.glyph }}</span
-                >{{ d.label }}
-                <span v-if="existingTypes.has(d.key)" class="ap-chip-check">✓</span>
+                <UiIcon class="ap-chip-glyph" :name="iconOr(d.glyph, 'link')" :size="12" />
+                {{ d.label }}
+                <UiIcon
+                  v-if="existingTypes.has(d.key)"
+                  class="ap-chip-check"
+                  name="check"
+                  :size="12"
+                />
               </button>
             </div>
             <Transition name="apflash">
-              <div v-if="justLinked" class="ap-flash">✨ Linked — {{ justLinked }}</div>
+              <div v-if="justLinked" class="ap-flash">
+                <UiIcon name="check" :size="14" />Linked — {{ justLinked }}
+              </div>
             </Transition>
             <button
               v-if="!mode3d"
@@ -292,7 +323,7 @@
               title="Light up the shortest chain between them"
               @click="$emit('trace-pair', [pairA, pairB])"
             >
-              <span class="ap-ic">🧭</span>Trace connection
+              <UiIcon name="route" :size="14" />Trace connection
             </button>
           </div>
 
@@ -336,7 +367,7 @@
 
           <div class="ap-danger-row ap-stagger" :style="{ '--i': 2 }">
             <button class="ap-btn ap-btn-danger" @click="deleteSelected">
-              <span class="ap-ic">🗑</span>Delete{{ n > 1 ? ` ${n}` : '' }}
+              <UiIcon name="trash-2" :size="14" />Delete{{ n > 1 ? ` ${n}` : '' }}
             </button>
             <button
               v-if="n > 1"
@@ -356,6 +387,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useMainStore } from '../../store/index.js'
+import UiIcon, { hasIcon } from '../ui/UiIcon.js'
 import { nodeColor } from './linkHelpers.js'
 import { confirmDialog } from '../../lib/dialogs.js'
 import { undoToast } from '../../lib/undoToast.js'
@@ -502,6 +534,11 @@ function colorOf(id) {
 
 function close() {
   store.clearGraphSelection()
+}
+
+/** A stored icon (name or legacy glyph) when it resolves, else a fallback. */
+function iconOr(value, fallback) {
+  return value && hasIcon(value) ? value : fallback
 }
 
 // ── People mode ─────────────────────────────────────────────────────────────
@@ -830,9 +867,15 @@ async function deleteRel() {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: auto;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
   background: var(--hover);
   color: var(--t2);
-  font-size: 8px;
+  font-size: 10.5px;
+  line-height: 1;
   font-weight: 700;
   box-shadow: none;
 }
@@ -845,7 +888,6 @@ async function deleteRel() {
   height: 30px;
   border-radius: 9px;
   flex-shrink: 0;
-  font-size: 15px;
   color: var(--pc);
   background: color-mix(in srgb, var(--pc) 14%, transparent);
   border: 1px solid color-mix(in srgb, var(--pc) 30%, transparent);
@@ -864,7 +906,7 @@ async function deleteRel() {
   text-overflow: ellipsis;
 }
 .ap-sub {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
   white-space: nowrap;
   overflow: hidden;
@@ -875,21 +917,21 @@ async function deleteRel() {
 }
 .ap-dir {
   margin: 0 4px;
-  opacity: 0.7;
+  color: var(--t3);
 }
 .ap-dates {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
   margin-top: 1px;
 }
 .ap-close {
-  width: 22px;
-  height: 22px;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
+  padding: 0;
   border: none;
   border-radius: 6px;
   background: transparent;
   color: var(--t3);
-  font-size: 11px;
   cursor: pointer;
   flex-shrink: 0;
   display: flex;
@@ -913,14 +955,16 @@ async function deleteRel() {
 .ap-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  padding: 6px 9px;
+  height: var(--ctl-sm);
+  padding: 0 9px;
   border: 1px solid transparent;
   border-radius: 9px;
   background: var(--hover);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -955,16 +999,12 @@ async function deleteRel() {
   transform: none;
   box-shadow: none;
 }
-.ap-ic {
-  font-size: 12px;
-  line-height: 1;
-}
 .ap-btn-danger {
   color: var(--danger);
   background: rgba(var(--danger-rgb), 0.1);
 }
 .ap-btn-danger:hover {
-  color: #ff6f6c;
+  color: var(--danger);
   background: rgba(var(--danger-rgb), 0.18);
   border-color: rgba(var(--danger-rgb), 0.4);
 }
@@ -993,13 +1033,13 @@ async function deleteRel() {
   gap: 8px;
 }
 .ap-sec-label {
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
   color: var(--t3);
   flex-shrink: 0;
-  width: 34px;
+  width: 44px;
 }
 
 /* Segmented control (size / bond status). */
@@ -1013,13 +1053,14 @@ async function deleteRel() {
 }
 .ap-seg-opt {
   flex: 1;
-  padding: 4px 2px;
+  height: var(--ctl-xs);
+  padding: 0 2px;
   border: none;
   border-radius: 6px;
   background: transparent;
   color: var(--t3);
   font-family: var(--font);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   cursor: pointer;
   transition:
@@ -1088,13 +1129,14 @@ async function deleteRel() {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  height: var(--ctl-xs);
+  padding: 0 9px;
   border: 1px solid color-mix(in srgb, var(--rc) 28%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--rc) 8%, transparent);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1110,16 +1152,14 @@ async function deleteRel() {
   box-shadow: 0 3px 10px color-mix(in srgb, var(--rc) 25%, transparent);
 }
 .ap-chip:disabled {
-  opacity: 0.45;
+  color: var(--t3);
   cursor: default;
 }
 .ap-chip-glyph {
   color: var(--rc);
-  font-size: 11px;
 }
 .ap-chip-check {
   color: var(--rc);
-  font-weight: 700;
 }
 
 /* The direction pill (who → whom) with its swap affordance. */
@@ -1127,13 +1167,14 @@ async function deleteRel() {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 8px;
+  height: var(--ctl-xs);
+  padding: 0 9px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   cursor: pointer;
   min-width: 0;
   transition:
@@ -1155,20 +1196,22 @@ async function deleteRel() {
   transform: rotate(180deg);
 }
 .ap-swap-arrow {
-  opacity: 0.6;
+  color: var(--t3);
 }
 .ap-swap-ic {
   color: var(--accent);
-  font-size: 12px;
   transition: transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 /* "Linked!" confirmation flash. */
 .ap-flash {
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--accent);
-  text-align: center;
   padding: 3px 0;
 }
 .apflash-enter-active {
@@ -1210,7 +1253,7 @@ async function deleteRel() {
   background: color-mix(in srgb, var(--kc) 10%, transparent);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   cursor: pointer;
   text-align: left;
   animation: ap-kin-in 0.45s var(--ease-spring) backwards;
@@ -1229,7 +1272,7 @@ async function deleteRel() {
   }
 }
 .ap-kin-ic {
-  font-size: 13px;
+  color: var(--kc);
 }
 .ap-kin-text {
   display: inline-flex;

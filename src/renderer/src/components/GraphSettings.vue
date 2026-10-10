@@ -3,7 +3,14 @@
     <div v-if="store.settingsOpen" class="settings-panel">
       <div class="settings-header">
         <h3 class="settings-title">Style</h3>
-        <button class="icon-btn" @click="store.toggleSettings()">✕</button>
+        <button
+          class="icon-btn sm"
+          title="Close style panel"
+          aria-label="Close style panel"
+          @click="store.toggleSettings()"
+        >
+          <UiIcon name="x" :size="16" />
+        </button>
       </div>
 
       <div class="settings-body">
@@ -15,7 +22,7 @@
             title="Full resolution, ornaments, atmosphere and ambient motion"
             @click="set('renderQuality', 'quality')"
           >
-            ✨ Quality
+            <UiIcon name="sparkles" :size="14" />Quality
           </button>
           <button
             class="quality-opt"
@@ -23,14 +30,19 @@
             title="Trimmed resolution, still ornaments, no atmosphere — for low-end machines"
             @click="set('renderQuality', 'performance')"
           >
-            ⚡ Performance
+            <UiIcon name="zap" :size="14" />Performance
           </button>
         </div>
 
         <!-- Themes -->
         <div class="settings-group">
           <button class="group-toggle" @click="toggle('themes')">
-            <span class="group-icon" :class="{ rotated: expanded.themes }">›</span>
+            <UiIcon
+              class="group-icon"
+              :class="{ rotated: expanded.themes }"
+              name="chevron-right"
+              :size="14"
+            />
             <span>Theme</span>
             <span v-if="gs.themePreset === 'custom'" class="custom-chip">custom</span>
           </button>
@@ -49,7 +61,7 @@
                   :title="t.tagline"
                   @click="applyTheme(t)"
                 >
-                  <span class="theme-icon">{{ t.icon }}</span>
+                  <UiIcon class="theme-icon" :name="t.icon" :size="18" />
                   <span class="theme-name">{{ t.name }}</span>
                   <span class="theme-swatch">
                     <i v-for="(c, i) in t.swatch" :key="i" :style="{ background: c }"></i>
@@ -63,8 +75,13 @@
         <!-- Node Appearance -->
         <div class="settings-group">
           <button class="group-toggle" @click="toggle('nodes')">
-            <span class="group-icon" :class="{ rotated: expanded.nodes }">›</span>
-            <span>Node Appearance</span>
+            <UiIcon
+              class="group-icon"
+              :class="{ rotated: expanded.nodes }"
+              name="chevron-right"
+              :size="14"
+            />
+            <span>Node appearance</span>
           </button>
           <Transition name="expand">
             <div v-if="expanded.nodes" class="group-content">
@@ -100,7 +117,7 @@
                 </div>
               </div>
               <div v-if="gs.nodeDecor !== 'none'" class="setting-item">
-                <label>Ornament Color</label>
+                <label>Ornament color</label>
                 <div class="color-row">
                   <input
                     type="color"
@@ -111,7 +128,7 @@
                 </div>
               </div>
               <div class="setting-item">
-                <label>Node Size</label>
+                <label>Node size</label>
                 <div class="slider-row">
                   <input
                     type="range"
@@ -125,7 +142,7 @@
                 </div>
               </div>
               <div class="setting-item">
-                <label>Node Opacity</label>
+                <label>Node opacity</label>
                 <div class="slider-row">
                   <input
                     type="range"
@@ -139,7 +156,7 @@
                 </div>
               </div>
               <div class="setting-item">
-                <label>Label Size</label>
+                <label>Label size</label>
                 <div class="slider-row">
                   <input
                     type="range"
@@ -153,7 +170,7 @@
                 </div>
               </div>
               <div class="setting-item setting-toggle-row">
-                <label>Show Labels</label>
+                <label>Show labels</label>
                 <button
                   class="micro-toggle"
                   :class="{ on: gs.showLabels }"
@@ -163,7 +180,7 @@
                 </button>
               </div>
               <div class="setting-item setting-toggle-row">
-                <label>Show Age</label>
+                <label>Show age</label>
                 <button
                   class="micro-toggle"
                   :class="{ on: gs.showAge }"
@@ -173,7 +190,7 @@
                 </button>
               </div>
               <div class="setting-item setting-toggle-row">
-                <label>Glow on Hover</label>
+                <label>Glow on hover</label>
                 <button
                   class="micro-toggle"
                   :class="{ on: gs.glowOnHover }"
@@ -189,8 +206,13 @@
         <!-- Node Colors -->
         <div class="settings-group">
           <button class="group-toggle" @click="toggle('colors')">
-            <span class="group-icon" :class="{ rotated: expanded.colors }">›</span>
-            <span>Node Colors</span>
+            <UiIcon
+              class="group-icon"
+              :class="{ rotated: expanded.colors }"
+              name="chevron-right"
+              :size="14"
+            />
+            <span>Node colors</span>
           </button>
           <Transition name="expand">
             <div v-if="expanded.colors" class="group-content">
@@ -234,13 +256,18 @@
         <!-- Relationship Lines -->
         <div class="settings-group">
           <button class="group-toggle" @click="toggle('lines')">
-            <span class="group-icon" :class="{ rotated: expanded.lines }">›</span>
-            <span>Relationship Lines</span>
+            <UiIcon
+              class="group-icon"
+              :class="{ rotated: expanded.lines }"
+              name="chevron-right"
+              :size="14"
+            />
+            <span>Relationship lines</span>
           </button>
           <Transition name="expand">
             <div v-if="expanded.lines" class="group-content">
               <div class="setting-item">
-                <label>Line Style</label>
+                <label>Line style</label>
                 <div class="route-grid">
                   <button
                     v-for="r in routes"
@@ -273,7 +300,7 @@
                 </div>
               </div>
               <div class="setting-item">
-                <label>Line Opacity</label>
+                <label>Line opacity</label>
                 <div class="slider-row">
                   <input
                     type="range"
@@ -287,7 +314,7 @@
                 </div>
               </div>
               <div v-if="gs.linkRoute === 'organic'" class="setting-item">
-                <label>Line Curvature</label>
+                <label>Line curvature</label>
                 <div class="slider-row">
                   <input
                     type="range"
@@ -304,7 +331,7 @@
               <div class="line-type-section">
                 <div class="line-type-label">
                   <span class="line-preview" :style="{ background: gs.parentChildColor }"></span>
-                  Parent / Child
+                  Parent / child
                 </div>
                 <div class="setting-item">
                   <label>Color</label>
@@ -409,19 +436,27 @@
         <!-- Line Effects -->
         <div class="settings-group">
           <button class="group-toggle" @click="toggle('fx')">
-            <span class="group-icon" :class="{ rotated: expanded.fx }">›</span>
-            <span>Line Effects</span>
+            <UiIcon
+              class="group-icon"
+              :class="{ rotated: expanded.fx }"
+              name="chevron-right"
+              :size="14"
+            />
+            <span>Line effects</span>
             <span v-if="gs.lineFx !== 'none'" class="custom-chip fx-live-chip">
-              {{ fxCurrent.icon }} live
+              <UiIcon :name="fxCurrent.icon" :size="12" />live
             </span>
           </button>
           <Transition name="expand">
             <div v-if="expanded.fx" class="group-content">
               <div v-if="brushOwns" class="fx-paused">
-                <span
-                  >🖌 Brush strokes own the lines right now — effects resume on any other line
-                  style.</span
-                >
+                <span class="fx-paused-text">
+                  <UiIcon name="brush" :size="14" />
+                  <span
+                    >Brush strokes own the lines right now — effects resume on any other line
+                    style.</span
+                  >
+                </span>
                 <button class="fx-paused-btn" @click="set('linkRoute', 'organic')">
                   Use Organic
                 </button>
@@ -437,10 +472,9 @@
                   @click="set('lineFx', f.id)"
                 >
                   <FxPreview :id="f.id" />
-                  <span class="fx-name"
-                    ><span class="fx-ic">{{ f.icon }}</span
-                    >{{ f.label }}</span
-                  >
+                  <span class="fx-name">
+                    <UiIcon class="fx-ic" :name="f.icon" :size="14" />{{ f.label }}
+                  </span>
                 </button>
               </div>
               <div v-if="gs.lineFx !== 'none'" class="fx-hint">{{ fxCurrent.hint }}</div>
@@ -463,10 +497,10 @@
                   <label>Palette</label>
                   <div class="fx-seg">
                     <button :class="{ on: !gs.lineFxKeep }" @click="set('lineFxKeep', false)">
-                      Effect colours
+                      Effect colors
                     </button>
                     <button :class="{ on: gs.lineFxKeep }" @click="set('lineFxKeep', true)">
-                      Relationship colours
+                      Relationship colors
                     </button>
                   </div>
                 </div>
@@ -506,9 +540,20 @@
         <!-- Atmosphere -->
         <div class="settings-group">
           <button class="group-toggle" @click="toggle('atmosphere')">
-            <span class="group-icon" :class="{ rotated: expanded.atmosphere }">›</span>
+            <UiIcon
+              class="group-icon"
+              :class="{ rotated: expanded.atmosphere }"
+              name="chevron-right"
+              :size="14"
+            />
             <span>Atmosphere</span>
-            <span v-if="gs.renderQuality === 'performance'" class="custom-chip">off in ⚡</span>
+            <span
+              v-if="gs.renderQuality === 'performance'"
+              class="custom-chip"
+              title="Atmosphere is off in Performance mode"
+            >
+              <UiIcon name="zap" :size="12" />off
+            </span>
           </button>
           <Transition name="expand">
             <div v-if="expanded.atmosphere" class="group-content">
@@ -523,7 +568,7 @@
                     :title="a.label"
                     @click="set('ambientFx', a.id)"
                   >
-                    <span class="ambient-icon">{{ a.icon }}</span>
+                    <UiIcon class="ambient-icon" :name="a.icon" :size="16" />
                     <span class="chip-label">{{ a.label }}</span>
                   </button>
                 </div>
@@ -567,13 +612,18 @@
         <!-- Physics (Advanced mode only) -->
         <div v-if="store.caps.style === 'full'" class="settings-group">
           <button class="group-toggle" @click="toggle('physics')">
-            <span class="group-icon" :class="{ rotated: expanded.physics }">›</span>
-            <span>Physics / Layout</span>
+            <UiIcon
+              class="group-icon"
+              :class="{ rotated: expanded.physics }"
+              name="chevron-right"
+              :size="14"
+            />
+            <span>Physics / layout</span>
           </button>
           <Transition name="expand">
             <div v-if="expanded.physics" class="group-content">
               <div class="setting-item">
-                <label>Link Distance</label>
+                <label>Link distance</label>
                 <div class="slider-row">
                   <input
                     type="range"
@@ -607,7 +657,7 @@
 
       <!-- Footer -->
       <div class="settings-footer">
-        <button class="btn btn-ghost btn-sm" @click="store.resetGraphSettings()">Reset All</button>
+        <button class="btn btn-ghost btn-sm" @click="store.resetGraphSettings()">Reset all</button>
       </div>
     </div>
   </Transition>
@@ -619,6 +669,7 @@ import { useMainStore } from '../store/index.js'
 import { GRAPH_THEMES, THEME_KEYS } from './graph/graphThemes.js'
 import { LINE_FX, lineFxSpec } from './graph/webgl/lineFx.js'
 import FxPreview from './graph/FxPreview.vue'
+import UiIcon from './ui/UiIcon.js'
 import { inkLook } from './graph/inkStyle.js'
 
 const store = useMainStore()
@@ -714,16 +765,16 @@ const routes = [
 ]
 
 const ambients = [
-  { id: 'none', label: 'None', icon: '◦' },
-  { id: 'fireflies', label: 'Fireflies', icon: '✨' },
-  { id: 'stars', label: 'Stars', icon: '🌌' },
-  { id: 'petals', label: 'Petals', icon: '🌸' },
-  { id: 'snow', label: 'Snow', icon: '❄️' },
-  { id: 'embers', label: 'Embers', icon: '🔥' },
-  { id: 'rain', label: 'Rain', icon: '🌧️' },
-  { id: 'motes', label: 'Motes', icon: '🌫️' },
-  { id: 'mist', label: 'Mist', icon: '⛰️' },
-  { id: 'plum', label: 'Plum', icon: '🌺' }
+  { id: 'none', label: 'None', icon: 'ban' },
+  { id: 'fireflies', label: 'Fireflies', icon: 'sparkles' },
+  { id: 'stars', label: 'Stars', icon: 'star' },
+  { id: 'petals', label: 'Petals', icon: 'flower-2' },
+  { id: 'snow', label: 'Snow', icon: 'snowflake' },
+  { id: 'embers', label: 'Embers', icon: 'flame' },
+  { id: 'rain', label: 'Rain', icon: 'cloud-rain' },
+  { id: 'motes', label: 'Motes', icon: 'sparkle' },
+  { id: 'mist', label: 'Mist', icon: 'mountain' },
+  { id: 'plum', label: 'Plum', icon: 'flower' }
 ]
 
 // Line effects: the shader catalog, plus which bonds they dress.
@@ -816,7 +867,7 @@ function applyTheme(t) {
   border: none;
   background: transparent;
   color: var(--t1);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   font-family: var(--font);
   cursor: pointer;
@@ -830,13 +881,8 @@ function applyTheme(t) {
 }
 
 .group-icon {
-  font-size: 14px;
-  font-weight: 700;
   color: var(--t3);
   transition: transform 0.2s ease;
-  display: inline-block;
-  width: 12px;
-  text-align: center;
 }
 
 .group-icon.rotated {
@@ -845,7 +891,10 @@ function applyTheme(t) {
 
 .custom-chip {
   margin-left: auto;
-  font-size: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.4px;
   padding: 2px 7px;
@@ -870,7 +919,7 @@ function applyTheme(t) {
 }
 
 .setting-item label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t2);
 }
@@ -891,12 +940,17 @@ function applyTheme(t) {
 
 .quality-opt {
   flex: 1;
-  padding: 7px 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ctl-md);
+  padding: 0;
   border-radius: 9px;
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--t2);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   font-family: var(--font);
   cursor: pointer;
@@ -910,7 +964,7 @@ function applyTheme(t) {
 .quality-opt.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
 }
 
@@ -949,12 +1003,14 @@ function applyTheme(t) {
 }
 
 .theme-icon {
-  font-size: 18px;
-  line-height: 1;
+  color: var(--t2);
+}
+.theme-card.active .theme-icon {
+  color: var(--accent);
 }
 
 .theme-name {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--t1);
 }
@@ -1029,7 +1085,7 @@ function applyTheme(t) {
 }
 
 .chip-label {
-  font-size: 8.5px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.2px;
 }
@@ -1081,7 +1137,7 @@ function applyTheme(t) {
 
 .ink-note {
   margin: 0 0 8px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.45;
   color: var(--t2);
 }
@@ -1166,8 +1222,7 @@ function applyTheme(t) {
 }
 
 .ambient-icon {
-  font-size: 14px;
-  line-height: 1;
+  flex: none;
 }
 
 /* Slider */
@@ -1212,7 +1267,7 @@ function applyTheme(t) {
 }
 
 .slider-val {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--accent);
   min-width: 36px;
@@ -1248,7 +1303,7 @@ function applyTheme(t) {
 }
 
 .color-hex {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--t3);
   font-family: 'SF Mono', 'Fira Code', monospace;
@@ -1302,7 +1357,7 @@ function applyTheme(t) {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--t1);
 }
@@ -1411,14 +1466,18 @@ function applyTheme(t) {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 650;
 }
 .fx-ic {
-  font-size: 12px;
+  flex: none;
+  color: var(--t2);
+}
+.fx-tile.active .fx-ic {
+  color: var(--accent);
 }
 .fx-hint {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
   line-height: 1.4;
   margin-top: 6px;
@@ -1435,18 +1494,30 @@ function applyTheme(t) {
   margin-bottom: 8px;
   border-radius: var(--r-sm);
   border: 1px dashed var(--border-strong);
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t2);
+}
+.fx-paused-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.fx-paused-text > .ui-icon {
+  margin-top: 1px;
+  color: var(--t3);
 }
 .fx-paused-btn {
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ctl-xs);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--t1);
   border-radius: var(--r-pill);
-  padding: 2px 10px;
+  padding: 0 10px;
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 650;
   cursor: pointer;
 }
@@ -1463,9 +1534,10 @@ function applyTheme(t) {
   background: transparent;
   color: var(--t3);
   border-radius: 6px;
-  padding: 4px 4px;
+  min-height: var(--ctl-xs);
+  padding: 2px 4px;
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 650;
   cursor: pointer;
   transition:

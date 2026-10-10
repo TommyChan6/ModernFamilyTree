@@ -25,7 +25,6 @@ export interface ShapeSlider {
 export interface ShapeGroup {
   id: string
   label: string
-  icon: string
   /** Camera focus region for this group (see HumanStage.focusRegion). */
   focus: string
   /** Region on the face/body the stage highlights + sculpts by drag. */
@@ -91,7 +90,6 @@ export const FACE_GROUPS: ShapeGroup[] = [
   {
     id: 'head',
     label: 'Head shape',
-    icon: '🗿',
     focus: 'head',
     sliders: [
       uni('head-oval', 'Oval'),
@@ -116,7 +114,6 @@ export const FACE_GROUPS: ShapeGroup[] = [
   {
     id: 'forehead',
     label: 'Forehead',
-    icon: '🧠',
     focus: 'forehead',
     sliders: [
       bi('forehead-scale-vert', 'decr', 'incr', 'Height', ['Low', 'High']),
@@ -131,7 +128,6 @@ export const FACE_GROUPS: ShapeGroup[] = [
   {
     id: 'eyes',
     label: 'Eyes',
-    icon: '👁',
     focus: 'eyes',
     sliders: [
       lr('eye-scale', 'decr', 'incr', 'Size', SMALL_BIG),
@@ -156,7 +152,6 @@ export const FACE_GROUPS: ShapeGroup[] = [
   {
     id: 'nose',
     label: 'Nose',
-    icon: '👃',
     focus: 'nose',
     sliders: [
       bi('nose-scale-vert', 'decr', 'incr', 'Length', ['Short', 'Long']),
@@ -185,7 +180,6 @@ export const FACE_GROUPS: ShapeGroup[] = [
   {
     id: 'mouth',
     label: 'Mouth & lips',
-    icon: '👄',
     focus: 'mouth',
     sliders: [
       bi('mouth-scale-horiz', 'decr', 'incr', 'Width', NARROW_WIDE),
@@ -215,7 +209,6 @@ export const FACE_GROUPS: ShapeGroup[] = [
   {
     id: 'cheeks',
     label: 'Cheeks',
-    icon: '😊',
     focus: 'cheeks',
     sliders: [
       lr('cheek-bones', 'decr', 'incr', 'Cheekbones', ['Soft', 'High']),
@@ -227,7 +220,6 @@ export const FACE_GROUPS: ShapeGroup[] = [
   {
     id: 'jaw',
     label: 'Jaw & chin',
-    icon: '🧔',
     focus: 'jaw',
     sliders: [
       bi('chin-width', 'decr', 'incr', 'Chin width', NARROW_WIDE),
@@ -242,7 +234,6 @@ export const FACE_GROUPS: ShapeGroup[] = [
   {
     id: 'ears',
     label: 'Ears',
-    icon: '👂',
     focus: 'ears',
     sliders: [
       lr('ear-scale', 'decr', 'incr', 'Size', SMALL_BIG),
@@ -261,7 +252,6 @@ export const FACE_GROUPS: ShapeGroup[] = [
   {
     id: 'neck',
     label: 'Neck',
-    icon: '🦒',
     focus: 'neck',
     sliders: [
       bi('neck-scale-horiz', 'decr', 'incr', 'Width', NARROW_WIDE),
@@ -280,7 +270,6 @@ export const BODY_GROUPS: ShapeGroup[] = [
   {
     id: 'torso',
     label: 'Torso',
-    icon: '👕',
     focus: 'torso',
     sliders: [
       bi('measure-shoulder-dist', 'decr', 'incr', 'Shoulder width', NARROW_WIDE),
@@ -307,7 +296,6 @@ export const BODY_GROUPS: ShapeGroup[] = [
   {
     id: 'hips',
     label: 'Hips',
-    icon: '🩳',
     focus: 'hips',
     sliders: [
       bi('measure-hips-circ', 'decr', 'incr', 'Hips', ['Narrow', 'Wide']),
@@ -323,7 +311,6 @@ export const BODY_GROUPS: ShapeGroup[] = [
   {
     id: 'arms',
     label: 'Arms & hands',
-    icon: '💪',
     focus: 'arms',
     sliders: [
       bi('measure-upperarm-length', 'decr', 'incr', 'Upper arm length', ['Short', 'Long']),
@@ -344,7 +331,6 @@ export const BODY_GROUPS: ShapeGroup[] = [
   {
     id: 'legs',
     label: 'Legs & feet',
-    icon: '🦵',
     focus: 'legs',
     sliders: [
       bi('upperlegs-height', 'decr', 'incr', 'Thigh length', ['Short', 'Long']),

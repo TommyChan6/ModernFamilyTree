@@ -1,7 +1,9 @@
 <template>
   <div class="roster" :class="{ 'is-entering': entering }" :style="{ '--pc': focusColor }">
     <div v-if="!persons.length" class="roster-empty">
-      <div class="roster-empty-icon">🎮</div>
+      <div class="roster-empty-icon">
+        <UiIcon name="gamepad-2" :size="44" :stroke="1.5" />
+      </div>
       <div class="roster-empty-title">No challengers</div>
       <div class="roster-empty-text">No people match — clear the search or add someone.</div>
     </div>
@@ -51,7 +53,10 @@
                   No.{{ String(focusIdx + 1).padStart(3, '0') }}
                   <small>/ {{ persons.length }}</small>
                 </span>
-                <span v-if="focusDead" class="sp-fallen">☾ Departed</span>
+                <span v-if="focusDead" class="sp-fallen">
+                  <UiIcon name="moon" :size="12" :stroke="2.4" />
+                  Departed
+                </span>
               </div>
               <h2 class="sp-name">{{ focused.name || 'Unnamed' }}</h2>
               <div class="sp-epithet">{{ focusEpithet }}</div>
@@ -77,13 +82,17 @@
                   class="sp-tag"
                   :style="{ '--tc': t.color || 'var(--accent)', '--k': k }"
                 >
-                  <span>{{ t.icon ? t.icon + ' ' : '' }}{{ t.label }}</span>
+                  <span>
+                    <UiIcon v-if="t.icon" class="sp-tag-icon" :name="t.icon" :size="12" />
+                    {{ t.label }}
+                  </span>
                 </span>
                 <span v-if="focusTags.more" class="sp-tag sp-tag-more" :style="{ '--k': 5 }">
                   <span>+{{ focusTags.more }}</span>
                 </span>
                 <span v-if="focusPartner" class="sp-partner" :style="{ '--k': 6 }">
-                  ♥ {{ focusPartner }}
+                  <UiIcon name="heart" :size="12" :stroke="2.4" />
+                  {{ focusPartner }}
                 </span>
               </div>
             </div>
@@ -102,9 +111,13 @@
 
       <!-- ── Divider rail ── -->
       <div class="rail">
-        <span class="rail-title">◆ Select your character</span>
+        <span class="rail-title">Select your character</span>
         <span class="rail-hint">
-          <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> move <kbd>Enter</kbd> lock in
+          <kbd><UiIcon name="arrow-left" :size="11" :stroke="2.6" label="Left" /></kbd>
+          <kbd><UiIcon name="arrow-up" :size="11" :stroke="2.6" label="Up" /></kbd>
+          <kbd><UiIcon name="arrow-down" :size="11" :stroke="2.6" label="Down" /></kbd>
+          <kbd><UiIcon name="arrow-right" :size="11" :stroke="2.6" label="Right" /></kbd>
+          move <kbd>Enter</kbd> lock in
         </span>
         <span class="rail-count">{{ persons.length }} fighters</span>
       </div>
@@ -139,7 +152,7 @@
                 <TileArt :person="t.p" />
                 <div class="tile-scrim"></div>
                 <div class="tile-name">{{ t.p.name || 'Unnamed' }}</div>
-                <span v-if="t.dead" class="tile-moon">☾</span>
+                <UiIcon v-if="t.dead" class="tile-moon" name="moon" :size="12" :stroke="2.4" />
               </div>
             </div>
           </div>
@@ -177,6 +190,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, h } from 'vue'
 import { useMainStore } from '../../store/index.js'
 import { isDeceased, ageOf, genderLabel } from './peopleLayout.js'
+import UiIcon from '../ui/UiIcon.js'
 import { useThumbnail } from './useThumbnail.js'
 import {
   TILE_W,
@@ -869,7 +883,7 @@ watch(
 .sp-p1 {
   display: inline-block;
   padding: 2px 11px 2px 9px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 900;
   font-style: italic;
   letter-spacing: 0.06em;
@@ -879,7 +893,7 @@ watch(
   box-shadow: 0 0 16px var(--cur);
 }
 .sp-no {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 800;
   font-style: italic;
   letter-spacing: 0.08em;
@@ -887,11 +901,14 @@ watch(
   font-variant-numeric: tabular-nums;
 }
 .sp-no small {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
 }
 .sp-fallen {
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--t2);
   letter-spacing: 0.06em;
@@ -941,7 +958,7 @@ watch(
   animation: sp-slide-in 0.34s cubic-bezier(0.2, 1, 0.3, 1) 0.09s backwards;
 }
 .sp-life {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--t2);
   letter-spacing: 0.06em;
@@ -971,7 +988,7 @@ watch(
   animation: sp-slide-in 0.3s cubic-bezier(0.2, 1, 0.3, 1) calc(0.14s + var(--d) * 0.04s) backwards;
 }
 .sp-stat-k {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 800;
   font-style: italic;
   letter-spacing: 0.14em;
@@ -1041,7 +1058,7 @@ watch(
 .sp-tag > span {
   display: inline-block;
   transform: skewX(14deg);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 800;
   color: var(--t1);
   white-space: nowrap;
@@ -1055,7 +1072,10 @@ watch(
 }
 .sp-partner {
   align-self: center;
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
   font-weight: 800;
   font-style: italic;
   color: var(--pink);
@@ -1169,7 +1189,7 @@ watch(
   background: color-mix(in srgb, var(--cur) 14%, var(--glass-strong));
   color: var(--t1);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 900;
   font-style: italic;
   letter-spacing: 0.12em;
@@ -1187,8 +1207,12 @@ watch(
 }
 .sp-lock kbd,
 .rail kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 16px;
   font-family: var(--font);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   font-style: normal;
   padding: 0 5px;
@@ -1239,7 +1263,7 @@ watch(
     var(--surface) 45%
   );
   box-shadow: 0 -2px 18px -4px color-mix(in srgb, var(--pc) 45%, transparent);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 800;
   font-style: italic;
   letter-spacing: 0.14em;
@@ -1396,7 +1420,7 @@ watch(
   left: 5px;
   right: 17px;
   bottom: 3px;
-  font-size: 8.5px;
+  font-size: 9.5px;
   font-weight: 800;
   font-style: italic;
   letter-spacing: 0.04em;
@@ -1409,12 +1433,10 @@ watch(
 }
 .tile-moon {
   position: absolute;
-  top: 2px;
+  top: 4px;
   right: 8px;
-  font-size: 11px;
-  line-height: 1;
   color: white;
-  text-shadow: 0 0 4px black;
+  filter: drop-shadow(0 0 2px black);
 }
 .tile.dead :deep(.tile-img),
 .tile.dead :deep(.tile-mono) {
@@ -1520,7 +1542,7 @@ watch(
   left: -2px;
   top: -20px;
   padding: 1px 9px 1px 7px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 900;
   font-style: italic;
   letter-spacing: 0.06em;
@@ -1568,8 +1590,8 @@ watch(
   pointer-events: none;
 }
 .roster-empty-icon {
-  font-size: 44px;
-  opacity: 0.6;
+  display: flex;
+  color: var(--t3);
 }
 .roster-empty-title {
   font-size: 16px;

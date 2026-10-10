@@ -13,7 +13,7 @@
 
     <!-- Empty roster -->
     <div v-if="!persons.length" class="stage-empty">
-      <div class="stage-empty-icon">🃏</div>
+      <div class="stage-empty-icon"><UiIcon name="layers" :size="44" :stroke="1.5" /></div>
       <div class="stage-empty-title">Nothing to deal</div>
       <div class="stage-empty-text">No people match — clear the search or add someone.</div>
     </div>
@@ -65,7 +65,14 @@
         </div>
       </Transition>
       <div class="stage-scrub">
-        <button class="stage-arrow" title="Previous (←)" @click="step(-1)">‹</button>
+        <button
+          class="stage-arrow"
+          title="Previous (Left arrow)"
+          aria-label="Previous"
+          @click="step(-1)"
+        >
+          <UiIcon name="chevron-left" :size="16" />
+        </button>
         <input
           class="stage-range"
           type="range"
@@ -74,7 +81,9 @@
           :value="focusedIndex"
           @input="goTo(+$event.target.value)"
         />
-        <button class="stage-arrow" title="Next (→)" @click="step(1)">›</button>
+        <button class="stage-arrow" title="Next (Right arrow)" aria-label="Next" @click="step(1)">
+          <UiIcon name="chevron-right" :size="16" />
+        </button>
         <span class="stage-count">{{ focusedIndex + 1 }} / {{ persons.length }}</span>
       </div>
     </div>
@@ -86,6 +95,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useMainStore } from '../../store/index.js'
 import PersonCard from './PersonCard.vue'
 import { CARD_W, CARD_H } from './peopleLayout.js'
+import UiIcon from '../ui/UiIcon.js'
 
 // The Directory's 3D stage: the non-grid viewing modes. One shared physics
 // engine — a fractional focus position `pos` driven by drag / wheel / keys
@@ -575,7 +585,7 @@ const capSub = computed(() => {
   text-overflow: ellipsis;
 }
 .stage-cap-sub {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t3);
   white-space: nowrap;
@@ -607,14 +617,16 @@ const capSub = computed(() => {
   gap: 9px;
 }
 .stage-arrow {
-  width: 26px;
-  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--elevated);
   color: var(--t2);
-  font-size: 15px;
-  line-height: 1;
   cursor: pointer;
   transition:
     color 0.15s,
@@ -651,7 +663,7 @@ const capSub = computed(() => {
   transform: scale(1.25);
 }
 .stage-count {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--t3);
   font-variant-numeric: tabular-nums;
@@ -672,8 +684,8 @@ const capSub = computed(() => {
   pointer-events: none;
 }
 .stage-empty-icon {
-  font-size: 44px;
-  opacity: 0.6;
+  display: flex;
+  color: var(--t3);
 }
 .stage-empty-title {
   font-size: 16px;

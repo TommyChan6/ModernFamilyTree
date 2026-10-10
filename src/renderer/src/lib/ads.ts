@@ -21,7 +21,8 @@ export interface AdCreative {
   /** Advertiser label shown in the "Sponsored · …" line. */
   sponsor: 'house' | string
   placements: AdPlacement[]
-  emoji: string
+  /** Art-tile icon: a UiIcon name (components/ui/icons.js). */
+  icon: string
   hue: number
   /** i18n base key — `${copyKey}.title|body|cta`. Network ads carry raw text instead. */
   copyKey?: string
@@ -50,7 +51,7 @@ const HOUSE_ADS: AdCreative[] = [
     id: 'house-go-plus',
     sponsor: 'house',
     placements: ['card', 'banner', 'strip'],
-    emoji: '✦',
+    icon: 'sparkles',
     hue: 262,
     copyKey: 'ads.house.goPlus',
     action: { kind: 'pricing', plan: 'plus' }
@@ -59,7 +60,7 @@ const HOUSE_ADS: AdCreative[] = [
     id: 'house-room',
     sponsor: 'house',
     placements: ['card', 'banner'],
-    emoji: '🌳',
+    icon: 'tree-deciduous',
     hue: 140,
     copyKey: 'ads.house.room',
     action: { kind: 'pricing', plan: 'plus' }
@@ -68,7 +69,7 @@ const HOUSE_ADS: AdCreative[] = [
     id: 'house-pro',
     sponsor: 'house',
     placements: ['card', 'banner', 'strip'],
-    emoji: '🧬',
+    icon: 'dna',
     hue: 200,
     copyKey: 'ads.house.pro',
     action: { kind: 'pricing', plan: 'pro' }
@@ -77,7 +78,7 @@ const HOUSE_ADS: AdCreative[] = [
     id: 'house-browse',
     sponsor: 'house',
     placements: ['banner', 'strip'],
-    emoji: '🧭',
+    icon: 'compass',
     hue: 28,
     copyKey: 'ads.house.browse',
     action: { kind: 'browse' }

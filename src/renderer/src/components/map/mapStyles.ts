@@ -106,7 +106,7 @@ export const MAP_STYLES: Record<string, MapStyle> = {
   // ── Parchment: an explorer's chart in sepia ink ─────────────────────────────
   parchment: {
     id: 'parchment',
-    icon: '📜',
+    icon: 'scroll',
     desk: { dark: '#17130e', light: '#d9cfbd' },
     sea: '#d9c7a1',
     seaDeep: '#cdb78d',
@@ -156,7 +156,7 @@ export const MAP_STYLES: Record<string, MapStyle> = {
   // ── Fantasy: a storybook atlas in watercolor ────────────────────────────────
   fantasy: {
     id: 'fantasy',
-    icon: '🐉',
+    icon: 'wand-sparkles',
     desk: { dark: '#0c1418', light: '#c9d8dc' },
     sea: '#5f9fb3',
     seaDeep: '#3f7f98',
@@ -206,7 +206,7 @@ export const MAP_STYLES: Record<string, MapStyle> = {
   // ── Ink: 水墨 — a Chinese ink-wash landscape on rice paper ──────────────────
   ink: {
     id: 'ink',
-    icon: '🖌',
+    icon: 'brush',
     eastern: true,
     desk: { dark: '#121212', light: '#dcd6c8' },
     sea: '#ece6d6',
@@ -257,7 +257,7 @@ export const MAP_STYLES: Record<string, MapStyle> = {
   // ── Shanshui 山水: a Song ink landscape mounted as a scroll ─────────────────
   shanshui: {
     id: 'shanshui',
-    icon: '⛰',
+    icon: 'mountain',
     eastern: true,
     painting: 'ink',
     seaWaves: 'rgba(52,58,60,0.26)',
@@ -313,7 +313,7 @@ export const MAP_STYLES: Record<string, MapStyle> = {
   // ── Qinglü 青绿: Wang Ximeng's mineral blue-green on aged silk ──────────────
   qinglu: {
     id: 'qinglu',
-    icon: '🏞',
+    icon: 'mountain-snow',
     eastern: true,
     painting: 'qinglu',
     seaWaves: 'rgba(47,95,138,0.28)',
@@ -369,7 +369,7 @@ export const MAP_STYLES: Record<string, MapStyle> = {
   // ── High-tech: a holographic tactical display ───────────────────────────────
   hightech: {
     id: 'hightech',
-    icon: '🛰',
+    icon: 'satellite',
     desk: { dark: '#03060b', light: '#0b1220', ink: '#0b1220' },
     sea: '#061321',
     seaDeep: '#040d18',
@@ -419,7 +419,7 @@ export const MAP_STYLES: Record<string, MapStyle> = {
   // ── Atlas: a clean modern political map ─────────────────────────────────────
   atlas: {
     id: 'atlas',
-    icon: '🗺',
+    icon: 'map',
     desk: { dark: '#10141c', light: '#e6eaf0' },
     sea: '#a9d3ec',
     seaDeep: '#8fc3e3',

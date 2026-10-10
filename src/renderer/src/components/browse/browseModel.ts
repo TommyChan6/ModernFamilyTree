@@ -10,11 +10,12 @@ import type { BrowseProfile, BrowseProject, Genre, Lang, PersonRow } from './bro
 export type Capability = 'view' | 'export' | 'fork' | 'edit'
 export const CAPABILITIES: Capability[] = ['view', 'export', 'fork', 'edit']
 export const ACCESS_MODES: ShareAccess[] = ['glasshouse', 'seedbank', 'graft', 'grove']
+/** UiIcon names for each access mode. */
 export const ACCESS_ICONS: Record<ShareAccess, string> = {
-  glasshouse: '🔭',
-  seedbank: '🌰',
-  graft: '🌿',
-  grove: '🤝'
+  glasshouse: 'eye',
+  seedbank: 'download',
+  graft: 'git-fork',
+  grove: 'users'
 }
 
 /** The ladder is cumulative: each mode grants everything below it. */
@@ -540,7 +541,7 @@ export function recommend(
 // ── Fun facts ────────────────────────────────────────────────────────────────
 export interface FunFact {
   key: 'longest' | 'children' | 'married' | 'connected' | 'rivals' | 'span' | 'gens'
-  icon: string
+  icon: string // UiIcon name
   n: number
   name?: string
 }
@@ -570,29 +571,30 @@ export function funFacts(project: BrowseProject): FunFact[] {
     const age = p[4] - p[3]
     if (!longest || age > longest[1]) longest = [p[1], age]
   }
-  if (longest) facts.push({ key: 'longest', icon: '🕰️', n: longest[1], name: longest[0] })
+  if (longest) facts.push({ key: 'longest', icon: 'hourglass', n: longest[1], name: longest[0] })
 
   const kids = top(tally((r) => VERTICAL.has(r.type), false))
   if (kids && kids[1] >= 2)
-    facts.push({ key: 'children', icon: '👶', n: kids[1], name: names.get(kids[0]) })
+    facts.push({ key: 'children', icon: 'baby', n: kids[1], name: names.get(kids[0]) })
 
   const married = top(tally((r) => r.type === 'spouse', true))
   if (married && married[1] >= 2) {
-    facts.push({ key: 'married', icon: '💍', n: married[1], name: names.get(married[0]) })
+    facts.push({ key: 'married', icon: 'gem', n: married[1], name: names.get(married[0]) })
   }
 
   const degree = top(tally(() => true, true))
-  if (degree) facts.push({ key: 'connected', icon: '🕸️', n: degree[1], name: names.get(degree[0]) })
+  if (degree)
+    facts.push({ key: 'connected', icon: 'network', n: degree[1], name: names.get(degree[0]) })
 
   const rivals = rels.filter((r) => r.type === 'rival').length
-  if (rivals) facts.push({ key: 'rivals', icon: '⚔️', n: rivals })
+  if (rivals) facts.push({ key: 'rivals', icon: 'swords', n: rivals })
 
   const years = project.people.flatMap((p) => [p[3], p[4]]).filter((y): y is number => y != null)
   if (years.length >= 2) {
     const span = Math.max(...years) - Math.min(...years)
-    if (span > 0) facts.push({ key: 'span', icon: '📜', n: span })
+    if (span > 0) facts.push({ key: 'span', icon: 'calendar-range', n: span })
   }
-  facts.push({ key: 'gens', icon: '🌳', n: treeOf(project).generations })
+  facts.push({ key: 'gens', icon: 'tree-deciduous', n: treeOf(project).generations })
   return facts
 }
 

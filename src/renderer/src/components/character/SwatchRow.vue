@@ -16,13 +16,14 @@
         @input="$emit('live', $event.target.value)"
         @change="$emit('done')"
       />
-      <span>＋</span>
+      <UiIcon class="sw-plus" name="plus" :size="12" :stroke="3" />
     </label>
   </div>
 </template>
 
 <script setup>
 import { useI18n } from '../../i18n'
+import UiIcon from '../ui/UiIcon.js'
 
 // One palette channel's quick-pick row: curated swatches + a custom picker.
 // `pick` is a discrete edit; `live`/`done` bracket a color-picker drag so the
@@ -77,11 +78,9 @@ const { t } = useI18n()
   overflow: hidden;
 }
 
-.sw-custom span {
-  font-size: 12px;
-  font-weight: 700;
+.sw-plus {
   color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
   pointer-events: none;
 }
 

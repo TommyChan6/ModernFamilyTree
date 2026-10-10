@@ -27,15 +27,26 @@
           <span
             v-if="scenes.length > 1 && renamingId !== s.id"
             class="st-x"
+            role="button"
             :title="deleteTitle"
+            :aria-label="deleteTitle"
             @click.stop="$emit('remove', s)"
-            >×</span
           >
+            <UiIcon name="x" :size="12" :stroke="2.4" />
+          </span>
         </button>
       </TransitionGroup>
-      <button class="st-add" :title="addTitle" @click="$emit('create')">＋</button>
-      <button v-if="activeId" class="st-add" :title="duplicateTitle" @click="$emit('duplicate')">
-        ⧉
+      <button class="st-add" :title="addTitle" :aria-label="addTitle" @click="$emit('create')">
+        <UiIcon name="plus" :size="14" />
+      </button>
+      <button
+        v-if="activeId"
+        class="st-add"
+        :title="duplicateTitle"
+        :aria-label="duplicateTitle"
+        @click="$emit('duplicate')"
+      >
+        <UiIcon name="copy" :size="14" />
       </button>
     </div>
     <span v-if="hint" class="st-hint">{{ hint }}</span>
@@ -44,6 +55,7 @@
 
 <script setup>
 import { ref, nextTick } from 'vue'
+import UiIcon from './ui/UiIcon.js'
 
 // The shared Scene tab strip: lists ONE view's scenes, marks the active one,
 // and offers switch / new / rename (dblclick) / duplicate / delete. Purely
@@ -104,7 +116,7 @@ defineExpose({ startRename })
   min-height: 46px;
 }
 .st-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -128,13 +140,14 @@ defineExpose({ startRename })
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 5px 11px;
+  height: var(--ctl-sm);
+  padding: 0 11px;
   border-radius: 18px;
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -161,7 +174,7 @@ defineExpose({ startRename })
   text-overflow: ellipsis;
 }
 .st-badge {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   background: var(--surface);
   color: var(--t3);
@@ -182,8 +195,8 @@ defineExpose({ startRename })
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  line-height: 1;
+  width: 16px;
+  height: 16px;
   color: var(--t3);
   border-radius: 4px;
   max-width: 0;
@@ -217,20 +230,20 @@ defineExpose({ startRename })
   border-radius: 6px;
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   padding: 1px 6px;
   outline: none;
   box-shadow: none;
 }
 .st-add {
-  width: 28px;
-  height: 28px;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
   border-radius: 50%;
   border: 1px dashed var(--border);
   background: transparent;
   color: var(--t3);
-  font-size: 13px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -245,7 +258,7 @@ defineExpose({ startRename })
   border-style: solid;
 }
 .st-hint {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
   flex-shrink: 0;
 }
@@ -280,7 +293,7 @@ defineExpose({ startRename })
 }
 :root[data-theme='ink'] .st-label {
   font-family: var(--font-ink-label);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   font-variant: small-caps;
   text-transform: lowercase;

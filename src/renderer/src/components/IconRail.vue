@@ -19,7 +19,7 @@
         :data-key="i < 9 ? '  ·  Alt+' + (i + 1) : ''"
         @click="store.activeView = v.id"
       >
-        <UiIcon class="rail-icon" :name="v.id" :size="20" :stroke="1.7" />
+        <UiIcon class="rail-icon" :name="v.id" :size="18" :stroke="1.7" />
       </button>
     </div>
 
@@ -32,7 +32,7 @@
       data-key="  ·  Alt+N"
       @click="store.openForm()"
     >
-      <UiIcon class="rail-icon" name="add" :size="20" :stroke="2.1" />
+      <UiIcon class="rail-icon" name="add" :size="18" :stroke="2.1" />
     </button>
 
     <div class="rail-spacer"></div>
@@ -45,7 +45,7 @@
       :data-tip="t('rail.style')"
       @click="store.toggleSettings()"
     >
-      <UiIcon class="rail-icon" name="style" :size="20" :stroke="1.7" />
+      <UiIcon class="rail-icon" name="style" :size="18" :stroke="1.7" />
     </button>
   </nav>
 </template>
@@ -197,7 +197,7 @@ const STEP = 44 // button height (40) + gap (4)
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
   color: var(--t1);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   white-space: pre;
   opacity: 0;

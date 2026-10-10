@@ -5,7 +5,7 @@
     <div class="hive-sweep" aria-hidden="true"><i></i></div>
 
     <div v-if="!persons.length" class="hive-empty">
-      <div class="hive-empty-icon">⬡</div>
+      <div class="hive-empty-icon"><UiIcon name="hexagon" :size="44" :stroke="1.5" /></div>
       <div class="hive-empty-title">The hive is empty</div>
       <div class="hive-empty-text">No people match — clear the search or add someone.</div>
     </div>
@@ -32,7 +32,14 @@
               <div class="hex-label">
                 <div class="hex-name">{{ c.p.name || 'Unnamed' }}</div>
                 <div class="hex-year">
-                  {{ c.p.birth?.year || '·' }}<span v-if="c.dead"> ☾</span>
+                  {{ c.p.birth?.year || '·'
+                  }}<UiIcon
+                    v-if="c.dead"
+                    class="hex-moon"
+                    name="moon"
+                    :size="11"
+                    label="Deceased"
+                  />
                 </div>
               </div>
             </div>
@@ -48,6 +55,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, h } from 'v
 import { useMainStore } from '../../store/index.js'
 import { isDeceased } from './peopleLayout.js'
 import { useThumbnail } from './useThumbnail.js'
+import UiIcon from '../ui/UiIcon.js'
 
 // The Hive: every person is a hexagon in a honeycomb. Native vertical scroll
 // with row windowing (only combs near the viewport exist in the DOM), a wave
@@ -345,7 +353,7 @@ function select(id) {
   text-align: center;
 }
 .hex-name {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: #fff;
   white-space: nowrap;
@@ -354,7 +362,7 @@ function select(id) {
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 .hex-year {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.62);
   font-variant-numeric: tabular-nums;
@@ -386,8 +394,11 @@ function select(id) {
   pointer-events: none;
 }
 .hive-empty-icon {
-  font-size: 44px;
-  opacity: 0.6;
+  display: flex;
+  color: var(--t3);
+}
+.hex-moon {
+  margin-left: 3px;
 }
 .hive-empty-title {
   font-size: 16px;

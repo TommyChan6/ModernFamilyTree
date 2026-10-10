@@ -26,7 +26,8 @@
           class="bp-btn primary"
           @click="store.openPricing({ reason: 'menu' })"
         >
-          {{ store.isPaid ? t('billing.panel.change') : '✦ ' + t('billing.panel.upgrade') }}
+          <UiIcon v-if="!store.isPaid" name="sparkles" :size="16" />
+          {{ store.isPaid ? t('billing.panel.change') : t('billing.panel.upgrade') }}
         </button>
         <button
           v-if="sub?.status === 'active' && !sub.cancel_at_period_end"
@@ -47,7 +48,10 @@
       </div>
     </div>
 
-    <p v-if="provider === 'sandbox'" class="bp-note">🧪 {{ t('billing.panel.sandboxNote') }}</p>
+    <p v-if="provider === 'sandbox'" class="bp-note">
+      <UiIcon name="flask-conical" :size="14" />
+      <span>{{ t('billing.panel.sandboxNote') }}</span>
+    </p>
 
     <div class="bp-invoices">
       <h3>{{ t('billing.panel.history') }}</h3>
@@ -89,6 +93,7 @@ import { useMainStore } from '../../store/index.js'
 import { useI18n } from '../../i18n'
 import { confirmDialog, toast } from '../../lib/dialogs.js'
 import PlanBadge from './PlanBadge.vue'
+import UiIcon from '../ui/UiIcon.js'
 import { offerFor } from '../../../../shared/billing'
 
 const store = useMainStore()
@@ -120,7 +125,7 @@ async function cancel() {
     confirmLabel: t('billing.panel.cancelConfirm'),
     cancelLabel: t('billing.panel.keep'),
     tone: 'danger',
-    icon: '🍂'
+    icon: 'leaf'
   })
   if (!ok) return
   busy.value = true
@@ -133,7 +138,7 @@ async function resume() {
   busy.value = true
   const res = await store.resumeSubscription()
   busy.value = false
-  if (res.success) toast(t('billing.panel.resumedToast'), { tone: 'success', icon: '🌱' })
+  if (res.success) toast(t('billing.panel.resumedToast'), { tone: 'success', icon: 'sprout' })
   else toast(res.error, { tone: 'error' })
 }
 </script>
@@ -182,7 +187,12 @@ async function resume() {
   flex-wrap: wrap;
 }
 .bp-btn {
-  padding: 9px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--ctl-md);
+  padding: 0 16px;
   border-radius: var(--r-md);
   border: 1px solid var(--border-strong);
   background: var(--elevated);
@@ -201,9 +211,16 @@ async function resume() {
   box-shadow: var(--glow);
 }
 .bp-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--amber);
+}
+.bp-note .ui-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 .bp-invoices h3 {
   margin: 0 0 8px;
@@ -214,11 +231,11 @@ async function resume() {
 .bp-invoices table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .bp-invoices th {
   text-align: left;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -232,12 +249,12 @@ async function resume() {
 }
 .mono {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 .bp-status {
   padding: 2px 8px;
   border-radius: var(--r-pill);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
 }
 .bp-status.paid {
@@ -250,7 +267,7 @@ async function resume() {
 }
 .bp-empty {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
 }
 </style>

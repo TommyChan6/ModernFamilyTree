@@ -99,7 +99,7 @@ export default {
     reviewTitle: '確認訂單',
     couponPh: '優惠碼',
     apply: '使用',
-    couponOk: '已使用 {code} 🎉',
+    couponOk: '已使用 {code}',
     couponErr: { unknown: '該優惠碼不存在。', interval: '該優惠碼只適用於按年付費。' },
     annualSavings: '相比按月節省',
     dueToday: '今日應付',
@@ -159,7 +159,7 @@ export default {
       cancelBody: '在 {date} 前一切照常；之後帳戶會回到免費版，不會刪除任何內容。',
       cancelConfirm: '取消方案',
       keep: '繼續保留',
-      canceledToast: '你的方案將不再續費。感謝你對森林的支持 🌳',
+      canceledToast: '你的方案將不再續費。感謝你對森林的支持',
       resumedToast: '歡迎回來 — 方案將照常續費。'
     }
   },
@@ -317,15 +317,15 @@ export default {
       castPh: '尋找人物…',
       access: '你可以在這裏做甚麼',
       download: '下載項目檔案',
-      downloaded: '已儲存 {file} — 隨時可透過 項目 ▾ → 匯入 開啟。',
+      downloaded: '已儲存 {file} — 隨時可透過 項目選單 → 匯入 開啟。',
       graft: '嫁接到我的項目',
       grafting: '嫁接中…',
-      grafted: '「{name}」已嫁接到你的項目 🌱',
+      grafted: '「{name}」已嫁接到你的項目',
       graftFailed: '嫁接失敗：{error}',
       openCopy: '開啟我的副本',
       join: '以園丁身份加入',
       pending: '申請已發送，等待創作者批核…',
-      member: '你已成為園丁 🌻',
+      member: '你已成為園丁',
       memberNote:
         '即時協作編輯將隨託管社群推出。在此之前，可以先嫁接一份副本，並在留言區分享想法。',
       glassNote: '創作者把這棵樹留在了溫室裏 — 想要一份的話，留言告訴 TA 吧。',
@@ -752,7 +752,7 @@ export default {
       confirmDelete: '刪除地圖「{name}」？此操作無法撤銷。'
     },
     toast: {
-      created: '🗺 {name} 已就緒',
+      created: '{name} 已就緒',
       undo: '已撤銷',
       redo: '已重做',
       nothingToUndo: '沒有可撤銷的操作',
@@ -763,7 +763,7 @@ export default {
       autoPlaced: '已按所在地放置 {n} 人',
       noLater: '此地圖上沒有更晚的時刻',
       noEarlier: '此地圖上沒有更早的時刻',
-      firstJourney: '行程開始 — 按 ▶ 觀看',
+      firstJourney: '行程開始 — 按「播放」觀看',
       tooSmall: '太小了 — 請畫大一點',
       exported: '地圖已保存為 PNG'
     },
@@ -908,7 +908,7 @@ export default {
     inherit: '繼承父母的樣貌',
     resemblance: '相似度',
     rollChild: '生成家族面孔',
-    inherited: '有家族相似感的面孔 ✨',
+    inherited: '有家族相似感的面孔',
     noParents: '此成員尚未關聯父母。',
     parentsNoLooks: '請先為 TA 的父母建立形象 — 然後才能遺傳特徵。',
     genePool: '基因池',

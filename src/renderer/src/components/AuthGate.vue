@@ -9,12 +9,15 @@
     </div>
 
     <button class="auth-back" type="button" @click="emit('back')">
-      <span class="auth-back-arrow">←</span> Home
+      <UiIcon class="auth-back-arrow" name="arrow-left" :size="16" />
+      Home
     </button>
 
     <div class="auth-card" :class="{ shake: shaking }">
       <div class="auth-logo">
-        <div class="auth-logo-mark">🌳</div>
+        <div class="auth-logo-mark">
+          <UiIcon name="tree-deciduous" :size="28" />
+        </div>
         <h1 class="auth-title">Family Tree</h1>
         <p class="auth-subtitle">
           {{
@@ -74,10 +77,11 @@
             type="button"
             class="auth-eye"
             :title="showPassword ? 'Hide password' : 'Show password'"
+            :aria-label="showPassword ? 'Hide password' : 'Show password'"
             tabindex="-1"
             @click="showPassword = !showPassword"
           >
-            {{ showPassword ? '🙈' : '👁' }}
+            <UiIcon :name="showPassword ? 'eye-off' : 'eye'" :size="16" />
           </button>
         </label>
 
@@ -140,7 +144,7 @@
         @click="continueAsGuest"
       >
         <span v-if="!guestBusy" class="auth-guest-inner">
-          <span class="auth-guest-icon">👋</span>
+          <UiIcon class="auth-guest-icon" name="hand" :size="16" />
           Continue as guest
         </span>
         <span v-else class="auth-spinner dark"></span>
@@ -164,6 +168,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { validateUsername, validatePassword } from '../../../shared/auth'
 import LegalModal from './LegalModal.vue'
+import UiIcon from './ui/UiIcon.js'
 
 const props = defineProps({
   // Which panel to open on: the landing page's "Sign in" vs "Get started"
@@ -351,14 +356,15 @@ async function continueAsGuest() {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 8px 16px;
+  height: var(--ctl-md);
+  padding: 0 16px 0 12px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--glass-strong);
   backdrop-filter: blur(10px);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -374,6 +380,7 @@ async function continueAsGuest() {
 }
 
 .auth-back-arrow {
+  flex-shrink: 0;
   transition: transform 0.2s ease;
 }
 
@@ -432,7 +439,7 @@ async function continueAsGuest() {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  color: var(--accent);
   border-radius: 18px;
   background: linear-gradient(135deg, var(--adim), rgba(var(--accent-rgb), 0.32));
   border: 1px solid rgba(var(--accent-rgb), 0.35);
@@ -455,7 +462,7 @@ async function continueAsGuest() {
 }
 
 .auth-subtitle {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
   margin: 5px 0 0;
 }
@@ -559,7 +566,7 @@ async function continueAsGuest() {
 .auth-input:focus + .auth-label,
 .auth-input:not(:placeholder-shown) + .auth-label {
   top: 12px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -571,18 +578,25 @@ async function continueAsGuest() {
   right: 8px;
   top: 50%;
   transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
   border: none;
   background: transparent;
-  font-size: 14px;
+  color: var(--t3);
   cursor: pointer;
-  padding: 4px 6px;
   border-radius: 7px;
-  opacity: 0.55;
-  transition: opacity 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .auth-eye:hover {
-  opacity: 1;
+  color: var(--t1);
+  background: var(--hover);
 }
 
 /* ── Register-only section slides open (grid-rows trick) ─────────────────── */
@@ -658,7 +672,7 @@ async function continueAsGuest() {
 }
 
 .strength-text {
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t3);
   min-width: 52px;
@@ -670,7 +684,7 @@ async function continueAsGuest() {
   display: flex;
   align-items: flex-start;
   gap: 9px;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
   line-height: 1.5;
   cursor: pointer;
@@ -703,7 +717,7 @@ async function continueAsGuest() {
 /* ── Error + submit ───────────────────────────────────────────────────────── */
 .auth-error {
   margin: -2px 0;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--danger);
   text-align: center;
@@ -726,10 +740,10 @@ async function continueAsGuest() {
   border-radius: 11px;
   padding: 12px;
   margin-top: 2px;
-  background: linear-gradient(135deg, var(--accent), #8b6cc5);
-  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--on-accent);
   font-family: var(--font);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.3px;
   cursor: pointer;
@@ -777,7 +791,7 @@ async function continueAsGuest() {
   gap: 12px;
   margin: 16px 0 14px;
   color: var(--t3);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -853,7 +867,8 @@ async function continueAsGuest() {
 }
 
 .auth-guest-icon {
-  font-size: 15px;
+  flex-shrink: 0;
+  color: var(--accent);
   animation: guest-wave 2.4s ease-in-out infinite;
   transform-origin: 70% 80%;
 }
@@ -877,7 +892,7 @@ async function continueAsGuest() {
 .auth-guest-note {
   margin: 9px 0 0;
   text-align: center;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--t3);
 }
 
@@ -890,7 +905,7 @@ async function continueAsGuest() {
 .auth-foot {
   margin: 18px 0 0;
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
 }
 </style>

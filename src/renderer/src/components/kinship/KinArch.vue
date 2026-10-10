@@ -71,7 +71,9 @@
     >
       <circle v-if="p.keystone" :cx="p.x" :cy="p.y" r="14" class="ka-halo" />
       <circle :cx="p.x" :cy="p.y" :r="i === 0 || i === pts.length - 1 ? 8 : 6" :fill="p.color" />
-      <text v-if="p.keystone" :x="p.x" :y="p.y - 13" class="ka-crown">♛</text>
+      <g v-if="p.keystone" class="ka-crown">
+        <UiIcon name="crown" :size="12" :x="p.x - 6" :y="p.y - 26" />
+      </g>
       <text :x="p.x" :y="p.y + labelDy(p, i)" class="ka-label">{{ p.short }}</text>
     </g>
   </svg>
@@ -79,6 +81,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import UiIcon from '../ui/UiIcon.js'
 
 // points: [{ id, level, via, keystone, name, color }] — from kinRoute()
 const props = defineProps({
@@ -175,7 +178,7 @@ const ariaLabel = computed(() => props.points.map((p) => p.name).join(' → '))
   stroke-dasharray: none;
 }
 .ka-gen {
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 700;
   fill: var(--t3);
   text-anchor: end;
@@ -254,9 +257,7 @@ const ariaLabel = computed(() => props.points.map((p) => p.name).join(' → '))
   }
 }
 .ka-crown {
-  font-size: 11px;
-  fill: var(--kin-blood);
-  text-anchor: middle;
+  color: var(--kin-blood);
   animation: ka-float 3s ease-in-out infinite;
 }
 @keyframes ka-float {
@@ -265,7 +266,7 @@ const ariaLabel = computed(() => props.points.map((p) => p.name).join(' → '))
   }
 }
 .ka-label {
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 600;
   fill: var(--t2);
   text-anchor: middle;

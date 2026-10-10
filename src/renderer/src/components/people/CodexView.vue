@@ -2,7 +2,7 @@
   <div class="codex" :class="['cx-' + (store.isLightTheme ? 'light' : 'dark')]">
     <!-- Empty codex -->
     <div v-if="!persons.length" class="cx-empty">
-      <div class="cx-empty-icon">❦</div>
+      <div class="cx-empty-icon"><UiIcon name="book-open" :size="44" :stroke="1.5" /></div>
       <div class="cx-empty-title">The codex is unwritten</div>
       <div class="cx-empty-text">No entries match — clear the search or add someone.</div>
     </div>
@@ -12,7 +12,7 @@
       <aside class="cx-index" :class="{ 'cx-entering': entering }">
         <header class="cx-index-head">
           <div class="cx-index-title">
-            <span class="cx-index-glyph">❧</span>
+            <UiIcon class="cx-index-glyph" name="feather" :size="18" />
             Codex
           </div>
           <div class="cx-index-count">
@@ -67,7 +67,9 @@
                 <IndexArt :person="r.p" />
               </span>
               <span class="cx-row-name">{{ r.p.name || 'Unnamed' }}</span>
-              <span v-if="r.dead" class="cx-row-mark" title="Deceased">☾</span>
+              <span v-if="r.dead" class="cx-row-mark" title="Deceased">
+                <UiIcon name="moon" :size="12" label="Deceased" />
+              </span>
             </button>
           </div>
         </div>
@@ -108,10 +110,10 @@
                     <span class="cx-frame-inner" :class="{ dead: L.e.dead }">
                       <PortraitArt :person="L.e.p" />
                     </span>
-                    <span class="cx-corner tl">✦</span>
-                    <span class="cx-corner tr">✦</span>
-                    <span class="cx-corner bl">✦</span>
-                    <span class="cx-corner br">✦</span>
+                    <UiIcon class="cx-corner tl" name="sparkle" :size="12" />
+                    <UiIcon class="cx-corner tr" name="sparkle" :size="12" />
+                    <UiIcon class="cx-corner bl" name="sparkle" :size="12" />
+                    <UiIcon class="cx-corner br" name="sparkle" :size="12" />
                   </button>
 
                   <!-- Wax seal: stamped anew each time the base page shows a new entry -->
@@ -146,7 +148,10 @@
                     <text x="50" y="61" class="cx-seal-year" :class="{ long: L.e.seal.long }">
                       {{ L.e.seal.year }}
                     </text>
-                    <text x="50" y="75" class="cx-seal-star">✦</text>
+                    <path
+                      class="cx-seal-star"
+                      d="M50 67.5l1.3 3.2 3.2 1.3-3.2 1.3-1.3 3.2-1.3-3.2-3.2-1.3 3.2-1.3z"
+                    />
                   </svg>
                 </div>
 
@@ -154,7 +159,7 @@
                   <h2 class="cx-name">{{ L.e.name }}</h2>
                   <div v-if="L.e.epithet" class="cx-epithet">{{ L.e.epithet }}</div>
                   <div v-if="L.e.location" class="cx-loc">
-                    <span class="cx-loc-glyph">⌖</span>{{ L.e.location }}
+                    <UiIcon class="cx-loc-glyph" name="map-pin" :size="14" />{{ L.e.location }}
                   </div>
 
                   <dl class="cx-vitals">
@@ -208,14 +213,17 @@
                       class="cx-sigil"
                       :style="{ '--tc': t.color || 'var(--accent)' }"
                     >
-                      <b class="cx-sigil-mark">{{ t.icon || (t.label || '?').charAt(0) }}</b>
+                      <b class="cx-sigil-mark">
+                        <UiIcon v-if="t.icon" :name="t.icon" :size="12" :stroke="2.4" />
+                        <template v-else>{{ (t.label || '?').charAt(0) }}</template>
+                      </b>
                       {{ t.label }}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div class="cx-orn" aria-hidden="true"><span>❦</span></div>
+              <div class="cx-orn" aria-hidden="true"><UiIcon name="flower" :size="15" /></div>
 
               <div class="cx-lower">
                 <section class="cx-kin">
@@ -238,7 +246,13 @@
                           :transform="`rotate(${pt.angle})`"
                         />
                         <text class="cx-petal-n" :x="pt.nx" :y="pt.ny">{{ pt.count }}</text>
-                        <text class="cx-petal-g-l" :x="pt.gx" :y="pt.gy">{{ pt.glyph }}</text>
+                        <UiIcon
+                          class="cx-petal-g-l"
+                          :name="pt.glyph"
+                          :size="12"
+                          :x="pt.gx - 6"
+                          :y="pt.gy - 6"
+                        />
                       </g>
                       <circle r="23" class="cx-ros-core" />
                       <circle r="19" class="cx-ros-ring thin" />
@@ -290,20 +304,22 @@
                   class="cx-turn"
                   :disabled="L.e.i <= 0"
                   :tabindex="L.kind === 'leaf' ? -1 : null"
-                  title="Previous entry (↑ / ←)"
+                  title="Previous entry (Up or Left arrow)"
+                  aria-label="Previous entry"
                   @click="turnBy(-1)"
                 >
-                  ‹
+                  <UiIcon name="chevron-left" :size="16" />
                 </button>
                 <span class="cx-folio">— {{ L.e.i + 1 }} of {{ persons.length }} —</span>
                 <button
                   class="cx-turn"
                   :disabled="L.e.i >= persons.length - 1"
                   :tabindex="L.kind === 'leaf' ? -1 : null"
-                  title="Next entry (↓ / →)"
+                  title="Next entry (Down or Right arrow)"
+                  aria-label="Next entry"
                   @click="turnBy(1)"
                 >
-                  ›
+                  <UiIcon name="chevron-right" :size="16" />
                 </button>
                 <span class="cx-foot-sp"></span>
                 <button
@@ -311,7 +327,7 @@
                   :tabindex="L.kind === 'leaf' ? -1 : null"
                   @click="openProfile(L.e.p.id)"
                 >
-                  Open full profile <span>→</span>
+                  Open full profile <UiIcon class="cx-open-arrow" name="arrow-right" :size="14" />
                 </button>
               </footer>
             </div>
@@ -340,6 +356,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, h } from 'vue'
 import { useMainStore } from '../../store/index.js'
 import { ageOf, isDeceased } from './peopleLayout.js'
+import UiIcon from '../ui/UiIcon.js'
 import { useThumbnail } from './useThumbnail.js'
 import {
   INDEX_ROW_H,
@@ -583,11 +600,11 @@ const entryCache = computed(() => ({
 }))
 
 const ROSETTE = [
-  { key: 'parents', glyph: '↑', tone: 'var(--accent)' },
-  { key: 'partners', glyph: '⚭', tone: 'var(--pink)' },
-  { key: 'children', glyph: '↓', tone: 'var(--green)' },
-  { key: 'siblings', glyph: '⇄', tone: 'var(--amber)' },
-  { key: 'others', glyph: '✦', tone: 'var(--t2)' }
+  { key: 'parents', glyph: 'arrow-up', tone: 'var(--accent)' },
+  { key: 'partners', glyph: 'heart-handshake', tone: 'var(--pink)' },
+  { key: 'children', glyph: 'arrow-down', tone: 'var(--green)' },
+  { key: 'siblings', glyph: 'users', tone: 'var(--amber)' },
+  { key: 'others', glyph: 'sparkle', tone: 'var(--t2)' }
 ]
 // A pointed vesica petal from the core (r 25) out to r 66, pointing up.
 const PETAL_D = 'M0 -25 C 17 -35 17 -56 0 -66 C -17 -56 -17 -35 0 -25 Z'
@@ -1023,11 +1040,10 @@ onBeforeUnmount(() => {
 }
 .cx-index-glyph {
   color: var(--gild);
-  font-size: 18px;
 }
 .cx-index-count {
   margin-top: 2px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t2);
   font-variant-numeric: tabular-nums;
@@ -1072,7 +1088,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--t3);
   font-family: var(--serif);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   transition:
@@ -1094,7 +1110,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 4px;
   font-family: var(--serif);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--t3);
 }
@@ -1107,7 +1123,7 @@ onBeforeUnmount(() => {
   background: var(--bg);
   color: var(--t1);
   font-family: var(--serif);
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   outline: none;
 }
@@ -1195,7 +1211,7 @@ onBeforeUnmount(() => {
   width: 50px;
   flex-shrink: 0;
   font-family: var(--serif);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.3px;
   color: var(--t3);
@@ -1227,7 +1243,7 @@ onBeforeUnmount(() => {
   object-fit: cover;
 }
 .cx-row :deep(.cx-av-ini) {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 800;
   color: var(--t1);
 }
@@ -1241,7 +1257,7 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
 }
 .cx-row-mark {
-  font-size: 11px;
+  display: inline-flex;
   color: var(--t3);
 }
 
@@ -1447,7 +1463,7 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid color-mix(in srgb, var(--rule) 35%, transparent);
 }
 .cx-head-kind {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 2.4px;
   text-transform: uppercase;
@@ -1554,10 +1570,8 @@ onBeforeUnmount(() => {
 }
 .cx-corner {
   position: absolute;
-  font-size: 12px;
-  line-height: 1;
   color: var(--gild);
-  text-shadow: 0 1px 0 color-mix(in srgb, var(--paper) 80%, transparent);
+  filter: drop-shadow(0 1px 0 color-mix(in srgb, var(--paper) 80%, transparent));
   pointer-events: none;
 }
 .cx-corner.tl {
@@ -1623,7 +1637,7 @@ onBeforeUnmount(() => {
 }
 .cx-seal-arc {
   font-family: var(--serif);
-  font-size: 8.4px;
+  font-size: 9.4px;
   font-weight: 700;
   letter-spacing: 1.4px;
   fill: color-mix(in srgb, var(--sc) 35%, black);
@@ -1645,8 +1659,6 @@ onBeforeUnmount(() => {
   font-size: 14px;
 }
 .cx-seal-star {
-  font-size: 8px;
-  text-anchor: middle;
   fill: color-mix(in srgb, var(--sc) 38%, black);
   opacity: 0.75;
 }
@@ -1680,13 +1692,12 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--ink-2);
 }
 .cx-loc-glyph {
   color: var(--gild);
-  font-size: 14px;
 }
 
 .cx-vitals {
@@ -1704,7 +1715,7 @@ onBeforeUnmount(() => {
   border-left: 1px dotted color-mix(in srgb, var(--rule) 60%, transparent);
 }
 .cx-vitals dt {
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 800;
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -1735,7 +1746,7 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 800;
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -1743,7 +1754,7 @@ onBeforeUnmount(() => {
 }
 .cx-span-cap {
   font-family: var(--serif);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.3px;
   text-transform: none;
   font-weight: 700;
@@ -1818,7 +1829,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   font-family: var(--serif);
   font-style: italic;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--ink-3);
 }
 .cx-tick {
@@ -1835,7 +1846,7 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
   font-family: var(--serif);
   font-style: normal;
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 700;
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
@@ -1858,7 +1869,7 @@ onBeforeUnmount(() => {
   border: 1px solid color-mix(in srgb, var(--tc) 50%, transparent);
   background: color-mix(in srgb, var(--tc) 11%, transparent);
   font-family: var(--serif);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--ink);
   max-width: 220px;
@@ -1874,7 +1885,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   color: color-mix(in srgb, var(--tc) 30%, black);
   background: radial-gradient(
@@ -1915,7 +1926,7 @@ onBeforeUnmount(() => {
 .cx-sec {
   margin-bottom: 10px;
   font-family: var(--serif);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 3px;
   text-transform: uppercase;
@@ -1995,18 +2006,13 @@ onBeforeUnmount(() => {
 .cx-petal-g.none .cx-petal-n {
   fill: var(--ink-3);
   font-weight: 400;
-  opacity: 0.7;
 }
 .cx-petal-g-l {
-  font-size: 11px;
-  font-weight: 700;
-  text-anchor: middle;
-  dominant-baseline: central;
-  fill: color-mix(in srgb, var(--pc) 80%, var(--ink));
+  overflow: visible;
+  color: color-mix(in srgb, var(--pc) 80%, var(--ink));
 }
 .cx-petal-g.none .cx-petal-g-l {
-  fill: var(--ink-3);
-  opacity: 0.6;
+  color: var(--ink-3);
 }
 .cx-ros-core {
   fill: var(--paper-2);
@@ -2021,7 +2027,7 @@ onBeforeUnmount(() => {
   fill: var(--ink);
 }
 .cx-ros-cap {
-  font-size: 7px;
+  font-size: 8px;
   font-weight: 800;
   letter-spacing: 1.6px;
   text-anchor: middle;
@@ -2046,7 +2052,7 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 800;
   letter-spacing: 1.6px;
   text-transform: uppercase;
@@ -2094,7 +2100,7 @@ onBeforeUnmount(() => {
 }
 .cx-more {
   font-style: italic;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--ink-3);
 }
 .cx-kin-none {
@@ -2149,7 +2155,7 @@ onBeforeUnmount(() => {
 .cx-folio {
   font-family: var(--serif);
   font-style: italic;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
@@ -2157,8 +2163,12 @@ onBeforeUnmount(() => {
   flex: 1;
 }
 .cx-turn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 28px;
   height: 28px;
+  padding: 0;
   border-radius: 50%;
   border: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
   background: transparent;
@@ -2202,14 +2212,14 @@ onBeforeUnmount(() => {
     transform 0.2s,
     box-shadow 0.2s;
 }
-.cx-open span {
+.cx-open-arrow {
   transition: transform 0.2s;
 }
 .cx-open:hover {
   background: color-mix(in srgb, var(--accent) 24%, transparent);
   box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--accent) 70%, transparent);
 }
-.cx-open:hover span {
+.cx-open:hover .cx-open-arrow {
   transform: translateX(3px);
 }
 
@@ -2309,9 +2319,8 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 .cx-empty-icon {
-  font-size: 44px;
+  display: flex;
   color: var(--amber);
-  opacity: 0.7;
 }
 .cx-empty-title {
   font-family: Georgia, 'Times New Roman', serif;

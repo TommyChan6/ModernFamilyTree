@@ -20,10 +20,11 @@
                 class="pf-rail-tag"
                 :style="{ '--tc': tag.color }"
               >
-                {{ tag.icon ? tag.icon + ' ' : '' }}{{ tag.label }}
+                <UiIcon v-if="tag.icon" :name="tag.icon" :size="12" />
+                {{ tag.label }}
               </span>
             </div>
-            <div class="pf-rail-note">live preview</div>
+            <div class="pf-rail-note">Live preview</div>
           </div>
         </aside>
 
@@ -42,7 +43,15 @@
                 {{ s.label }}
               </button>
             </nav>
-            <button class="pf-close" type="button" title="Close" @click="cancel">✕</button>
+            <button
+              class="pf-close icon-btn"
+              type="button"
+              title="Close"
+              aria-label="Close"
+              @click="cancel"
+            >
+              <UiIcon name="x" :size="18" />
+            </button>
           </header>
 
           <div ref="bodyEl" class="pf-body">
@@ -62,7 +71,9 @@
             <section :ref="(el) => (sectionEls.traits = el)" class="pf-section">
               <div class="pf-section-label">
                 Traits
-                <span class="pf-section-hint">hold ⠿ to reorder · drop on a slot to assign</span>
+                <span class="pf-section-hint"
+                  >Drag a row's handle to reorder · drop it on a slot to assign</span
+                >
               </div>
               <TransitionGroup name="fl" tag="div" class="pf-field-list">
                 <FieldRow
@@ -95,8 +106,14 @@
                     <span v-if="rel.status && rel.status !== 'active'" class="pf-rel-divorced">
                       {{ statusLabel(rel.relType, rel.status) }}
                     </span>
-                    <button class="pf-rel-x" type="button" @click="removeExistingRel(rel.id)">
-                      ✕
+                    <button
+                      class="pf-rel-x"
+                      type="button"
+                      title="Remove relationship"
+                      aria-label="Remove relationship"
+                      @click="removeExistingRel(rel.id)"
+                    >
+                      <UiIcon name="x" :size="14" />
                     </button>
                   </div>
                   <div class="pf-rel-fields">
@@ -143,7 +160,8 @@
                   :style="{ '--i': i }"
                   title="Derived from a shared parent — no separate relationship needed"
                 >
-                  ⇄ {{ s.name }}
+                  <UiIcon name="arrow-left-right" :size="12" />
+                  {{ s.name }}
                 </span>
                 <span class="pf-sibs-hint">via shared parents</span>
               </div>
@@ -157,9 +175,15 @@
                   <div class="pf-rel-top">
                     <span class="pf-rel-type">{{ link.roleLabel }}</span>
                     <span class="pf-rel-name">{{ personName(link.personId) }}</span>
-                    <span class="pf-rel-pending">new</span>
-                    <button class="pf-rel-x" type="button" @click="pendingLinks.splice(idx, 1)">
-                      ✕
+                    <span class="pf-rel-pending">New</span>
+                    <button
+                      class="pf-rel-x"
+                      type="button"
+                      title="Discard this link"
+                      aria-label="Discard this link"
+                      @click="pendingLinks.splice(idx, 1)"
+                    >
+                      <UiIcon name="x" :size="14" />
                     </button>
                   </div>
                   <div class="pf-rel-fields">
@@ -191,7 +215,13 @@
                     :class="{ active: pickerFor === intent.id }"
                     @click="pickerFor = pickerFor === intent.id ? null : intent.id"
                   >
-                    <span class="pf-intent-glyph">{{ intent.glyph }}</span> {{ intent.label }}
+                    <UiIcon
+                      v-if="intent.glyph"
+                      class="pf-intent-glyph"
+                      :name="intent.glyph"
+                      :size="14"
+                    />
+                    {{ intent.label }}
                   </button>
                 </div>
               </div>
@@ -229,13 +259,14 @@
                         class="pf-img-x"
                         type="button"
                         title="Remove image"
+                        aria-label="Remove image"
                         @click.stop="deletePhoto(imageForRole(slot.role))"
                       >
-                        ✕
+                        <UiIcon name="x" :size="14" />
                       </button>
                     </template>
                     <template v-else>
-                      <span class="pf-img-glyph">{{ slot.glyph }}</span>
+                      <UiIcon class="pf-img-glyph" :name="slot.icon" :size="22" :stroke="1.75" />
                       <span class="pf-img-label">{{ slot.label }}</span>
                     </template>
                   </div>
@@ -250,22 +281,30 @@
                         class="pf-extra-btn"
                         type="button"
                         :title="`Use as ${slot.label.toLowerCase()}`"
+                        :aria-label="`Use as ${slot.label.toLowerCase()}`"
                         @click="setRole(photo, slot.role)"
                       >
-                        {{ slot.glyph }}
+                        <UiIcon :name="slot.icon" :size="12" />
                       </button>
                       <button
                         class="pf-extra-btn pf-extra-del"
                         type="button"
-                        title="Delete"
+                        title="Delete image"
+                        aria-label="Delete image"
                         @click="deletePhoto(photo)"
                       >
-                        ✕
+                        <UiIcon name="trash-2" :size="12" />
                       </button>
                     </div>
                   </div>
-                  <button class="pf-extra-add" type="button" @click="addPhotoWithRole('')">
-                    ＋<span>extra</span>
+                  <button
+                    class="pf-extra-add"
+                    type="button"
+                    title="Add an extra image"
+                    @click="addPhotoWithRole('')"
+                  >
+                    <UiIcon name="image-plus" :size="18" />
+                    <span>Extra</span>
                   </button>
                 </div>
               </template>
@@ -304,7 +343,8 @@
           }"
           :style="{ left: drag.x + 'px', top: drag.y + 'px' }"
         >
-          ⠿ {{ drag.label }}
+          <UiIcon name="grip-vertical" :size="14" />
+          {{ drag.label }}
         </div>
       </div>
     </div>
@@ -331,6 +371,7 @@ import FieldRow from './personForm/FieldRow.vue'
 import AddFieldBar from './personForm/AddFieldBar.vue'
 import PersonPicker from './personForm/PersonPicker.vue'
 import TagChipsEditor from './TagChipsEditor.vue'
+import UiIcon from './ui/UiIcon.js'
 import { derivedSiblings } from './graph/graphInsights.js'
 
 const store = useMainStore()
@@ -355,7 +396,7 @@ const intentBands = computed(() => {
         dir, // which side the PICKED person takes: role_a or role_b
         glyph: def.glyph,
         label: pickedRole || def.label,
-        hint: `Who is this person's ${(pickedRole || def.label).toLowerCase()}?`
+        hint: `Who is this ${store.noun.toLowerCase()}'s ${(pickedRole || def.label).toLowerCase()}?`
       })
       intents.push(mk('a', def.role_a), mk('b', def.role_b))
     } else {
@@ -365,7 +406,7 @@ const intentBands = computed(() => {
         dir: 'sym',
         glyph: def.glyph,
         label: def.label,
-        hint: `${def.label}: pick the other person`
+        hint: `${def.label}: pick the other ${store.noun.toLowerCase()}`
       })
     }
     const band = BAND_LABELS[def.band] ? def.band : 'custom'
@@ -390,9 +431,14 @@ function statusLabel(defKey, s) {
 }
 
 const IMAGE_SLOTS = [
-  { role: 'portrait', glyph: '☺', label: 'Portrait', hint: 'Head & shoulders — the avatar' },
-  { role: 'fullbody', glyph: '🧍', label: 'Full body', hint: 'Standing figure' },
-  { role: 'background', glyph: '🏞', label: 'Background', hint: 'A scene or backdrop' }
+  {
+    role: 'portrait',
+    icon: 'user-round',
+    label: 'Portrait',
+    hint: 'Head & shoulders — the avatar'
+  },
+  { role: 'fullbody', icon: 'person-standing', label: 'Full body', hint: 'Standing figure' },
+  { role: 'background', icon: 'mountain', label: 'Background', hint: 'A scene or backdrop' }
 ]
 
 const sections = [
@@ -423,7 +469,9 @@ const sectionEls = reactive({})
 
 const advanced = computed(() => store.programMode === 'advanced')
 const formTitle = computed(() =>
-  store.editingPerson ? `Edit: ${store.editingPerson.name || 'Unnamed'}` : `Add ${store.noun}`
+  store.editingPerson
+    ? `Edit: ${store.editingPerson.name || 'Unnamed'}`
+    : `Add ${store.noun.toLowerCase()}`
 )
 
 const clone = (v) => (v == null ? null : JSON.parse(JSON.stringify(v)))
@@ -1063,7 +1111,7 @@ function scrollToSection(id) {
   padding: 24px 16px;
 }
 .pf-rail-life {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t2);
   letter-spacing: 0.4px;
 }
@@ -1074,7 +1122,10 @@ function scrollToSection(id) {
   justify-content: center;
 }
 .pf-rail-tag {
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--tc);
@@ -1084,7 +1135,7 @@ function scrollToSection(id) {
 .pf-rail-note {
   position: absolute;
   bottom: 12px;
-  font-size: 9px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 1.2px;
   color: var(--t3);
@@ -1124,7 +1175,7 @@ function scrollToSection(id) {
   background: transparent;
   color: var(--t3);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   padding: 4px 9px;
   border-radius: 999px;
@@ -1138,17 +1189,7 @@ function scrollToSection(id) {
   background: var(--hover);
 }
 .pf-close {
-  border: none;
-  background: transparent;
   color: var(--t3);
-  font-size: 14px;
-  cursor: pointer;
-  padding: 6px 8px;
-  border-radius: 8px;
-}
-.pf-close:hover {
-  color: var(--t1);
-  background: var(--hover);
 }
 
 .pf-body {
@@ -1167,7 +1208,7 @@ function scrollToSection(id) {
   scroll-margin-top: 8px;
 }
 .pf-section-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.9px;
@@ -1182,11 +1223,11 @@ function scrollToSection(id) {
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0.2px;
-  font-size: 9.5px;
+  font-size: 12px;
   margin-left: auto;
 }
 .pf-hint {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t3);
   font-style: italic;
 }
@@ -1226,12 +1267,15 @@ function scrollToSection(id) {
   position: fixed;
   z-index: 400;
   pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 7px 13px;
   border-radius: 10px;
   background: var(--elevated);
   border: 1px solid var(--accent);
   color: var(--t1);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
   transform: rotate(1.5deg);
@@ -1284,18 +1328,18 @@ function scrollToSection(id) {
 }
 .pf-rel-type {
   font-weight: 700;
-  font-size: 9.5px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
   color: var(--accent);
 }
 .pf-rel-name {
   color: var(--t1);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
 }
 .pf-rel-divorced {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   color: var(--danger);
@@ -1304,7 +1348,7 @@ function scrollToSection(id) {
   border-radius: 8px;
 }
 .pf-rel-pending {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   color: var(--green);
@@ -1314,14 +1358,21 @@ function scrollToSection(id) {
 }
 .pf-rel-x {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
+  padding: 0;
   border: none;
+  border-radius: var(--r-xs);
   background: transparent;
   color: var(--t3);
   cursor: pointer;
-  font-size: 11px;
 }
 .pf-rel-x:hover {
   color: var(--danger);
+  background: rgba(var(--danger-rgb), 0.1);
 }
 .pf-rel-fields {
   display: flex;
@@ -1337,7 +1388,7 @@ function scrollToSection(id) {
   max-width: 160px;
 }
 .pf-rel-field span {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1345,7 +1396,7 @@ function scrollToSection(id) {
 }
 .pf-rel-field input,
 .pf-rel-field select {
-  font-size: 11px;
+  font-size: 12px;
   padding: 5px 8px;
   border-radius: 6px;
   border: 1px solid var(--border);
@@ -1363,7 +1414,7 @@ function scrollToSection(id) {
   margin-bottom: 12px;
 }
 .pf-sibs-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1374,11 +1425,11 @@ function scrollToSection(id) {
   align-items: center;
   gap: 4px;
   padding: 3px 10px;
-  border: 1px solid color-mix(in srgb, #58b5bc 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--kin-marriage) 40%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, #58b5bc 12%, transparent);
+  background: color-mix(in srgb, var(--kin-marriage) 12%, transparent);
   color: var(--t1);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   animation: pf-sib-in 0.4s cubic-bezier(0.3, 1.5, 0.4, 1) backwards;
   animation-delay: calc(var(--i, 0) * 0.06s);
@@ -1390,7 +1441,7 @@ function scrollToSection(id) {
   }
 }
 .pf-sibs-hint {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--t3);
   font-style: italic;
 }
@@ -1399,7 +1450,7 @@ function scrollToSection(id) {
   margin-bottom: 10px;
 }
 .pf-band-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1421,7 +1472,7 @@ function scrollToSection(id) {
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1442,7 +1493,7 @@ function scrollToSection(id) {
   color: var(--accent);
 }
 .pf-intent-glyph {
-  font-size: 13px;
+  flex-shrink: 0;
 }
 .pf-picker {
   margin-top: 2px;
@@ -1524,11 +1575,10 @@ function scrollToSection(id) {
   }
 }
 .pf-img-glyph {
-  font-size: 21px;
-  opacity: 0.75;
+  color: var(--t3);
 }
 .pf-img-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.6px;
@@ -1539,13 +1589,16 @@ function scrollToSection(id) {
   top: 6px;
   right: 6px;
   z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: none;
   border-radius: 6px;
-  width: 20px;
-  height: 20px;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
-  font-size: 10px;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s;
@@ -1594,7 +1647,7 @@ function scrollToSection(id) {
   border-radius: 5px;
   width: 18px;
   height: 18px;
-  font-size: 9px;
+  padding: 0;
   cursor: pointer;
   display: grid;
   place-items: center;
@@ -1618,15 +1671,14 @@ function scrollToSection(id) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  gap: 3px;
   transition:
     border-color 0.15s,
     color 0.15s;
 }
 .pf-extra-add span {
-  font-size: 8.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 11px;
+  font-weight: 600;
 }
 .pf-extra-add:hover {
   border-color: var(--accent);
@@ -1645,7 +1697,7 @@ function scrollToSection(id) {
 }
 .pf-error {
   margin-right: auto;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--danger);
   animation: fr-slide 0.2s ease-out;
 }
@@ -1707,7 +1759,7 @@ function scrollToSection(id) {
 :root[data-theme='ink'] .pf-rail-tag {
   border-radius: 2px;
   font-family: var(--font-ink-label);
-  font-size: 11px;
+  font-size: 12px;
 }
 :root[data-theme='ink'] .pf-rail-note {
   bottom: auto;
@@ -1802,7 +1854,7 @@ function scrollToSection(id) {
 }
 :root[data-theme='ink'] .pf-section-hint {
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-style: italic;
   color: var(--t3);
 }
@@ -1816,7 +1868,7 @@ function scrollToSection(id) {
 :root[data-theme='ink'] .pf-sibs-label,
 :root[data-theme='ink'] .pf-band-label {
   font-family: var(--font-ink-label);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   font-variant: small-caps;
   text-transform: lowercase;

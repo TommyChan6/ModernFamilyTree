@@ -107,7 +107,9 @@ export function computeTimelineLayout(
         estimated = true
       }
       const divorced = r.status === 'divorced'
-      const badge = estimated ? '⚭ add year' : `${divorced ? '⚮' : '⚭'} ${year}`
+      // Badge text; the renderer draws `badgeIcon` (an icon name) before it.
+      const badge = estimated ? 'add year' : String(year)
+      const badgeIcon = divorced ? 'heart-crack' : 'heart-handshake'
       marriages.push({
         id: r.id,
         ids: [r.person_a_id, r.person_b_id],
@@ -120,7 +122,8 @@ export function computeTimelineLayout(
         divorced,
         estimated,
         badge,
-        bw: badge.length * 6.6 + 20
+        badgeIcon,
+        bw: badge.length * 6.6 + 33
       })
     } else if (r.type === 'parent_child' || r.type === 'adopted') {
       const parent = laneById.get(r.person_a_id)

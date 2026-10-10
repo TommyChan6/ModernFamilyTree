@@ -1731,14 +1731,14 @@ function star(cx: number, cy: number, r: number): string {
 export const simplePack: StylePack = {
   id: 'simple',
   name: 'Simplistic',
-  icon: '◐',
+  icon: 'contrast',
   width: 320,
   height: 460,
   ink: INK,
   slots: lowerSlots([
     {
       id: 'back',
-      icon: '🎒',
+      icon: 'backpack',
       socket: { x: 160, y: 236 },
       z: 31,
       backZ: 2,
@@ -1747,14 +1747,14 @@ export const simplePack: StylePack = {
     },
     {
       id: 'head',
-      icon: '🙂',
+      icon: 'user-round',
       socket: { x: 160, y: 150 },
       z: 40,
       thumb: { cx: 160, cy: 160, span: 170 }
     },
     {
       id: 'hair',
-      icon: '💇',
+      icon: 'waves',
       socket: { x: 160, y: 100 },
       z: 60,
       backZ: 4,
@@ -1762,21 +1762,21 @@ export const simplePack: StylePack = {
     },
     {
       id: 'eyes',
-      icon: '👁',
+      icon: 'eye',
       socket: { x: 160, y: EYE_Y },
       z: 50,
       thumb: { cx: 160, cy: 156, span: 90 }
     },
     {
       id: 'brows',
-      icon: '🤨',
+      icon: 'spline',
       socket: { x: 160, y: 138 },
       z: 52,
       thumb: { cx: 160, cy: 145, span: 90 }
     },
     {
       id: 'nose',
-      icon: '👃',
+      icon: 'scan-face',
       socket: { x: 160, y: 170 },
       z: 45,
       optional: true,
@@ -1784,14 +1784,14 @@ export const simplePack: StylePack = {
     },
     {
       id: 'mouth',
-      icon: '👄',
+      icon: 'smile',
       socket: { x: 160, y: 186 },
       z: 51,
       thumb: { cx: 160, cy: 186, span: 70 }
     },
     {
       id: 'facialHair',
-      icon: '🧔',
+      icon: 'scissors',
       socket: { x: 160, y: 192 },
       z: 53,
       optional: true,
@@ -1799,7 +1799,7 @@ export const simplePack: StylePack = {
     },
     {
       id: 'marks',
-      icon: '✨',
+      icon: 'sparkles',
       socket: { x: 160, y: 168 },
       z: 42,
       optional: true,
@@ -1807,28 +1807,28 @@ export const simplePack: StylePack = {
     },
     {
       id: 'torso',
-      icon: '👕',
+      icon: 'shirt',
       socket: { x: 160, y: 270 },
       z: 30,
       thumb: { cx: 160, cy: 290, span: 210 }
     },
     {
       id: 'legs',
-      icon: '👖',
+      icon: 'person-standing',
       socket: { x: 160, y: 360 },
       z: 20,
       thumb: { cx: 160, cy: 384, span: 150 }
     },
     {
       id: 'feet',
-      icon: '👟',
+      icon: 'footprints',
       socket: { x: 160, y: 440 },
       z: 22,
       thumb: { cx: 160, cy: 428, span: 110 }
     },
     {
       id: 'headwear',
-      icon: '🎩',
+      icon: 'crown',
       socket: { x: 160, y: 96 },
       z: 70,
       optional: true,
@@ -1836,7 +1836,7 @@ export const simplePack: StylePack = {
     },
     {
       id: 'accessory',
-      icon: '👓',
+      icon: 'glasses',
       socket: { x: 160, y: EYE_Y },
       z: 65,
       optional: true,

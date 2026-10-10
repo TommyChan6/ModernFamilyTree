@@ -3,18 +3,18 @@
     <div v-if="open" class="cp-backdrop ink-veil" @click.self="close">
       <div class="cp-panel ink-mount ink-unroll ink-rollers">
         <div class="cp-search-row">
-          <span class="cp-icon">🔍</span>
-          <input
+          <SearchField
             ref="inputRef"
             v-model="query"
-            class="cp-input"
+            class="cp-search"
+            size="lg"
             placeholder="Jump to a person…"
             @keydown.down.prevent="move(1)"
             @keydown.up.prevent="move(-1)"
             @keydown.enter.prevent="pick(results[cursor])"
             @keydown.escape="close"
           />
-          <span class="cp-kbd">esc</span>
+          <kbd class="cp-kbd">Esc</kbd>
         </div>
         <div ref="listEl" class="cp-results">
           <button
@@ -43,6 +43,7 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useMainStore } from '../store/index.js'
+import SearchField from './ui/SearchField.vue'
 
 // ⌘K / Ctrl+K command palette: fuzzy-ish jump to any entity. Picking one
 // selects it (opening the profile) wherever you are.
@@ -144,33 +145,19 @@ defineExpose({ show })
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border);
 }
 
-.cp-icon {
-  font-size: 14px;
-}
-
-.cp-input {
+.cp-search {
   flex: 1;
-  background: none;
-  border: none;
-  outline: none;
-  box-shadow: none;
-  font: inherit;
-  font-size: 14px;
-  color: var(--t1);
-  padding: 0;
 }
 
 .cp-kbd {
-  font-size: 10px;
+  flex-shrink: 0;
+  font-size: 11px;
   font-weight: 700;
   color: var(--t3);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 2px 6px;
 }
 
 .cp-results {
@@ -215,7 +202,7 @@ defineExpose({ show })
 
 .cp-meta {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
   white-space: nowrap;
   overflow: hidden;
@@ -226,7 +213,7 @@ defineExpose({ show })
 .cp-empty {
   padding: 18px;
   text-align: center;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--t3);
 }
 
@@ -252,16 +239,10 @@ defineExpose({ show })
     calc(100% - 28px) 1px no-repeat;
   padding: 14px 16px;
 }
-:root[data-theme='ink'] .cp-icon {
-  filter: grayscale(1) sepia(0.4);
-}
-:root[data-theme='ink'] .cp-input {
-  font-family: var(--font);
+:root[data-theme='ink'] .cp-search :deep(.sf-input) {
   font-size: 17px;
-  background: none;
-  box-shadow: none;
 }
-:root[data-theme='ink'] .cp-input::placeholder {
+:root[data-theme='ink'] .cp-search :deep(.sf-input)::placeholder {
   font-style: italic;
 }
 :root[data-theme='ink'] .cp-kbd {
@@ -306,7 +287,7 @@ defineExpose({ show })
   letter-spacing: 0.01em;
 }
 :root[data-theme='ink'] .cp-meta {
-  font-size: 12px;
+  font-size: 12.5px;
   font-style: italic;
 }
 :root[data-theme='ink'] .cp-empty {

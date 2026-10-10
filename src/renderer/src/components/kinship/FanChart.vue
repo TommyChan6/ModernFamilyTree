@@ -146,14 +146,14 @@ const wedges = computed(() => {
   filter: drop-shadow(0 0 6px var(--c));
 }
 .fan-hub-t {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
   fill: #fff;
   text-anchor: middle;
   pointer-events: none;
 }
 .fan-hot {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   fill: var(--t1);
   text-anchor: middle;

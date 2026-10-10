@@ -12,7 +12,7 @@
           :aria-describedby="'dh-msg-' + current.id"
         >
           <div v-if="current.icon" class="dh-icon" aria-hidden="true">
-            <span>{{ current.icon }}</span>
+            <UiIcon :name="dialogIcon(current)" :size="24" />
           </div>
           <h2 :id="'dh-title-' + current.id" class="dh-title">
             {{
@@ -58,13 +58,20 @@
         @mouseenter="hover(tst.id, true)"
         @mouseleave="hover(tst.id, false)"
       >
-        <span class="dh-toast-icon" aria-hidden="true">{{ tst.icon }}</span>
+        <span class="dh-toast-icon" aria-hidden="true">
+          <UiIcon :name="toastIcon(tst)" :size="13" :stroke="2.5" />
+        </span>
         <span class="dh-toast-msg">{{ tst.message }}</span>
         <button v-if="tst.action" class="dh-toast-action" @click="runAction(tst)">
           {{ tst.action.label }}
         </button>
-        <button class="dh-toast-close" :title="t('dialog.dismiss')" @click="dismissToast(tst.id)">
-          ×
+        <button
+          class="dh-toast-close"
+          :title="t('dialog.dismiss')"
+          :aria-label="t('dialog.dismiss')"
+          @click="dismissToast(tst.id)"
+        >
+          <UiIcon name="x" :size="14" />
         </button>
         <span
           v-if="tst.duration > 0"
@@ -80,7 +87,8 @@
 <script setup>
 import { computed, nextTick, reactive, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from '../../i18n'
-import { dialogState, settleDialog, dismissToast, holdToast } from '../../lib/dialogs.js'
+import { dialogState, settleDialog, dismissToast, holdToast, TONE_ICON } from '../../lib/dialogs.js'
+import UiIcon, { hasIcon } from './UiIcon.js'
 
 // Renders lib/dialogs.js: confirm/alert dialogs and the toast stack. Mounted
 // once by App.vue. While a dialog is up it owns the keyboard (Enter confirms,
@@ -102,6 +110,16 @@ watch(current, async (d, prev) => {
     restoreFocus = null
   }
 })
+
+// Icons are UiIcon names (legacy emoji passed by older callers still resolve);
+// anything unknown falls back to the tone's own icon so the badge never blanks.
+function dialogIcon(d) {
+  if (hasIcon(d.icon)) return d.icon
+  return d.tone === 'danger' ? 'trash-2' : 'info'
+}
+function toastIcon(tst) {
+  return hasIcon(tst.icon) ? tst.icon : TONE_ICON[tst.tone] || 'info'
+}
 
 function accept() {
   if (current.value) settleDialog(current.value.id, true)
@@ -193,7 +211,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   display: grid;
   place-items: center;
   border-radius: 50%;
-  font-size: 22px;
   background: var(--adim);
   color: var(--accent);
   animation: dh-icon-in 0.5s var(--ease-spring) both;
@@ -319,7 +336,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
   color: var(--t1);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   pointer-events: auto;
   overflow: hidden;
@@ -344,8 +361,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   display: grid;
   place-items: center;
   border-radius: 50%;
-  font-size: 11px;
-  font-weight: 800;
   color: var(--tone);
   background: rgba(var(--tone-rgb), 0.16);
   animation: dh-toast-icon 0.5s var(--ease-spring) 0.08s both;
@@ -367,7 +382,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   border: none;
   background: rgba(var(--tone-rgb), 0.16);
   color: var(--tone);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   padding: 4px 10px;
   border-radius: var(--r-sm);
@@ -384,10 +399,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
   height: 22px;
   border: none;
   border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   background: transparent;
   color: var(--t3);
-  font-size: 15px;
-  line-height: 1;
   cursor: pointer;
 }
 .dh-toast-close:hover {
@@ -468,8 +485,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 :root[data-theme='ink'] .dh-danger .dh-icon {
   background-color: var(--danger);
 }
-:root[data-theme='ink'] .dh-icon > span {
-  filter: grayscale(1) brightness(2.4) contrast(1.3);
+:root[data-theme='ink'] .dh-icon {
+  color: var(--on-accent);
 }
 @keyframes dh-ink-stamp {
   from {
@@ -517,7 +534,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 }
 :root[data-theme='ink'] .dh-toast-icon {
   border-radius: 2px 3px 2px 4px;
-  color: #fbf4e6;
+  color: var(--on-accent);
   background: var(--tone);
 }
 :root[data-theme='ink'] .dh-toast-action {

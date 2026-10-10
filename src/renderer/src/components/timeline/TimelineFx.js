@@ -11,6 +11,8 @@
 // `resolve.person(id)` → { x, y0, y1 } | null and `resolve.yearY(year)`, so
 // they ride along with pans and zooms.
 
+import { drawIcon } from '../../lib/canvasIcon.js'
+
 const TAU = Math.PI * 2
 const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif'
 const easeOut = (k) => 1 - Math.pow(1 - k, 3)
@@ -213,7 +215,7 @@ export class TimelineFx {
         g.stroke()
         g.setLineDash([])
         g.globalAlpha = 1
-        chip(g, (p.x0 ?? 0) + 6, p.y, String(p.label), p.color, this.pal, 'left')
+        chip(g, (p.x0 ?? 0) + 6, p.y, String(p.label), p.color, this.pal, 'left', false, p.icon)
         break
       }
       case 'line': {
@@ -259,7 +261,7 @@ export class TimelineFx {
         g.lineTo(p.x, y1)
         g.lineTo(p.x + 10, y1)
         g.stroke()
-        chip(g, p.x - 8, y0, p.a, p.color, this.pal, 'right')
+        chip(g, p.x - 8, y0, p.a, p.color, this.pal, 'right', false, p.aIcon)
         chip(g, p.x - 8, y1, p.b, p.color, this.pal, 'right')
         break
       }
@@ -302,7 +304,7 @@ export class TimelineFx {
         break
       }
       case 'bubble':
-        chip(g, p.x, p.y, p.text, p.color, this.pal, 'center', true)
+        chip(g, p.x, p.y, p.text, p.color, this.pal, 'center', true, p.icon)
         break
       case 'glowLife': {
         // Delete-mode target: a hot outline breathing around the lifeline.
@@ -551,11 +553,15 @@ function roundRect(g, x, y, w, h, r) {
   g.closePath()
 }
 
-/** A glassy label chip; anchor 'left' | 'right' | 'center' (center floats above). */
-function chip(g, x, y, text, color, pal, anchor = 'left', big = false) {
+/** A glassy label chip; anchor 'left' | 'right' | 'center' (center floats above).
+ *  An optional leading `icon` (icon name) is drawn in the chip's colour; icon +
+ *  text are measured and centred as one unit. */
+function chip(g, x, y, text, color, pal, anchor = 'left', big = false, icon = null) {
   g.save()
   g.font = `${big ? 800 : 700} ${big ? 12 : 10.5}px ${FONT}`
-  const tw = g.measureText(text).width
+  const isz = big ? 13 : 11.5
+  const iw = icon ? isz + 5 : 0
+  const tw = g.measureText(text).width + iw
   const w = tw + (big ? 20 : 14),
     h = big ? 24 : 19
   const bx = anchor === 'left' ? x : anchor === 'right' ? x - w : x - w / 2
@@ -580,9 +586,11 @@ function chip(g, x, y, text, color, pal, anchor = 'left', big = false) {
     g.closePath()
     g.fill()
   }
+  const left = bx + (w - tw) / 2
+  if (icon) drawIcon(g, icon, left + isz / 2, by + h / 2, isz, { color, lineWidth: 2.3 })
   g.fillStyle = pal.text
-  g.textAlign = 'center'
+  g.textAlign = 'left'
   g.textBaseline = 'middle'
-  g.fillText(text, bx + w / 2, by + h / 2 + 0.5)
+  g.fillText(text, left + iw, by + h / 2 + 0.5)
   g.restore()
 }

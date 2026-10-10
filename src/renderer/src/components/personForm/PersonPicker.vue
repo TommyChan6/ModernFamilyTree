@@ -3,12 +3,10 @@
        inline "create as new person" row so trees grow outward in one step. -->
   <div class="pp" @keydown.esc.stop="emit('cancel')">
     <div class="pp-input-wrap">
-      <span class="pp-glass">⌕</span>
-      <input
+      <SearchField
         ref="inputEl"
         v-model="query"
-        class="pp-input"
-        type="text"
+        size="sm"
         :placeholder="placeholder"
         @keydown.down.prevent="move(1)"
         @keydown.up.prevent="move(-1)"
@@ -44,7 +42,7 @@
         @pointerenter="activeIdx = results.length"
         @click="createAndPick"
       >
-        <span class="pp-avatar pp-avatar-new">＋</span>
+        <span class="pp-avatar pp-avatar-new"><UiIcon name="plus" :size="14" /></span>
         <span class="pp-name">
           {{
             creating ? 'Creating…' : `Create “${query.trim()}” as a new ${store.noun.toLowerCase()}`
@@ -59,6 +57,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useMainStore } from '../../store/index.js'
 import { api } from '../../api'
+import SearchField from '../ui/SearchField.vue'
+import UiIcon from '../ui/UiIcon.js'
 
 const props = defineProps({
   /** person ids to hide (self, already linked…) */
@@ -152,24 +152,8 @@ function hueOf(p) {
   }
 }
 .pp-input-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  padding: 6px;
   border-bottom: 1px solid var(--border);
-}
-.pp-glass {
-  color: var(--t3);
-  font-size: 14px;
-}
-.pp-input {
-  flex: 1;
-  border: none;
-  outline: none;
-  background: transparent;
-  color: var(--t1);
-  font-family: var(--font);
-  font-size: 13px;
 }
 .pp-list {
   max-height: 236px;
@@ -187,7 +171,7 @@ function hueOf(p) {
   background: transparent;
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   cursor: pointer;
   text-align: left;
   transition: background 0.1s;
@@ -203,7 +187,7 @@ function hueOf(p) {
   display: grid;
   place-items: center;
   overflow: hidden;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: #fff;
   background: hsl(var(--pa-hue, 220), 45%, 45%);
@@ -221,13 +205,13 @@ function hueOf(p) {
   white-space: nowrap;
 }
 .pp-meta {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--t3);
   flex-shrink: 0;
 }
 .pp-empty {
   padding: 12px;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t3);
   text-align: center;
   font-style: italic;
@@ -241,7 +225,6 @@ function hueOf(p) {
 .pp-avatar-new {
   background: var(--adim);
   color: var(--accent);
-  font-size: 14px;
 }
 
 /* ── 水墨 ink theme ─────────────────────────────────────────────────────── */
@@ -266,8 +249,5 @@ function hueOf(p) {
   font-family: var(--font-brush);
   font-size: 15.5px;
   font-weight: 400;
-}
-:root[data-theme='ink'] .pp-glass {
-  filter: grayscale(1) sepia(0.4);
 }
 </style>

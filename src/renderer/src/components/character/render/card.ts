@@ -25,6 +25,20 @@ export interface CardInfo {
   base: string
 }
 
+/** A five-pointed star path centred on (cx, cy) with outer radius r. */
+function starPath(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
+  ctx.beginPath()
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5
+    const rr = i % 2 ? r * 0.45 : r
+    const x = cx + Math.cos(a) * rr
+    const y = cy + Math.sin(a) * rr
+    if (i) ctx.lineTo(x, y)
+    else ctx.moveTo(x, y)
+  }
+  ctx.closePath()
+}
+
 function roundRect(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -160,11 +174,11 @@ export function paintCard(
   ctx.fillStyle = 'rgba(255,255,255,0.72)'
   const sub = [info.lifespan, info.subtitle].filter(Boolean).join('  ·  ')
   if (sub) ctx.fillText(sub, ax + 24, py + 94, aw - 48)
-  // Rarity stars
-  ctx.font = '28px "Segoe UI Symbol", "Segoe UI", sans-serif'
+  // Rarity stars (drawn as paths — no font glyphs, so they look the same everywhere)
   for (let i = 0; i < 5; i++) {
     ctx.fillStyle = i < info.stars ? '#ffd76a' : 'rgba(255,255,255,0.2)'
-    ctx.fillText('★', ax + 24 + i * 32, py + 150)
+    starPath(ctx, ax + 37 + i * 32, py + 140, 13)
+    ctx.fill()
   }
   ctx.restore()
 

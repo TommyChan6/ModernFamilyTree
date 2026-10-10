@@ -27,6 +27,9 @@ export function chronicleViewModel(eras = [], events = []) {
         id: ev.id,
         title: ev.title,
         icon: ev.icon || k.icon,
+        // The kind's own icon — renderers fall back to it when a stored
+        // custom value (e.g. an old free-typed emoji) doesn't resolve.
+        kindIcon: k.icon,
         color: ev.color || k.color,
         a: a ?? NaN,
         b: b ?? NaN,

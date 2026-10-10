@@ -3,13 +3,28 @@
     <button
       class="mt-play"
       :title="playing ? t('map.time.pause') : t('map.time.play')"
+      :aria-label="playing ? t('map.time.pause') : t('map.time.play')"
       @click="emit('toggle-play')"
     >
-      <span v-if="playing">❚❚</span>
-      <span v-else>▶</span>
+      <UiIcon v-if="playing" name="pause" :size="18" />
+      <UiIcon v-else class="mt-play-icon" name="play" :size="18" />
     </button>
-    <button class="mt-btn" :title="t('map.time.prevEvent')" @click="emit('jump', -1)">⏮</button>
-    <button class="mt-btn" :title="t('map.time.stepBack')" @click="emit('step', -1)">‹</button>
+    <button
+      class="mt-btn"
+      :title="t('map.time.prevEvent')"
+      :aria-label="t('map.time.prevEvent')"
+      @click="emit('jump', -1)"
+    >
+      <UiIcon name="skip-back" :size="14" />
+    </button>
+    <button
+      class="mt-btn"
+      :title="t('map.time.stepBack')"
+      :aria-label="t('map.time.stepBack')"
+      @click="emit('step', -1)"
+    >
+      <UiIcon name="chevron-left" :size="14" />
+    </button>
 
     <label class="mt-year" :title="t('map.time.typeYear')">
       <span class="mt-year-cap">{{ t('map.time.year') }}</span>
@@ -22,8 +37,22 @@
       />
     </label>
 
-    <button class="mt-btn" :title="t('map.time.stepFwd')" @click="emit('step', 1)">›</button>
-    <button class="mt-btn" :title="t('map.time.nextEvent')" @click="emit('jump', 1)">⏭</button>
+    <button
+      class="mt-btn"
+      :title="t('map.time.stepFwd')"
+      :aria-label="t('map.time.stepFwd')"
+      @click="emit('step', 1)"
+    >
+      <UiIcon name="chevron-right" :size="14" />
+    </button>
+    <button
+      class="mt-btn"
+      :title="t('map.time.nextEvent')"
+      :aria-label="t('map.time.nextEvent')"
+      @click="emit('jump', 1)"
+    >
+      <UiIcon name="skip-forward" :size="14" />
+    </button>
 
     <div class="mt-track-wrap">
       <span class="mt-end">{{ range.min }}</span>
@@ -66,6 +95,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useI18n } from '../../i18n'
+import UiIcon from '../ui/UiIcon.js'
 
 // The Map view's own time bar: scrub, play, step, and jump between moments.
 // Journey stops (person color) and events (feature color) mark the track so
@@ -150,14 +180,21 @@ function onYearInput(e) {
   flex: 0 0 auto;
   border: none;
   border-radius: 50%;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--accent);
-  color: #fff;
-  font-size: 13px;
+  color: var(--on-accent);
   cursor: pointer;
   box-shadow: 0 2px 12px var(--adim);
   transition:
     transform 0.15s,
     box-shadow 0.2s;
+}
+.mt-play-icon {
+  /* the triangle's visual centre sits left of its box */
+  margin-left: 2px;
 }
 .mt-play:hover {
   transform: scale(1.08);
@@ -173,14 +210,17 @@ function onYearInput(e) {
 .mt-btn,
 .mt-speed {
   flex: 0 0 auto;
-  height: 28px;
-  min-width: 26px;
+  height: var(--ctl-sm);
+  min-width: var(--ctl-sm);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 8px;
   background: transparent;
   color: var(--t2);
   cursor: pointer;
-  font-size: 14px;
   transition:
     background 0.12s,
     color 0.12s;
@@ -191,7 +231,7 @@ function onYearInput(e) {
   color: var(--t1);
 }
 .mt-speed {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   padding: 0 8px;
   border: 1px solid var(--border);
@@ -204,8 +244,8 @@ function onYearInput(e) {
   padding: 0 4px;
 }
 .mt-year-cap {
-  font-size: 8.5px;
-  letter-spacing: 1.4px;
+  font-size: var(--fs-xs);
+  letter-spacing: 1.2px;
   color: var(--t3);
   font-weight: 700;
 }
@@ -234,7 +274,7 @@ function onYearInput(e) {
   min-width: 0;
 }
 .mt-end {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
   font-variant-numeric: tabular-nums;
 }

@@ -14,10 +14,13 @@
 
         <header class="bp-topbar">
           <button class="bp-back" @click="close">
-            <span class="bp-back-arrow">←</span>
+            <UiIcon class="bp-back-arrow" name="arrow-left" :size="16" />
             {{ t('browse.back') }}
           </button>
-          <span class="bp-brand">🧭 {{ t('browse.brand') }}</span>
+          <span class="bp-brand">
+            <UiIcon name="compass" :size="18" />
+            {{ t('browse.brand') }}
+          </span>
           <div class="bp-ticker" aria-live="polite">
             <Transition name="tick" mode="out-in">
               <button
@@ -27,7 +30,9 @@
                 @click="openProject(tickLine.projectId)"
               >
                 <span class="bp-tick-dot"></span>
-                <span class="bp-tick-av">{{ tickLine.avatar }}</span>
+                <span class="bp-tick-av" :style="{ '--ah': tickLine.hue }">
+                  <UiIcon :name="tickLine.avatar" :size="12" />
+                </span>
                 <b>{{ tickLine.name }}</b>
                 {{ tickLine.verb }}
                 <em>{{ tickLine.title }}</em>
@@ -35,7 +40,7 @@
             </Transition>
           </div>
           <button class="bp-surprise" :class="{ rolling }" @click="surprise">
-            <span class="bp-dice">🎲</span>
+            <UiIcon class="bp-dice" name="dices" :size="16" />
             {{ t('browse.surprise') }}
           </button>
         </header>
@@ -45,25 +50,25 @@
             <!-- ── Hero ────────────────────────────────────────────────── -->
             <section class="bp-hero">
               <div class="bp-hero-crests" aria-hidden="true">
-                <span v-for="(c, i) in heroCrests" :key="i" :style="c.style">{{ c.glyph }}</span>
+                <span v-for="(c, i) in heroCrests" :key="i" :style="c.style">
+                  <UiIcon :name="c.glyph" :size="c.size" :stroke="1.5" />
+                </span>
               </div>
               <p class="bp-eyebrow">{{ t('browse.eyebrow') }}</p>
               <h1 class="bp-title">{{ t('browse.title') }}</h1>
               <p class="bp-subtitle">{{ t('browse.subtitle') }}</p>
-              <div class="bp-search" :class="{ focused: searchFocused }">
-                <span class="bp-search-icon">🔍</span>
-                <input
+              <div class="bp-search">
+                <SearchField
                   ref="searchRef"
                   v-model="query"
-                  class="bp-search-input"
+                  class="bp-search-field"
+                  size="lg"
                   :placeholder="placeholder"
-                  spellcheck="false"
+                  :aria-label="t('browse.searchPh')"
                   @focus="searchFocused = true"
                   @blur="searchFocused = false"
-                  @keydown.esc.stop="clearQuery"
                 />
-                <button v-if="query" class="bp-search-clear" @click="clearQuery">×</button>
-                <kbd v-else class="bp-kbd">/</kbd>
+                <kbd v-if="!query" class="bp-kbd">/</kbd>
               </div>
               <div class="bp-try">
                 <span>{{ t('browse.try') }}</span>
@@ -71,7 +76,10 @@
                   {{ s }}
                 </button>
               </div>
-              <p class="bp-mock-note">🧪 {{ t('browse.mockNote') }}</p>
+              <p class="bp-mock-note">
+                <UiIcon name="flask-conical" :size="14" />
+                <span>{{ t('browse.mockNote') }}</span>
+              </p>
             </section>
 
             <!-- ── Access ladder ───────────────────────────────────────── -->
@@ -90,7 +98,7 @@
                   :aria-pressed="filters.access.includes(m)"
                   @click="toggleAccess(m)"
                 >
-                  <span class="bp-step-icon">{{ ACCESS_ICONS[m] }}</span>
+                  <UiIcon class="bp-step-icon" :name="ACCESS_ICONS[m]" :size="24" />
                   <span class="bp-step-name">{{ t('browse.modes.' + m + '.name') }}</span>
                   <span class="bp-step-short">{{ t('browse.modes.' + m + '.short') }}</span>
                   <span class="bp-step-pips">
@@ -116,7 +124,7 @@
                   :class="{ on: filters.genre === g }"
                   @click="filters.genre = g"
                 >
-                  <span>{{ GENRE_ICON[g] }}</span>
+                  <UiIcon :name="GENRE_ICON[g]" :size="14" />
                   {{ t('browse.genres.' + g) }}
                   <span class="bp-genre-n">{{ genreCount(g) }}</span>
                 </button>
@@ -144,7 +152,7 @@
                   </option>
                 </select>
                 <label class="bp-sort">
-                  <span>⇅</span>
+                  <UiIcon name="arrow-up-down" :size="14" />
                   <select
                     v-model="sortBy"
                     class="bp-select bare"
@@ -166,7 +174,10 @@
             <template v-if="!filtering">
               <section class="bp-shelf">
                 <div class="bp-shelf-head">
-                  <h2>✨ {{ t('browse.shelves.forYou') }}</h2>
+                  <h2>
+                    <UiIcon name="sparkles" :size="18" />
+                    {{ t('browse.shelves.forYou') }}
+                  </h2>
                   <p>{{ t('browse.shelves.forYouHint') }}</p>
                 </div>
                 <div class="bp-row">
@@ -191,7 +202,10 @@
 
               <section class="bp-shelf">
                 <div class="bp-shelf-head">
-                  <h2>📚 {{ t('browse.shelves.collections') }}</h2>
+                  <h2>
+                    <UiIcon name="library" :size="18" />
+                    {{ t('browse.shelves.collections') }}
+                  </h2>
                   <p>{{ t('browse.shelves.collectionsHint') }}</p>
                 </div>
                 <div class="bp-collections">
@@ -202,7 +216,7 @@
                     :style="{ '--h': c.hue, '--i': i }"
                     @click="openCollection(c.id)"
                   >
-                    <span class="bp-coll-emoji">{{ c.emoji }}</span>
+                    <UiIcon class="bp-coll-icon" :name="c.icon" :size="26" />
                     <span class="bp-coll-title">{{ collTitle(c) }}</span>
                     <span class="bp-coll-stack">
                       <span
@@ -210,8 +224,8 @@
                         :key="pid"
                         class="bp-coll-crest"
                         :style="{ '--j': j, '--ch': projectById.get(pid).hue }"
-                        >{{ projectById.get(pid).crest }}</span
-                      >
+                        ><UiIcon :name="projectById.get(pid).crest" :size="15"
+                      /></span>
                     </span>
                     <span class="bp-coll-n">{{
                       t('browse.results', { n: c.projectIds.length })
@@ -224,7 +238,10 @@
 
               <section class="bp-shelf">
                 <div class="bp-shelf-head">
-                  <h2>🌟 {{ t('browse.shelves.creators') }}</h2>
+                  <h2>
+                    <UiIcon name="star" :size="18" />
+                    {{ t('browse.shelves.creators') }}
+                  </h2>
                   <p>{{ t('browse.shelves.creatorsHint') }}</p>
                 </div>
                 <div class="bp-row">
@@ -238,11 +255,16 @@
                     @click="openProfile(p.id)"
                     @keydown.enter="openProfile(p.id)"
                   >
-                    <span class="bp-creator-av">{{ p.avatar }}</span>
+                    <span class="bp-creator-av"><UiIcon :name="p.avatar" :size="26" /></span>
                     <span class="bp-creator-name">{{ p.displayName }}</span>
                     <span class="bp-creator-handle">@{{ p.username }}</span>
                     <span class="bp-creator-crests">
-                      <span v-for="tr in treesBy(p.id)" :key="tr.id">{{ tr.crest }}</span>
+                      <UiIcon
+                        v-for="tr in treesBy(p.id)"
+                        :key="tr.id"
+                        :name="tr.crest"
+                        :size="16"
+                      />
                     </span>
                     <span class="bp-creator-meta">
                       {{ compactNum(p.followers + (signals.isFollowing(p.id) ? 1 : 0)) }}
@@ -253,10 +275,11 @@
                       :class="{ on: signals.isFollowing(p.id) }"
                       @click.stop="signals.toggleFollow(p.id)"
                     >
+                      <UiIcon :name="signals.isFollowing(p.id) ? 'check' : 'plus'" :size="14" />
                       {{
                         signals.isFollowing(p.id)
-                          ? '✓ ' + t('browse.profile.following')
-                          : '＋ ' + t('browse.profile.follow')
+                          ? t('browse.profile.following')
+                          : t('browse.profile.follow')
                       }}
                     </button>
                   </div>
@@ -265,7 +288,10 @@
 
               <section class="bp-shelf">
                 <div class="bp-shelf-head">
-                  <h2>🪴 {{ t('browse.shelves.yours') }}</h2>
+                  <h2>
+                    <UiIcon name="sprout" :size="18" />
+                    {{ t('browse.shelves.yours') }}
+                  </h2>
                   <p>{{ t('browse.shelves.yoursHint') }}</p>
                 </div>
                 <div class="bp-yours">
@@ -276,7 +302,9 @@
                     :style="{ '--h': hueOf(p) }"
                     @click="manageMine"
                   >
-                    <span class="bp-mine-mode">{{ ACCESS_ICONS[p.access || 'glasshouse'] }}</span>
+                    <span class="bp-mine-mode">
+                      <UiIcon :name="ACCESS_ICONS[p.access || 'glasshouse']" :size="20" />
+                    </span>
                     <span class="bp-mine-name">{{ p.name }}</span>
                     <span class="bp-mine-sub">
                       {{ t('browse.modes.' + (p.access || 'glasshouse') + '.name') }} ·
@@ -284,7 +312,7 @@
                     </span>
                   </button>
                   <button class="bp-mine add" @click="manageMine">
-                    <span class="bp-mine-mode">＋</span>
+                    <span class="bp-mine-mode"><UiIcon name="plus" :size="20" /></span>
                     <span class="bp-mine-name">{{
                       myPublic.length ? t('browse.yoursManage') : t('browse.yoursEmpty')
                     }}</span>
@@ -300,15 +328,25 @@
             <section class="bp-results">
               <div class="bp-results-head">
                 <h2>
-                  <template v-if="!filtering">🌲 {{ t('browse.shelves.all') }}</template>
+                  <template v-if="!filtering">
+                    <UiIcon name="trees" :size="18" />
+                    {{ t('browse.shelves.all') }}
+                  </template>
                   <template v-else-if="query.trim()">{{
                     t('browse.resultsFor', { n: results.length, q: query.trim() })
                   }}</template>
                   <template v-else>{{ t('browse.results', { n: results.length }) }}</template>
                 </h2>
                 <span v-if="activeCollection" class="bp-active-coll">
-                  {{ activeCollection.emoji }} {{ collTitle(activeCollection) }}
-                  <button @click="collectionId = null">×</button>
+                  <UiIcon :name="activeCollection.icon" :size="14" />
+                  {{ collTitle(activeCollection) }}
+                  <button
+                    :title="t('browse.clear')"
+                    :aria-label="t('browse.clear')"
+                    @click="collectionId = null"
+                  >
+                    <UiIcon name="x" :size="12" />
+                  </button>
                 </span>
                 <button v-if="filtering" class="bp-clear" @click="clearAll">
                   {{ t('browse.clear') }}
@@ -334,7 +372,7 @@
                 </template>
               </TransitionGroup>
               <div v-else class="bp-empty">
-                <span class="bp-empty-art">🍂</span>
+                <UiIcon class="bp-empty-art" name="leaf" :size="52" :stroke="1.5" />
                 <h3>{{ t('browse.emptyTitle') }}</h3>
                 <p>{{ t('browse.emptyBody') }}</p>
                 <button class="bp-clear" @click="clearAll">{{ t('browse.clear') }}</button>
@@ -378,6 +416,8 @@ import BrowseDetail from './browse/BrowseDetail.vue'
 import CreatorProfile from './browse/CreatorProfile.vue'
 import AdSlot from './billing/AdSlot.vue'
 import InkBackdrop from './ui/InkBackdrop.vue'
+import SearchField from './ui/SearchField.vue'
+import UiIcon from './ui/UiIcon.js'
 import { ACTIVITY, COLLECTIONS, PROFILES, PROJECTS } from './browse/browseData'
 import {
   ACCESS_ICONS,
@@ -398,13 +438,13 @@ const { t, locale } = useI18n()
 
 const GENRES = ['all', 'anime', 'tv', 'history', 'dynasty', 'sitcom', 'myth']
 const GENRE_ICON = {
-  all: '✦',
-  anime: '🍥',
-  tv: '📺',
-  history: '👑',
-  dynasty: '🐉',
-  sitcom: '🛋️',
-  myth: '⚡'
+  all: 'layout-grid',
+  anime: 'sparkles',
+  tv: 'tv',
+  history: 'crown',
+  dynasty: 'scroll',
+  sitcom: 'sofa',
+  myth: 'zap'
 }
 const SIZES = ['any', 'cozy', 'clan', 'dynasty']
 const LANGS = ['any', 'en', 'zh-Hans', 'zh-Hant', 'ja']
@@ -428,11 +468,11 @@ const FIREFLIES = Array.from({ length: 18 }, (_, i) => {
 })
 const heroCrests = PROJECTS.slice(0, 10).map((p, i) => ({
   glyph: p.crest,
+  size: 22 + ((i * 7) % 18),
   style: {
     left: `${6 + ((i * 37) % 88)}%`,
     top: `${10 + ((i * 53) % 70)}%`,
-    animationDelay: `${i * 0.7}s`,
-    fontSize: `${22 + ((i * 7) % 18)}px`
+    animationDelay: `${i * 0.7}s`
   }
 }))
 
@@ -536,9 +576,6 @@ function toggleAccess(m) {
   else filters.access.splice(i, 1)
 }
 
-function clearQuery() {
-  query.value = ''
-}
 function clearAll() {
   query.value = ''
   Object.assign(filters, { ...EMPTY_FILTERS, access: [] })
@@ -654,6 +691,7 @@ const tickLine = computed(() => {
   const p = profileById.get(who)
   return {
     avatar: p.avatar,
+    hue: p.hue,
     name: p.displayName,
     verb: t('browse.activity.' + verb),
     title: projectById.get(pid).title,
@@ -812,8 +850,9 @@ onUnmounted(() => {
 .bp-back {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 14px;
+  gap: 6px;
+  height: var(--ctl-md);
+  padding: 0 14px;
   border-radius: var(--r-pill);
   border: 1px solid var(--border);
   background: var(--surface);
@@ -829,6 +868,9 @@ onUnmounted(() => {
   transition: transform 0.2s var(--ease-out);
 }
 .bp-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 900;
   font-size: 15px;
   color: var(--t1);
@@ -845,12 +887,13 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   max-width: 100%;
-  padding: 5px 12px;
+  height: var(--ctl-md);
+  padding: 0 12px;
   border-radius: var(--r-pill);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--t2);
-  font-size: 12px;
+  font-size: 12.5px;
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -865,6 +908,18 @@ onUnmounted(() => {
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.bp-tick-av {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t1);
+  background: hsl(var(--ah, 220) 60% 50% / 0.22);
+  box-shadow: inset 0 0 0 1px hsl(var(--ah, 220) 60% 55% / 0.45);
 }
 .bp-tick-dot {
   width: 7px;
@@ -897,8 +952,9 @@ onUnmounted(() => {
 .bp-surprise {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
+  gap: 6px;
+  height: var(--ctl-md);
+  padding: 0 16px;
   border-radius: var(--r-pill);
   border: none;
   color: var(--on-accent);
@@ -912,9 +968,6 @@ onUnmounted(() => {
 }
 .bp-surprise:hover {
   transform: translateY(-1px) scale(1.03);
-}
-.bp-dice {
-  display: inline-block;
 }
 .bp-surprise.rolling .bp-dice {
   animation: bp-roll 0.65s var(--ease-out);
@@ -952,6 +1005,7 @@ onUnmounted(() => {
 }
 .bp-hero-crests span {
   position: absolute;
+  color: var(--t2);
   opacity: 0.16;
   animation: bp-bob 7s ease-in-out infinite;
   filter: saturate(0.8);
@@ -965,7 +1019,7 @@ onUnmounted(() => {
 .bp-eyebrow {
   position: relative;
   margin: 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 900;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -993,55 +1047,43 @@ onUnmounted(() => {
 }
 .bp-search {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
   max-width: 680px;
   margin: 24px auto 0;
-  padding: 6px 8px 6px 18px;
+  transition: transform 0.25s var(--ease-out);
+}
+.bp-search:focus-within {
+  transform: translateY(-1px);
+}
+.bp-search .bp-search-field {
+  --sf-h: 52px;
+  --sf-pad: 18px;
+}
+.bp-search .bp-search-field :deep(.sf-input) {
+  padding-right: 56px;
   border-radius: var(--r-pill);
   background: var(--surface);
   border: 1px solid var(--border-strong);
   box-shadow: var(--shadow);
-  transition:
-    box-shadow 0.25s ease,
-    transform 0.25s var(--ease-out);
+  color: var(--t1);
+  font-size: 16px;
+  transition: box-shadow 0.25s ease;
 }
-.bp-search.focused {
+.bp-search .bp-search-field :deep(.sf-input:focus) {
+  border-color: var(--border-strong);
   box-shadow:
     var(--shadow-lg),
     0 0 0 4px rgba(var(--accent-rgb), 0.22);
-  transform: translateY(-1px);
 }
-.bp-search-icon {
-  font-size: 17px;
-}
-.bp-search-input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  outline: none;
-  background: transparent;
-  color: var(--t1);
-  font-size: 16px;
-  padding: 10px 0;
-  font-family: var(--font);
-}
-.bp-search-input::placeholder {
-  color: var(--t3);
-}
-.bp-search-clear {
-  width: 32px;
-  height: 32px;
+.bp-search .bp-search-field :deep(.sf-clear) {
+  right: 10px;
   border-radius: 50%;
-  border: none;
-  background: var(--elevated);
-  color: var(--t2);
-  font-size: 18px;
-  cursor: pointer;
 }
 .bp-kbd {
-  margin-right: 8px;
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 .bp-try {
   position: relative;
@@ -1051,16 +1093,19 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   margin-top: 14px;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 .bp-try-chip {
-  padding: 4px 11px;
+  display: inline-flex;
+  align-items: center;
+  height: var(--ctl-sm);
+  padding: 0 11px;
   border-radius: var(--r-pill);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--t2);
-  font-size: 12px;
+  font-size: 12.5px;
   cursor: pointer;
   transition:
     color var(--dur) ease,
@@ -1074,8 +1119,12 @@ onUnmounted(() => {
 }
 .bp-mock-note {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   margin: 14px 0 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 
@@ -1096,7 +1145,7 @@ onUnmounted(() => {
 }
 .bp-ladder-head p {
   margin: 4px 0 0;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
 }
 .bp-ladder-steps {
@@ -1146,7 +1195,7 @@ onUnmounted(() => {
   box-shadow: var(--glow);
 }
 .bp-step-icon {
-  font-size: 26px;
+  color: var(--accent);
   transition: transform 0.35s var(--ease-spring);
 }
 .bp-step:hover .bp-step-icon {
@@ -1157,7 +1206,7 @@ onUnmounted(() => {
   font-weight: 900;
 }
 .bp-step-short {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
 }
 .bp-step-pips {
@@ -1180,7 +1229,7 @@ onUnmounted(() => {
   position: absolute;
   top: 12px;
   right: 12px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   color: var(--t2);
   background: var(--elevated);
@@ -1213,12 +1262,13 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  height: var(--ctl-md);
+  padding: 0 12px;
   border-radius: var(--r-pill);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--t2);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   transition:
@@ -1236,8 +1286,11 @@ onUnmounted(() => {
   border-color: var(--accent);
 }
 .bp-genre-n {
-  font-size: 10.5px;
-  opacity: 0.75;
+  font-size: 12px;
+  color: var(--t3);
+}
+.bp-genre.on .bp-genre-n {
+  color: inherit;
 }
 .bp-filter-right {
   display: flex;
@@ -1247,18 +1300,22 @@ onUnmounted(() => {
 }
 .bp-seg {
   display: inline-flex;
+  align-items: stretch;
+  height: var(--ctl-md);
   padding: 3px;
   border-radius: var(--r-pill);
   background: var(--elevated);
   border: 1px solid var(--border);
 }
 .bp-seg-btn {
-  padding: 5px 11px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 11px;
   border: none;
   border-radius: var(--r-pill);
   background: transparent;
   color: var(--t2);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -1269,17 +1326,19 @@ onUnmounted(() => {
 }
 .bp-select {
   width: auto;
-  padding: 7px 10px;
+  height: var(--ctl-md);
+  padding: 0 10px;
   border-radius: var(--r-pill);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--t1);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   outline: none;
 }
 .bp-select.bare {
+  height: 100%;
   border: none;
   background: transparent;
   padding-left: 2px;
@@ -1287,7 +1346,8 @@ onUnmounted(() => {
 .bp-sort {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
+  height: var(--ctl-md);
   padding-left: 12px;
   border-radius: var(--r-pill);
   border: 1px solid var(--border);
@@ -1305,21 +1365,28 @@ onUnmounted(() => {
 }
 .bp-shelf-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
   margin-bottom: 12px;
 }
 .bp-shelf-head h2,
 .bp-results-head h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
   font-size: 19px;
   font-weight: 900;
   color: var(--t1);
 }
+.bp-shelf-head h2 .ui-icon,
+.bp-results-head h2 .ui-icon {
+  color: var(--accent);
+}
 .bp-shelf-head p {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
 }
 .bp-row {
@@ -1375,16 +1442,16 @@ onUnmounted(() => {
   transform: translateY(-4px) rotate(-0.6deg);
   box-shadow: var(--shadow-lg);
 }
-.bp-coll-emoji {
-  font-size: 28px;
+.bp-coll-icon {
+  margin-bottom: 2px;
 }
 .bp-coll-title {
   font-size: 15px;
   font-weight: 900;
 }
 .bp-coll-n {
-  font-size: 11.5px;
-  opacity: 0.75;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.78);
 }
 .bp-coll-stack {
   position: absolute;
@@ -1399,7 +1466,6 @@ onUnmounted(() => {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 15px;
   background: hsl(var(--ch) 50% 20%);
   border: 2px solid rgba(255, 255, 255, 0.25);
   transition: transform 0.3s var(--ease-spring);
@@ -1450,7 +1516,7 @@ onUnmounted(() => {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 28px;
+  color: hsl(var(--h) 60% 50%);
   background: var(--surface);
   box-shadow:
     0 0 0 3px var(--surface),
@@ -1471,28 +1537,33 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .bp-creator-handle {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
 }
 .bp-creator-crests {
   display: flex;
-  gap: 4px;
-  font-size: 16px;
+  gap: 6px;
   margin-top: 4px;
+  color: var(--t2);
 }
 .bp-creator-meta {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
 }
 .bp-creator-follow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ctl-sm);
   margin-top: 8px;
-  padding: 6px 14px;
+  padding: 0 14px;
   border-radius: var(--r-pill);
   border: 1px solid rgba(var(--accent-rgb), 0.5);
   background: var(--adim);
   color: var(--accent);
   font-weight: 800;
-  font-size: 12px;
+  font-size: 12.5px;
   cursor: pointer;
 }
 .bp-creator-follow.on {
@@ -1536,7 +1607,7 @@ onUnmounted(() => {
   border-radius: var(--r-md);
   display: grid;
   place-items: center;
-  font-size: 20px;
+  color: var(--accent);
   background: var(--elevated);
 }
 .bp-mine-name {
@@ -1547,7 +1618,7 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .bp-mine-sub {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1570,16 +1641,21 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 6px 4px 12px;
+  height: var(--ctl-md);
+  padding: 0 5px 0 12px;
   border-radius: var(--r-pill);
   background: var(--adim);
   color: var(--t1);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
 }
 .bp-active-coll button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 22px;
   height: 22px;
+  padding: 0;
   border-radius: 50%;
   border: none;
   background: var(--surface);
@@ -1587,14 +1663,17 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .bp-clear {
+  display: inline-flex;
+  align-items: center;
+  height: var(--ctl-md);
   margin-left: auto;
-  padding: 6px 14px;
+  padding: 0 14px;
   border-radius: var(--r-pill);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--t2);
   font-weight: 700;
-  font-size: 12.5px;
+  font-size: 13px;
   cursor: pointer;
 }
 .bp-clear:hover {
@@ -1626,7 +1705,7 @@ onUnmounted(() => {
   color: var(--t2);
 }
 .bp-empty-art {
-  font-size: 56px;
+  color: var(--t3);
   animation: bp-fall 3s ease-in-out infinite;
 }
 @keyframes bp-fall {
@@ -1818,32 +1897,21 @@ onUnmounted(() => {
   font-size: 16px;
   font-style: italic;
 }
-:root[data-theme='ink'] .bp-search {
+:root[data-theme='ink'] .bp-search .bp-search-field :deep(.sf-input) {
   border-radius: 3px;
   border-color: var(--ink-mount-line);
   background: rgba(255, 251, 240, 0.8);
+  font-size: 17px;
   box-shadow:
     0 0 0 3px var(--ink-silk),
     0 0 0 4px rgba(58, 42, 22, 0.2),
     var(--shadow);
 }
-:root[data-theme='ink'] .bp-search.focused {
+:root[data-theme='ink'] .bp-search .bp-search-field :deep(.sf-input:focus) {
   box-shadow:
     0 0 0 3px var(--ink-silk),
     0 0 0 4px rgba(179, 53, 42, 0.45),
     var(--shadow-lg);
-}
-:root[data-theme='ink'] .bp-search-input {
-  font-size: 17px;
-  background: none;
-  box-shadow: none;
-}
-:root[data-theme='ink'] .bp-search-icon,
-:root[data-theme='ink'] .bp-step-icon,
-:root[data-theme='ink'] .bp-coll-emoji,
-:root[data-theme='ink'] .bp-dice,
-:root[data-theme='ink'] .bp-empty-art {
-  filter: grayscale(1) sepia(0.4) contrast(1.1);
 }
 :root[data-theme='ink'] .bp-ladder {
   border-radius: 2px;
@@ -1925,7 +1993,7 @@ onUnmounted(() => {
   border-radius: 3px;
   background: var(--surface);
   border-color: rgba(48, 36, 20, 0.25);
-  filter: grayscale(0.7) sepia(0.3);
+  color: var(--t2);
 }
 :root[data-theme='ink'] .bp-creator {
   border-radius: 2px;
@@ -1944,6 +2012,7 @@ onUnmounted(() => {
 }
 :root[data-theme='ink'] .bp-creator-av {
   border-radius: 4px 6px 3px 7px / 6px 3px 7px 4px;
+  color: var(--t1);
 }
 :root[data-theme='ink'] .bp-creator-name,
 :root[data-theme='ink'] .bp-mine-name {

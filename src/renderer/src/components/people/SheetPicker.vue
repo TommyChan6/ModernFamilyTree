@@ -10,10 +10,11 @@
       @pointerdown.stop
     >
       <div class="shp-search">
-        <input
+        <SearchField
           ref="inputEl"
           v-model="query"
-          class="shp-input"
+          size="sm"
+          :clearable="false"
           :placeholder="multi ? 'Find or create a group…' : 'Find or add an option…'"
           @keydown="onKey"
         />
@@ -31,9 +32,9 @@
           @click="pick(o.id)"
         >
           <span class="shp-dot"></span>
-          <span v-if="o.icon" class="shp-icon">{{ o.icon }}</span>
+          <UiIcon v-if="o.icon" class="shp-icon" :name="o.icon" :size="14" />
           <span class="shp-label">{{ o.label }}</span>
-          <span class="shp-check" aria-hidden="true">✓</span>
+          <UiIcon class="shp-check" name="check" :size="14" :stroke="2.6" />
         </button>
         <button
           v-if="canCreate"
@@ -42,7 +43,7 @@
           @pointerenter="hot = shown.length"
           @click="create"
         >
-          <span class="shp-plus">＋</span>
+          <UiIcon class="shp-plus" name="plus" :size="14" :stroke="2.4" />
           <span class="shp-label">
             {{ multi ? 'New group' : 'Add option' }} “<b>{{ query.trim() }}</b
             >”
@@ -54,7 +55,10 @@
         <button v-if="!multi && selected.length" class="shp-clear" @click="$emit('clear')">
           Clear
         </button>
-        <span class="shp-hint">↑↓ move · ↵ {{ multi ? 'toggle' : 'pick' }} · Esc close</span>
+        <span class="shp-hint">
+          <UiIcon name="arrow-up-down" :size="12" /> move · Enter {{ multi ? 'toggle' : 'pick' }} ·
+          Esc close
+        </span>
       </div>
     </div>
   </Teleport>
@@ -62,6 +66,8 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import UiIcon from '../ui/UiIcon.js'
+import SearchField from '../ui/SearchField.vue'
 
 // Floating option picker for the Sheet's select-trait and Groups cells. It is
 // anchored to the cell's screen rect (flipping above when there's no room
@@ -159,10 +165,11 @@ function onKey(e) {
 }
 
 onMounted(() => {
-  inputEl.value?.focus({ preventScroll: true })
+  const input = inputEl.value?.el
+  input?.focus({ preventScroll: true })
   // Caret after any typed-to-open text.
   const len = query.value.length
-  inputEl.value?.setSelectionRange?.(len, len)
+  input?.setSelectionRange?.(len, len)
 })
 
 defineExpose({ contains: (el) => !!rootEl.value?.contains(el) })
@@ -205,22 +212,6 @@ defineExpose({ contains: (el) => !!rootEl.value?.contains(el) })
   padding: 8px;
   border-bottom: 1px solid var(--border);
 }
-.shp-input {
-  width: 100%;
-  height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--elevated);
-  color: var(--t1);
-  font-family: var(--font);
-  font-size: 12.5px;
-}
-.shp-input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--adim);
-}
 .shp-list {
   flex: 1 1 auto;
   min-height: 0;
@@ -240,7 +231,7 @@ defineExpose({ contains: (el) => !!rootEl.value?.contains(el) })
   background: transparent;
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   text-align: left;
   cursor: pointer;
   animation: shp-opt-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--i, 0) * 0.018s) backwards;
@@ -264,7 +255,8 @@ defineExpose({ contains: (el) => !!rootEl.value?.contains(el) })
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--oc) 18%, transparent);
 }
 .shp-icon {
-  font-size: 12px;
+  flex-shrink: 0;
+  color: var(--oc);
 }
 .shp-label {
   flex: 1 1 auto;
@@ -274,8 +266,8 @@ defineExpose({ contains: (el) => !!rootEl.value?.contains(el) })
   white-space: nowrap;
 }
 .shp-check {
+  flex-shrink: 0;
   color: var(--accent);
-  font-weight: 800;
   opacity: 0;
   transform: scale(0.4);
   transition:
@@ -293,15 +285,13 @@ defineExpose({ contains: (el) => !!rootEl.value?.contains(el) })
   color: var(--t1);
 }
 .shp-plus {
-  width: 9px;
-  text-align: center;
+  flex-shrink: 0;
   color: var(--accent);
-  font-weight: 800;
 }
 .shp-empty {
   padding: 14px 8px;
   text-align: center;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 .shp-foot {
@@ -312,8 +302,11 @@ defineExpose({ contains: (el) => !!rootEl.value?.contains(el) })
   border-top: 1px solid var(--border);
 }
 .shp-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin-left: auto;
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
 }
 .shp-clear {
@@ -321,7 +314,7 @@ defineExpose({ contains: (el) => !!rootEl.value?.contains(el) })
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   padding: 2px 6px;

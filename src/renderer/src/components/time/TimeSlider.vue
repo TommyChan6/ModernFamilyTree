@@ -29,7 +29,7 @@
           :style="{ '--ec': currentEra.color }"
           :title="currentEra.name"
         >
-          <span class="ts-era-ic">{{ currentEra.icon || '◆' }}</span>
+          <UiIcon class="ts-era-ic" :name="eraIcon" :size="11" />
           <span class="ts-era-name">{{ currentEra.name }}</span>
         </div>
       </Transition>
@@ -90,25 +90,43 @@
       <button
         class="ts-btn ts-btn-play"
         :title="playing ? 'Pause' : reversed ? 'Play backwards' : 'Play through time'"
+        :aria-label="playing ? 'Pause' : reversed ? 'Play backwards' : 'Play through time'"
         @click="tt.togglePlay()"
       >
-        {{ playing ? '❚❚' : reversed ? '◀' : '▶' }}
+        <UiIcon
+          :name="playing ? 'pause' : 'play'"
+          :class="{ 'ts-flip': !playing && reversed }"
+          :size="14"
+        />
       </button>
       <button
         class="ts-btn"
         :disabled="!active"
         title="Stop — back to the present"
+        aria-label="Stop"
         @click="tt.stop()"
       >
-        ■
+        <UiIcon name="square" :size="13" />
       </button>
       <template v-if="store.caps.timeControls">
         <div class="ts-ctrl-sep"></div>
         <div class="ts-btn-row">
-          <button class="ts-btn ts-btn-sm" title="Previous event" @click="tt.skipEvent(-1)">
-            «
+          <button
+            class="ts-btn ts-btn-sm"
+            title="Previous event"
+            aria-label="Previous event"
+            @click="tt.skipEvent(-1)"
+          >
+            <UiIcon name="skip-back" :size="12" />
           </button>
-          <button class="ts-btn ts-btn-sm" title="Next event" @click="tt.skipEvent(1)">»</button>
+          <button
+            class="ts-btn ts-btn-sm"
+            title="Next event"
+            aria-label="Next event"
+            @click="tt.skipEvent(1)"
+          >
+            <UiIcon name="skip-forward" :size="12" />
+          </button>
         </div>
         <div class="ts-btn-row">
           <button class="ts-btn ts-btn-sm" title="Back one year" @click="tt.stepYears(-1)">
@@ -130,17 +148,19 @@
             class="ts-btn ts-btn-sm"
             :class="{ 'ts-btn-active': reversed }"
             title="Reverse playback direction"
+            aria-label="Reverse playback direction"
             @click="tt.toggleReversed()"
           >
-            ⇅
+            <UiIcon name="arrow-down-up" :size="12" />
           </button>
           <button
             class="ts-btn ts-btn-sm"
             :class="{ 'ts-btn-active': looping }"
             title="Loop playback"
+            aria-label="Loop playback"
             @click="tt.toggleLooping()"
           >
-            ∞
+            <UiIcon name="infinity" :size="12" />
           </button>
         </div>
       </template>
@@ -150,7 +170,11 @@
     <div class="ts-feed">
       <TransitionGroup name="ts-toast">
         <div v-for="t in toasts" :key="t.key" class="ts-toast" :class="'ts-toast-' + t.kind">
-          <span class="ts-toast-icon">{{ t.kind === 'birth' ? '👶' : '💍' }}</span>
+          <UiIcon
+            class="ts-toast-icon"
+            :name="t.kind === 'birth' ? 'baby' : 'heart-handshake'"
+            :size="14"
+          />
           <span class="ts-toast-label">{{ t.label }}</span>
           <span class="ts-toast-year">{{ t.year }}</span>
         </div>
@@ -166,6 +190,8 @@ import { useTimeTravel, TIME_SPEEDS } from './useTimeTravel'
 import { bucketizeEvents, eventsCrossed } from './timeMath'
 import { erasAt, eraLanes } from '../../../../shared/chronicle'
 import { toOrdinal } from '../../../../shared/calendarMath'
+import UiIcon from '../ui/UiIcon.js'
+import { hasIcon } from '../ui/icons.js'
 
 const store = useMainStore()
 const tt = useTimeTravel()
@@ -211,6 +237,9 @@ const currentEra = computed(() => {
     null
   )
 })
+const eraIcon = computed(() =>
+  hasIcon(currentEra.value?.icon) ? currentEra.value.icon : 'diamond'
+)
 const eraStripes = computed(() => {
   const { minYear, maxYear } = range.value
   const span = Math.max(1e-6, maxYear - minYear)
@@ -369,7 +398,7 @@ onBeforeUnmount(() => {
   user-select: none;
 }
 .ts-readout-cap {
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 1.4px;
   color: var(--t3);
@@ -385,7 +414,7 @@ onBeforeUnmount(() => {
   color: var(--accent);
 }
 .ts-readout-span {
-  font-size: 8.5px;
+  font-size: 10px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--t3);
@@ -411,7 +440,7 @@ onBeforeUnmount(() => {
   align-self: stretch;
 }
 .ts-endcap {
-  font-size: 8.5px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--t3);
@@ -529,7 +558,7 @@ onBeforeUnmount(() => {
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   width: 34px;
   height: 26px;
@@ -558,14 +587,16 @@ onBeforeUnmount(() => {
 .ts-btn-play {
   width: 38px;
   height: 30px;
-  font-size: 12px;
   background: var(--adim);
   border-color: rgba(var(--accent-rgb), 0.4);
   color: var(--accent);
 }
 .ts-btn-play:hover {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent, #fff);
+}
+.ts-flip {
+  transform: scaleX(-1);
 }
 .ts-btn-row {
   display: flex;
@@ -574,13 +605,13 @@ onBeforeUnmount(() => {
 .ts-btn-sm {
   width: 21px;
   height: 21px;
-  font-size: 11px;
+  font-size: 12px;
   border-radius: 6px;
 }
 .ts-btn-speed {
   width: 46px;
   height: 21px;
-  font-size: 10px;
+  font-size: 11px;
   border-radius: 6px;
   letter-spacing: 0.4px;
 }
@@ -620,7 +651,7 @@ onBeforeUnmount(() => {
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t1);
   white-space: nowrap;
@@ -632,14 +663,20 @@ onBeforeUnmount(() => {
   border-left: 2.5px solid var(--amber, #f5a623);
 }
 .ts-toast-icon {
-  font-size: 12px;
+  flex-shrink: 0;
+}
+.ts-toast-birth .ts-toast-icon {
+  color: var(--green, #57c99b);
+}
+.ts-toast-marriage .ts-toast-icon {
+  color: var(--amber, #f5a623);
 }
 .ts-toast-label {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .ts-toast-year {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--t3);
@@ -704,7 +741,7 @@ onBeforeUnmount(() => {
 }
 :root[data-theme='ink'] .ts-readout-cap {
   font-family: var(--font-ink-label);
-  font-size: 10px;
+  font-size: 11px;
   font-variant: small-caps;
   letter-spacing: 0.16em;
 }
@@ -716,7 +753,7 @@ onBeforeUnmount(() => {
 :root[data-theme='ink'] .ts-endcap,
 :root[data-theme='ink'] .ts-readout-span {
   font-family: var(--font-ink-label);
-  font-size: 10px;
+  font-size: 11px;
   font-style: italic;
 }
 :root[data-theme='ink'] .ts-rail {
@@ -790,10 +827,11 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 10px color-mix(in srgb, var(--ec) 30%, transparent);
 }
 .ts-era-ic {
-  font-size: 9px;
+  flex-shrink: 0;
+  color: var(--ec);
 }
 .ts-era-name {
-  font-size: 8.5px;
+  font-size: 10px;
   font-weight: 750;
   color: var(--t1);
   white-space: nowrap;

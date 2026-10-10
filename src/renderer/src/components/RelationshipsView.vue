@@ -9,9 +9,7 @@
 
       <div class="rv-controls">
         <div class="rv-search">
-          <span class="rv-search-icon">🔍</span>
-          <input v-model="query" class="rv-search-input" placeholder="Search by name…" />
-          <button v-if="query" class="rv-search-clear" title="Clear" @click="query = ''">✕</button>
+          <SearchField v-model="query" placeholder="Search by name…" />
         </div>
 
         <div class="rv-chips">
@@ -35,7 +33,7 @@
               title="Relationships that need attention"
               @click="typeFilter = 'issues'"
             >
-              <span>⚠</span>
+              <UiIcon name="triangle-alert" :size="14" />
               <span>Issues</span>
               <span class="rv-chip-count">{{ issueCount }}</span>
             </button>
@@ -47,7 +45,7 @@
           :class="{ active: filtersOpen || activeFilterCount > 0 }"
           @click="filtersOpen = !filtersOpen"
         >
-          <span class="rv-filter-icon" :class="{ open: filtersOpen }">⚙</span>
+          <UiIcon name="sliders-horizontal" :size="16" />
           Filters
           <Transition name="rv-badge">
             <span v-if="activeFilterCount" class="rv-filter-badge">{{ activeFilterCount }}</span>
@@ -61,14 +59,13 @@
           title="Manage relationship types"
           @click="typesOpen = true"
         >
-          ⚙ Types
+          <UiIcon name="settings" :size="16" />
+          Types
         </button>
 
-        <button
-          class="btn btn-primary btn-sm"
-          @click="editing?.id === 'new' ? cancelEdit() : startAdd()"
-        >
-          {{ editing?.id === 'new' ? '✕ Cancel' : '＋ Add Relationship' }}
+        <button class="btn btn-primary rv-add-btn" @click="toggleAdd">
+          <UiIcon :name="editing?.id === 'new' ? 'x' : 'plus'" :size="16" />
+          {{ editing?.id === 'new' ? 'Cancel' : 'Add relationship' }}
         </button>
       </div>
     </div>
@@ -97,14 +94,16 @@
               :class="{ on: dateFilter === 'dated' }"
               @click="dateFilter = dateFilter === 'dated' ? 'all' : 'dated'"
             >
-              📅 Dated
+              <UiIcon name="calendar" :size="14" />
+              Dated
             </button>
             <button
               class="rv-fchip"
               :class="{ on: dateFilter === 'undated' }"
               @click="dateFilter = dateFilter === 'undated' ? 'all' : 'undated'"
             >
-              〰 Undated
+              <UiIcon name="circle-dashed" :size="14" />
+              Undated
             </button>
           </div>
         </div>
@@ -124,14 +123,16 @@
               :class="{ on: marriageFilter === 'current' }"
               @click="marriageFilter = marriageFilter === 'current' ? 'all' : 'current'"
             >
-              💍 Together
+              <UiIcon name="heart" :size="14" />
+              Together
             </button>
             <button
               class="rv-fchip m-ended"
               :class="{ on: marriageFilter === 'ended' }"
               @click="marriageFilter = marriageFilter === 'ended' ? 'all' : 'ended'"
             >
-              💔 Ended
+              <UiIcon name="heart-crack" :size="14" />
+              Ended
             </button>
           </div>
         </div>
@@ -148,8 +149,8 @@
               @click="toggleGroup(g.id)"
             >
               <span class="rv-fchip-dot" :style="{ background: g.color }"></span>
-              <span v-if="g.icon" class="rv-fchip-emoji">{{ g.icon }}</span
-              >{{ g.label }}
+              <UiIcon v-if="g.icon" class="rv-fchip-icon" :name="g.icon" :size="14" />
+              {{ g.label }}
             </button>
           </div>
           <Transition name="rv-clear">
@@ -178,7 +179,8 @@
 
         <Transition name="rv-clear">
           <button v-if="activeFilterCount" class="rv-clear" @click="clearFilters">
-            ✕ Clear {{ activeFilterCount }} filter{{ activeFilterCount > 1 ? 's' : '' }}
+            <UiIcon name="x" :size="14" />
+            Clear {{ activeFilterCount }} filter{{ activeFilterCount > 1 ? 's' : '' }}
           </button>
         </Transition>
       </div>
@@ -202,7 +204,14 @@
               @cancel="pickerSide = null"
             />
           </div>
-          <button class="rv-swap-btn" title="Swap A and B" @click="swapEditing">⇄</button>
+          <button
+            class="rv-swap-btn"
+            title="Swap A and B"
+            aria-label="Swap A and B"
+            @click="swapEditing"
+          >
+            <UiIcon name="arrow-left-right" :size="16" />
+          </button>
           <div class="rv-field">
             <label>Relationship</label>
             <select v-model="editing.type">
@@ -275,19 +284,34 @@
         <div class="rv-head">
           <button class="rv-th" @click="setSort('from')">
             From
-            <span class="rv-sort-arrow" :class="arrowClass('from')">▲</span>
+            <UiIcon
+              class="rv-sort-arrow"
+              :class="arrowClass('from')"
+              name="chevron-up"
+              :size="12"
+            />
           </button>
           <button class="rv-th rv-th-center" @click="setSort('type')">
             Relation
-            <span class="rv-sort-arrow" :class="arrowClass('type')">▲</span>
+            <UiIcon
+              class="rv-sort-arrow"
+              :class="arrowClass('type')"
+              name="chevron-up"
+              :size="12"
+            />
           </button>
           <button class="rv-th" @click="setSort('to')">
             To
-            <span class="rv-sort-arrow" :class="arrowClass('to')">▲</span>
+            <UiIcon class="rv-sort-arrow" :class="arrowClass('to')" name="chevron-up" :size="12" />
           </button>
           <button class="rv-th" @click="setSort('since')">
             Since
-            <span class="rv-sort-arrow" :class="arrowClass('since')">▲</span>
+            <UiIcon
+              class="rv-sort-arrow"
+              :class="arrowClass('since')"
+              name="chevron-up"
+              :size="12"
+            />
           </button>
           <div class="rv-th rv-th-plain"></div>
         </div>
@@ -451,20 +475,33 @@
 
               <!-- Actions -->
               <div class="rv-actions" @click.stop>
-                <span v-if="row.issues.length" class="rv-warn" :title="row.issues.join('\n')"
-                  >⚠</span
-                >
+                <span v-if="row.issues.length" class="rv-warn" :title="row.issues.join('\n')">
+                  <UiIcon name="triangle-alert" :size="16" label="Issues" />
+                </span>
                 <button
                   v-if="isDirected(row.rel.type)"
                   class="rv-action-btn"
                   title="Swap direction"
+                  aria-label="Swap direction"
                   @click="swapRel(row)"
                 >
-                  ⇄
+                  <UiIcon name="arrow-left-right" :size="14" />
                 </button>
-                <button class="rv-action-btn" title="Edit" @click="startEdit(row.rel)">✎</button>
-                <button class="rv-action-btn rv-action-del" title="Delete" @click="removeRel(row)">
-                  ✕
+                <button
+                  class="rv-action-btn"
+                  title="Edit"
+                  aria-label="Edit relationship"
+                  @click="startEdit(row.rel)"
+                >
+                  <UiIcon name="pencil" :size="14" />
+                </button>
+                <button
+                  class="rv-action-btn rv-action-del"
+                  title="Delete"
+                  aria-label="Delete relationship"
+                  @click="removeRel(row)"
+                >
+                  <UiIcon name="trash-2" :size="14" />
                 </button>
               </div>
             </div>
@@ -486,7 +523,14 @@
                       @cancel="pickerSide = null"
                     />
                   </div>
-                  <button class="rv-swap-btn" title="Swap A and B" @click="swapEditing">⇄</button>
+                  <button
+                    class="rv-swap-btn"
+                    title="Swap A and B"
+                    aria-label="Swap A and B"
+                    @click="swapEditing"
+                  >
+                    <UiIcon name="arrow-left-right" :size="16" />
+                  </button>
                   <div class="rv-field">
                     <label>Relationship</label>
                     <select v-model="editing.type">
@@ -560,7 +604,7 @@
       <!-- Empty state -->
       <div v-else class="rv-empty">
         <div class="rv-empty-icon">
-          {{ store.relationships.length ? (typeFilter === 'issues' ? '✅' : '🔍') : '🔗' }}
+          <UiIcon :name="emptyIcon" :size="44" :stroke="1.5" />
         </div>
         <div class="rv-empty-title">
           {{
@@ -585,7 +629,8 @@
           class="btn btn-primary btn-sm"
           @click="startAdd"
         >
-          ＋ Add Relationship
+          <UiIcon name="plus" :size="14" />
+          Add relationship
         </button>
       </div>
     </div>
@@ -599,6 +644,8 @@ import { api } from '../api'
 import { yearDate } from '../../../shared/calendarMath'
 import PersonPicker from './personForm/PersonPicker.vue'
 import RelTypesPanel from './RelTypesPanel.vue'
+import UiIcon from './ui/UiIcon.js'
+import SearchField from './ui/SearchField.vue'
 import { derivedSiblings } from './graph/graphInsights.js'
 import { confirmDialog } from '../lib/dialogs.js'
 import { undoToast } from '../lib/undoToast.js'
@@ -909,6 +956,10 @@ function setSort(key) {
     sortDir.value = 1
   }
 }
+const emptyIcon = computed(() =>
+  store.relationships.length ? (typeFilter.value === 'issues' ? 'circle-check' : 'search') : 'link'
+)
+
 function arrowClass(key) {
   if (sortKey.value !== key) return 'hidden'
   return sortDir.value === 1 ? 'asc' : 'desc'
@@ -1018,6 +1069,10 @@ function startEdit(rel) {
     ended_year: rel.ended?.year || '',
     status: rel.status || 'active'
   }
+}
+function toggleAdd() {
+  if (editing.value?.id === 'new') cancelEdit()
+  else startAdd()
 }
 function cancelEdit() {
   editing.value = null
@@ -1186,7 +1241,7 @@ async function toggleStatus(row) {
   color: var(--t1);
 }
 .rv-count {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--accent);
   background: var(--adim);
@@ -1205,15 +1260,16 @@ async function toggleStatus(row) {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  height: 34px;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ctl-md);
   padding: 0 13px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1229,13 +1285,6 @@ async function toggleStatus(row) {
   color: var(--t1);
   border-color: rgba(var(--accent-rgb), 0.45);
 }
-.rv-filter-icon {
-  font-size: 13px;
-  transition: transform 0.4s cubic-bezier(0.34, 1.4, 0.5, 1);
-}
-.rv-filter-icon.open {
-  transform: rotate(90deg);
-}
 .rv-filter-badge {
   min-width: 17px;
   height: 17px;
@@ -1245,8 +1294,8 @@ async function toggleStatus(row) {
   justify-content: center;
   border-radius: 9px;
   background: var(--accent);
-  color: #fff;
-  font-size: 10.5px;
+  color: var(--on-accent);
+  font-size: 11.5px;
   font-weight: 800;
 }
 .rv-badge-enter-active,
@@ -1298,7 +1347,7 @@ async function toggleStatus(row) {
   flex-wrap: wrap;
 }
 .rv-facet-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.7px;
   text-transform: uppercase;
@@ -1321,7 +1370,7 @@ async function toggleStatus(row) {
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1346,8 +1395,8 @@ async function toggleStatus(row) {
   background: var(--fchip-c);
   flex-shrink: 0;
 }
-.rv-fchip-emoji {
-  font-size: 12px;
+.rv-fchip-icon {
+  color: var(--fchip-c);
 }
 .m-current {
   --fchip-c: var(--green);
@@ -1364,13 +1413,16 @@ async function toggleStatus(row) {
   background: var(--elevated);
 }
 .rv-seg {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
   border: none;
   background: transparent;
   color: var(--t3);
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  padding: 3px 10px;
+  padding: 0 10px;
   border-radius: 6px;
   cursor: pointer;
   transition:
@@ -1379,11 +1431,12 @@ async function toggleStatus(row) {
 }
 .rv-seg.on {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .rv-clear {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   height: 28px;
   padding: 0 12px;
   border: 1px solid transparent;
@@ -1391,7 +1444,7 @@ async function toggleStatus(row) {
   background: transparent;
   color: var(--t3);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1414,53 +1467,16 @@ async function toggleStatus(row) {
   transform: translateX(-6px);
 }
 
+/* One control height across the toolbar (search, chips, buttons). */
 .rv-search {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  background: var(--elevated);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0 10px;
-  height: 34px;
+  width: 220px;
   min-width: 190px;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
 }
-.rv-search:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
+.rv-search .search-field {
+  --sf-h: var(--ctl-md);
 }
-.rv-search-icon {
-  font-size: 13px;
-  opacity: 0.7;
-}
-.rv-search-input {
-  border: none;
-  background: transparent;
-  padding: 0;
-  height: 100%;
-  font-size: 13px;
-  color: var(--t1);
-  width: 100%;
-  box-shadow: none;
-}
-.rv-search-input:focus {
-  box-shadow: none;
-}
-.rv-search-clear {
-  border: none;
-  background: transparent;
-  color: var(--t3);
-  cursor: pointer;
-  font-size: 11px;
-  padding: 2px;
-  border-radius: 4px;
-  transition: color 0.12s;
-}
-.rv-search-clear:hover {
-  color: var(--t1);
+.rv-add-btn {
+  gap: 6px;
 }
 
 /* Filter chips */
@@ -1475,14 +1491,14 @@ async function toggleStatus(row) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 30px;
-  padding: 0 11px;
+  height: var(--ctl-md);
+  padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 20px;
   background: var(--elevated);
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1512,7 +1528,7 @@ async function toggleStatus(row) {
   transform: scale(1.25);
 }
 .rv-chip-count {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--t3);
 }
@@ -1521,18 +1537,18 @@ async function toggleStatus(row) {
 }
 
 .rv-chip-issues {
-  --chip-c: #f5a623;
-  color: #f5a623;
-  border-color: rgba(245, 166, 35, 0.35);
+  --chip-c: var(--warning);
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
 }
 .rv-chip-issues:hover {
-  color: #f5a623;
+  color: var(--warning);
 }
 .rv-chip-issues.active {
-  color: #f5a623;
+  color: var(--warning);
 }
 .rv-chip-issues .rv-chip-count {
-  color: #f5a623;
+  color: var(--warning);
 }
 .rv-chip-pop-enter-active {
   transition: all 0.3s cubic-bezier(0.34, 1.4, 0.5, 1);
@@ -1560,7 +1576,7 @@ async function toggleStatus(row) {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
 }
 .rv-editor-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -1580,7 +1596,7 @@ async function toggleStatus(row) {
   min-width: 0;
 }
 .rv-field label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1590,7 +1606,7 @@ async function toggleStatus(row) {
 .rv-field input {
   height: 34px;
   padding: 0 10px;
-  font-size: 12.5px;
+  font-size: 13px;
   background: var(--surface);
 }
 .rv-field select {
@@ -1612,7 +1628,7 @@ async function toggleStatus(row) {
   background: var(--surface);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -1634,14 +1650,17 @@ async function toggleStatus(row) {
 }
 
 .rv-swap-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 34px;
   width: 34px;
+  padding: 0;
   flex-shrink: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
   color: var(--t2);
-  font-size: 15px;
   cursor: pointer;
   transition:
     color 0.15s,
@@ -1662,7 +1681,7 @@ async function toggleStatus(row) {
 .rv-editor-preview {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: 12.5px;
   font-style: italic;
   color: var(--t2);
   white-space: nowrap;
@@ -1672,7 +1691,7 @@ async function toggleStatus(row) {
   border-left: 3px solid var(--rel-c, var(--accent));
 }
 .rv-editor-error {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--danger);
   background: rgba(var(--danger-rgb), 0.12);
@@ -1756,7 +1775,7 @@ async function toggleStatus(row) {
   border: none;
   background: transparent;
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.7px;
@@ -1776,7 +1795,6 @@ async function toggleStatus(row) {
   cursor: default;
 }
 .rv-sort-arrow {
-  font-size: 8px;
   transition:
     transform 0.25s cubic-bezier(0.34, 1.4, 0.5, 1),
     opacity 0.2s;
@@ -1823,7 +1841,7 @@ async function toggleStatus(row) {
   }
 }
 .rv-rowwrap.issue {
-  box-shadow: inset 3px 0 0 #f5a623;
+  box-shadow: inset 3px 0 0 var(--warning);
 }
 .rv-rowwrap.expanded {
   background: color-mix(in srgb, var(--elevated) 55%, transparent);
@@ -1907,7 +1925,7 @@ async function toggleStatus(row) {
   font-style: italic;
 }
 .rv-psub {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t3);
   margin-top: 1px;
   white-space: nowrap;
@@ -1927,10 +1945,10 @@ async function toggleStatus(row) {
 .rv-conn-pill {
   border: none;
   font-family: var(--font);
-  font-size: 8.5px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.5px;
   color: var(--rel-c);
   background: color-mix(in srgb, var(--rel-c) 13%, transparent);
   padding: 2px 9px;
@@ -2061,7 +2079,7 @@ async function toggleStatus(row) {
   width: 60px;
   height: 28px;
   padding: 0 7px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--t2);
   background: transparent;
@@ -2100,8 +2118,8 @@ async function toggleStatus(row) {
   padding: 0 12px;
 }
 .rv-warn {
-  font-size: 13px;
-  color: #f5a623;
+  display: inline-flex;
+  color: var(--warning);
   margin-right: auto;
   cursor: help;
   animation: rv-warn-pulse 2.4s ease-in-out infinite;
@@ -2116,13 +2134,13 @@ async function toggleStatus(row) {
   }
 }
 .rv-action-btn {
-  width: 26px;
-  height: 26px;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
   border: none;
   border-radius: 7px;
   background: transparent;
   color: var(--t3);
-  font-size: 12px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -2166,8 +2184,10 @@ async function toggleStatus(row) {
   color: var(--t2);
 }
 .rv-empty-icon {
-  font-size: 44px;
-  opacity: 0.6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t3);
 }
 .rv-empty-title {
   font-size: 16px;
@@ -2230,7 +2250,7 @@ async function toggleStatus(row) {
   font-family: var(--font-ink-label);
   padding: 0 7px;
 }
-:root[data-theme='ink'] .rv-search,
+:root[data-theme='ink'] .rv-search :deep(.sf-input),
 :root[data-theme='ink'] .rv-filter-btn,
 :root[data-theme='ink'] .rv-chip,
 :root[data-theme='ink'] .rv-fchip,
@@ -2238,19 +2258,13 @@ async function toggleStatus(row) {
   border-radius: 3px 5px 4px 6px / 5px 3px 6px 4px;
   font-family: var(--font-ink-label);
 }
-:root[data-theme='ink'] .rv-search {
+:root[data-theme='ink'] .rv-search :deep(.sf-input) {
   background: rgba(255, 251, 240, 0.55);
   border-color: rgba(48, 36, 20, 0.2);
 }
-:root[data-theme='ink'] .rv-search:focus-within {
+:root[data-theme='ink'] .rv-search :deep(.sf-input:focus) {
   border-color: rgba(179, 53, 42, 0.55);
   box-shadow: 0 0 0 3px rgba(179, 53, 42, 0.1);
-}
-:root[data-theme='ink'] .rv-search-icon,
-:root[data-theme='ink'] .rv-filter-icon,
-:root[data-theme='ink'] .rv-fchip-emoji,
-:root[data-theme='ink'] .rv-empty-icon {
-  filter: grayscale(1) sepia(0.35) contrast(1.1);
 }
 :root[data-theme='ink'] .rv-filter-btn,
 :root[data-theme='ink'] .rv-chip {
@@ -2309,7 +2323,7 @@ async function toggleStatus(row) {
 }
 :root[data-theme='ink'] .rv-th {
   font-family: var(--font-ink-label);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   font-variant: small-caps;
   text-transform: lowercase;
@@ -2357,7 +2371,7 @@ async function toggleStatus(row) {
   gap: 5px;
   background: transparent;
   font-family: var(--font-ink-label);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   font-variant: small-caps;
   text-transform: lowercase;
@@ -2523,8 +2537,11 @@ async function toggleStatus(row) {
   place-items: center;
   width: 110px;
   height: 110px;
-  font-size: 34px;
-  opacity: 0.85;
+  color: var(--t2);
+}
+:root[data-theme='ink'] .rv-empty-icon .ui-icon {
+  width: 34px;
+  height: 34px;
 }
 :root[data-theme='ink'] .rv-empty-icon::before {
   content: '';

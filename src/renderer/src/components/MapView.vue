@@ -1,7 +1,7 @@
 <template>
   <div class="mv">
     <ViewHeader
-      icon="🗺"
+      icon="map"
       :title="t('rail.map')"
       :count="store.maps.length || null"
       :hint="meta ? meta.name : ''"
@@ -10,7 +10,9 @@
         <!-- map switcher -->
         <div class="mv-menu-wrap">
           <button class="mv-pill" :class="{ open: menu === 'maps' }" @click="toggleMenu('maps')">
-            🗺 <span class="mv-pill-text">{{ meta.name }}</span> ▾
+            <UiIcon name="map" :size="16" />
+            <span class="mv-pill-text">{{ meta.name }}</span>
+            <UiIcon class="mv-caret" name="chevron-down" :size="14" />
           </button>
           <Transition name="mv-pop">
             <div v-if="menu === 'maps'" class="mv-menu">
@@ -22,13 +24,16 @@
                 :class="{ on: m.id === meta.id }"
                 @click="openMap(m.id)"
               >
-                <span>{{ styleIcon(m.style) }}</span>
+                <UiIcon :name="styleIcon(m.style)" :size="16" />
                 <span class="mv-menu-name">{{ m.name }}</span>
-                <span class="mv-menu-meta">{{ m.features.length }}✦ · {{ m.tokens.length }}👤</span>
+                <span class="mv-menu-meta">
+                  <UiIcon name="shapes" :size="12" />{{ m.features.length }}
+                  <UiIcon class="mv-menu-meta-gap" name="user" :size="12" />{{ m.tokens.length }}
+                </span>
               </button>
               <div class="mv-menu-sep"></div>
               <label class="mv-menu-rename">
-                ✎
+                <UiIcon name="pencil" :size="16" />
                 <input
                   :value="meta.name"
                   :placeholder="t('map.menu.rename')"
@@ -36,12 +41,17 @@
                   @change="renameMap($event.target.value)"
                 />
               </label>
-              <button class="mv-menu-item" @click="openNew">＋ {{ t('map.menu.new') }}</button>
+              <button class="mv-menu-item" @click="openNew">
+                <UiIcon name="plus" :size="16" />
+                {{ t('map.menu.new') }}
+              </button>
               <button class="mv-menu-item" @click="duplicateMap">
-                ⧉ {{ t('map.menu.duplicate') }}
+                <UiIcon name="copy" :size="16" />
+                {{ t('map.menu.duplicate') }}
               </button>
               <button class="mv-menu-item mv-danger" @click="deleteMap">
-                🗑 {{ t('map.menu.delete') }}
+                <UiIcon name="trash-2" :size="16" />
+                {{ t('map.menu.delete') }}
               </button>
             </div>
           </Transition>
@@ -50,7 +60,9 @@
         <!-- style switcher: the user's own map in every look -->
         <div class="mv-menu-wrap">
           <button class="mv-pill" :class="{ open: menu === 'style' }" @click="toggleMenu('style')">
-            {{ style.icon }} <span class="mv-pill-text">{{ t('map.styles.' + style.id) }}</span> ▾
+            <UiIcon :name="style.icon" :size="16" />
+            <span class="mv-pill-text">{{ t('map.styles.' + style.id) }}</span>
+            <UiIcon class="mv-caret" name="chevron-down" :size="14" />
           </button>
           <Transition name="mv-pop">
             <div v-if="menu === 'style'" class="mv-menu mv-style-menu">
@@ -71,16 +83,21 @@
                     :height="thumbH"
                     :theme="store.theme"
                   />
-                  <span>{{ st.icon }} {{ t('map.styles.' + st.id) }}</span>
+                  <span class="mv-style-name">
+                    <UiIcon :name="st.icon" :size="14" />
+                    {{ t('map.styles.' + st.id) }}
+                  </span>
                 </button>
               </div>
               <div class="mv-menu-title">{{ t('map.menu.ground') }}</div>
               <div class="mv-seg">
                 <button :class="{ on: meta.base === 'sea' }" @click="setBase('sea')">
-                  🌊 {{ t('map.menu.groundSea') }}
+                  <UiIcon name="waves" :size="14" />
+                  {{ t('map.menu.groundSea') }}
                 </button>
                 <button :class="{ on: meta.base === 'land' }" @click="setBase('land')">
-                  🌾 {{ t('map.menu.groundLand') }}
+                  <UiIcon name="wheat" :size="14" />
+                  {{ t('map.menu.groundLand') }}
                 </button>
               </div>
             </div>
@@ -91,19 +108,30 @@
           class="mv-toggle"
           :class="{ on: showLabels }"
           :title="t('map.menu.labels')"
+          :aria-label="t('map.menu.labels')"
+          :aria-pressed="showLabels"
           @click="showLabels = !showLabels"
         >
-          🏷
+          <UiIcon name="tag" :size="16" />
         </button>
         <button
           class="mv-toggle"
           :class="{ on: showTrails }"
           :title="t('map.menu.journeys')"
+          :aria-label="t('map.menu.journeys')"
+          :aria-pressed="showTrails"
           @click="showTrails = !showTrails"
         >
-          🧭
+          <UiIcon name="footprints" :size="16" />
         </button>
-        <button class="mv-toggle" :title="t('map.menu.export')" @click="exportPng">⤓</button>
+        <button
+          class="mv-toggle"
+          :title="t('map.menu.export')"
+          :aria-label="t('map.menu.export')"
+          @click="exportPng"
+        >
+          <UiIcon name="download" :size="16" />
+        </button>
       </div>
     </ViewHeader>
 
@@ -178,7 +206,7 @@
         <!-- what the current tool does, in plain words -->
         <Transition name="mv-hint" mode="out-in">
           <div :key="hintText" class="mv-hint">
-            <span class="mv-hint-icon">{{ hintIcon }}</span>
+            <UiIcon class="mv-hint-icon" :name="hintIcon" :size="16" />
             <span>{{ hintText }}</span>
           </div>
         </Transition>
@@ -191,15 +219,26 @@
             class="mv-toast"
             :style="{ '--c': tst.color || 'var(--accent)' }"
           >
+            <UiIcon v-if="tst.icon" class="mv-toast-icon" :name="tst.icon" :size="16" />
             {{ tst.text }}
           </div>
         </TransitionGroup>
 
         <!-- zoom + scale -->
         <div class="mv-zoom" @pointerdown.stop>
-          <button :title="t('map.zoom.in')" @click="zoomBy(1.6)">＋</button>
-          <button :title="t('map.zoom.out')" @click="zoomBy(1 / 1.6)">－</button>
-          <button :title="t('map.zoom.fit')" @click="fitView(true)">⤢</button>
+          <button :title="t('map.zoom.in')" :aria-label="t('map.zoom.in')" @click="zoomBy(1.6)">
+            <UiIcon name="plus" :size="16" />
+          </button>
+          <button
+            :title="t('map.zoom.out')"
+            :aria-label="t('map.zoom.out')"
+            @click="zoomBy(1 / 1.6)"
+          >
+            <UiIcon name="minus" :size="16" />
+          </button>
+          <button :title="t('map.zoom.fit')" :aria-label="t('map.zoom.fit')" @click="fitView(true)">
+            <UiIcon name="maximize" :size="16" />
+          </button>
           <div class="mv-scale">
             <div class="mv-scale-bar" :style="{ width: scaleBar.px + 'px' }"></div>
             <span>{{ scaleBar.label }}</span>
@@ -251,6 +290,7 @@ import { useMainStore } from '../store/index.js'
 import { useI18n } from '../i18n'
 import { api } from '../api'
 import ViewHeader from './ViewHeader.vue'
+import UiIcon from './ui/UiIcon.js'
 import MapToolbar from './map/MapToolbar.vue'
 import MapInspector from './map/MapInspector.vue'
 import MapTimeline from './map/MapTimeline.vue'
@@ -604,13 +644,13 @@ function undo() {
   if (!undoStack.length) return toast(t('map.toast.nothingToUndo'))
   redoStack.push(snapshot())
   restore(undoStack.pop())
-  toast('↶ ' + t('map.toast.undo'))
+  toast(t('map.toast.undo'), null, 'undo-2')
 }
 function redo() {
   if (!redoStack.length) return toast(t('map.toast.nothingToRedo'))
   undoStack.push(snapshot())
   restore(redoStack.pop())
-  toast('↷ ' + t('map.toast.redo'))
+  toast(t('map.toast.redo'), null, 'redo-2')
 }
 
 /** Apply one committed edit: snapshot for undo, mutate, re-render, autosave. */
@@ -774,7 +814,7 @@ function deleteSelected() {
     const id = selectedFeatureId.value
     commit((d) => (d.features = d.features.filter((f) => f.id !== id)))
     selectedFeatureId.value = null
-    toast('🗑 ' + t('map.toast.deleted'))
+    toast(t('map.toast.deleted'), null, 'trash-2')
   } else if (selectedTokenId.value) {
     const id = selectedTokenId.value
     commit((d) => (d.tokens = d.tokens.filter((tk) => tk.id !== id)))
@@ -818,7 +858,7 @@ function forkEra() {
     d.features.splice(i + 1, 0, copy)
   })
   selectFeature(copy.id)
-  toast('✂ ' + t('map.toast.forked', { y }))
+  toast(t('map.toast.forked', { y }), null, 'scissors')
 }
 
 function setTokenKeys(keys, key) {
@@ -865,7 +905,7 @@ function placeToken(personId, wx, wy) {
   selectToken(tk.id)
   burst(wx, wy, style.value.accent)
   const p = personById.value.get(personId)
-  toast(`📍 ${p?.name || ''} · ${y}`)
+  toast(`${p?.name || ''} · ${y}`, null, 'map-pin')
 }
 
 function placeAtCenter(personId) {
@@ -891,7 +931,7 @@ function autoPlace() {
       burst(x, y0, style.value.accent, i * 0.05)
     })
   })
-  toast('✨ ' + t('map.toast.autoPlaced', { n: list.length }))
+  toast(t('map.toast.autoPlaced', { n: list.length }), null, 'sparkles')
 }
 
 function flyToPerson(personId) {
@@ -1031,21 +1071,19 @@ function checkEvents(prev, cur) {
             : f.pts
       burst(pts[0], pts[1], f.color || style.value.accent)
       const icon =
-        f.kind === 'event'
-          ? TOOL_BY_ID.get('event:' + (f.icon || 'star'))?.icon || '✦'
-          : f.kind === 'arrow'
-            ? '➶'
-            : '◌'
-      toast(`${icon} ${f.name || t('map.kinds.' + f.kind)} · ${f.from}`, f.color)
+        (f.kind === 'event'
+          ? TOOL_BY_ID.get('event:' + (f.icon || 'star'))?.icon
+          : TOOL_BY_ID.get(f.kind)?.icon) || 'sparkles'
+      toast(`${f.name || t('map.kinds.' + f.kind)} · ${f.from}`, f.color, icon)
     }
   }
 }
 
 // ── feedback ─────────────────────────────────────────────────────────────────
 let toastN = 0
-function toast(text, color) {
+function toast(text, color, icon) {
   const id = ++toastN
-  toasts.value = [...toasts.value.slice(-2), { id, text, color }]
+  toasts.value = [...toasts.value.slice(-2), { id, text, color, icon }]
   setTimeout(() => (toasts.value = toasts.value.filter((x) => x.id !== id)), 2600)
 }
 function burst(x, y, color, delay = 0) {
@@ -1454,9 +1492,9 @@ function onPointerUp(e) {
         if (g.type === 'moveToken') {
           const tk = tokenBase.value.find((x) => x.id === g.id)
           if (tk && !(g.alt || e.altKey)) {
-            toast(`📍 ${tk.name} · ${Math.round(year.value)}`)
+            toast(`${tk.name} · ${Math.round(year.value)}`, null, 'map-pin')
             if (tk.keys.length === 2 && g.keys0.length === 1)
-              toast('🧭 ' + t('map.toast.firstJourney'))
+              toast(t('map.toast.firstJourney'), null, 'footprints')
           }
         }
       } else if (g.type !== 'moveFeature') undoStack.pop()
@@ -1652,7 +1690,7 @@ const cursor = computed(() => {
 })
 
 // ── hints ────────────────────────────────────────────────────────────────────
-const hintIcon = computed(() => TOOL_BY_ID.get(tool.value)?.icon || '➤')
+const hintIcon = computed(() => TOOL_BY_ID.get(tool.value)?.icon || 'mouse-pointer-2')
 const hintText = computed(() => {
   const tl = tool.value
   if (strokeMode.value === 'click') return t('map.hint.clickMode')
@@ -1836,7 +1874,7 @@ async function exportPng() {
     a.remove()
     setTimeout(() => URL.revokeObjectURL(url), 4000)
     r.dispose()
-    toast('⤓ ' + t('map.toast.exported'))
+    toast(t('map.toast.exported'), null, 'download')
   }, 'image/png')
 }
 
@@ -1965,18 +2003,18 @@ defineExpose({ undo, redo, flushSave })
   position: relative;
 }
 .mv-pill {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   max-width: 220px;
-  height: 32px;
+  height: var(--ctl-md);
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1993,26 +2031,34 @@ defineExpose({ undo, redo, flushSave })
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.mv-pill .ui-icon {
+  flex: 0 0 auto;
+}
+.mv-caret {
+  color: var(--t3);
+}
 .mv-toggle {
-  width: 32px;
-  height: 32px;
+  width: var(--ctl-md);
+  height: var(--ctl-md);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--border);
   border-radius: 9px;
   background: transparent;
-  color: var(--t2);
+  color: var(--t3);
   cursor: pointer;
-  font-size: 14px;
-  opacity: 0.6;
   transition:
     background 0.12s,
-    opacity 0.12s;
+    color 0.12s;
 }
 .mv-toggle:hover {
   background: var(--hover);
-  opacity: 1;
+  color: var(--t1);
 }
 .mv-toggle.on {
-  opacity: 1;
+  color: var(--accent);
   background: var(--adim);
   border-color: var(--accent);
 }
@@ -2034,7 +2080,7 @@ defineExpose({ undo, redo, flushSave })
   gap: 2px;
 }
 .mv-menu-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 1.2px;
   text-transform: uppercase;
@@ -2051,7 +2097,7 @@ defineExpose({ undo, redo, flushSave })
   background: transparent;
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   cursor: pointer;
   text-align: left;
 }
@@ -2069,8 +2115,15 @@ defineExpose({ undo, redo, flushSave })
   white-space: nowrap;
 }
 .mv-menu-meta {
-  font-size: 10.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
   color: var(--t3);
+  font-variant-numeric: tabular-nums;
+}
+.mv-menu-meta-gap {
+  margin-left: 6px;
 }
 .mv-menu-sep {
   height: 1px;
@@ -2092,7 +2145,7 @@ defineExpose({ undo, redo, flushSave })
   border-radius: 7px;
   padding: 5px 8px;
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   outline: none;
 }
 .mv-menu-rename input:focus {
@@ -2110,6 +2163,11 @@ defineExpose({ undo, redo, flushSave })
   gap: 8px;
   padding: 2px 4px 8px;
 }
+.mv-style-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .mv-style-card {
   display: flex;
   flex-direction: column;
@@ -2120,7 +2178,7 @@ defineExpose({ undo, redo, flushSave })
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   animation: mv-card-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
@@ -2149,13 +2207,18 @@ defineExpose({ undo, redo, flushSave })
 }
 .mv-seg button {
   flex: 1;
-  padding: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ctl-md);
+  padding: 0 8px;
   border: 1px solid var(--border);
   border-radius: 9px;
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 12.5px;
   cursor: pointer;
 }
 .mv-seg button.on {
@@ -2183,12 +2246,13 @@ defineExpose({ undo, redo, flushSave })
   border-radius: 999px;
   box-shadow: var(--shadow);
   color: var(--t2);
-  font-size: 12px;
+  font-size: 12.5px;
   pointer-events: none;
   z-index: 7;
 }
 .mv-hint-icon {
-  font-size: 15px;
+  flex: 0 0 auto;
+  color: var(--t1);
 }
 .mv-hint-enter-active,
 .mv-hint-leave-active {
@@ -2217,6 +2281,9 @@ defineExpose({ undo, redo, flushSave })
   z-index: 11;
 }
 .mv-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 16px;
   border-radius: 12px;
   background: var(--surface);
@@ -2227,6 +2294,10 @@ defineExpose({ undo, redo, flushSave })
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
+}
+.mv-toast-icon {
+  flex: 0 0 auto;
+  color: var(--c);
 }
 .mv-toast-enter-active {
   transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -2259,13 +2330,16 @@ defineExpose({ undo, redo, flushSave })
   z-index: 8;
 }
 .mv-zoom button {
-  width: 30px;
-  height: 30px;
+  width: var(--ctl-md);
+  height: var(--ctl-md);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 8px;
   background: transparent;
   color: var(--t1);
-  font-size: 15px;
   cursor: pointer;
 }
 .mv-zoom button:hover {
@@ -2277,7 +2351,7 @@ defineExpose({ undo, redo, flushSave })
   align-items: flex-start;
   gap: 2px;
   padding: 0 8px 0 6px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t2);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -2305,11 +2379,11 @@ defineExpose({ undo, redo, flushSave })
   font-size: 13px;
 }
 .mv-hover-sub {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t2);
 }
 .mv-hover-note {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--t2);
   margin-top: 4px;
   line-height: 1.4;

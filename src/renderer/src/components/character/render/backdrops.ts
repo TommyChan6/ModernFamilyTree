@@ -13,14 +13,14 @@ export interface BackdropDef {
 }
 
 export const BACKDROPS: BackdropDef[] = [
-  { id: 'studio', icon: '💡', floor: 'accent' },
-  { id: 'sunset', icon: '🌅', floor: '#5a2d4a' },
-  { id: 'night', icon: '🌙', floor: '#0a0f24' },
-  { id: 'sakura', icon: '🌸', floor: '#c97a9a' },
-  { id: 'forest', icon: '🌲', floor: '#10261c' },
-  { id: 'arcade', icon: '🕹', floor: '#ff3ea5' },
-  { id: 'paper', icon: '📄', floor: '#8a7f6a' },
-  { id: 'none', icon: '⬚', floor: 'accent' }
+  { id: 'studio', icon: 'lightbulb', floor: 'accent' },
+  { id: 'sunset', icon: 'sunset', floor: '#5a2d4a' },
+  { id: 'night', icon: 'moon', floor: '#0a0f24' },
+  { id: 'sakura', icon: 'flower-2', floor: '#c97a9a' },
+  { id: 'forest', icon: 'trees', floor: '#10261c' },
+  { id: 'arcade', icon: 'gamepad-2', floor: '#ff3ea5' },
+  { id: 'paper', icon: 'scroll', floor: '#8a7f6a' },
+  { id: 'none', icon: 'square-dashed', floor: 'accent' }
 ]
 
 export interface BackdropOptions {

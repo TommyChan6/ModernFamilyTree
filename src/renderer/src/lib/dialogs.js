@@ -24,7 +24,7 @@ let seq = 0
 /**
  * Ask the user to confirm. Resolves true (confirmed) or false (cancelled,
  * Esc, backdrop click). Options: title, message, confirmLabel, cancelLabel,
- * tone ('primary' | 'danger'), icon (an emoji/glyph shown in the header).
+ * tone ('primary' | 'danger'), icon (a UiIcon name shown in the header).
  */
 export function confirmDialog(opts = {}) {
   return new Promise((resolve) => {
@@ -36,7 +36,7 @@ export function confirmDialog(opts = {}) {
       confirmLabel: opts.confirmLabel,
       cancelLabel: opts.cancelLabel,
       tone: opts.tone === 'danger' ? 'danger' : 'primary',
-      icon: opts.icon ?? (opts.tone === 'danger' ? '🗑' : undefined),
+      icon: opts.icon ?? (opts.tone === 'danger' ? 'trash-2' : undefined),
       resolve
     })
   })
@@ -52,7 +52,7 @@ export function alertDialog(opts = {}) {
       message: opts.message || '',
       confirmLabel: opts.confirmLabel,
       tone: 'primary',
-      icon: opts.icon ?? 'ℹ',
+      icon: opts.icon ?? 'info',
       resolve: () => resolve()
     })
   })
@@ -65,7 +65,13 @@ export function settleDialog(id, value) {
   d.resolve(!!value)
 }
 
-const TONE_ICON = { success: '✓', error: '!', warning: '⚠', info: 'i' }
+// Default icon per tone (UiIcon names; callers may pass their own `icon`).
+export const TONE_ICON = {
+  success: 'check',
+  error: 'circle-alert',
+  warning: 'triangle-alert',
+  info: 'info'
+}
 // id → { timer, remaining, startedAt } — auto-dismiss bookkeeping, kept out of
 // the reactive state so hover pauses never re-render the stack.
 const clocks = new Map()
@@ -78,7 +84,7 @@ function arm(id, ms) {
 
 /**
  * Show a toast. Options: tone ('info' | 'success' | 'warning' | 'error'),
- * duration (ms; 0 = sticky), icon, action ({ label, run } — e.g. Undo).
+ * duration (ms; 0 = sticky), icon (a UiIcon name), action ({ label, run } — e.g. Undo).
  * Returns the toast id (pass to dismissToast).
  */
 export function toast(message, opts = {}) {

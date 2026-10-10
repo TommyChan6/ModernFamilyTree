@@ -592,7 +592,7 @@ export function drawInkFg(r) {
     ctx.font = `14px ${kai}`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(String(year), GUTTER / 2 + 1, r.mouseY + 1)
+    ctx.fillText(String(year), 6 + (GUTTER - 14) / 2, r.mouseY + 1)
   }
   // Eras, events and their cast (chronicleDraw.js).
   drawChronicleFg(r, ctx, c)

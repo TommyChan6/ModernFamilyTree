@@ -64,6 +64,7 @@ export const LIVE_KINDS = new Set<MapFeatureKind>(['zone', 'arrow', 'event'])
 export interface ToolDef {
   /** Tool id: a feature kind, or 'select' / 'pan' / 'erase'. */
   id: string
+  /** UiIcon / drawIcon name (lucideIcons.js registry). */
   icon: string
   /** Default place/event glyph when this tool draws a point. */
   glyph?: string
@@ -81,84 +82,84 @@ export interface ToolGroup {
 export const TOOL_GROUPS: ToolGroup[] = [
   {
     id: 'select',
-    icon: '➤',
+    icon: 'mouse-pointer-2',
     tools: [
-      { id: 'select', icon: '➤', hotkey: 'v' },
-      { id: 'pan', icon: '✋', hotkey: 'h' },
-      { id: 'erase', icon: '⌫', hotkey: 'e' }
+      { id: 'select', icon: 'mouse-pointer-2', hotkey: 'v' },
+      { id: 'pan', icon: 'hand', hotkey: 'h' },
+      { id: 'erase', icon: 'eraser', hotkey: 'e' }
     ]
   },
   {
     id: 'terrain',
-    icon: '⛰',
+    icon: 'mountain',
     tools: [
-      { id: 'land', icon: '🏝', hotkey: 'l' },
-      { id: 'water', icon: '🌊', hotkey: 'w' },
-      { id: 'forest', icon: '🌲', hotkey: 'f' },
-      { id: 'mountains', icon: '⛰', hotkey: 'm' },
-      { id: 'hills', icon: '🌄' },
-      { id: 'grass', icon: '🌾' },
-      { id: 'desert', icon: '🏜' },
-      { id: 'swamp', icon: '🪷' },
-      { id: 'snow', icon: '❄' }
+      { id: 'land', icon: 'tree-palm', hotkey: 'l' },
+      { id: 'water', icon: 'waves', hotkey: 'w' },
+      { id: 'forest', icon: 'trees', hotkey: 'f' },
+      { id: 'mountains', icon: 'mountain', hotkey: 'm' },
+      { id: 'hills', icon: 'sunrise' },
+      { id: 'grass', icon: 'wheat' },
+      { id: 'desert', icon: 'sun' },
+      { id: 'swamp', icon: 'droplets' },
+      { id: 'snow', icon: 'snowflake' }
     ]
   },
   {
     id: 'realm',
-    icon: '👑',
-    tools: [{ id: 'territory', icon: '👑', hotkey: 'k' }]
+    icon: 'crown',
+    tools: [{ id: 'territory', icon: 'crown', hotkey: 'k' }]
   },
   {
     id: 'lines',
-    icon: '〰',
+    icon: 'spline',
     tools: [
-      { id: 'river', icon: '〰', hotkey: 'r' },
-      { id: 'road', icon: '🛣', hotkey: 'd' },
-      { id: 'rail', icon: '🚆' },
-      { id: 'searoute', icon: '⛵' },
-      { id: 'wall', icon: '🧱' },
-      { id: 'border', icon: '┅' }
+      { id: 'river', icon: 'spline', hotkey: 'r' },
+      { id: 'road', icon: 'route', hotkey: 'd' },
+      { id: 'rail', icon: 'train-front' },
+      { id: 'searoute', icon: 'sailboat' },
+      { id: 'wall', icon: 'brick-wall' },
+      { id: 'border', icon: 'square-dashed' }
     ]
   },
   {
     id: 'places',
-    icon: '🏰',
+    icon: 'castle',
     tools: [
-      { id: 'place:capital', icon: '⭐', glyph: 'capital', hotkey: 'c' },
-      { id: 'place:city', icon: '🏙', glyph: 'city' },
-      { id: 'place:town', icon: '🏘', glyph: 'town' },
-      { id: 'place:village', icon: '🛖', glyph: 'village' },
-      { id: 'place:castle', icon: '🏰', glyph: 'castle' },
-      { id: 'place:port', icon: '⚓', glyph: 'port' },
-      { id: 'place:temple', icon: '⛩', glyph: 'temple' },
-      { id: 'place:tower', icon: '🗼', glyph: 'tower' },
-      { id: 'place:ruin', icon: '🏛', glyph: 'ruin' },
-      { id: 'place:cave', icon: '🕳', glyph: 'cave' },
-      { id: 'place:camp', icon: '⛺', glyph: 'camp' },
-      { id: 'place:mine', icon: '⛏', glyph: 'mine' },
-      { id: 'place:station', icon: '🚉', glyph: 'station' },
-      { id: 'place:landmark', icon: '🗿', glyph: 'landmark' }
+      { id: 'place:capital', icon: 'star', glyph: 'capital', hotkey: 'c' },
+      { id: 'place:city', icon: 'building-2', glyph: 'city' },
+      { id: 'place:town', icon: 'building', glyph: 'town' },
+      { id: 'place:village', icon: 'house', glyph: 'village' },
+      { id: 'place:castle', icon: 'castle', glyph: 'castle' },
+      { id: 'place:port', icon: 'anchor', glyph: 'port' },
+      { id: 'place:temple', icon: 'church', glyph: 'temple' },
+      { id: 'place:tower', icon: 'tower-control', glyph: 'tower' },
+      { id: 'place:ruin', icon: 'landmark', glyph: 'ruin' },
+      { id: 'place:cave', icon: 'circle-dot', glyph: 'cave' },
+      { id: 'place:camp', icon: 'tent', glyph: 'camp' },
+      { id: 'place:mine', icon: 'pickaxe', glyph: 'mine' },
+      { id: 'place:station', icon: 'warehouse', glyph: 'station' },
+      { id: 'place:landmark', icon: 'milestone', glyph: 'landmark' }
     ]
   },
   {
     id: 'events',
-    icon: '⚔',
+    icon: 'swords',
     tools: [
-      { id: 'event:battle', icon: '⚔', glyph: 'battle', hotkey: 'b' },
-      { id: 'event:fire', icon: '🔥', glyph: 'fire' },
-      { id: 'event:crown', icon: '👑', glyph: 'crown' },
-      { id: 'event:heart', icon: '💞', glyph: 'heart' },
-      { id: 'event:skull', icon: '☠', glyph: 'skull' },
-      { id: 'event:star', icon: '✨', glyph: 'star' },
-      { id: 'event:flag', icon: '🚩', glyph: 'flag' },
-      { id: 'arrow', icon: '➶', hotkey: 'a' },
-      { id: 'zone', icon: '◌', hotkey: 'z' }
+      { id: 'event:battle', icon: 'swords', glyph: 'battle', hotkey: 'b' },
+      { id: 'event:fire', icon: 'flame', glyph: 'fire' },
+      { id: 'event:crown', icon: 'crown', glyph: 'crown' },
+      { id: 'event:heart', icon: 'heart', glyph: 'heart' },
+      { id: 'event:skull', icon: 'skull', glyph: 'skull' },
+      { id: 'event:star', icon: 'sparkles', glyph: 'star' },
+      { id: 'event:flag', icon: 'flag', glyph: 'flag' },
+      { id: 'arrow', icon: 'arrow-up-right', hotkey: 'a' },
+      { id: 'zone', icon: 'circle-dashed', hotkey: 'z' }
     ]
   },
   {
     id: 'text',
-    icon: '𝐓',
-    tools: [{ id: 'label', icon: '𝐓', hotkey: 't' }]
+    icon: 'type',
+    tools: [{ id: 'label', icon: 'type', hotkey: 't' }]
   }
 ]
 

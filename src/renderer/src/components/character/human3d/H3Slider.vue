@@ -10,7 +10,7 @@
         :aria-label="resetTitle"
         @click="reset"
       >
-        ↺
+        <UiIcon name="rotate-ccw" :size="12" />
       </button>
     </div>
     <div class="h3s-track-wrap">
@@ -38,6 +38,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import UiIcon from '../../ui/UiIcon.js'
 
 // One editor slider: bipolar sliders fill from the centre notch, unipolar
 // from the left. `live` fires during a drag, `done` once it's released (the
@@ -131,7 +132,7 @@ function reset() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--t2);
 }
@@ -142,7 +143,7 @@ function reset() {
 
 .h3s-value {
   font-variant-numeric: tabular-nums;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
   min-width: 30px;
   text-align: right;
@@ -154,6 +155,10 @@ function reset() {
 }
 
 .h3s-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
   width: 18px;
   height: 18px;
   padding: 0;
@@ -161,8 +166,6 @@ function reset() {
   border-radius: 6px;
   background: transparent;
   color: var(--t3);
-  font-size: 12px;
-  line-height: 18px;
   cursor: pointer;
 }
 
@@ -266,7 +269,7 @@ function reset() {
 .h3s-ends {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
   margin-top: -1px;
 }

@@ -441,7 +441,18 @@ expand it. Tests: `tests/inkArt.test.js`, `inkChrome`, `profileScroll`,
   danger-solid`, sizes `.btn-xs|sm|lg`, `.btn-icon`, `.is-loading`; `.icon-btn`,
   `.chip`, `.seg`/`.seg-btn`, `input.switch`, `kbd`, `.card`, `.eyebrow`,
   `.skeleton`, `.spinner`. Every `<button>` gets a baseline focus ring + press
-  feedback. Icons: `components/ui/UiIcon.js` (shared stroke set, no `v-html`).
+  feedback. Control heights `--ctl-xs/sm/md/lg` (24/28/32/40px) and text sizes
+  `--fs-xs…xl`: every control in one toolbar/strip shares ONE height step.
+  Readable copy never below 11px; dim text with `--t2`/`--t3`, never `opacity`.
+- **Icons: no emoji, ever** (their per-OS font metrics knock button contents
+  off-centre; `tests/uiIcons.test.js` fails on emoji in source). Every icon is a
+  NAME from `components/ui/icons.js` — Lucide kebab-case names from the curated
+  `ui/lucideIcons.js` registry (add imports there; only listed names bundle) plus
+  app icons (graph/directory/timeline/…). DOM: `<UiIcon name="trash-2" :size="16" />`;
+  canvas: `drawIcon()` / `iconCanvas()` from `lib/canvasIcon.js`. Data catalogs
+  store names; anything rendering a data `icon`/`glyph` goes through UiIcon (it
+  also resolves legacy emoji saved in old DBs via `LEGACY_GLYPHS`). Users pick
+  icons with `ui/IconPicker.vue`; every search box is `ui/SearchField.vue`.
 - Never use native `alert`/`confirm`: `await confirmDialog({...})` / `toast(msg,
   { tone })` from `lib/dialogs.js` (rendered by `components/ui/DialogHost.vue`), and
   `undoToast(msg, channel)` (`lib/undoToast.js`) after undoable deletes — its Undo

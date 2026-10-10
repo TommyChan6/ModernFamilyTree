@@ -79,7 +79,14 @@ export function ageOf(p, refYear) {
 }
 
 export function genderLabel(g) {
-  if (g === 'male') return '♂ Male'
-  if (g === 'female') return '♀ Female'
-  return '● Person'
+  if (g === 'male') return 'Male'
+  if (g === 'female') return 'Female'
+  return 'Person'
+}
+
+// Icon name (components/ui/icons.js) to show beside genderLabel().
+export function genderIcon(g) {
+  if (g === 'male') return 'mars'
+  if (g === 'female') return 'venus'
+  return 'user'
 }

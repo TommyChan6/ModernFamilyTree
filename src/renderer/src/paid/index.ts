@@ -15,6 +15,7 @@
 import { defineAsyncComponent, defineComponent, h } from 'vue'
 import type { Component } from 'vue'
 import { useMainStore } from '../store/index.js'
+import UiIcon from '../components/ui/UiIcon.js'
 
 /** Friendly refusal, shown instead of a gated feature the plan doesn't allow.
  *  Styled with the design tokens so it fits both themes. */
@@ -37,7 +38,11 @@ const PlanRefusal = defineComponent({
               'border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);'
           },
           [
-            h('div', { style: 'font-size:28px;margin-bottom:10px;' }, '🔒'),
+            h(
+              'div',
+              { style: 'display:flex;justify-content:center;margin-bottom:10px;color:var(--t3);' },
+              h(UiIcon, { name: 'lock', size: 28 })
+            ),
             h(
               'div',
               { style: 'font-weight:700;color:var(--t1);margin-bottom:6px;font-size:15px;' },
@@ -45,7 +50,7 @@ const PlanRefusal = defineComponent({
             ),
             h(
               'div',
-              { style: 'font-size:12.5px;line-height:1.5;' },
+              { style: 'font-size:13px;line-height:1.5;' },
               'Your current plan doesn’t include this feature yet.'
             ),
             h(

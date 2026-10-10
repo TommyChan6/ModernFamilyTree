@@ -23,7 +23,10 @@
       <div class="pcard-aura"></div>
 
       <div class="pcard-banner">
-        <span class="pcard-type">{{ genderLabel(person.gender) }}</span>
+        <span class="pcard-type">
+          <UiIcon :name="genderIcon(person.gender)" :size="12" :stroke="2.4" />
+          {{ genderLabel(person.gender) }}
+        </span>
         <span v-if="age !== null" class="pcard-hp">
           {{ age }}<small>{{ deceased ? 'yr†' : 'yr' }}</small>
         </span>
@@ -64,8 +67,14 @@
         </div>
 
         <div class="pcard-tags">
-          <span v-if="person.occupation" class="pcard-tag">💼 {{ person.occupation }}</span>
-          <span v-if="person.location" class="pcard-tag">📍 {{ person.location }}</span>
+          <span v-if="person.occupation" class="pcard-tag">
+            <UiIcon name="briefcase" :size="12" />
+            <span class="pcard-tag-text">{{ person.occupation }}</span>
+          </span>
+          <span v-if="person.location" class="pcard-tag">
+            <UiIcon name="map-pin" :size="12" />
+            <span class="pcard-tag-text">{{ person.location }}</span>
+          </span>
         </div>
       </div>
 
@@ -98,8 +107,12 @@
       </div>
 
       <div class="po-top">
-        <span class="po-chip po-glyph">{{ genderGlyph }}</span>
-        <span v-if="deceased" class="po-chip">🕊</span>
+        <span class="po-chip po-glyph">
+          <UiIcon :name="genderIcon(person.gender)" :size="12" :stroke="2.4" />
+        </span>
+        <span v-if="deceased" class="po-chip" title="Deceased">
+          <UiIcon name="bird" :size="12" />
+        </span>
         <span v-if="age !== null" class="po-chip po-age">{{ age }} yr</span>
       </div>
 
@@ -113,9 +126,12 @@
           {{ lifeText }}<span v-if="person.location"> · {{ person.location }}</span>
         </div>
         <div class="po-foot">
-          <span class="po-stat">🔗 {{ kin }}</span>
-          <span class="po-stat">✦ {{ children }}</span>
+          <span class="po-stat" title="Relations"><UiIcon name="link" :size="12" />{{ kin }}</span>
+          <span class="po-stat" title="Children">
+            <UiIcon name="sprout" :size="12" />{{ children }}
+          </span>
           <span v-for="t in tagPills" :key="t.id" class="po-tag" :style="{ '--tc': t.color }">
+            <UiIcon v-if="t.icon" :name="t.icon" :size="11" />
             {{ t.label }}
           </span>
         </div>
@@ -140,12 +156,12 @@
         </div>
 
         <div class="ho-type">
-          <span class="ho-type-orb">{{ genderGlyph }}</span>
+          <UiIcon class="ho-type-orb" :name="genderIcon(person.gender)" :size="12" :stroke="2.4" />
           {{ typeLabel }} · {{ lifeText }}
         </div>
 
         <div class="ho-attack">
-          <span class="ho-orb">🔗</span>
+          <span class="ho-orb"><UiIcon name="link" :size="12" /></span>
           <span class="ho-atk">
             <b>Kinship</b>
             <small>Draws strength from every bond.</small>
@@ -153,7 +169,7 @@
           <span class="ho-dmg">{{ kin * 10 }}</span>
         </div>
         <div class="ho-attack">
-          <span class="ho-orb">✦</span>
+          <span class="ho-orb"><UiIcon name="sprout" :size="12" /></span>
           <span class="ho-atk">
             <b>Legacy</b>
             <small>Passes the story to the next age.</small>
@@ -162,7 +178,9 @@
         </div>
 
         <div class="ho-foot">
-          <span class="ho-stars"><i v-for="n in stars" :key="n">★</i></span>
+          <span class="ho-stars" :title="`Rarity ${stars} of 5`">
+            <i v-for="n in stars" :key="n"><UiIcon name="star" :size="11" /></i>
+          </span>
           <span class="ho-set">№ {{ person.birth?.year || '???' }} · {{ refYear }}</span>
         </div>
       </div>
@@ -229,10 +247,10 @@
       <div class="ar-name" :title="person.name">{{ person.name || 'Unnamed' }}</div>
       <div class="ar-role">{{ person.occupation || genderLabel(person.gender) }}</div>
 
-      <div class="ar-divider"><span>✦</span></div>
+      <div class="ar-divider"><UiIcon name="sparkle" :size="11" /></div>
 
       <div class="ar-years">{{ lifeText }}</div>
-      <div class="ar-glyph">{{ deceased ? '☾' : '☀' }}</div>
+      <div class="ar-glyph"><UiIcon :name="deceased ? 'moon' : 'sun'" :size="16" /></div>
     </template>
 
     <!-- ═══════ Scroll — a 水墨 hanging scroll (立轴), see ScrollCardFace ═══════ -->
@@ -259,7 +277,8 @@
 
 <script setup>
 import { computed, reactive, ref, onBeforeUnmount } from 'vue'
-import { ageOf, isDeceased, genderLabel } from './peopleLayout.js'
+import { ageOf, isDeceased, genderLabel, genderIcon } from './peopleLayout.js'
+import UiIcon from '../ui/UiIcon.js'
 import { useThumbnail } from './useThumbnail.js'
 import ScrollCardFace from './ScrollCardFace.vue'
 import FanCardFace from './FanCardFace.vue'
@@ -353,10 +372,6 @@ const initials = computed(() => {
   return (parts[0] || '?').substring(0, 2).toUpperCase()
 })
 
-const genderGlyph = computed(() =>
-  props.person.gender === 'male' ? '♂' : props.person.gender === 'female' ? '♀' : '●'
-)
-
 const lifeText = computed(() => {
   const b = props.person.birth?.year
   const d = props.person.death?.year
@@ -369,7 +384,8 @@ const lifeText = computed(() => {
 const tagPills = computed(() =>
   (props.tags || []).slice(0, 2).map((t) => ({
     id: t.id,
-    label: (t.icon ? t.icon + ' ' : '') + t.label,
+    label: t.label,
+    icon: t.icon || '',
     color: t.color || 'var(--accent)'
   }))
 )
@@ -377,16 +393,15 @@ const tagPills = computed(() =>
 // ── Holo (TCG) flavour ──────────────────────────────────────────────────────
 const hp = computed(() => Math.min(240, 60 + props.kin * 20))
 const stars = computed(() => Math.max(1, Math.min(5, 1 + Math.floor(props.kin / 2))))
-const typeLabel = computed(
-  () => props.tags?.[0]?.label || genderLabel(props.person.gender).replace(/^\S+\s/, '')
-)
+const typeLabel = computed(() => props.tags?.[0]?.label || genderLabel(props.person.gender))
 
 // ── Neon flavour ────────────────────────────────────────────────────────────
 const shortId = computed(() => (props.person.id || '').replace(/-/g, '').slice(0, 8).toUpperCase())
 
 // ── Arcana flavour ──────────────────────────────────────────────────────────
 function roman(n) {
-  if (!Number.isFinite(n) || n <= 0 || n > 3999) return '✶'
+  // 0 (and anything unknown) is the Fool's numeral.
+  if (!Number.isFinite(n) || n <= 0 || n > 3999) return '0'
   const table = [
     [1000, 'M'],
     [900, 'CM'],
@@ -698,7 +713,10 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   }
 }
 .pcard-type {
-  font-size: 9.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -715,7 +733,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   line-height: 1;
 }
 .pcard-hp small {
-  font-size: 8.5px;
+  font-size: 9.5px;
   font-weight: 700;
   opacity: 0.85;
   margin-left: 1px;
@@ -880,7 +898,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   width: 70%;
 }
 .pcard-life {
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--t2);
   margin-top: 2px;
@@ -899,7 +917,10 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   min-height: 4px;
 }
 .pcard-tag {
-  font-size: 10.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
   font-weight: 500;
   color: var(--t2);
   background: var(--elevated);
@@ -909,6 +930,11 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+.pcard-tag-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pcard-stats {
@@ -921,6 +947,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   border-top: 1px solid var(--border);
 }
 .pcard-stat {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -951,10 +978,12 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   text-shadow: 0 0 12px color-mix(in srgb, var(--accent-c) 65%, transparent);
 }
 .pcard-stat-key {
-  font-size: 8px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--t3);
 }
 
@@ -1042,13 +1071,15 @@ const numeral = computed(() => roman(age.value ?? props.kin))
 .po-chip {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
+  min-height: 20px;
   padding: 3px 8px;
   border-radius: 14px;
   background: rgba(8, 10, 16, 0.55);
   backdrop-filter: blur(5px);
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: rgba(255, 255, 255, 0.92);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
 }
 .po-age {
@@ -1070,7 +1101,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   transform: translateY(-4px);
 }
 .po-kicker {
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 1.4px;
   text-transform: uppercase;
@@ -1108,7 +1139,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   width: 78px;
 }
 .po-meta {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.75);
   white-space: nowrap;
@@ -1123,7 +1154,10 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   overflow: hidden;
 }
 .po-stat {
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.85);
   background: rgba(8, 10, 16, 0.5);
@@ -1133,7 +1167,10 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   flex-shrink: 0;
 }
 .po-tag {
-  font-size: 9.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
   font-weight: 700;
   color: #fff;
   background: color-mix(in srgb, var(--tc, var(--accent-c)) 40%, rgba(8, 10, 16, 0.5));
@@ -1181,7 +1218,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   padding: 0 1px 5px;
 }
 .ho-stage {
-  font-size: 7.5px;
+  font-size: 8.5px;
   font-weight: 800;
   letter-spacing: 0.5px;
   color: var(--t3);
@@ -1210,7 +1247,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
 }
 .ho-hp i {
   font-style: normal;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 800;
   margin-right: 2px;
   vertical-align: 2px;
@@ -1300,7 +1337,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   border-radius: 12px;
   background: color-mix(in srgb, var(--accent-c) 14%, var(--elevated));
   border: 1px solid color-mix(in srgb, var(--accent-c) 30%, transparent);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--t1);
   white-space: nowrap;
@@ -1309,7 +1346,6 @@ const numeral = computed(() => roman(age.value ?? props.kin))
 }
 .ho-type-orb {
   color: color-mix(in srgb, var(--accent-c) 80%, var(--t1));
-  font-weight: 800;
 }
 
 .ho-attack {
@@ -1329,7 +1365,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  color: color-mix(in srgb, var(--accent-c) 80%, var(--t1));
   flex-shrink: 0;
   transition: transform 0.3s cubic-bezier(0.34, 1.4, 0.5, 1);
 }
@@ -1344,12 +1380,12 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   line-height: 1.2;
 }
 .ho-atk b {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   color: var(--t1);
 }
 .ho-atk small {
-  font-size: 8.5px;
+  font-size: 10.5px;
   color: var(--t3);
   white-space: nowrap;
   overflow: hidden;
@@ -1382,10 +1418,13 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   display: inline-flex;
   gap: 1px;
   color: #d9a93c;
-  font-size: 10px;
-  text-shadow: 0 0 6px rgba(217, 169, 60, 0.6);
+  filter: drop-shadow(0 0 3px rgba(217, 169, 60, 0.6));
+}
+.ho-stars .ui-icon {
+  fill: currentColor;
 }
 .ho-stars i {
+  display: flex;
   font-style: normal;
   transition: transform 0.3s cubic-bezier(0.34, 1.5, 0.5, 1);
 }
@@ -1408,7 +1447,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   transition-delay: 0.2s;
 }
 .ho-set {
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--t3);
   letter-spacing: 0.4px;
@@ -1538,7 +1577,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   font-family: Consolas, 'Courier New', monospace;
 }
 .ne-id {
-  font-size: 9px;
+  font-size: 10.5px;
   color: color-mix(in srgb, var(--accent-c) 70%, #9aa);
   letter-spacing: 0.5px;
 }
@@ -1546,7 +1585,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 8.5px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.8px;
 }
@@ -1708,7 +1747,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   display: flex;
   align-items: baseline;
   gap: 7px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .ne-row span {
   color: color-mix(in srgb, var(--accent-c) 55%, #8892a8);
@@ -1723,7 +1762,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
 .ne-row b {
   color: #dfe9ff;
   font-weight: 700;
-  font-size: 11px;
+  font-size: 12px;
   flex-shrink: 0;
 }
 .ne-clip {
@@ -1909,7 +1948,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   position: relative;
   z-index: 2;
   margin-top: 2px;
-  font-size: 11px;
+  font-size: 12px;
   font-style: italic;
   color: rgba(220, 208, 175, 0.65);
   white-space: nowrap;
@@ -1927,7 +1966,7 @@ const numeral = computed(() => roman(age.value ?? props.kin))
   align-items: center;
   gap: 8px;
   color: #d4af37;
-  font-size: 9px;
+  font-size: 10px;
 }
 .ar-divider::before,
 .ar-divider::after {
@@ -1939,17 +1978,17 @@ const numeral = computed(() => roman(age.value ?? props.kin))
 .ar-divider::after {
   background: linear-gradient(90deg, rgba(212, 175, 55, 0.55), transparent);
 }
-.ar-divider span {
+.ar-divider .ui-icon {
   transition: transform 0.5s cubic-bezier(0.34, 1.4, 0.5, 1);
 }
-.st-arcana:hover .ar-divider span {
+.st-arcana:hover .ar-divider .ui-icon {
   transform: rotate(180deg) scale(1.25);
 }
 
 .ar-years {
   position: relative;
   z-index: 2;
-  font-size: 12px;
+  font-size: 12.5px;
   letter-spacing: 1.6px;
   color: rgba(233, 222, 190, 0.85);
   font-variant-numeric: tabular-nums;
@@ -1957,10 +1996,10 @@ const numeral = computed(() => roman(age.value ?? props.kin))
 .ar-glyph {
   position: relative;
   z-index: 2;
+  display: flex;
   margin-top: auto;
-  font-size: 15px;
   color: #d4af37;
-  text-shadow: 0 0 12px rgba(212, 175, 55, 0.6);
+  filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.6));
   transition: transform 0.5s cubic-bezier(0.34, 1.4, 0.5, 1);
 }
 .st-arcana:hover .ar-glyph {

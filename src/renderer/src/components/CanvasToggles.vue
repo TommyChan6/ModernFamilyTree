@@ -9,11 +9,12 @@
         :class="{ on: t.active }"
         :style="{ '--tint': t.tint, '--i': i }"
         :title="t.title"
+        :aria-label="t.title"
         :aria-pressed="t.active"
         @click="t.toggle"
       >
         <span class="ct-aura" aria-hidden="true"></span>
-        <span class="ct-glyph">{{ t.icon }}</span>
+        <UiIcon class="ct-glyph" :name="t.icon" :size="16" />
         <span class="ct-dot" aria-hidden="true"></span>
       </button>
     </div>
@@ -29,11 +30,12 @@
         :class="{ on: t.active }"
         :style="{ '--tint': t.tint, '--i': buttons.length + i }"
         :title="t.title"
+        :aria-label="t.title"
         :aria-pressed="t.active"
         @click="t.toggle"
       >
         <span class="ct-aura" aria-hidden="true"></span>
-        <span class="ct-glyph">{{ t.icon }}</span>
+        <UiIcon class="ct-glyph" :name="t.icon" :size="16" />
         <span class="ct-dot" aria-hidden="true"></span>
       </button>
     </div>
@@ -50,11 +52,12 @@
         :class="{ on: activeModeId === m.id, 'ct-locked': m.disabled }"
         :style="{ '--tint': m.color || 'var(--accent)', '--i': buttons.length + 2 + i }"
         :title="m.disabled ? m.disabledHint || m.label : `${m.label} — ${m.hint}`"
+        :aria-label="m.label"
         :aria-pressed="activeModeId === m.id"
         @click="emit('pick-mode', m)"
       >
         <span class="ct-aura" aria-hidden="true"></span>
-        <span class="ct-glyph">{{ m.icon }}</span>
+        <UiIcon class="ct-glyph" :name="m.icon" :size="16" />
         <span class="ct-dot" aria-hidden="true"></span>
       </button>
       <button
@@ -62,9 +65,10 @@
         class="ct-btn ct-btn-mode ct-btn-gear"
         :style="{ '--tint': 'var(--accent)', '--i': buttons.length + 2 + modes.length }"
         title="Customize edit modes (or hold Tab for the wheel)"
+        aria-label="Customize edit modes"
         @click="emit('config-modes')"
       >
-        <span class="ct-glyph">⚙</span>
+        <UiIcon class="ct-glyph" name="settings" :size="16" />
       </button>
     </div>
   </div>
@@ -73,6 +77,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useMainStore } from '../store/index.js'
+import UiIcon from './ui/UiIcon.js'
 
 // The shared canvas-control cluster, dropped into the header of every spatial
 // view (graph / timeline / groups). It renders up to three pills: the overlay
@@ -101,7 +106,7 @@ const props = defineProps({
   /** Resolved wheel slots ({ id, icon, color, label, hint, disabled… }) or null. */
   modes: { type: Array, default: null },
   activeModeId: { type: String, default: null },
-  /** Show the ⚙ (customize the wheel) after the edit modes. */
+  /** Show the gear (customize the wheel) after the edit modes. */
   modeGear: { type: Boolean, default: true }
 })
 const emit = defineEmits([
@@ -121,7 +126,7 @@ const buttons = computed(() => {
   if (props.showFocus) {
     list.push({
       key: 'focus',
-      icon: '🎯',
+      icon: 'target',
       title: 'Focus — highlight & emphasise people',
       tint: 'var(--accent)',
       active: props.focus,
@@ -131,7 +136,7 @@ const buttons = computed(() => {
   if (props.showLegend) {
     list.push({
       key: 'legend',
-      icon: '🗺',
+      icon: 'map',
       title: 'Legend',
       tint: 'var(--green)',
       active: props.legend,
@@ -141,7 +146,7 @@ const buttons = computed(() => {
   if (props.showRelTypes) {
     list.push({
       key: 'relTypes',
-      icon: '🔗',
+      icon: 'link',
       title: 'Relationships — types, weights & lenses',
       tint: 'var(--pink)',
       active: props.relTypes,
@@ -151,7 +156,7 @@ const buttons = computed(() => {
   if (props.showChronicle) {
     list.push({
       key: 'chronicle',
-      icon: '📜',
+      icon: 'scroll-text',
       title: 'Chronicle — eras & story events',
       tint: 'var(--kin-blood)',
       active: props.chronicle,
@@ -161,7 +166,7 @@ const buttons = computed(() => {
   if (props.showStyle) {
     list.push({
       key: 'style',
-      icon: '🎨',
+      icon: 'palette',
       title: 'Style — lifeline looks, canvas & atmosphere',
       tint: 'var(--accent-2)',
       active: props.stylePane,
@@ -171,7 +176,7 @@ const buttons = computed(() => {
   if (props.showKinship) {
     list.push({
       key: 'kinship',
-      icon: '🧬',
+      icon: 'dna',
       title: 'Kinship — name every relative, see through their eyes',
       tint: 'var(--kin-blood)',
       active: props.kinship,
@@ -181,7 +186,7 @@ const buttons = computed(() => {
   if (props.showClean) {
     list.push({
       key: 'clean',
-      icon: '✨',
+      icon: 'sparkles',
       title: 'Clean view — hide canvas overlays',
       tint: 'var(--amber)',
       active: store.cleanView,
@@ -195,7 +200,7 @@ const buttons = computed(() => {
 const marqueeButtons = computed(() => [
   {
     key: 'box',
-    icon: '▧',
+    icon: 'square-dashed',
     title: 'Box select — hold Shift and drag on the canvas',
     tint: 'var(--accent)',
     active: store.marqueeTool === 'box',
@@ -203,7 +208,7 @@ const marqueeButtons = computed(() => [
   },
   {
     key: 'lasso',
-    icon: '◌',
+    icon: 'lasso',
     title: 'Lasso select — hold Shift and drag a freeform loop',
     tint: 'var(--accent)',
     active: store.marqueeTool === 'lasso',
@@ -247,9 +252,9 @@ const marqueeButtons = computed(() => [
 
 /* Tiny caption chip that names what a pill does */
 .ct-rail-tag {
-  font-size: 8px;
+  font-size: var(--fs-xs);
   font-weight: 800;
-  letter-spacing: 1.1px;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
   color: var(--t3);
   padding: 0 3px 0 7px;
@@ -259,10 +264,12 @@ const marqueeButtons = computed(() => [
 
 .ct-btn {
   position: relative;
-  width: 34px;
-  height: 34px;
+  flex: none;
+  width: var(--ctl-md);
+  height: var(--ctl-md);
+  padding: 0;
   border: none;
-  border-radius: 10px;
+  border-radius: 9px;
   background: transparent;
   color: var(--t2);
   cursor: pointer;
@@ -293,14 +300,7 @@ const marqueeButtons = computed(() => [
   transform: translateY(0) scale(0.9);
 }
 
-/* Edit-mode buttons: a touch smaller so eight of them stay compact */
-.ct-btn-mode {
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-}
 .ct-btn-gear .ct-glyph {
-  font-size: 13px;
   color: var(--t3);
 }
 .ct-btn-gear:hover .ct-glyph {
@@ -313,12 +313,8 @@ const marqueeButtons = computed(() => [
 .ct-glyph {
   position: relative;
   z-index: 2;
-  font-size: 15px;
-  line-height: 1;
+  flex: none;
   transition: transform 0.3s cubic-bezier(0.34, 1.6, 0.5, 1);
-}
-.ct-btn-mode .ct-glyph {
-  font-size: 13.5px;
 }
 .ct-btn:hover .ct-glyph {
   transform: scale(1.14) rotate(-6deg);
@@ -353,7 +349,7 @@ const marqueeButtons = computed(() => [
   position: absolute;
   inset: -2px;
   z-index: 1;
-  border-radius: 12px;
+  border-radius: 11px;
   padding: 1.5px;
   background: conic-gradient(
     from 0deg,

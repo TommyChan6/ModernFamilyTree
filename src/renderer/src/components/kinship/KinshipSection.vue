@@ -6,8 +6,7 @@
     <div class="ks-groups">
       <div v-for="(g, gi) in groups" :key="g.key" class="ks-group" :style="{ '--gi': gi }">
         <div class="ks-g-head">
-          <span class="ks-g-ic">{{ g.icon }}</span
-          >{{ g.label }}
+          <UiIcon class="ks-g-ic" :name="g.icon" :size="14" />{{ g.label }}
           <span class="ks-g-n">{{ g.items.length }}</span>
         </div>
         <div class="ks-chips">
@@ -79,6 +78,7 @@ import { useKinship, kinClass, kinPalette } from './useKinship'
 import { ancestorFan, pedigreeStats } from './kinshipGraph'
 import FanChart from './FanChart.vue'
 import BloodMeter from './BloodMeter.vue'
+import UiIcon from '../ui/UiIcon.js'
 
 const props = defineProps({ personId: { type: String, required: true } })
 defineEmits(['navigate'])
@@ -89,13 +89,13 @@ const CAP = 10
 const expanded = reactive({})
 
 const GROUPS = [
-  { key: 'ancestors', label: 'Ancestors', icon: '🌳' },
-  { key: 'siblings', label: 'Siblings', icon: '👫' },
-  { key: 'descendants', label: 'Descendants', icon: '🌱' },
-  { key: 'collateral', label: 'Aunts, uncles, nieces & nephews', icon: '🌿' },
-  { key: 'cousins', label: 'Cousins', icon: '🍃' },
-  { key: 'marriage', label: 'Spouse & in-laws', icon: '💍' },
-  { key: 'step', label: 'Step-family', icon: '🪢' }
+  { key: 'ancestors', label: 'Ancestors', icon: 'tree-deciduous' },
+  { key: 'siblings', label: 'Siblings', icon: 'users' },
+  { key: 'descendants', label: 'Descendants', icon: 'sprout' },
+  { key: 'collateral', label: 'Aunts, uncles, nieces & nephews', icon: 'leaf' },
+  { key: 'cousins', label: 'Cousins', icon: 'git-branch' },
+  { key: 'marriage', label: 'Spouse & in-laws', icon: 'heart-handshake' },
+  { key: 'step', label: 'Step-family', icon: 'link-2' }
 ]
 
 function groupOf(k) {
@@ -184,7 +184,7 @@ const F = computed(() => K.coef.value.F(props.personId))
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -192,10 +192,10 @@ const F = computed(() => K.coef.value.F(props.personId))
   margin-bottom: 6px;
 }
 .ks-g-ic {
-  font-size: 12px;
+  flex-shrink: 0;
 }
 .ks-g-n {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--t2);
   background: var(--elevated);
@@ -245,7 +245,7 @@ const F = computed(() => K.coef.value.F(props.personId))
   place-items: center;
   background: var(--pc);
   color: #fff;
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 800;
   flex-shrink: 0;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--kc) 70%, transparent);
@@ -258,7 +258,7 @@ const F = computed(() => K.coef.value.F(props.personId))
   text-align: left;
 }
 .ks-rel {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   color: var(--kc);
   white-space: nowrap;
@@ -266,7 +266,7 @@ const F = computed(() => K.coef.value.F(props.personId))
   text-overflow: ellipsis;
 }
 .ks-name {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -279,13 +279,13 @@ const F = computed(() => K.coef.value.F(props.personId))
   border-radius: var(--r-pill);
   padding: 4px 11px;
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
 }
 .ks-empty {
   color: var(--t3);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 .ks-side {
   display: flex;
@@ -316,7 +316,7 @@ const F = computed(() => K.coef.value.F(props.personId))
   color: var(--kin-blood);
 }
 .ks-stat-k {
-  font-size: 8.5px;
+  font-size: var(--fs-xs);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;

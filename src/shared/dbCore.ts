@@ -1966,7 +1966,7 @@ export const channelHandlers: Record<string, Handler> = {
       role_a: String(data?.role_a ?? ''),
       role_b: String(data?.role_b ?? ''),
       color: String(data?.color || '#8a93a6'),
-      glyph: String(data?.glyph || '◆'),
+      glyph: String(data?.glyph || 'diamond'),
       band: 'custom',
       builtin: false,
       statuses:

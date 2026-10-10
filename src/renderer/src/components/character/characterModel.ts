@@ -90,35 +90,35 @@ export interface Expression {
 }
 
 export const EXPRESSIONS: Expression[] = [
-  { id: 'neutral', icon: '😐', parts: {} },
+  { id: 'neutral', icon: 'meh', parts: {} },
   {
     id: 'happy',
-    icon: '😊',
+    icon: 'smile',
     parts: { eyes: 'eyes-happy', mouth: 'mouth-grin', brows: 'brows-soft' },
     blush: true
   },
   {
     id: 'laugh',
-    icon: '😆',
+    icon: 'laugh',
     parts: { eyes: 'eyes-closed', mouth: 'mouth-open', brows: 'brows-raised' }
   },
   {
     id: 'surprised',
-    icon: '😮',
+    icon: 'circle-alert',
     parts: { eyes: 'eyes-wide', brows: 'brows-raised', mouth: 'mouth-o' }
   },
   {
     id: 'angry',
-    icon: '😠',
+    icon: 'angry',
     parts: { eyes: 'eyes-sharp', brows: 'brows-angry', mouth: 'mouth-frown' }
   },
-  { id: 'sad', icon: '😢', parts: { brows: 'brows-sad', mouth: 'mouth-frown' }, tears: true },
+  { id: 'sad', icon: 'frown', parts: { brows: 'brows-sad', mouth: 'mouth-frown' }, tears: true },
   {
     id: 'smug',
-    icon: '😏',
+    icon: 'annoyed',
     parts: { eyes: 'eyes-sleepy', brows: 'brows-arched', mouth: 'mouth-smirk' }
   },
-  { id: 'shy', icon: '😳', parts: { brows: 'brows-sad', mouth: 'mouth-cat' }, blush: true }
+  { id: 'shy', icon: 'heart', parts: { brows: 'brows-sad', mouth: 'mouth-cat' }, blush: true }
 ]
 
 const EXPRESSION_BY_ID = new Map(EXPRESSIONS.map((e) => [e.id, e]))

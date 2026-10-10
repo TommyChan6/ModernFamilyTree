@@ -10,25 +10,38 @@
       <!-- ── Hero band ────────────────────────────────────────────────────── -->
       <header class="bd-hero">
         <div class="bd-hero-sky"></div>
-        <span class="bd-hero-crest">{{ project.crest }}</span>
-        <button class="bd-close" :title="t('browse.detail.close')" @click="emit('close')">✕</button>
+        <UiIcon class="bd-hero-crest" :name="project.crest" :size="110" :stroke="1.25" />
+        <button
+          class="bd-close"
+          :title="t('browse.detail.close')"
+          :aria-label="t('browse.detail.close')"
+          @click="emit('close')"
+        >
+          <UiIcon name="x" :size="18" />
+        </button>
         <div class="bd-hero-text">
           <div class="bd-hero-meta">
             <span class="bd-pill mode" :class="'mode-' + project.access">
-              {{ ACCESS_ICONS[project.access] }} {{ t('browse.modes.' + project.access + '.name') }}
+              <UiIcon :name="ACCESS_ICONS[project.access]" :size="13" />
+              {{ t('browse.modes.' + project.access + '.name') }}
             </span>
             <span v-if="project.badge" class="bd-pill">{{
               t('browse.badges.' + project.badge)
             }}</span>
             <span class="bd-pill">{{ t('browse.genres.' + project.genre) }}</span>
             <span class="bd-pill">{{ t('browse.langs.' + project.lang) }}</span>
-            <span class="bd-pill">🗓 {{ project.era }}</span>
+            <span class="bd-pill">
+              <UiIcon name="calendar" :size="13" />
+              {{ project.era }}
+            </span>
           </div>
           <h2 class="bd-title">{{ project.title }}</h2>
           <p class="bd-blurb">{{ project.blurb }}</p>
           <div class="bd-hero-row">
             <button v-if="author" class="bd-author" @click="emit('author', author.id)">
-              <span class="bd-avatar" :style="{ '--ah': author.hue }">{{ author.avatar }}</span>
+              <span class="bd-avatar" :style="{ '--ah': author.hue }">
+                <UiIcon :name="author.avatar" :size="16" />
+              </span>
               <span>
                 <span class="bd-author-name">{{ author.displayName }}</span>
                 <span class="bd-author-handle">@{{ author.username }}</span>
@@ -41,18 +54,22 @@
               <button
                 class="bd-heart"
                 :class="{ on: liked, pop: likePop }"
+                :title="liked ? t('browse.card.unlike') : t('browse.card.like')"
+                :aria-pressed="liked"
                 @click="like"
                 @animationend="likePop = false"
               >
-                {{ liked ? '❤️' : '🤍' }}
+                <UiIcon name="heart" :size="16" />
                 <span>{{ compactNum(project.likes + (liked ? 1 : 0)) }}</span>
               </button>
               <button
                 class="bd-save"
                 :class="{ on: saved }"
+                :aria-pressed="saved"
                 @click="signals.toggleSave(project.id)"
               >
-                {{ saved ? '🔖 ' + t('browse.detail.saved') : '📑 ' + t('browse.card.save') }}
+                <UiIcon name="bookmark" :size="16" />
+                {{ saved ? t('browse.detail.saved') : t('browse.card.save') }}
               </button>
             </div>
           </div>
@@ -76,19 +93,22 @@
                 <button
                   class="bd-tool"
                   :title="t('browse.detail.zoomIn')"
+                  :aria-label="t('browse.detail.zoomIn')"
                   @click="treeRef?.zoomIn()"
                 >
-                  ＋
+                  <UiIcon name="zoom-in" :size="14" />
                 </button>
                 <button
                   class="bd-tool"
                   :title="t('browse.detail.zoomOut')"
+                  :aria-label="t('browse.detail.zoomOut')"
                   @click="treeRef?.zoomOut()"
                 >
-                  －
+                  <UiIcon name="zoom-out" :size="14" />
                 </button>
                 <button class="bd-tool wide" @click="treeRef?.fit()">
-                  ⤢ {{ t('browse.detail.fit') }}
+                  <UiIcon name="maximize" :size="14" />
+                  {{ t('browse.detail.fit') }}
                 </button>
               </div>
               <div class="bd-legend">
@@ -102,7 +122,14 @@
               <!-- Person inspector -->
               <Transition name="bd-pop">
                 <aside v-if="selected" :key="selected.id" class="bd-person">
-                  <button class="bd-person-x" @click="selectedId = null">✕</button>
+                  <button
+                    class="bd-person-x"
+                    :title="t('browse.detail.close')"
+                    :aria-label="t('browse.detail.close')"
+                    @click="selectedId = null"
+                  >
+                    <UiIcon name="x" :size="14" />
+                  </button>
                   <div class="bd-person-head">
                     <span class="bd-person-dot" :class="selected[2]">{{
                       [...selected[1]][0]
@@ -133,12 +160,14 @@
             <div class="bd-card">
               <div class="bd-card-head">
                 <h3>
-                  👥 {{ t('browse.detail.cast') }}
+                  <UiIcon name="users" :size="16" />
+                  {{ t('browse.detail.cast') }}
                   <span class="bd-count">{{ project.people.length }}</span>
                 </h3>
-                <input
+                <SearchField
                   v-model="castQuery"
                   class="bd-cast-search"
+                  size="sm"
                   :placeholder="t('browse.detail.castPh')"
                 />
               </div>
@@ -163,7 +192,9 @@
           <section class="bd-right">
             <div class="bd-card bd-access" :class="'mode-' + project.access">
               <div class="bd-access-head">
-                <span class="bd-access-icon">{{ ACCESS_ICONS[project.access] }}</span>
+                <span class="bd-access-icon">
+                  <UiIcon :name="ACCESS_ICONS[project.access]" :size="24" />
+                </span>
                 <div>
                   <p class="bd-eyebrow">{{ t('browse.detail.access') }}</p>
                   <h3>{{ t('browse.modes.' + project.access + '.name') }}</h3>
@@ -172,7 +203,9 @@
               </div>
               <ul class="bd-caps">
                 <li v-for="c in CAPABILITIES" :key="c" :class="{ ok: can(project.access, c) }">
-                  <span class="bd-cap-mark">{{ can(project.access, c) ? '✓' : '🔒' }}</span>
+                  <span class="bd-cap-mark">
+                    <UiIcon :name="can(project.access, c) ? 'check' : 'lock'" :size="14" />
+                  </span>
                   <span class="bd-cap-name">{{ t('browse.caps.' + c) }}</span>
                   <span class="bd-cap-note">
                     {{
@@ -183,24 +216,28 @@
               </ul>
               <div class="bd-actions">
                 <button v-if="can(project.access, 'export')" class="bd-act" @click="download">
-                  ⬇ {{ t('browse.detail.download') }}
+                  <UiIcon name="download" :size="16" />
+                  {{ t('browse.detail.download') }}
                 </button>
                 <template v-if="can(project.access, 'fork')">
                   <button v-if="graftCopy" class="bd-act primary" @click="openCopy(graftCopy.id)">
-                    🌿 {{ t('browse.detail.openCopy') }}
+                    <UiIcon name="external-link" :size="16" />
+                    {{ t('browse.detail.openCopy') }}
                   </button>
                   <button v-else class="bd-act primary" :disabled="busy === 'graft'" @click="graft">
                     <span v-if="busy === 'graft'" class="bd-spin"></span>
-                    🌿
+                    <UiIcon v-else name="git-fork" :size="16" />
                     {{ busy === 'graft' ? t('browse.detail.grafting') : t('browse.detail.graft') }}
                   </button>
                 </template>
                 <template v-if="can(project.access, 'edit')">
                   <button v-if="!grove" class="bd-act grove" @click="join">
-                    🤝 {{ t('browse.detail.join') }}
+                    <UiIcon name="users" :size="16" />
+                    {{ t('browse.detail.join') }}
                   </button>
                   <div v-else class="bd-grove" :class="grove">
                     <span v-if="grove === 'pending'" class="bd-spin"></span>
+                    <UiIcon v-else name="check" :size="16" />
                     <span>{{
                       grove === 'pending' ? t('browse.detail.pending') : t('browse.detail.member')
                     }}</span>
@@ -223,10 +260,13 @@
             </div>
 
             <div class="bd-card">
-              <h3>✨ {{ t('browse.detail.facts') }}</h3>
+              <h3>
+                <UiIcon name="sparkles" :size="16" />
+                {{ t('browse.detail.facts') }}
+              </h3>
               <ul class="bd-facts">
                 <li v-for="f in facts" :key="f.key" :style="{ '--i': facts.indexOf(f) }">
-                  <span class="bd-fact-icon">{{ f.icon }}</span>
+                  <span class="bd-fact-icon"><UiIcon :name="f.icon" :size="16" /></span>
                   <span>{{ t('browse.facts.' + f.key, { name: f.name, n: f.n }) }}</span>
                 </li>
               </ul>
@@ -249,12 +289,15 @@
 
             <div class="bd-card">
               <h3>
-                💬 {{ t('browse.detail.comments') }}
+                <UiIcon name="message-circle" :size="16" />
+                {{ t('browse.detail.comments') }}
                 <span class="bd-count">{{ comments.length }}</span>
               </h3>
               <ul class="bd-comments">
                 <li v-for="(c, i) in comments" :key="i" :class="{ mine: c.mine }">
-                  <span class="bd-avatar sm" :style="{ '--ah': c.hue }">{{ c.avatar }}</span>
+                  <span class="bd-avatar sm" :style="{ '--ah': c.hue }">
+                    <UiIcon :name="c.avatar" :size="14" />
+                  </span>
                   <div>
                     <p class="bd-c-head">
                       <button
@@ -317,6 +360,8 @@ import { useI18n } from '../../i18n'
 import { toast } from '../../lib/dialogs.js'
 import MiniTree from './MiniTree.vue'
 import BrowseCard from './BrowseCard.vue'
+import SearchField from '../ui/SearchField.vue'
+import UiIcon from '../ui/UiIcon.js'
 import { PROFILES, PROJECTS } from './browseData'
 import {
   ACCESS_ICONS,
@@ -440,7 +485,7 @@ const comments = computed(() => {
   const mine = (props.signals.state.comments[props.project.id] || []).map((c) => ({
     mine: true,
     name: store.authUser?.display_name || store.authUser?.username || t('browse.detail.you'),
-    avatar: '🌱',
+    avatar: 'sprout',
     hue: store.authUser?.avatar_hue ?? 200,
     text: c.text,
     when: ago((Date.now() - c.at) / 86400000),
@@ -476,7 +521,7 @@ function download() {
   a.download = name
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
-  toast(t('browse.detail.downloaded', { file: name }), { tone: 'success', icon: '🌰' })
+  toast(t('browse.detail.downloaded', { file: name }), { tone: 'success', icon: 'download' })
 }
 
 // Graft = import the project file as a brand-new project of the viewer's —
@@ -494,7 +539,7 @@ async function graft() {
   const copyId = res.data.id
   toast(t('browse.detail.grafted', { name: res.data.name }), {
     tone: 'success',
-    icon: '🌿',
+    icon: 'git-fork',
     duration: 7000,
     action: { label: t('browse.detail.openCopy'), run: () => openCopy(copyId) }
   })
@@ -567,7 +612,7 @@ function join() {
   position: absolute;
   right: 60px;
   top: 50%;
-  font-size: 110px;
+  color: hsl(var(--h) 70% 82%);
   opacity: 0.35;
   transform: translateY(-50%) rotate(-10deg);
   animation: bd-float 6s ease-in-out infinite;
@@ -582,14 +627,17 @@ function join() {
   position: absolute;
   top: 14px;
   right: 14px;
-  width: 34px;
-  height: 34px;
+  width: var(--ctl-md);
+  height: var(--ctl-md);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.25);
   background: rgba(10, 12, 22, 0.45);
   color: #fff;
   cursor: pointer;
-  font-size: 14px;
 }
 .bd-close:hover {
   background: rgba(10, 12, 22, 0.7);
@@ -606,9 +654,12 @@ function join() {
   gap: 6px;
 }
 .bd-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 3px 10px;
   border-radius: var(--r-pill);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -661,8 +712,8 @@ function join() {
   font-weight: 800;
 }
 .bd-author-handle {
-  font-size: 11px;
-  opacity: 0.7;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
 }
 .bd-avatar {
   width: 32px;
@@ -670,7 +721,7 @@ function join() {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 17px;
+  color: inherit;
   background: hsl(var(--ah) 60% 50% / 0.3);
   box-shadow: inset 0 0 0 1.5px hsl(var(--ah) 60% 60% / 0.6);
   flex-shrink: 0;
@@ -678,11 +729,11 @@ function join() {
 .bd-avatar.sm {
   width: 28px;
   height: 28px;
-  font-size: 14px;
+  color: var(--t1);
 }
 .bd-updated {
-  font-size: 12px;
-  opacity: 0.7;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.75);
 }
 .bd-hero-actions {
   display: flex;
@@ -694,7 +745,8 @@ function join() {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 14px;
+  height: var(--ctl-md);
+  padding: 0 14px;
   border-radius: var(--r-pill);
   border: 1px solid rgba(255, 255, 255, 0.25);
   background: rgba(10, 12, 22, 0.4);
@@ -707,6 +759,10 @@ function join() {
 .bd-heart:hover,
 .bd-save:hover {
   transform: translateY(-1px);
+}
+.bd-heart.on .ui-icon,
+.bd-save.on .ui-icon {
+  fill: currentColor;
 }
 .bd-heart.on {
   background: rgba(240, 98, 146, 0.35);
@@ -759,7 +815,7 @@ function join() {
   gap: 6px;
 }
 .bd-count {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--t2);
   background: var(--elevated);
@@ -768,7 +824,7 @@ function join() {
 }
 .bd-muted {
   margin: 0;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
   line-height: 1.5;
 }
@@ -795,8 +851,13 @@ function join() {
   gap: 6px;
 }
 .bd-tool {
-  min-width: 30px;
-  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
   border-radius: var(--r-sm);
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(10, 12, 22, 0.55);
@@ -807,7 +868,7 @@ function join() {
 }
 .bd-tool.wide {
   padding: 0 10px;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 .bd-tool:hover {
   background: rgba(10, 12, 22, 0.8);
@@ -819,7 +880,7 @@ function join() {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: rgba(255, 255, 255, 0.75);
   background: rgba(10, 12, 22, 0.5);
   padding: 5px 10px;
@@ -852,8 +913,8 @@ function join() {
   right: 12px;
   bottom: 10px;
   margin: 0;
-  font-size: 10.5px;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.72);
   pointer-events: none;
 }
 
@@ -874,8 +935,15 @@ function join() {
 }
 .bd-person-x {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 6px;
+  right: 6px;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-sm);
   border: none;
   background: transparent;
   color: var(--t2);
@@ -893,7 +961,7 @@ function join() {
 }
 .bd-person-head p {
   margin: 2px 0 0;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
 }
 .bd-person-dot {
@@ -915,18 +983,18 @@ function join() {
 }
 .bd-person-years {
   margin: 10px 0 0;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--accent);
 }
 .bd-person-bio {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
 }
 .bd-person h5 {
   margin: 12px 0 6px;
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--t3);
@@ -938,11 +1006,11 @@ function join() {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 .bd-bonds em {
   color: var(--t2);
-  font-size: 11px;
+  font-size: 12px;
 }
 .bd-bond-verb {
   color: var(--t2);
@@ -961,7 +1029,7 @@ function join() {
   color: var(--accent);
   font-weight: 700;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 .bd-bond-who:hover {
   text-decoration: underline;
@@ -991,17 +1059,7 @@ function join() {
 }
 .bd-cast-search {
   width: 180px;
-  padding: 6px 10px;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--border);
-  background: var(--elevated);
-  color: var(--t1);
-  font-size: 12px;
-  outline: none;
-}
-.bd-cast-search:focus {
-  border-color: var(--accent);
-  box-shadow: var(--focus-ring);
+  flex-shrink: 0;
 }
 .bd-cast {
   display: flex;
@@ -1019,7 +1077,7 @@ function join() {
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--t1);
-  font-size: 12px;
+  font-size: 12.5px;
   cursor: pointer;
   max-width: 100%;
   transition:
@@ -1039,7 +1097,7 @@ function join() {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   background: var(--surface);
   box-shadow: inset 0 0 0 1.5px var(--border-strong);
@@ -1056,7 +1114,7 @@ function join() {
 }
 .bd-cast-role {
   color: var(--t2);
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1081,7 +1139,7 @@ function join() {
   align-items: flex-start;
 }
 .bd-access-icon {
-  font-size: 30px;
+  color: var(--accent);
   width: 50px;
   height: 50px;
   border-radius: var(--r-md);
@@ -1092,7 +1150,7 @@ function join() {
 }
 .bd-eyebrow {
   margin: 0;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1104,7 +1162,7 @@ function join() {
 }
 .bd-access-desc {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
   line-height: 1.5;
 }
@@ -1119,17 +1177,20 @@ function join() {
 .bd-caps li {
   display: grid;
   grid-template-columns: 22px 78px 1fr;
-  align-items: baseline;
+  align-items: start;
+  line-height: 1.5;
   gap: 6px;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 .bd-caps li.ok {
   color: var(--t1);
 }
 .bd-cap-mark {
-  font-weight: 900;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.5em;
 }
 .bd-caps li.ok .bd-cap-mark {
   color: var(--green);
@@ -1139,7 +1200,7 @@ function join() {
 }
 .bd-cap-note {
   color: var(--t2);
-  font-size: 11.5px;
+  font-size: 12.5px;
 }
 .bd-caps li:not(.ok) .bd-cap-note {
   color: var(--t3);
@@ -1153,8 +1214,10 @@ function join() {
 .bd-act {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 9px 16px;
+  height: var(--ctl-lg);
+  padding: 0 16px;
   border-radius: var(--r-md);
   border: 1px solid var(--border-strong);
   background: var(--elevated);
@@ -1188,16 +1251,18 @@ function join() {
   background: rgba(76, 175, 114, 0.14);
 }
 .bd-act.sm {
-  padding: 7px 12px;
-  font-size: 12px;
+  height: var(--ctl-md);
+  padding: 0 12px;
+  font-size: 12.5px;
 }
 .bd-grove {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 14px;
+  height: var(--ctl-lg);
+  padding: 0 14px;
   border-radius: var(--r-md);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   background: var(--elevated);
   color: var(--t2);
@@ -1242,7 +1307,7 @@ function join() {
   color: var(--t1);
 }
 .bd-stat-label {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--t2);
 }
 
@@ -1259,7 +1324,7 @@ function join() {
   display: flex;
   gap: 10px;
   align-items: center;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t1);
   animation: bd-slide 0.4s var(--ease-out) both;
   animation-delay: calc(var(--i) * 60ms);
@@ -1276,6 +1341,7 @@ function join() {
   border-radius: var(--r-sm);
   display: grid;
   place-items: center;
+  color: var(--accent);
   background: var(--elevated);
   flex-shrink: 0;
 }
@@ -1286,7 +1352,7 @@ function join() {
   margin-top: 12px;
 }
 .bd-group {
-  font-size: 11.5px;
+  font-size: 12.5px;
   padding: 3px 10px;
   border-radius: var(--r-pill);
   background: var(--adim);
@@ -1306,7 +1372,7 @@ function join() {
   border: none;
   background: transparent;
   color: var(--t2);
-  font-size: 11.5px;
+  font-size: 12.5px;
   cursor: pointer;
   padding: 2px 4px;
   border-radius: var(--r-xs);
@@ -1337,14 +1403,14 @@ function join() {
   display: flex;
   gap: 8px;
   align-items: baseline;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t3);
 }
 .bd-c-name {
   border: none;
   background: none;
   padding: 0;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 800;
   color: var(--t1);
   cursor: pointer;
@@ -1354,7 +1420,7 @@ button.bd-c-name:hover {
 }
 .bd-c-text {
   margin: 3px 0 0;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.5;
   color: var(--t1);
   padding: 6px 10px;
@@ -1369,13 +1435,14 @@ button.bd-c-name:hover {
 .bd-c-form input {
   flex: 1;
   min-width: 0;
-  padding: 8px 12px;
+  height: var(--ctl-md);
+  padding: 0 12px;
   border-radius: var(--r-md);
   border: 1px solid var(--border);
   background: var(--elevated);
   color: var(--t1);
   outline: none;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .bd-c-form input:focus {
   border-color: var(--accent);
@@ -1417,7 +1484,8 @@ button.bd-c-name:hover {
     padding: 18px 16px 14px;
   }
   .bd-hero-crest {
-    font-size: 70px;
+    width: 70px;
+    height: 70px;
     right: 20px;
   }
   .bd-hero-actions {
@@ -1463,7 +1531,7 @@ button.bd-c-name:hover {
     linear-gradient(180deg, #f3ecdc, #e9dfc8);
 }
 :root[data-theme='ink'] .bd-hero-crest {
-  filter: grayscale(1) sepia(0.35);
+  color: var(--t1);
   opacity: 0.18;
 }
 :root[data-theme='ink'] .bd-close {
@@ -1537,7 +1605,7 @@ button.bd-c-name:hover {
 :root[data-theme='ink'] .bd-grove,
 :root[data-theme='ink'] .bd-cast-chip,
 :root[data-theme='ink'] .bd-tag,
-:root[data-theme='ink'] .bd-cast-search,
+:root[data-theme='ink'] .bd-cast-search :deep(.sf-input),
 :root[data-theme='ink'] .bd-c-form input {
   border-radius: 3px 5px 4px 6px / 5px 3px 6px 4px;
   font-family: var(--font-ink-label);

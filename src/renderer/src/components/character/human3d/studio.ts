@@ -25,7 +25,7 @@ export interface LightPreset {
 export const LIGHT_PRESETS: LightPreset[] = [
   {
     id: 'studio',
-    icon: '💡',
+    icon: 'lightbulb',
     label: 'Studio',
     bg: ['#1b1f27', '#2b303b', '#15171c'],
     exposure: 0.95,
@@ -39,7 +39,7 @@ export const LIGHT_PRESETS: LightPreset[] = [
   },
   {
     id: 'daylight',
-    icon: '☀️',
+    icon: 'sun',
     label: 'Daylight',
     bg: ['#a9c3df', '#dfe7ee', '#b9bcb8'],
     exposure: 1.05,
@@ -53,7 +53,7 @@ export const LIGHT_PRESETS: LightPreset[] = [
   },
   {
     id: 'golden',
-    icon: '🌅',
+    icon: 'sunset',
     label: 'Golden hour',
     bg: ['#3a2a3f', '#d98c52', '#2a1d1a'],
     exposure: 1.0,
@@ -67,7 +67,7 @@ export const LIGHT_PRESETS: LightPreset[] = [
   },
   {
     id: 'moonlight',
-    icon: '🌙',
+    icon: 'moon',
     label: 'Moonlight',
     bg: ['#05070f', '#16203a', '#05060a'],
     exposure: 1.1,
@@ -81,7 +81,7 @@ export const LIGHT_PRESETS: LightPreset[] = [
   },
   {
     id: 'neon',
-    icon: '🌆',
+    icon: 'zap',
     label: 'Neon',
     bg: ['#0c0414', '#2a0d3a', '#07040b'],
     exposure: 1.05,
@@ -95,7 +95,7 @@ export const LIGHT_PRESETS: LightPreset[] = [
   },
   {
     id: 'noir',
-    icon: '🎞',
+    icon: 'film',
     label: 'Noir',
     bg: ['#050505', '#151515', '#030303'],
     exposure: 1.0,
@@ -109,7 +109,7 @@ export const LIGHT_PRESETS: LightPreset[] = [
   },
   {
     id: 'candle',
-    icon: '🕯',
+    icon: 'flame',
     label: 'Candlelight',
     bg: ['#0a0604', '#2a170c', '#070403'],
     exposure: 1.15,

@@ -79,11 +79,11 @@ const FIST: PoseOp[] = [
 const R = (ops: PoseOp[]) => mirrorOps(ops)
 
 export const POSES: PoseDef[] = [
-  { id: 'apose', icon: '🧍', label: 'A-pose', ops: [] },
-  { id: 'relaxed', icon: '🙂', label: 'Relaxed', ops: [...ARMS_DOWN, ...SOFT_HAND] },
+  { id: 'apose', icon: 'accessibility', label: 'A-pose', ops: [] },
+  { id: 'relaxed', icon: 'sofa', label: 'Relaxed', ops: [...ARMS_DOWN, ...SOFT_HAND] },
   {
     id: 'contrapposto',
-    icon: '🗽',
+    icon: 'person-standing',
     label: 'Contrapposto',
     noMirror: true,
     ops: [
@@ -105,7 +105,7 @@ export const POSES: PoseDef[] = [
   },
   {
     id: 'wave',
-    icon: '👋',
+    icon: 'hand',
     label: 'Wave',
     noMirror: true,
     ops: [
@@ -123,7 +123,7 @@ export const POSES: PoseDef[] = [
   },
   {
     id: 'thinking',
-    icon: '🤔',
+    icon: 'brain',
     label: 'Thinking',
     noMirror: true,
     ops: [
@@ -142,7 +142,7 @@ export const POSES: PoseDef[] = [
   },
   {
     id: 'heroic',
-    icon: '🏆',
+    icon: 'trophy',
     label: 'Heroic',
     ops: [
       ['clavicle.L', 'z', 3],
@@ -159,7 +159,7 @@ export const POSES: PoseDef[] = [
   },
   {
     id: 'shy',
-    icon: '🫣',
+    icon: 'eye-off',
     label: 'Shy',
     ops: [
       ['clavicle.L', 'z', -6],
@@ -178,7 +178,7 @@ export const POSES: PoseDef[] = [
   },
   {
     id: 'clasped',
-    icon: '🤲',
+    icon: 'hand-heart',
     label: 'Hands clasped',
     ops: [
       ['clavicle.L', 'z', -4],
@@ -270,10 +270,10 @@ export interface ExpressionDef {
 
 const E = 'expr/'
 export const EXPRESSIONS: ExpressionDef[] = [
-  { id: 'neutral', icon: '😐', label: 'Neutral', units: {} },
+  { id: 'neutral', icon: 'meh', label: 'Neutral', units: {} },
   {
     id: 'smile',
-    icon: '🙂',
+    icon: 'smile',
     label: 'Smile',
     units: {
       'mouth-corner-puller': 0.55,
@@ -284,7 +284,7 @@ export const EXPRESSIONS: ExpressionDef[] = [
   },
   {
     id: 'grin',
-    icon: '😁',
+    icon: 'smile-plus',
     label: 'Big grin',
     units: {
       'mouth-corner-puller': 1,
@@ -298,7 +298,7 @@ export const EXPRESSIONS: ExpressionDef[] = [
   },
   {
     id: 'laugh',
-    icon: '😆',
+    icon: 'laugh',
     label: 'Laugh',
     units: {
       'mouth-corner-puller': 1,
@@ -312,7 +312,7 @@ export const EXPRESSIONS: ExpressionDef[] = [
   },
   {
     id: 'sad',
-    icon: '😢',
+    icon: 'frown',
     label: 'Sad',
     units: {
       'mouth-depression': 0.7,
@@ -325,7 +325,7 @@ export const EXPRESSIONS: ExpressionDef[] = [
   },
   {
     id: 'angry',
-    icon: '😠',
+    icon: 'angry',
     label: 'Angry',
     units: {
       'eyebrows-left-down': 1,
@@ -340,7 +340,7 @@ export const EXPRESSIONS: ExpressionDef[] = [
   },
   {
     id: 'surprised',
-    icon: '😮',
+    icon: 'circle-alert',
     label: 'Surprised',
     units: {
       'eyebrows-left-up': 1,
@@ -353,7 +353,7 @@ export const EXPRESSIONS: ExpressionDef[] = [
   },
   {
     id: 'fear',
-    icon: '😨',
+    icon: 'ghost',
     label: 'Afraid',
     units: {
       'eyebrows-left-inner-up': 1,
@@ -369,7 +369,7 @@ export const EXPRESSIONS: ExpressionDef[] = [
   },
   {
     id: 'disgust',
-    icon: '🤢',
+    icon: 'frown',
     label: 'Disgust',
     units: {
       'nose-left-elevation': 0.9,
@@ -384,7 +384,7 @@ export const EXPRESSIONS: ExpressionDef[] = [
   },
   {
     id: 'smirk',
-    icon: '😏',
+    icon: 'annoyed',
     label: 'Smirk',
     units: {
       'mouth-part-later': 0.6,
@@ -395,7 +395,7 @@ export const EXPRESSIONS: ExpressionDef[] = [
   },
   {
     id: 'pout',
-    icon: '😗',
+    icon: 'heart',
     label: 'Pout',
     units: {
       'mouth-protusion': 0.8,
@@ -406,7 +406,7 @@ export const EXPRESSIONS: ExpressionDef[] = [
   },
   {
     id: 'determined',
-    icon: '😤',
+    icon: 'flame',
     label: 'Determined',
     units: {
       'eyebrows-left-down': 0.45,
@@ -420,7 +420,7 @@ export const EXPRESSIONS: ExpressionDef[] = [
   },
   {
     id: 'sleepy',
-    icon: '😴',
+    icon: 'moon',
     label: 'Sleepy',
     units: {
       'eye-left-closure': 0.55,
@@ -431,7 +431,7 @@ export const EXPRESSIONS: ExpressionDef[] = [
   },
   {
     id: 'wink',
-    icon: '😉',
+    icon: 'eye-closed',
     label: 'Wink',
     units: {
       'eye-left-closure': 1,

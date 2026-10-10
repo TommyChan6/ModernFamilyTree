@@ -84,7 +84,7 @@ function setDay(v) {
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   padding: 0 8px;
   outline: none;
   transition:

@@ -8,7 +8,7 @@
   >
     <!-- Empty roster -->
     <div v-if="!persons.length" class="reel-empty">
-      <div class="reel-empty-icon">🎞</div>
+      <div class="reel-empty-icon"><UiIcon name="film" :size="44" :stroke="1.5" /></div>
       <div class="reel-empty-title">The reel is blank</div>
       <div class="reel-empty-text">No people match — clear the search or add someone.</div>
     </div>
@@ -50,7 +50,9 @@
             {{ firstTag(s.p.id).label }}
           </span>
           <span class="strip-years">{{ lifeText(s.p) }}</span>
-          <span class="strip-kin">🔗 {{ statsOf(s.p.id).kin }}</span>
+          <span class="strip-kin" title="Relations">
+            <UiIcon name="link" :size="12" />{{ statsOf(s.p.id).kin }}
+          </span>
           <div class="strip-holes strip-holes-r"></div>
           <div class="strip-shine"></div>
         </div>
@@ -74,9 +76,23 @@
       </div>
 
       <div class="reel-count" @pointerdown.stop>
-        <button class="reel-count-arrow" title="Previous (↑)" @click="stepBy(-1)">‹</button>
+        <button
+          class="reel-count-arrow"
+          title="Previous (Up arrow)"
+          aria-label="Previous"
+          @click="stepBy(-1)"
+        >
+          <UiIcon name="chevron-up" :size="14" />
+        </button>
         {{ focusedIndex + 1 }} / {{ persons.length }}
-        <button class="reel-count-arrow" title="Next (↓)" @click="stepBy(1)">›</button>
+        <button
+          class="reel-count-arrow"
+          title="Next (Down arrow)"
+          aria-label="Next"
+          @click="stepBy(1)"
+        >
+          <UiIcon name="chevron-down" :size="14" />
+        </button>
       </div>
     </template>
   </div>
@@ -87,6 +103,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, h } from 'vue'
 import { useMainStore } from '../../store/index.js'
 import { isDeceased } from './peopleLayout.js'
 import { useThumbnail } from './useThumbnail.js'
+import UiIcon from '../ui/UiIcon.js'
 
 // The Reel: people as film-strip rows on a spinning picker drum. Strips curve
 // away above and below the focal line (rotateX around a horizontal axis);
@@ -454,7 +471,7 @@ function lifeText(p) {
   text-overflow: ellipsis;
 }
 .strip-sub {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--t3);
   white-space: nowrap;
@@ -472,7 +489,7 @@ function lifeText(p) {
   border: 1px solid color-mix(in srgb, var(--tc) 45%, transparent);
   background: color-mix(in srgb, var(--tc) 14%, transparent);
   color: var(--t1);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   max-width: 130px;
   white-space: nowrap;
@@ -481,14 +498,17 @@ function lifeText(p) {
 }
 .strip-years {
   flex-shrink: 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--t2);
   font-variant-numeric: tabular-nums;
 }
 .strip-kin {
   flex-shrink: 0;
-  font-size: 10.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--t3);
 }
@@ -584,7 +604,7 @@ function lifeText(p) {
   background: transparent;
   color: var(--t3);
   font-family: var(--font);
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 800;
   cursor: pointer;
   transition:
@@ -617,21 +637,23 @@ function lifeText(p) {
   background: var(--glass-strong);
   backdrop-filter: blur(10px);
   color: var(--t2);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   cursor: default;
   animation: reel-az-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.35s backwards;
 }
 .reel-count-arrow {
-  width: 22px;
-  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 7px;
   background: var(--elevated);
   color: var(--t2);
-  font-size: 13px;
-  line-height: 1;
   cursor: pointer;
   transition:
     color 0.15s,
@@ -657,8 +679,8 @@ function lifeText(p) {
   pointer-events: none;
 }
 .reel-empty-icon {
-  font-size: 44px;
-  opacity: 0.6;
+  display: flex;
+  color: var(--t3);
 }
 .reel-empty-title {
   font-size: 16px;

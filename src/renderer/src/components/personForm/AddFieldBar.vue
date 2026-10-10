@@ -2,7 +2,8 @@
   <div class="afb">
     <!-- collapsed -->
     <button v-if="!open" class="afb-toggle" type="button" @click="open = true">
-      <span class="afb-plus">＋</span> Add trait
+      <UiIcon name="plus" :size="14" />
+      Add trait
     </button>
 
     <!-- expanded: type palette → name it → create -->
@@ -17,18 +18,26 @@
           :title="m.hint"
           @click="picked = m"
         >
-          <span class="afb-glyph">{{ m.glyph }}</span>
+          <UiIcon class="afb-glyph" :name="m.icon" :size="16" />
           <span class="afb-name">{{ m.label }}</span>
         </button>
-        <button class="afb-cancel" type="button" title="Close" @click="open = false">✕</button>
+        <button
+          class="afb-cancel"
+          type="button"
+          title="Close"
+          aria-label="Close"
+          @click="open = false"
+        >
+          <UiIcon name="x" :size="14" />
+        </button>
       </div>
 
       <div v-else class="afb-naming">
-        <span class="afb-picked" @click="picked = null">
-          <span class="afb-glyph">{{ picked.glyph }}</span
-          >{{ picked.label }}
-          <i class="afb-picked-x">✕</i>
-        </span>
+        <button type="button" class="afb-picked" title="Change type" @click="picked = null">
+          <UiIcon class="afb-glyph" :name="picked.icon" :size="14" />
+          {{ picked.label }}
+          <UiIcon class="afb-picked-x" name="x" :size="12" />
+        </button>
         <input
           ref="nameEl"
           v-model="label"
@@ -39,7 +48,7 @@
           @keydown.esc="picked = null"
         />
         <label class="afb-lock" title="Locked traits appear on every person's form">
-          <input v-model="locked" type="checkbox" /> lock
+          <input v-model="locked" type="checkbox" /> Lock
         </label>
         <button
           class="btn btn-primary btn-sm"
@@ -57,6 +66,7 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
 import { FIELD_TYPE_META } from './fieldUi.js'
+import UiIcon from '../ui/UiIcon.js'
 
 const emit = defineEmits(['create'])
 
@@ -95,6 +105,10 @@ function create() {
 
 <style scoped>
 .afb-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   width: 100%;
   padding: 10px;
   border: 1.5px dashed var(--border);
@@ -102,7 +116,7 @@ function create() {
   background: transparent;
   color: var(--t2);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   cursor: pointer;
   transition:
     border-color 0.2s,
@@ -113,9 +127,6 @@ function create() {
   border-color: var(--accent);
   color: var(--accent);
   background: var(--adim);
-}
-.afb-plus {
-  font-size: 13px;
 }
 
 .afb-panel {
@@ -163,25 +174,31 @@ function create() {
   }
 }
 .afb-glyph {
-  font-size: 15px;
+  flex-shrink: 0;
   color: var(--accent);
-  line-height: 1;
 }
 .afb-name {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--t2);
 }
 .afb-cancel {
   position: absolute;
-  top: -18px;
-  right: -3px;
+  top: -24px;
+  right: -4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-xs);
+  height: var(--ctl-xs);
+  padding: 0;
   border: none;
+  border-radius: var(--r-xs);
   background: transparent;
   color: var(--t3);
   cursor: pointer;
-  font-size: 11px;
 }
 .afb-cancel:hover {
+  background: var(--hover);
   color: var(--t1);
 }
 
@@ -195,30 +212,31 @@ function create() {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 9px;
+  height: var(--ctl-sm);
+  padding: 0 10px;
+  font-family: var(--font);
   border-radius: 999px;
   background: var(--adim);
   border: 1px solid var(--accent);
   color: var(--t1);
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
   flex-shrink: 0;
 }
 .afb-picked-x {
-  font-style: normal;
-  font-size: 9px;
   color: var(--t3);
 }
 .afb-input {
   flex: 1;
   min-width: 0;
-  padding: 7px 10px;
+  height: var(--ctl-sm);
+  padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--elevated);
   color: var(--t1);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   outline: none;
 }
 .afb-input:focus {
@@ -228,7 +246,7 @@ function create() {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t2);
   cursor: pointer;
   flex-shrink: 0;
@@ -246,6 +264,6 @@ function create() {
   background: rgba(179, 53, 42, 0.05);
 }
 :root[data-theme='ink'] .afb-name {
-  font-size: 12.5px;
+  font-size: 13px;
 }
 </style>

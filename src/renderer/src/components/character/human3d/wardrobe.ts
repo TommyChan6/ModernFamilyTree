@@ -21,54 +21,53 @@ import { applyStencil } from './subdivision'
 export interface GarmentInfo {
   id: string
   label: string
-  icon: string
 }
 
 export const TOPS: GarmentInfo[] = [
-  { id: 'none', label: 'None', icon: '∅' },
-  { id: 'tank', label: 'Tank top', icon: '🎽' },
-  { id: 'tee', label: 'T-shirt', icon: '👕' },
-  { id: 'longsleeve', label: 'Long sleeve', icon: '🥼' },
-  { id: 'shirt', label: 'Button shirt', icon: '👔' },
-  { id: 'sweater', label: 'Sweater', icon: '🧶' },
-  { id: 'turtleneck', label: 'Turtleneck', icon: '🧣' },
-  { id: 'vneck', label: 'V-neck', icon: '🔻' },
-  { id: 'crop', label: 'Crop top', icon: '✂️' },
-  { id: 'dress', label: 'Dress', icon: '👗' },
-  { id: 'gown', label: 'Gown', icon: '👸' },
-  { id: 'robe', label: 'Robe', icon: '🥋' },
-  { id: 'armor', label: 'Plate armour', icon: '🛡' }
+  { id: 'none', label: 'None' },
+  { id: 'tank', label: 'Tank top' },
+  { id: 'tee', label: 'T-shirt' },
+  { id: 'longsleeve', label: 'Long sleeve' },
+  { id: 'shirt', label: 'Button shirt' },
+  { id: 'sweater', label: 'Sweater' },
+  { id: 'turtleneck', label: 'Turtleneck' },
+  { id: 'vneck', label: 'V-neck' },
+  { id: 'crop', label: 'Crop top' },
+  { id: 'dress', label: 'Dress' },
+  { id: 'gown', label: 'Gown' },
+  { id: 'robe', label: 'Robe' },
+  { id: 'armor', label: 'Plate armour' }
 ]
 
 export const BOTTOMS: GarmentInfo[] = [
-  { id: 'none', label: 'Underwear', icon: '🩲' },
-  { id: 'trousers', label: 'Trousers', icon: '👖' },
-  { id: 'jeans', label: 'Jeans', icon: '🧵' },
-  { id: 'shorts', label: 'Shorts', icon: '🩳' },
-  { id: 'leggings', label: 'Leggings', icon: '🦵' },
-  { id: 'skirt', label: 'Skirt', icon: '🎀' },
-  { id: 'midi-skirt', label: 'Midi skirt', icon: '🌸' },
-  { id: 'long-skirt', label: 'Long skirt', icon: '🌷' }
+  { id: 'none', label: 'Underwear' },
+  { id: 'trousers', label: 'Trousers' },
+  { id: 'jeans', label: 'Jeans' },
+  { id: 'shorts', label: 'Shorts' },
+  { id: 'leggings', label: 'Leggings' },
+  { id: 'skirt', label: 'Skirt' },
+  { id: 'midi-skirt', label: 'Midi skirt' },
+  { id: 'long-skirt', label: 'Long skirt' }
 ]
 
 export const SHOES: GarmentInfo[] = [
-  { id: 'none', label: 'Barefoot', icon: '🦶' },
-  { id: 'sneakers', label: 'Sneakers', icon: '👟' },
-  { id: 'boots', label: 'Boots', icon: '🥾' },
-  { id: 'loafers', label: 'Loafers', icon: '👞' },
-  { id: 'socks', label: 'Socks', icon: '🧦' }
+  { id: 'none', label: 'Barefoot' },
+  { id: 'sneakers', label: 'Sneakers' },
+  { id: 'boots', label: 'Boots' },
+  { id: 'loafers', label: 'Loafers' },
+  { id: 'socks', label: 'Socks' }
 ]
 
 export const ACCESSORIES: GarmentInfo[] = [
-  { id: 'glasses', label: 'Glasses', icon: '👓' },
-  { id: 'sunglasses', label: 'Sunglasses', icon: '🕶' },
-  { id: 'earrings', label: 'Earrings', icon: '💍' },
-  { id: 'necklace', label: 'Necklace', icon: '📿' },
-  { id: 'beanie', label: 'Beanie', icon: '🧢' },
-  { id: 'cap', label: 'Cap', icon: '⛑' },
-  { id: 'crown', label: 'Crown', icon: '👑' },
-  { id: 'headband', label: 'Headband', icon: '🎗' },
-  { id: 'watch', label: 'Watch', icon: '⌚' }
+  { id: 'glasses', label: 'Glasses' },
+  { id: 'sunglasses', label: 'Sunglasses' },
+  { id: 'earrings', label: 'Earrings' },
+  { id: 'necklace', label: 'Necklace' },
+  { id: 'beanie', label: 'Beanie' },
+  { id: 'cap', label: 'Cap' },
+  { id: 'crown', label: 'Crown' },
+  { id: 'headband', label: 'Headband' },
+  { id: 'watch', label: 'Watch' }
 ]
 
 export const TOP_FABRIC: Record<string, Fabric> = {

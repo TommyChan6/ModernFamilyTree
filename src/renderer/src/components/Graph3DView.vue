@@ -4,7 +4,7 @@
     <canvas ref="overlayEl" class="space3d-overlay"></canvas>
 
     <div class="space3d-badge" :class="{ 'space3d-badge-hidden': store.cleanView }">
-      <span class="badge-flask">🧪</span> Experimental · Space
+      <UiIcon class="badge-flask" name="flask-conical" :size="14" />Experimental · Space
     </div>
 
     <!-- Star chart: top-down radar over the x/z ground plane. The camera shows
@@ -24,8 +24,10 @@
     <Transition name="hints">
       <div v-if="helpOpen" class="hints-scrim" @click.self="closeHelp">
         <div class="hints-card">
-          <button class="hints-close" title="Close" @click="closeHelp">✕</button>
-          <div class="hints-emblem">🪐</div>
+          <button class="hints-close" title="Close" aria-label="Close" @click="closeHelp">
+            <UiIcon name="x" :size="16" />
+          </button>
+          <div class="hints-emblem"><UiIcon name="orbit" :size="24" /></div>
           <div class="hints-title">Navigating Space</div>
           <div class="hints-sub">
             Your tree in three dimensions — the same people and lines, one more axis. Controls
@@ -50,8 +52,8 @@
             </div>
           </div>
           <div class="hints-tip">
-            Tip: <strong>Generation layers</strong> (≡ in the toolbar) stacks each generation on its
-            own floor — oldest on top.
+            Tip: <strong>Generation layers</strong> (the layers button in the toolbar, or
+            <kbd>G</kbd>) stacks each generation on its own floor — oldest on top.
           </div>
           <button class="hints-gotit" @click="closeHelp">Got it</button>
         </div>
@@ -65,6 +67,7 @@ import { ref, watch, onMounted, onUnmounted } from 'vue'
 import * as d3 from 'd3'
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force-3d'
 import { useMainStore } from '../store/index.js'
+import UiIcon from './ui/UiIcon.js'
 import { api } from '../api'
 import {
   nodeColor,
@@ -949,7 +952,7 @@ watch(
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   color: var(--t3);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -965,7 +968,7 @@ watch(
   opacity: 0;
 }
 .badge-flask {
-  font-size: 12px;
+  color: var(--accent);
 }
 
 /* Star chart sits under the Experimental badge (compound selector so it
@@ -1004,8 +1007,14 @@ watch(
   gap: 12px;
 }
 .hints-emblem {
-  font-size: 30px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--adim);
+  color: var(--accent);
 }
 .hints-title {
   font-size: 17px;
@@ -1013,7 +1022,7 @@ watch(
   color: var(--t1);
 }
 .hints-sub {
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.5;
   color: var(--t2);
 }
@@ -1029,7 +1038,7 @@ watch(
   gap: 7px;
 }
 .hints-col-label {
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -1040,7 +1049,7 @@ watch(
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--t2);
 }
 .hint-row kbd {
@@ -1054,11 +1063,11 @@ watch(
   border-bottom-width: 2px;
   color: var(--t1);
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
 }
 .hints-tip {
-  font-size: 11.5px;
+  font-size: 12.5px;
   line-height: 1.5;
   color: var(--t3);
   background: var(--adim);
@@ -1071,13 +1080,17 @@ watch(
 }
 .hints-gotit {
   align-self: flex-end;
-  padding: 7px 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--ctl-md);
+  padding: 0 20px;
   border: none;
   border-radius: 8px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-family: var(--font);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1092,13 +1105,13 @@ watch(
   position: absolute;
   top: 12px;
   right: 12px;
-  width: 26px;
-  height: 26px;
+  width: var(--ctl-sm);
+  height: var(--ctl-sm);
+  padding: 0;
   border-radius: 7px;
   border: none;
   background: transparent;
   color: var(--t3);
-  font-size: 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
