@@ -200,7 +200,7 @@ detects the missing preload bridge and uses the browser-local backend.
 | API seam | [`api/`](../src/renderer/src/api/index.ts) | `invoke` / `getImageUrl` façade over swappable backends: `backends/ipc.ts` (Electron) or `backends/local.ts` (browser IndexedDB, used by the web build); auto-selected at startup. Future HTTP/Supabase backend slots in here. |
 | Shared data core | [`src/shared/`](../src/shared/dbCore.ts) | Channel handlers + entity types used by the main process *and* the browser backend (see above). |
 | Views | `components/{GraphCanvas,PeopleView,RelationshipsView,TimelineView,FactionsView}.vue` | Five main workspace views. Graph/timeline/groups draw with Three.js; directory/relationships virtualize their DOM lists. |
-| Panels & modals | `components/{LeftSidebar,RightSidebar,PersonModal,PersonForm,GraphSettings}.vue` | Right sidebar member list is virtualized. |
+| Panels & modals | `components/{LeftSidebar,RightSidebar,PersonModal,PersonForm}.vue`, `components/style/StyleStudio.vue` | Right sidebar member list is virtualized. |
 | Graph engine | [`components/graph/`](../src/renderer/src/components/graph/) | Pure layout/style helpers + the animation composable + the tree's WebGL renderer (`graph/webgl/`). |
 | Shared WebGL layers | [`components/webgl/`](../src/renderer/src/components/webgl/) | Instanced capsule/dot/ribbon/arc draw layers + overlay-canvas helpers, shared by the timeline and groups renderers. |
 | Timeline engine | [`components/timeline/`](../src/renderer/src/components/timeline/) | Pure layout math (`timelineLayout.js`) + Three.js renderer (`TimelineRenderer.js`). |

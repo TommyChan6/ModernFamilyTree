@@ -4,7 +4,7 @@
     <canvas ref="overlayEl" class="space3d-overlay"></canvas>
 
     <div class="space3d-badge" :class="{ 'space3d-badge-hidden': store.cleanView }">
-      <UiIcon class="badge-flask" name="flask-conical" :size="14" />Experimental · Space
+      <UiIcon class="badge-flask" name="flask-conical" :size="14" />{{ t('graph3d.badge') }}
     </div>
 
     <!-- Star chart: top-down radar over the x/z ground plane. The camera shows
@@ -24,38 +24,38 @@
     <Transition name="hints">
       <div v-if="helpOpen" class="hints-scrim" @click.self="closeHelp">
         <div class="hints-card">
-          <button class="hints-close" title="Close" aria-label="Close" @click="closeHelp">
+          <button
+            class="hints-close"
+            :title="t('graph3d.help.close')"
+            :aria-label="t('graph3d.help.close')"
+            @click="closeHelp"
+          >
             <UiIcon name="x" :size="16" />
           </button>
           <div class="hints-emblem"><UiIcon name="orbit" :size="24" /></div>
-          <div class="hints-title">Navigating Space</div>
-          <div class="hints-sub">
-            Your tree in three dimensions — the same people and lines, one more axis. Controls
-            follow the usual 3D conventions:
-          </div>
+          <div class="hints-title">{{ t('graph3d.help.title') }}</div>
+          <div class="hints-sub">{{ t('graph3d.help.sub') }}</div>
           <div class="hints-cols">
             <div class="hints-col">
-              <div class="hints-col-label">Mouse</div>
-              <div class="hint-row"><kbd>Left-drag</kbd><span>Orbit around the family</span></div>
-              <div class="hint-row"><kbd>Right-drag</kbd><span>Pan sideways</span></div>
-              <div class="hint-row"><kbd>Scroll</kbd><span>Zoom in / out</span></div>
-              <div class="hint-row"><kbd>Drag person</kbd><span>Move them in space</span></div>
-              <div class="hint-row"><kbd>Click</kbd><span>Select a person or line</span></div>
-              <div class="hint-row"><kbd>Dbl-click</kbd><span>Fly to a person</span></div>
+              <div class="hints-col-label">{{ t('graph3d.help.mouse') }}</div>
+              <div v-for="h in MOUSE_HINTS" :key="h" class="hint-row">
+                <kbd>{{ t(`graph3d.help.${h}.key`) }}</kbd
+                ><span>{{ t(`graph3d.help.${h}.desc`) }}</span>
+              </div>
             </div>
             <div class="hints-col">
-              <div class="hints-col-label">Keys</div>
-              <div class="hint-row"><kbd>F</kbd><span>Frame everything</span></div>
-              <div class="hint-row"><kbd>R</kbd><span>Auto-rotate on / off</span></div>
-              <div class="hint-row"><kbd>G</kbd><span>Generation layers</span></div>
-              <div class="hint-row"><kbd>?</kbd><span>Show these hints</span></div>
+              <div class="hints-col-label">{{ t('graph3d.help.keys') }}</div>
+              <div v-for="h in KEY_HINTS" :key="h.key" class="hint-row">
+                <kbd>{{ h.key }}</kbd
+                ><span>{{ t(`graph3d.help.${h.id}`) }}</span>
+              </div>
             </div>
           </div>
           <div class="hints-tip">
-            Tip: <strong>Generation layers</strong> (the layers button in the toolbar, or
-            <kbd>G</kbd>) stacks each generation on its own floor — oldest on top.
+            {{ t('graph3d.help.tipLabel') }} <strong>{{ t('graph3d.help.layers') }}</strong>
+            {{ t('graph3d.help.tipMid') }} <kbd>G</kbd>{{ t('graph3d.help.tipEnd') }}
           </div>
-          <button class="hints-gotit" @click="closeHelp">Got it</button>
+          <button class="hints-gotit" @click="closeHelp">{{ t('graph3d.help.gotIt') }}</button>
         </div>
       </div>
     </Transition>
@@ -68,6 +68,7 @@ import * as d3 from 'd3'
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force-3d'
 import { useMainStore } from '../store/index.js'
 import UiIcon from './ui/UiIcon.js'
+import { useI18n } from '../i18n'
 import { api } from '../api'
 import {
   nodeColor,
@@ -97,6 +98,15 @@ const props = defineProps({
 const emit = defineEmits(['persist'])
 
 const store = useMainStore()
+const { t, locale } = useI18n()
+// The help card's rows (copy in graph3d.help.*; key caps stay literal).
+const MOUSE_HINTS = ['leftDrag', 'rightDrag', 'scroll', 'dragPerson', 'click', 'dblClick']
+const KEY_HINTS = [
+  { key: 'F', id: 'frame' },
+  { key: 'R', id: 'rotate' },
+  { key: 'G', id: 'layers' },
+  { key: '?', id: 'hints' }
+]
 const containerEl = ref(null)
 const glCanvasEl = ref(null)
 const overlayEl = ref(null)
@@ -885,6 +895,8 @@ watch(
   }
 )
 watch([() => store.theme, () => store.accent], () => applyTheme())
+// Layer captions ("Gen 1"…) are translated as the overlay draws them.
+watch(locale, () => renderer?.requestRedraw())
 watch(
   () => store.graphSettings,
   () => {

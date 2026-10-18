@@ -7,7 +7,7 @@
         ref="inputEl"
         v-model="query"
         size="sm"
-        :placeholder="placeholder"
+        :placeholder="placeholder || t('personForm.picker.placeholder')"
         @keydown.down.prevent="move(1)"
         @keydown.up.prevent="move(-1)"
         @keydown.enter.prevent="chooseActive"
@@ -27,11 +27,15 @@
           <img v-if="p.primary_image" :src="imgUrl(p.primary_image)" alt="" />
           <template v-else>{{ initialOf(p) }}</template>
         </span>
-        <span class="pp-name">{{ p.name || 'Unnamed' }}</span>
-        <span v-if="p.birth?.year" class="pp-meta">b. {{ p.birth.year }}</span>
+        <span class="pp-name">{{ p.name || t('personForm.unnamed') }}</span>
+        <span v-if="p.birth?.year" class="pp-meta">{{
+          t('personForm.bornAbbr', { year: p.birth.year })
+        }}</span>
       </button>
 
-      <div v-if="results.length === 0 && !canCreate" class="pp-empty">No one matches</div>
+      <div v-if="results.length === 0 && !canCreate" class="pp-empty">
+        {{ t('personForm.picker.noMatches') }}
+      </div>
 
       <button
         v-if="canCreate"
@@ -45,7 +49,12 @@
         <span class="pp-avatar pp-avatar-new"><UiIcon name="plus" :size="14" /></span>
         <span class="pp-name">
           {{
-            creating ? 'Creating…' : `Create “${query.trim()}” as a new ${store.noun.toLowerCase()}`
+            creating
+              ? t('personForm.picker.creating')
+              : t('personForm.picker.createAs', {
+                  name: query.trim(),
+                  noun: nounLabel(store.noun).toLowerCase()
+                })
           }}
         </span>
       </button>
@@ -59,15 +68,18 @@ import { useMainStore } from '../../store/index.js'
 import { api } from '../../api'
 import SearchField from '../ui/SearchField.vue'
 import UiIcon from '../ui/UiIcon.js'
+import { useI18n } from '../../i18n'
+import { nounLabel } from '../../lib/dataLabels'
 
 const props = defineProps({
   /** person ids to hide (self, already linked…) */
   exclude: { type: Array, default: () => [] },
-  placeholder: { type: String, default: 'Type a name…' },
+  placeholder: { type: String, default: '' },
   /** allow the inline create-new row */
   allowCreate: { type: Boolean, default: true }
 })
 const emit = defineEmits(['pick', 'cancel'])
+const { t } = useI18n()
 
 const store = useMainStore()
 const query = ref('')

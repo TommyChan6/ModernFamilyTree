@@ -11,7 +11,7 @@
   >
     <!-- Metric picker: segmented pills with a gliding highlight -->
     <header class="rk-head">
-      <div class="rk-pills" role="tablist" aria-label="Ranking metric">
+      <div class="rk-pills" role="tablist" :aria-label="t('directory.ranks.metricAria')">
         <i class="rk-glide" :style="glideStyle" aria-hidden="true"></i>
         <button
           v-for="m in METRICS"
@@ -21,24 +21,25 @@
           :class="{ on: m.id === metricId }"
           role="tab"
           :aria-selected="m.id === metricId"
-          :title="m.blurb"
+          :title="metricBlurb(m)"
           @click="setMetric(m.id)"
         >
           <UiIcon class="rk-pill-ic" :name="m.icon" :size="14" />
-          <span class="rk-pill-lb">{{ m.label }}</span>
+          <span class="rk-pill-lb">{{ metricLabel(m) }}</span>
         </button>
       </div>
       <div v-if="persons.length" class="rk-summary">
-        <span class="rk-blurb">{{ metric.blurb }}</span>
+        <span class="rk-blurb">{{ metricBlurb(metric) }}</span>
         <span class="rk-chips">
           <span class="rk-chip"
-            ><b>{{ ranking.rankedCount }}</b> ranked</span
+            ><b>{{ ranking.rankedCount }}</b> {{ t('directory.ranks.ranked') }}</span
           >
           <span v-if="ranking.unrankedCount" class="rk-chip rk-chip-dim"
-            ><b>{{ ranking.unrankedCount }}</b> unranked</span
+            ><b>{{ ranking.unrankedCount }}</b> {{ t('directory.ranks.unranked') }}</span
           >
           <span v-if="ranking.rankedCount" class="rk-chip"
-            >avg <b>{{ fmt(ranking.avg, 1) }}</b> {{ unitFor(metric, ranking.avg) }}</span
+            >{{ t('directory.ranks.avg') }} <b>{{ fmt(ranking.avg, 1) }}</b>
+            {{ unitLabel(metric, ranking.avg) }}</span
           >
         </span>
       </div>
@@ -46,13 +47,17 @@
 
     <div v-if="!persons.length" class="rk-empty">
       <div class="rk-empty-icon"><UiIcon name="trophy" :size="44" :stroke="1.5" /></div>
-      <div class="rk-empty-title">No contenders</div>
-      <div class="rk-empty-text">No people match — clear the search or add someone.</div>
+      <div class="rk-empty-title">{{ t('directory.ranks.emptyTitle') }}</div>
+      <div class="rk-empty-text">{{ t('directory.ranks.emptyText') }}</div>
     </div>
 
     <template v-else>
       <!-- ── Podium: ranks 1–3 ── -->
-      <section class="rk-podium" aria-label="Top three" :style="{ '--sw': stepW + 'px' }">
+      <section
+        class="rk-podium"
+        :aria-label="t('directory.ranks.topThree')"
+        :style="{ '--sw': stepW + 'px' }"
+      >
         <div class="rk-rays" aria-hidden="true"></div>
         <div class="rk-stage">
           <div
@@ -68,7 +73,7 @@
                   :key="s.e.id"
                   class="rk-fig"
                   :class="{ selected: store.selectedPersonId === s.e.id, dead: s.dead }"
-                  :title="s.p.name || 'Unnamed'"
+                  :title="s.p.name || t('directory.ranks.unnamed')"
                   @click="select(s.e.id)"
                 >
                   <div v-if="s.e.rank === 1" class="rk-crown" aria-hidden="true">
@@ -95,17 +100,17 @@
                     <RankArt :person="s.p" :size="256" />
                   </div>
                   <div class="rk-fig-name">
-                    {{ s.p.name || 'Unnamed'
+                    {{ s.p.name || t('directory.ranks.unnamed')
                     }}<UiIcon
                       v-if="s.dead"
                       class="rk-moon"
                       name="moon"
                       :size="12"
-                      label="Deceased"
+                      :label="t('directory.ranks.deceased')"
                     />
                   </div>
                   <div class="rk-fig-val">
-                    <b>{{ fmt(s.val) }}</b> {{ unitFor(metric, s.e.value) }}
+                    <b>{{ fmt(s.val) }}</b> {{ unitLabel(metric, s.e.value) }}
                   </div>
                 </div>
               </Transition>
@@ -122,17 +127,17 @@
         </div>
         <div class="rk-floor" aria-hidden="true"></div>
         <div v-if="!ranking.rankedCount" class="rk-podium-note">
-          Nobody scores on {{ metric.label.toLowerCase() }} yet
+          {{ t('directory.ranks.podiumNote', { metric: metricLower(metric) }) }}
         </div>
       </section>
 
       <!-- ── Leaderboard ── -->
       <div class="rk-cols" aria-hidden="true">
         <span class="rk-col-rank">#</span>
-        <span class="rk-col-name">Name</span>
+        <span class="rk-col-name">{{ t('directory.ranks.colName') }}</span>
         <span class="rk-col-bar">
           <UiIcon :name="metric.icon" :size="12" :stroke="2.4" />
-          {{ metric.label }}
+          {{ metricLabel(metric) }}
         </span>
       </div>
       <div ref="boardEl" class="rk-board" :style="{ height: boardH + 'px' }">
@@ -141,10 +146,12 @@
           class="rk-divider"
           :style="{ transform: `translateY(${dividerY}px)` }"
         >
-          <span
-            >Unranked · {{ ranking.unrankedCount }} — no {{ metric.label.toLowerCase() }} on
-            record</span
-          >
+          <span>{{
+            t('directory.ranks.unrankedDivider', {
+              n: ranking.unrankedCount,
+              metric: metricLower(metric)
+            })
+          }}</span>
         </div>
 
         <div
@@ -159,7 +166,7 @@
             <span
               class="rk-rank"
               :class="{ long: r.rankLabel.length > 3, xlong: r.rankLabel.length > 4 }"
-              :title="r.tied ? 'Tied' : ''"
+              :title="r.tied ? t('directory.ranks.tied') : ''"
             >
               <span :key="r.rankLabel" class="rk-rank-n">{{ r.rankLabel }}</span>
             </span>
@@ -168,8 +175,13 @@
             </span>
             <span class="rk-id">
               <span class="rk-name"
-                >{{ r.p.name || 'Unnamed'
-                }}<UiIcon v-if="r.dead" class="rk-moon" name="moon" :size="12" label="Deceased"
+                >{{ r.p.name || t('directory.ranks.unnamed')
+                }}<UiIcon
+                  v-if="r.dead"
+                  class="rk-moon"
+                  name="moon"
+                  :size="12"
+                  :label="t('directory.ranks.deceased')"
               /></span>
               <span class="rk-sub">{{ r.sub }}</span>
             </span>
@@ -178,7 +190,7 @@
                 <template v-if="r.e">
                   <span class="rk-fill" :style="{ width: r.pct + '%' }"></span>
                   <span class="rk-val" :style="{ left: r.pct + '%' }">
-                    <b>{{ fmt(r.val) }}</b> {{ unitFor(metric, r.e.value) }}
+                    <b>{{ fmt(r.val) }}</b> {{ unitLabel(metric, r.e.value) }}
                   </span>
                 </template>
                 <span v-else class="rk-none">—</span>
@@ -186,13 +198,13 @@
             </span>
             <span v-if="showTags" class="rk-tags">
               <span
-                v-for="t in r.tags"
-                :key="t.id || t.label"
+                v-for="tg in r.tags"
+                :key="tg.id || tg.label"
                 class="rk-tag"
-                :style="{ '--tc': t.color || 'var(--accent)' }"
+                :style="{ '--tc': tg.color || 'var(--accent)' }"
               >
-                <UiIcon v-if="t.icon" :name="t.icon" :size="11" />
-                {{ t.label }}
+                <UiIcon v-if="tg.icon" :name="tg.icon" :size="11" />
+                {{ tagLabel(tg) }}
               </span>
             </span>
             <span class="rk-delta-slot">
@@ -215,17 +227,12 @@
 <script setup>
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick, h } from 'vue'
 import { useMainStore } from '../../store/index.js'
+import { useI18n } from '../../i18n'
+import { defaultNameLabel } from '../../lib/dataLabels'
 import { isDeceased } from './peopleLayout.js'
 import UiIcon from '../ui/UiIcon.js'
 import { useThumbnail } from './useThumbnail.js'
-import {
-  METRICS,
-  METRIC_BY_ID,
-  unitFor,
-  buildLineage,
-  metricValues,
-  rankEntries
-} from './ranksMetrics.js'
+import { METRICS, METRIC_BY_ID, buildLineage, metricValues, rankEntries } from './ranksMetrics.js'
 
 // Ranks: a podium for the top three and a leaderboard bar race below it.
 // Switching the metric re-ranks everyone: rows glide to their new slots
@@ -242,6 +249,7 @@ const props = defineProps({
 })
 
 const store = useMainStore()
+const { t } = useI18n()
 const scrollEl = ref(null)
 const boardEl = ref(null)
 
@@ -503,8 +511,8 @@ function lifeText(p) {
   const b = p.birth?.year
   const d = p.death?.year
   if (b != null && d != null) return `${b} – ${d}`
-  if (b != null) return `b. ${b}`
-  if (d != null) return `d. ${d}`
+  if (b != null) return t('directory.ranks.bornShort', { year: b })
+  if (d != null) return t('directory.ranks.diedShort', { year: d })
   return ''
 }
 
@@ -558,7 +566,7 @@ const rows = computed(() => {
     let delta = null
     if (deltaOn.value && e && deltaFrom.has(id)) {
       const from = deltaFrom.get(id)
-      if (from == null) delta = { kind: 'new', text: 'NEW' }
+      if (from == null) delta = { kind: 'new', text: t('directory.ranks.deltaNew') }
       else if (from !== e.rank) {
         const d = from - e.rank
         delta = d > 0 ? { kind: 'up', text: String(d) } : { kind: 'down', text: String(-d) }
@@ -643,6 +651,14 @@ const CONFETTI = Array.from({ length: 26 }, (_, k) => {
 })
 
 // ── Formatting & interaction ───────────────────────────────────────────────
+// Metric display text is translated at render time by metric id (the pure
+// METRICS catalog keeps its English labels for tests/fallback).
+const metricLabel = (m) => t(`directory.ranks.metrics.${m.id}.label`)
+const metricBlurb = (m) => t(`directory.ranks.metrics.${m.id}.blurb`)
+const metricLower = (m) => metricLabel(m).toLocaleLowerCase()
+const unitLabel = (m, value) =>
+  m ? t(`directory.ranks.metrics.${m.id}.unit.${Math.round(value) === 1 ? 'one' : 'other'}`) : ''
+const tagLabel = (tg) => defaultNameLabel(tg.label)
 function fmt(v, digits = 0) {
   if (v == null || !Number.isFinite(v)) return '—'
   const f = 10 ** digits

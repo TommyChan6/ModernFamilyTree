@@ -957,13 +957,35 @@ export function landscapeDataUrl(w = 1200, h = 260, seed = 21, color = INK.ink):
 
 let installed = false
 
+/** A base64 data: URL as a short blob: URL (the data URL itself if that fails).
+ *  Custom properties are substituted as STRINGS on every style recalc of an
+ *  element that uses them: with the ~670KB paper data URL, each recalc of a
+ *  var(--ink-paper) element cost ~6ms — the graph's ink backdrop recalcs
+ *  every camera frame, which made panning / tilting crawl. */
+function blobUrlOf(dataUrl: string): string {
+  try {
+    const comma = dataUrl.indexOf(',')
+    const meta = dataUrl.slice(5, comma)
+    if (!dataUrl.startsWith('data:') || !meta.endsWith(';base64') || !URL.createObjectURL) {
+      return dataUrl
+    }
+    const bin = atob(dataUrl.slice(comma + 1))
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    const type = meta.split(';')[0] || 'application/octet-stream'
+    return URL.createObjectURL(new Blob([bytes], { type }))
+  } catch {
+    return dataUrl
+  }
+}
+
 /** Generate the Ink theme's CSS textures once and publish them on <html> as
  *  custom properties (url(...) values). Cheap to call repeatedly. */
 export function installInkAssets(): void {
   if (installed || typeof document === 'undefined') return
   installed = true
   const st = document.documentElement.style
-  const set = (k: string, url: string) => st.setProperty(k, `url("${url}")`)
+  const set = (k: string, url: string) => st.setProperty(k, `url("${blobUrlOf(url)}")`)
   set('--ink-paper', paperDataUrl(512, 512, { tone: INK.paper, fiber: 0.7, seed: 11 }))
   set('--ink-paper-light', paperDataUrl(512, 512, { tone: INK.paperLight, fiber: 0.55, seed: 12 }))
   set('--ink-underline', strokeDataUrl('underline', { seed: 3 }))

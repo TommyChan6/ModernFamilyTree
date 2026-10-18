@@ -42,7 +42,7 @@
                 <button
                   class="ps-portrait"
                   :class="{ 'ps-portrait-photo': !!profile.portraitUrl }"
-                  :title="profile.portraitIndex >= 0 ? 'View portrait' : ''"
+                  :title="profile.portraitIndex >= 0 ? t('profile.viewPortrait') : ''"
                   @click="openPortrait"
                 >
                   <span class="ps-enso" :style="{ '--enso': `url(${ensoSrc})` }"></span>
@@ -83,12 +83,16 @@
                     <template v-if="person.birth?.year != null || person.death?.year != null">
                       <span>{{ fmtDate(person.birth) || '?' }}</span>
                       <i class="ps-dash"></i>
-                      <span>{{ profile.deceased ? fmtDate(person.death) || '?' : 'present' }}</span>
-                      <span v-if="profile.age !== null" class="ps-age"
-                        >{{ profile.age }} {{ profile.deceased ? 'years' : 'yrs' }}</span
-                      >
+                      <span>{{
+                        profile.deceased ? fmtDate(person.death) || '?' : t('profile.present')
+                      }}</span>
+                      <span v-if="profile.age !== null" class="ps-age">{{
+                        t(profile.deceased ? 'profile.ageYears' : 'profile.ageYrs', {
+                          n: profile.age
+                        })
+                      }}</span>
                     </template>
-                    <span v-else class="ps-soft">dates unrecorded</span>
+                    <span v-else class="ps-soft">{{ t('profile.datesUnrecorded') }}</span>
                   </div>
 
                   <div v-if="facts.length" class="ps-facts ps-ink" style="--d: 0.4s">
@@ -104,12 +108,12 @@
                     >
                       <i class="ps-slip-dot"></i>
                       <UiIcon v-if="tag.icon" :name="tag.icon" :size="14" />
-                      {{ tag.label }}
+                      {{ defaultNameLabel(tag.label) }}
                     </span>
                   </div>
                 </div>
 
-                <div class="ps-inscr" aria-label="Inscription">
+                <div class="ps-inscr" :aria-label="t('profile.inscription')">
                   <span
                     v-for="(col, i) in inscr"
                     :key="i"
@@ -121,7 +125,7 @@
                 </div>
 
                 <div class="ps-hint" :class="{ 'ps-hint-off': scrolled }" aria-hidden="true">
-                  <span>{{ vertical ? 'scroll to unroll' : 'unroll' }}</span>
+                  <span>{{ vertical ? t('profile.scrollToUnroll') : t('profile.unroll') }}</span>
                   <i class="ps-hint-arrow"></i>
                 </div>
               </section>
@@ -135,7 +139,7 @@
               >
                 <header class="ps-lh ps-ink">
                   <img v-if="marks.story" class="ps-mark" :src="marks.story" alt="" />
-                  <h2>Story</h2>
+                  <h2>{{ t('profile.leaves.story') }}</h2>
                 </header>
                 <div class="ps-cols">
                   <div
@@ -168,8 +172,10 @@
               >
                 <header class="ps-lh ps-ink">
                   <img v-if="marks.family" class="ps-mark" :src="marks.family" alt="" />
-                  <h2>Family</h2>
-                  <span class="ps-lh-sub">{{ profile.circleCount }} within two bonds</span>
+                  <h2>{{ t('profile.leaves.family') }}</h2>
+                  <span class="ps-lh-sub">{{
+                    t('profile.withinTwoBonds', { n: profile.circleCount })
+                  }}</span>
                 </header>
                 <div class="ps-sketch-box">
                   <ScrollFamilySketch
@@ -193,7 +199,7 @@
               >
                 <header class="ps-lh ps-ink">
                   <img v-if="marks.bonds" class="ps-mark" :src="marks.bonds" alt="" />
-                  <h2>Bonds</h2>
+                  <h2>{{ t('profile.leaves.bonds') }}</h2>
                   <span class="ps-lh-sub">{{ profile.relationshipChips.length }}</span>
                 </header>
                 <div class="ps-cols">
@@ -213,7 +219,7 @@
                         <span class="ps-bond-role"
                           ><i class="ps-bond-dot"></i>{{ item.chip.role
                           }}<template v-if="item.chip.endedYear">
-                            · ended {{ item.chip.endedYear }}</template
+                            · {{ t('profile.endedYear', { year: item.chip.endedYear }) }}</template
                           ></span
                         >
                       </button>
@@ -231,8 +237,8 @@
               >
                 <header class="ps-lh ps-ink">
                   <img v-if="marks.kin" class="ps-mark" :src="marks.kin" alt="" />
-                  <h2>Kinship</h2>
-                  <span class="ps-lh-sub">family, named</span>
+                  <h2>{{ t('profile.leaves.kin') }}</h2>
+                  <span class="ps-lh-sub">{{ t('profile.familyNamed') }}</span>
                   <KinLangPicker class="ps-kin-lang" />
                 </header>
                 <div class="ps-kin-body ps-ink" style="--d: 0.2s">
@@ -249,42 +255,42 @@
               >
                 <header class="ps-lh ps-ink">
                   <img v-if="marks.traits" class="ps-mark" :src="marks.traits" alt="" />
-                  <h2>Traits</h2>
+                  <h2>{{ t('profile.leaves.traits') }}</h2>
                   <span class="ps-lh-sub">{{ profile.traitRows.length }}</span>
                 </header>
                 <div class="ps-cols">
                   <div v-for="(col, ci) in traitCols" :key="ci" class="ps-col ps-col-traits">
                     <div
-                      v-for="t in col"
-                      :key="t.id"
+                      v-for="tr in col"
+                      :key="tr.id"
                       class="ps-trait ps-ink"
-                      :class="{ 'ps-trait-para': t.kind === 'para' }"
-                      :style="{ '--d': t.d + 's' }"
+                      :class="{ 'ps-trait-para': tr.kind === 'para' }"
+                      :style="{ '--d': tr.d + 's' }"
                     >
                       <div class="ps-trait-k">
-                        <UiIcon v-if="t.icon" class="ps-trait-icon" :name="t.icon" :size="14" />
-                        {{ t.label }}
+                        <UiIcon v-if="tr.icon" class="ps-trait-icon" :name="tr.icon" :size="14" />
+                        {{ tr.label }}
                       </div>
-                      <div v-if="t.kind === 'slider'" class="ps-slider">
+                      <div v-if="tr.kind === 'slider'" class="ps-slider">
                         <div class="ps-slider-track">
-                          <i class="ps-slider-fill" :style="{ '--pct': t.pct + '%' }"></i>
+                          <i class="ps-slider-fill" :style="{ '--pct': tr.pct + '%' }"></i>
                         </div>
-                        <div v-if="t.left || t.right" class="ps-slider-ends">
-                          <span>{{ t.left }}</span
-                          ><span>{{ t.right }}</span>
+                        <div v-if="tr.left || tr.right" class="ps-slider-ends">
+                          <span>{{ tr.left }}</span
+                          ><span>{{ tr.right }}</span>
                         </div>
                       </div>
                       <div
-                        v-else-if="t.kind === 'bool'"
+                        v-else-if="tr.kind === 'bool'"
                         class="ps-trait-v"
-                        :class="{ 'ps-no': !t.bool }"
+                        :class="{ 'ps-no': !tr.bool }"
                       >
-                        {{ t.bool ? 'Yes' : 'No' }}
+                        {{ tr.bool ? t('profile.yes') : t('profile.no') }}
                       </div>
-                      <div v-else-if="t.kind === 'para'" class="ps-trait-p">{{ t.text }}</div>
+                      <div v-else-if="tr.kind === 'para'" class="ps-trait-p">{{ tr.text }}</div>
                       <div v-else class="ps-trait-v">
-                        <i v-if="t.color" class="ps-sel-dot" :style="{ background: t.color }"></i
-                        >{{ t.text }}
+                        <i v-if="tr.color" class="ps-sel-dot" :style="{ background: tr.color }"></i
+                        >{{ tr.text }}
                       </div>
                     </div>
                   </div>
@@ -300,7 +306,7 @@
               >
                 <header class="ps-lh ps-ink">
                   <img v-if="marks.chron" class="ps-mark" :src="marks.chron" alt="" />
-                  <h2>Chronicle</h2>
+                  <h2>{{ t('profile.leaves.chron') }}</h2>
                 </header>
                 <div class="ps-cols">
                   <div v-for="(col, ci) in chronCols" :key="ci" class="ps-col ps-col-chron">
@@ -330,7 +336,7 @@
               >
                 <header class="ps-lh ps-ink">
                   <img v-if="marks.gallery" class="ps-mark" :src="marks.gallery" alt="" />
-                  <h2>Gallery</h2>
+                  <h2>{{ t('profile.leaves.gallery') }}</h2>
                   <span class="ps-lh-sub">{{ profile.images.length }}</span>
                 </header>
                 <div class="ps-gallery">
@@ -347,7 +353,7 @@
                     </span>
                     <i class="ps-mount-rod ps-mount-rod-b"></i>
                     <span v-if="img.role || img.is_primary" class="ps-mount-cap">
-                      {{ img.role || 'primary' }}
+                      {{ img.role || t('profile.primary') }}
                     </span>
                   </button>
                 </div>
@@ -361,14 +367,19 @@
                 data-leaf="blank"
               >
                 <span class="ps-blank-enso" :style="{ '--enso': `url(${ensoSrc})` }"></span>
-                <div class="ps-blank-title ps-ink" style="--d: 0.4s">A scroll waiting for ink</div>
+                <div class="ps-blank-title ps-ink" style="--d: 0.4s">
+                  {{ t('profile.blankTitle') }}
+                </div>
                 <div class="ps-blank-text ps-ink" style="--d: 0.6s">
-                  No traits, bonds or photos yet — open the editor to paint
-                  {{ person.name || 'them' }} in.
+                  {{
+                    person.name
+                      ? t('profile.blankText', { name: person.name })
+                      : t('profile.blankTextAnon')
+                  }}
                 </div>
                 <button class="ps-blank-cta ps-ink" style="--d: 0.8s" @click="emit('edit')">
                   <UiIcon name="pencil" :size="16" />
-                  Start editing
+                  {{ t('profile.startEditing') }}
                 </button>
               </section>
 
@@ -422,6 +433,8 @@ import ScrollFamilySketch from './ScrollFamilySketch.vue'
 import UiIcon from '../ui/UiIcon.js'
 import KinshipSection from '../kinship/KinshipSection.vue'
 import KinLangPicker from '../kinship/KinLangPicker.vue'
+import { useI18n } from '../../i18n'
+import { genderLabel, defaultNameLabel } from '../../lib/dataLabels'
 
 // 卷 — the handscroll (手卷) presentation of the person profile. PersonModal
 // owns all state (person, images, chips, traits, chronicle, navigation,
@@ -437,6 +450,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['navigate', 'lightbox', 'edit'])
 const store = useMainStore()
+const { t } = useI18n()
 
 const person = computed(() => props.profile.person)
 const seed = computed(() => hashStr(person.value?.id || 'scroll'))
@@ -523,7 +537,7 @@ function imageUrl(p) {
 const cjkName = computed(() => hasCjk(person.value?.name))
 const mono = computed(() => monogramChar(person.value?.name))
 const nameWords = computed(() => {
-  const name = (person.value?.name || 'Unnamed').trim()
+  const name = (person.value?.name || t('profile.unnamed')).trim()
   // CJK names are one vertical column; latin names break per word
   const words = cjkName.value ? [name.replace(/\s+/g, '')] : name.split(/\s+/)
   let d = 0
@@ -536,7 +550,10 @@ const nameWords = computed(() => {
 const facts = computed(() => {
   const p = person.value
   const out = []
-  if (p?.gender && p.gender !== 'unknown') out.push(p.gender[0].toUpperCase() + p.gender.slice(1))
+  if (p?.gender && p.gender !== 'unknown') {
+    const g = genderLabel(p.gender)
+    out.push(g === p.gender ? g[0].toUpperCase() + g.slice(1) : g)
+  }
   if (p?.occupation) out.push(p.occupation)
   if (p?.location) out.push(p.location)
   return out
@@ -550,10 +567,10 @@ const inscr = computed(() =>
 )
 const colophonLine = computed(() => `${cjkName.value ? person.value.name : ''}卷终`)
 const stats = computed(() => [
-  { k: 'Bonds', v: props.profile.statsShown.bonds },
-  { k: 'Circle', v: props.profile.statsShown.circle },
-  { k: 'Traits', v: props.profile.statsShown.traits },
-  { k: 'Photos', v: props.profile.statsShown.photos }
+  { k: t('profile.stats.bonds'), v: props.profile.statsShown.bonds },
+  { k: t('profile.stats.circle'), v: props.profile.statsShown.circle },
+  { k: t('profile.stats.traits'), v: props.profile.statsShown.traits },
+  { k: t('profile.stats.photos'), v: props.profile.statsShown.photos }
 ])
 
 function openPortrait() {

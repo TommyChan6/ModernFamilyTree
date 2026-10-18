@@ -2,6 +2,10 @@ import { fileURLToPath } from 'url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import JavaScriptObfuscator from 'javascript-obfuscator'
+import { readFileSync } from 'fs'
+
+// package.json `version` → `__APP_VERSION__` (read by src/renderer/src/lib/appInfo.ts).
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 
 // ── Code scrambling (deployment plan Step 3.2b) ──────────────────────────────
 // Production web builds only (`apply: 'build'`; never dev, Electron, or tests).
@@ -74,6 +78,7 @@ export default defineConfig({
   // component layer is left alone because obfuscating it broke the signed-in
   // build. NO_OBFUSCATE=1 skips it entirely (diagnostics / faster builds).
   plugins: [vue(), ...(process.env.NO_OBFUSCATE ? [] : [obfuscateOwnCode()])],
+  define: { __APP_VERSION__: JSON.stringify(version) },
   build: {
     outDir: fileURLToPath(new URL('./dist', import.meta.url)),
     emptyOutDir: true,

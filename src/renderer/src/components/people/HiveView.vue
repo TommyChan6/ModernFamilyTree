@@ -6,8 +6,8 @@
 
     <div v-if="!persons.length" class="hive-empty">
       <div class="hive-empty-icon"><UiIcon name="hexagon" :size="44" :stroke="1.5" /></div>
-      <div class="hive-empty-title">The hive is empty</div>
-      <div class="hive-empty-text">No people match — clear the search or add someone.</div>
+      <div class="hive-empty-title">{{ t('directory.hive.emptyTitle') }}</div>
+      <div class="hive-empty-text">{{ t('directory.stage.emptyText') }}</div>
     </div>
 
     <div v-else class="hive-sizer" :style="{ height: totalH + 'px' }">
@@ -30,7 +30,7 @@
               <HexArt :person="c.p" />
               <div class="hex-scrim"></div>
               <div class="hex-label">
-                <div class="hex-name">{{ c.p.name || 'Unnamed' }}</div>
+                <div class="hex-name">{{ c.p.name || t('directory.common.unnamed') }}</div>
                 <div class="hex-year">
                   {{ c.p.birth?.year || '·'
                   }}<UiIcon
@@ -38,7 +38,7 @@
                     class="hex-moon"
                     name="moon"
                     :size="11"
-                    label="Deceased"
+                    :label="t('directory.common.deceased')"
                   />
                 </div>
               </div>
@@ -53,6 +53,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, h } from 'vue'
 import { useMainStore } from '../../store/index.js'
+import { useI18n } from '../../i18n'
 import { isDeceased } from './peopleLayout.js'
 import { useThumbnail } from './useThumbnail.js'
 import UiIcon from '../ui/UiIcon.js'
@@ -68,6 +69,7 @@ const props = defineProps({
 })
 
 const store = useMainStore()
+const { t } = useI18n()
 const scrollEl = ref(null)
 
 // One comb's art: the person's thumbnail (cached, downscaled) or a monogram.

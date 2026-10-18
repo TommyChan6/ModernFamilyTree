@@ -47,7 +47,7 @@
 
           <div class="sc-cols">
             <span class="sc-name" :class="{ cjk: cjkName, unnamed: !person.name }">{{
-              person.name || 'Unnamed'
+              person.name || t('directory.card.unnamed')
             }}</span>
             <span class="sc-meta">
               <span v-if="lifeText">{{ lifeText }}</span>
@@ -56,9 +56,10 @@
           </div>
           <img v-if="seal" class="sc-seal" :src="seal" alt="" draggable="false" />
 
-          <span v-if="kin" class="sc-ties" :title="`${kin} ties · ${children} children`">
-            <b>{{ kin }}</b> ties<template v-if="children">
-              · <b>{{ children }}</b> heirs</template
+          <span v-if="kin" class="sc-ties" :title="tiesTitle">
+            <b>{{ kin }}</b> {{ plural('directory.card.ties', kin)
+            }}<template v-if="children">
+              · <b>{{ children }}</b> {{ plural('directory.card.heirs', children) }}</template
             >
           </span>
         </div>
@@ -78,6 +79,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from '../../i18n'
 import { hashStr } from '../../lib/inkArt'
 import {
   paintingPaperUrl,
@@ -105,6 +107,18 @@ const props = defineProps({
   kin: { type: Number, default: 0 },
   children: { type: Number, default: 0 }
 })
+
+const { t } = useI18n()
+/** `key.one` / `key.other` by count (Chinese values are the same for both). */
+const plural = (key, n, params) => t(`${key}.${n === 1 ? 'one' : 'other'}`, params)
+const tiesTitle = computed(
+  () =>
+    `${plural('directory.card.tiesCount', props.kin, { n: props.kin })} · ${plural(
+      'directory.card.childrenCount',
+      props.children,
+      { n: props.children }
+    )}`
+)
 
 const seed = computed(() => hashStr(props.person.id || props.person.name || ''))
 const silk = computed(() =>

@@ -7,12 +7,18 @@ import { TextGuideOverlay } from './TextGuideOverlay.js'
 import { Picker } from './Picking.js'
 import { approach, TWEEN_EPS } from './tween.js'
 import { nodeShapeId, nodeDecorId } from './NodeMaterial.js'
+import { shapeAnchor } from './nodeShapes.js'
+import { tiltProjection, screenToWorld, depthOrder } from './coords.js'
+import { GroundGrid } from './GroundGrid.js'
 import { inkLook, inkSealColor, staggerBirth } from '../inkStyle.js'
 import { InkBackdrop } from '../InkBackdrop.js'
+import { POP_DUR, RING_DUR, popDelay, popLabelReveal } from './popAnim.js'
 
 const NOT_BORN = -1e4 // birth time meaning 'already written / settled'
 const WRITE_DUR = 1.1 // brush write-on (s) — LinkMaterial uWriteDur
 const BLOOM_DUR = 1.3 // wash bloom (s) — NodeMaterial uBloomDur
+// Tilt angle at which the depth haze / ground grid reach full strength.
+const TILT_FULL = (50 * Math.PI) / 180
 
 function seedOf(id) {
   let h = 0x811c9dc5
@@ -70,11 +76,17 @@ export class WebGLGraphRenderer {
     this.renderer.setPixelRatio(this.dpr)
 
     this.scene = new THREE.Scene()
+    // `camera` is the flat pixel ortho (screen-space atmosphere); the world is
+    // drawn through `viewCamera`, whose projection folds in the optional
+    // perspective tilt (coords.tiltProjection — identical to the ortho when flat).
     this.camera = new THREE.OrthographicCamera(0, 1, 0, 1, 0.1, 1000)
     this.camera.position.z = 100
+    this.viewCamera = new THREE.Camera()
+    this._proj = new THREE.Matrix4()
     this.world = new THREE.Group()
     this.world.matrixAutoUpdate = false
     this.scene.add(this.world)
+    this.bgScene = new THREE.Scene()
 
     // Avatar load completion must rewrite the node's iAvatar attribute → mark styles dirty.
     this.atlas = new AvatarAtlas(() => {
@@ -104,6 +116,9 @@ export class WebGLGraphRenderer {
         fadeTo: 1
       }
     }
+    // The floor under the perspective tilt (hidden while flat).
+    this.grid = new GroundGrid()
+    this.world.add(this.grid.object3d)
     this.world.add(this.haloLayer.object3d)
     this.world.add(this.linkLayer.object3d)
     this.world.add(this.linkLayer.arrowObject3d)
@@ -111,7 +126,8 @@ export class WebGLGraphRenderer {
 
     // Atmosphere: screen-space particle weather behind everything (quality mode).
     this.ambient = new AmbientLayer()
-    this.scene.add(this.ambient.object3d)
+    // Drawn in its own flat pass so weather never tilts with the ground.
+    this.bgScene.add(this.ambient.object3d)
     this._hasAmbient = false
     this._quality = 'quality'
 
@@ -126,6 +142,11 @@ export class WebGLGraphRenderer {
     this._rebirth = false // next style sync re-paints every stroke/wash (write-on)
     this._clock = 0
     this._inkAnimUntil = 0 // keep the loop alive while strokes write / washes bloom
+    // Appear-pop: ids queued by popNodes() (→ batch index), consumed by the next
+    // style sync; the loop stays alive until the last ring has faded.
+    this._pendingPops = new Map()
+    this._popUntil = 0
+    this._popColor = null
     this.backdrop = backdropEl ? new InkBackdrop(backdropEl) : null
     this.picker = new Picker()
 
@@ -190,7 +211,9 @@ export class WebGLGraphRenderer {
   setData(nodes, links) {
     this.nodes = nodes
     this.links = links
+    this._order = null
     this.nodeLayer.setCount(nodes.length)
+    this.nodeLayer.setOrder(null)
     this.linkLayer.setLinks(links)
     // Force the halo underlay to re-sync against the new data. Must be a value
     // no real key can equal: '' is the key for "no halo links", so resetting to ''
@@ -203,6 +226,34 @@ export class WebGLGraphRenderer {
 
   markNodeStylesDirty() {
     this.nodeStylesDirty = true
+  }
+
+  /** People who just appeared: they spring in (GPU scale) with a ripple ring
+   *  in `color` and their name fading in after. A batch is staggered. */
+  popNodes(ids, color) {
+    if (!ids?.length || reducedMotion()) return
+    ids.forEach((id, i) => this._pendingPops.set(id, i))
+    this._popColor = color || null
+    this.nodeStylesDirty = true
+    this.requestRedraw()
+  }
+
+  // Overlay hand-off while a pop runs: the live rings and the name reveal.
+  _activePops() {
+    const out = []
+    const nodes = this.nodes || []
+    for (const n of nodes) {
+      const a = this._nodeAnim.get(n.id)
+      if (!a || !(a.pop > -100)) continue
+      const k = (this._clock - a.pop) / RING_DUR
+      if (k >= 0 && k < 1) out.push({ n, k })
+    }
+    return out
+  }
+  _popReveal(n) {
+    const a = this._nodeAnim.get(n.id)
+    if (!a || !(a.pop > -100)) return 1
+    return popLabelReveal((this._clock - a.pop) / POP_DUR)
   }
   markLinkStylesDirty() {
     this.linkStylesDirty = true
@@ -228,8 +279,50 @@ export class WebGLGraphRenderer {
     this._haloRGB = isLight ? [0.16, 0.2, 0.3] : [1, 1, 1]
     this.overlay.setTheme(isLight)
     this.ambient.setDark(!isLight)
+    this.grid.setTheme(isLight, null)
     this.markAllDirty()
     this.requestRedraw()
+  }
+
+  _syncDepthOrder(nodes, gs) {
+    const t = this.transform
+    const standing = !!(t.tl || t.yw) || shapeAnchor(gs.nodeShape).lift > 0
+    if (!standing) {
+      if (this._order) {
+        this._order = null
+        this.nodeLayer.setOrder(null)
+        this._stepNodes(0) // rewrite styles into index order
+      }
+      return
+    }
+    const vt = t.tl || t.yw ? { ...t, vw: this.width, vh: this.height } : t
+    const order = depthOrder(nodes, vt, this._order)
+    if (!order) return // still back-to-front
+    this._order = order
+    this.nodeLayer.setOrder(order)
+    this._stepNodes(0) // styles follow their nodes into the new slots
+  }
+
+  // Push the camera (incl. perspective tilt) to the view projection, the node
+  // billboards, the depth haze and the ground grid. Returns the tilt fraction.
+  _applyView(t, width, height, gs) {
+    const W = Math.max(1, width),
+      H = Math.max(1, height)
+    const vt = t.tl || t.yw ? { ...t, vw: W, vh: H } : t
+    this._proj.set(...tiltProjection(vt, W, H))
+    this.viewCamera.projectionMatrix.copy(this._proj)
+    this.viewCamera.projectionMatrixInverse.copy(this._proj).invert()
+    const amount = Math.min(1, Math.abs(t.tl || 0) / TILT_FULL)
+    this.nodeLayer.setView(W, H, t.k, shapeAnchor(gs.nodeShape).lift, amount)
+    this.linkLayer.material.uniforms.uFog.value = amount
+    this.haloLayer.material.uniforms.uFog.value = amount
+    if (amount > 0.002) {
+      const c = screenToWorld(W / 2, H / 2, vt)
+      const sx = t.sx ?? 1,
+        sy = t.sy ?? 1
+      this.grid.update(amount, t.k, c.x * sx, c.y * sy, (Math.max(W, H) * 3.2) / t.k)
+    } else this.grid.update(0)
+    return amount
   }
 
   // Resolve the 水墨 look for these settings + theme and push it to every layer when
@@ -257,6 +350,7 @@ export class WebGLGraphRenderer {
       this._haloRGB = this._appTheme === 'dark' ? [1, 1, 1] : [0.16, 0.2, 0.3]
     }
     this.overlay.setInk(look.links || look.nodes ? look.mode : null)
+    this.grid.setTheme(this._appTheme !== 'dark', look.links || look.nodes ? look.mode : null)
     this.backdrop?.setLook(look, this._appTheme)
     if ((look.links && !prev.links) || (look.nodes && !prev.nodes)) this._rebirth = true
     this.markAllDirty()
@@ -321,12 +415,18 @@ export class WebGLGraphRenderer {
         this._inkAnimUntil = Math.max(this._inkAnimUntil, a.born + BLOOM_DUR)
       } else if (!this._look.nodes) a.born = NOT_BORN
       v.born = a.born
+      const pi = this._pendingPops.get(n.id)
+      if (pi != null) {
+        a.pop = this._clock + popDelay(pi)
+        this._popUntil = Math.max(this._popUntil, a.pop + Math.max(POP_DUR, RING_DUR))
+      }
       a.top = v.opacity
       a.trad = v.radius
       a.tglow = v.glow
       if (v.glow > 0.001) this._hasNodeGlow = true
     }
     for (const id of this._nodeAnim.keys()) if (!seen.has(id)) this._nodeAnim.delete(id)
+    this._pendingPops.clear()
   }
 
   _stepNodes(dt) {
@@ -356,7 +456,8 @@ export class WebGLGraphRenderer {
         selected: v.selected,
         glow: a.glow,
         avatar: v.avatar,
-        born: v.born
+        born: v.born,
+        pop: a.pop
       })
     }
     this.nodeLayer.commitStyles()
@@ -527,6 +628,10 @@ export class WebGLGraphRenderer {
     const sx = this.transform.sx ?? 1,
       sy = this.transform.sy ?? 1
 
+    // Standing nodes (gravestones, or anything under the tilt) paint back to
+    // front: the one whose foot is lower on screen is nearer and goes on top.
+    this._syncDepthOrder(nodes, gs)
+
     // Per-frame positions (only on frames actually requested).
     for (let i = 0; i < nodes.length; i++)
       this.nodeLayer.setPosition(i, nodes[i].x * sx, nodes[i].y * sy)
@@ -579,11 +684,24 @@ export class WebGLGraphRenderer {
     this.nodeLayer.material.uniforms.uTime.value = clock
     nu.uDecorTime.value = this._decorAnim ? clock : 0
     this.ambient.setClock(clock, t.x, t.y)
+    this._applyView(t, this.width, this.height, gs)
 
-    this.renderer.render(this.scene, this.camera)
+    // Flat atmosphere pass, then the (possibly tilted) world on top.
+    this.renderer.autoClear = true
+    this.renderer.render(this.bgScene, this.camera)
+    this.renderer.autoClear = false
+    this.renderer.render(this.scene, this.viewCamera)
+    this.renderer.autoClear = true
     const oo = this.hooks.overlayOpts()
     // Names are brushed in once their wash has bloomed.
     if (look.nodes && clock < this._inkAnimUntil) oo.revealOf = this._labelReveal
+    if (clock < this._popUntil) {
+      // Newcomers: ripple rings, and names that fade in as each pop lands.
+      oo.pops = this._activePops()
+      oo.popColor = this._popColor
+      const ink = oo.revealOf
+      oo.revealOf = ink ? (n) => ink(n) * this._popReveal(n) : (n) => this._popReveal(n)
+    }
     this.overlay.draw(oo)
 
     // Keep the loop alive frame-to-frame while a tween is settling, dashes flow,
@@ -593,6 +711,7 @@ export class WebGLGraphRenderer {
       this._nodeTweening ||
       this._linkTweening ||
       this._clock < this._inkAnimUntil ||
+      this._clock < this._popUntil ||
       ((this._hasFlow || this._hasNodeGlow || this._hasAmbient || this._decorAnim) &&
         document.visibilityState === 'visible')
     ) {
@@ -641,6 +760,7 @@ export class WebGLGraphRenderer {
       this._stepNodes(0)
       // A still capture shows every wash fully bloomed (the live attrs re-sync after).
       this.nodeLayer.born.fill(NOT_BORN)
+      this.nodeLayer.pop.fill(NOT_BORN) // …and everyone at full size
       const nodes = this.nodes || []
       for (let i = 0; i < nodes.length; i++) this.nodeLayer.setPosition(i, nodes[i].x, nodes[i].y)
       this.nodeLayer.commitPositions()
@@ -677,7 +797,9 @@ export class WebGLGraphRenderer {
       this.nodeLayer.material.uniforms.uTime.value = 0 // neutral pulse phase for a still capture
       this.nodeLayer.material.uniforms.uDecorTime.value = 0
       this.ambient.object3d.visible = false // weather is ambience, not content
-      this.renderer.render(this.scene, this.camera)
+      // Same camera as the live view (tilt included), sized for the capture.
+      this._applyView(transform, width, height, gs)
+      this.renderer.render(this.scene, this.viewCamera)
       this.overlay.resize(width, height, 1)
       this.overlay.draw(overlayOpts)
 
@@ -715,6 +837,7 @@ export class WebGLGraphRenderer {
     this.linkLayer.dispose()
     this.haloLayer.dispose()
     this.ambient.dispose()
+    this.grid.dispose()
     this.backdrop?.dispose()
     this.renderer.dispose()
   }

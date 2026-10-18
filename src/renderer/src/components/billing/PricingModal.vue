@@ -267,7 +267,9 @@
           <!-- ══ Step 3: the payment partner (sandbox stand-in) ══════════ -->
           <div v-else-if="step === 'provider'" class="pm-scroll pm-narrow">
             <div class="pm-provider">
-              <div class="pm-provider-ribbon">SANDBOX · {{ t('billing.sandboxRibbon') }}</div>
+              <div class="pm-provider-ribbon">
+                {{ t('pagesX.sandbox') }} · {{ t('billing.sandboxRibbon') }}
+              </div>
               <template v-if="processing">
                 <div class="pm-processing">
                   <span class="pm-spin big"></span>
@@ -395,7 +397,10 @@ const reason = computed(() => {
   const ctx = store.pricingContext || {}
   if (ctx.reason === 'quota') {
     // "Free plan limit reached: 10 projects" → "10 projects"
-    const detail = String(ctx.detail || '').replace(/^.*limit reached:\s*/i, '')
+    const raw = String(ctx.detail || '').replace(/^.*limit reached:\s*/i, '')
+    // the core words it in English ("10 people") — re-word known units
+    const unit = raw.match(/^(\d+)\s+(people|projects|photos)$/)
+    const detail = unit ? t('pagesX.quotaDetail.' + unit[2], { n: unit[1] }) : raw
     return {
       icon: 'triangle-alert',
       text: `${t('billing.reason.quota')}${detail ? ' · ' + detail : ''}`

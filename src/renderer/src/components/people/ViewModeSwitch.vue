@@ -1,5 +1,5 @@
 <template>
-  <div class="vms" role="tablist" aria-label="Directory view mode">
+  <div class="vms" role="tablist" :aria-label="t('directory.modes.switchLabel')">
     <div class="vms-thumb" :style="{ transform: `translateX(${thumbX}px)` }"></div>
     <template v-for="(m, i) in MODES" :key="m.id">
       <!-- Divider between the card modes and the non-card mediums -->
@@ -7,8 +7,8 @@
       <button
         class="vms-btn"
         :class="{ active: store.viewMode === m.id }"
-        :title="m.label + ' — ' + m.blurb"
-        :aria-label="m.label"
+        :title="modeLabel(m.id) + ' — ' + modeBlurb(m.id)"
+        :aria-label="modeLabel(m.id)"
         @click="store.setViewMode(m.id)"
       >
         <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -96,7 +96,7 @@
       class="vms-btn vms-show"
       :class="{ active: !!activeShowcase, open: galleryOpen }"
       :title="showTitle"
-      aria-label="Showcase views"
+      :aria-label="t('directory.modes.showcaseViews')"
       :aria-expanded="galleryOpen"
       @click="toggleGallery"
     >
@@ -109,8 +109,10 @@
     <Transition name="vms-gal">
       <div v-if="galleryOpen" ref="galleryEl" class="vms-gallery" role="menu">
         <div class="vms-gal-head">
-          <span class="vms-gal-title"><UiIcon name="sparkles" :size="14" />Showcase</span>
-          <span class="vms-gal-sub">Other ways to meet everyone</span>
+          <span class="vms-gal-title"
+            ><UiIcon name="sparkles" :size="14" />{{ t('directory.modes.showcase') }}</span
+          >
+          <span class="vms-gal-sub">{{ t('directory.modes.showcaseSub') }}</span>
         </div>
         <div class="vms-gal-grid">
           <button
@@ -136,8 +138,8 @@
               </svg>
             </span>
             <span class="vms-tile-text">
-              <span class="vms-tile-label">{{ m.label }}</span>
-              <span class="vms-tile-blurb">{{ m.blurb }}</span>
+              <span class="vms-tile-label">{{ modeLabel(m.id) }}</span>
+              <span class="vms-tile-blurb">{{ modeBlurb(m.id) }}</span>
             </span>
           </button>
         </div>
@@ -149,6 +151,7 @@
 <script setup>
 import { computed, ref, watch, onBeforeUnmount, h } from 'vue'
 import { useMainStore } from '../../store/index.js'
+import { useI18n } from '../../i18n'
 import { landscapeDataUrl } from '../../lib/inkArt'
 import UiIcon from '../ui/UiIcon.js'
 
@@ -158,46 +161,40 @@ import UiIcon from '../ui/UiIcon.js'
 // the active mode.
 
 const store = useMainStore()
+const { t } = useI18n()
+
+// Mode names + one-line blurbs live in the locale files, keyed by mode id.
+const modeLabel = (id) => t(`directory.modes.${id}.label`)
+const modeBlurb = (id) => t(`directory.modes.${id}.blurb`)
 
 const MODES = [
-  { id: 'grid', label: 'Grid', blurb: 'the classic scrolling wall of cards' },
-  { id: 'wheel', label: 'Carousel', blurb: 'a 3D ring of cards — drag to spin it' },
-  { id: 'flow', label: 'Flow', blurb: 'coverflow with floor reflections' },
-  { id: 'fan', label: 'Hand', blurb: 'a fanned hand of cards' },
-  { id: 'deck', label: 'Deck', blurb: 'swipe through the deck one card at a time' },
-  { id: 'hive', label: 'Hive', blurb: 'a honeycomb — every person a hexagon' },
-  { id: 'reel', label: 'Reel', blurb: 'a spinning drum of film strips' },
-  { id: 'sheet', label: 'Sheet', blurb: 'a spreadsheet — type, paste and sort every trait' }
+  { id: 'grid' },
+  { id: 'wheel' },
+  { id: 'flow' },
+  { id: 'fan' },
+  { id: 'deck' },
+  { id: 'hive' },
+  { id: 'reel' },
+  { id: 'sheet' }
 ]
 const CARD_MODE_COUNT = 5
 
 // The showcase mediums live behind one ✦ button (the switch would otherwise
 // outgrow the toolbar); its gallery previews each one.
 const SHOWCASE = [
-  { id: 'roster', label: 'Roster', blurb: 'a fighting-game select screen', color: '#ff6b6b' },
-  { id: 'codex', label: 'Codex', blurb: 'an illustrated bestiary, page by page', color: '#e0b458' },
-  {
-    id: 'board',
-    label: 'Evidence',
-    blurb: 'polaroids and red yarn on a corkboard',
-    color: '#d9534f'
-  },
-  { id: 'elements', label: 'Elements', blurb: 'a periodic table of the family', color: '#4fc3a1' },
-  { id: 'ranks', label: 'Ranks', blurb: 'a podium and a leaderboard race', color: '#f5a623' },
-  { id: 'bubbles', label: 'Bubbles', blurb: 'packed bubbles that regroup', color: '#6c8ef5' },
-  {
-    id: 'handscroll',
-    label: 'Handscroll',
-    blurb: '长卷 — the family as one painted scroll, read right to left',
-    color: '#b3352a',
-    wide: true
-  }
+  { id: 'roster', color: '#ff6b6b' },
+  { id: 'codex', color: '#e0b458' },
+  { id: 'board', color: '#d9534f' },
+  { id: 'elements', color: '#4fc3a1' },
+  { id: 'ranks', color: '#f5a623' },
+  { id: 'bubbles', color: '#6c8ef5' },
+  { id: 'handscroll', color: '#b3352a', wide: true }
 ]
 const activeShowcase = computed(() => SHOWCASE.find((m) => m.id === store.viewMode) || null)
 const showTitle = computed(() =>
   activeShowcase.value
-    ? `${activeShowcase.value.label} — ${activeShowcase.value.blurb}`
-    : 'Showcase — more ways to see everyone'
+    ? `${modeLabel(activeShowcase.value.id)} — ${modeBlurb(activeShowcase.value.id)}`
+    : t('directory.modes.showcaseTitle')
 )
 
 // 16×16 glyphs for the showcase mediums (same filled, single-colour language

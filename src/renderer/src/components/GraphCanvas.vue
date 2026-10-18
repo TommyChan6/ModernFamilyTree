@@ -1,6 +1,6 @@
 <template>
   <div class="graph-view">
-    <ViewHeader icon="graph" title="Graph" :count="store.persons.length">
+    <ViewHeader icon="graph" :title="t('rail.graph')" :count="store.persons.length">
       <CanvasToggles
         :show-focus="store.caps.focus && !spaceActive"
         show-rel-types
@@ -12,6 +12,8 @@
         :kinship="kinOpen"
         :show-chronicle="!spaceActive"
         :chronicle="chronOpen"
+        :show-time-drag="!spaceActive"
+        :time-drag="timeDragOn"
         :modes="spaceActive ? null : pillModes"
         :active-mode-id="editMode?.id || null"
         @update:focus="focusOpen = $event"
@@ -19,6 +21,7 @@
         @update:rel-types="relTypesOpen = $event"
         @update:kinship="kinOpen = $event"
         @update:chronicle="chronOpen = $event"
+        @update:time-drag="setTimeDrag"
         @pick-mode="pickPillMode"
         @config-modes="openWheelConfig()"
       />
@@ -49,6 +52,14 @@
         />
         <polygon v-else class="marquee-shape" :points="marqueePoints" />
       </svg>
+      <!-- Time drag: the year the dragged life will be born in, beside the cursor -->
+      <div
+        v-if="timeBadge"
+        class="time-badge"
+        :style="{ left: timeBadge.x + 'px', top: timeBadge.y + 'px' }"
+      >
+        <UiIcon class="time-badge-ic" name="calendar-clock" :size="13" />{{ timeBadge.text }}
+      </div>
       <!-- Experimental Space (3D) type takes over the stage; the 2D canvases keep
          their state hidden underneath, like the graph itself does across views -->
       <Graph3DView
@@ -61,7 +72,7 @@
         @persist="(id) => schedulePersist(id || activeSceneId)"
       />
       <div class="graph-search" :class="{ 'clean-hide-up': store.cleanView }">
-        <SearchField v-model="searchQuery" size="md" placeholder="Search family members…" />
+        <SearchField v-model="searchQuery" size="md" :placeholder="t('graph.searchPh')" />
       </div>
       <!-- Spotlight: who holds the stage, and the switch to recast it -->
       <Transition name="spothud">
@@ -71,11 +82,11 @@
           :class="{ 'clean-hide-up': store.cleanView }"
         >
           <UiIcon class="spot-star" name="star" :size="14" />
-          <span class="spot-k">Spotlight on</span>
+          <span class="spot-k">{{ t('graph.spot.on') }}</span>
           <button
             class="spot-name"
             :style="{ '--pc': kinship.personColor(spotlightMain) }"
-            title="Choose who takes the spotlight"
+            :title="t('graph.spot.choose')"
             @click="spotPickerOpen = !spotPickerOpen"
           >
             <span class="spot-dot"></span>{{ kinship.personName(spotlightMain) }}
@@ -84,7 +95,7 @@
           <button
             v-if="store.selectedPersonId && store.selectedPersonId !== spotlightMain"
             class="spot-btn"
-            :title="`Put ${kinship.personName(store.selectedPersonId)} in the spotlight`"
+            :title="t('graph.spot.put', { name: kinship.personName(store.selectedPersonId) })"
             @click="setMainCharacter(store.selectedPersonId)"
           >
             <UiIcon name="arrow-right-left" :size="14" />
@@ -93,8 +104,8 @@
           <button
             class="spot-btn spot-btn-icon"
             :class="{ on: spotlightTitles }"
-            title="Titles — what everyone is to the main character"
-            aria-label="Show titles"
+            :title="t('graph.spot.titles')"
+            :aria-label="t('graph.spot.titlesAria')"
             :aria-pressed="spotlightTitles"
             @click="spotlightTitles = !spotlightTitles"
           >
@@ -104,7 +115,7 @@
             <PersonPicker
               :exclude="[spotlightMain]"
               :allow-create="false"
-              placeholder="Who takes the spotlight?"
+              :placeholder="t('graph.spot.pickerPh')"
               @pick="onSpotPick"
               @cancel="spotPickerOpen = false"
             />
@@ -122,16 +133,16 @@
         <div class="graph-controls">
           <button
             class="ctrl-btn"
-            title="Zoom in"
-            aria-label="Zoom in"
+            :title="t('graph.ctrl.zoomIn')"
+            :aria-label="t('graph.ctrl.zoomIn')"
             @click="spaceActive ? graph3dRef?.dollyIn() : zoomIn()"
           >
             <UiIcon name="zoom-in" :size="16" />
           </button>
           <button
             class="ctrl-btn"
-            title="Zoom out"
-            aria-label="Zoom out"
+            :title="t('graph.ctrl.zoomOut')"
+            :aria-label="t('graph.ctrl.zoomOut')"
             @click="spaceActive ? graph3dRef?.dollyOut() : zoomOut()"
           >
             <UiIcon name="zoom-out" :size="16" />
@@ -140,32 +151,32 @@
             <div class="ctrl-sep"></div>
             <button
               class="ctrl-btn"
-              title="Horizontal zoom in — stretch the layout wider (or hold X and scroll)"
-              aria-label="Stretch wider"
+              :title="t('graph.ctrl.stretchWideTitle')"
+              :aria-label="t('graph.ctrl.stretchWide')"
               @click="stretchBy('x', 1.3)"
             >
               <UiIcon name="unfold-horizontal" :size="16" />
             </button>
             <button
               class="ctrl-btn"
-              title="Horizontal zoom out — squeeze the layout narrower"
-              aria-label="Squeeze narrower"
+              :title="t('graph.ctrl.squeezeNarrowTitle')"
+              :aria-label="t('graph.ctrl.squeezeNarrow')"
               @click="stretchBy('x', 1 / 1.3)"
             >
               <UiIcon name="fold-horizontal" :size="16" />
             </button>
             <button
               class="ctrl-btn"
-              title="Vertical zoom in — stretch the layout taller (or hold Z and scroll)"
-              aria-label="Stretch taller"
+              :title="t('graph.ctrl.stretchTallTitle')"
+              :aria-label="t('graph.ctrl.stretchTall')"
               @click="stretchBy('y', 1.3)"
             >
               <UiIcon name="unfold-vertical" :size="16" />
             </button>
             <button
               class="ctrl-btn"
-              title="Vertical zoom out — squeeze the layout shorter"
-              aria-label="Squeeze shorter"
+              :title="t('graph.ctrl.squeezeShortTitle')"
+              :aria-label="t('graph.ctrl.squeezeShort')"
               @click="stretchBy('y', 1 / 1.3)"
             >
               <UiIcon name="fold-vertical" :size="16" />
@@ -174,19 +185,30 @@
           <div class="ctrl-sep"></div>
           <button
             class="ctrl-btn"
-            title="Fit all"
-            aria-label="Fit all"
+            :title="t('graph.ctrl.fitAll')"
+            :aria-label="t('graph.ctrl.fitAll')"
             @click="spaceActive ? graph3dRef?.fitAll() : fitAll()"
           >
             <UiIcon name="maximize" :size="16" />
           </button>
           <button
             class="ctrl-btn"
-            title="Reset view"
-            aria-label="Reset view"
+            :title="t('graph.ctrl.resetView')"
+            :aria-label="t('graph.ctrl.resetView')"
             @click="spaceActive ? graph3dRef?.resetView() : resetZoom()"
           >
             <UiIcon name="crosshair" :size="16" />
+          </button>
+          <button
+            v-if="!spaceActive"
+            class="ctrl-btn ctrl-btn-tilt"
+            :class="{ 'ctrl-btn-active': tiltOn }"
+            :title="tiltOn ? t('graph.ctrl.tiltOffTitle') : t('graph.ctrl.tiltOnTitle')"
+            :aria-label="t('graph.ctrl.tilt')"
+            :aria-pressed="tiltOn"
+            @click="toggleTilt"
+          >
+            <UiIcon name="rotate-3d" :size="16" />
           </button>
           <div class="ctrl-sep"></div>
           <button
@@ -194,17 +216,17 @@
             :key="m.id"
             class="ctrl-btn ctrl-btn-wide"
             :class="{ 'ctrl-btn-active': currentMode === m.id }"
-            :title="m.title"
+            :title="t(`graph.modes.${m.key}.title`)"
             @click="switchMode(m.id)"
           >
-            <UiIcon :name="m.icon" :size="16" />{{ m.label }}
+            <UiIcon :name="m.icon" :size="16" />{{ t(`graph.modes.${m.key}.label`) }}
           </button>
           <div class="ctrl-sep"></div>
           <button
             class="ctrl-btn ctrl-btn-refresh"
             :class="{ 'ctrl-btn-refreshing': refreshSpinning }"
-            title="Refresh layout — re-run the family tree algorithm"
-            aria-label="Refresh layout"
+            :title="t('graph.ctrl.refreshTitle')"
+            :aria-label="t('graph.ctrl.refresh')"
             @click="spaceActive ? graph3dRef?.refreshLayout() : refreshLayout()"
           >
             <UiIcon class="refresh-icon" name="refresh-cw" :size="16" />
@@ -213,8 +235,8 @@
           <button
             class="ctrl-btn"
             :class="{ 'ctrl-btn-lock': store.lockNodes }"
-            :title="store.lockNodes ? 'Unlock node clicks' : 'Lock node clicks'"
-            :aria-label="store.lockNodes ? 'Unlock node clicks' : 'Lock node clicks'"
+            :title="store.lockNodes ? t('graph.ctrl.unlockNodes') : t('graph.ctrl.lockNodes')"
+            :aria-label="store.lockNodes ? t('graph.ctrl.unlockNodes') : t('graph.ctrl.lockNodes')"
             :aria-pressed="store.lockNodes"
             @click="store.lockNodes = !store.lockNodes"
           >
@@ -223,8 +245,8 @@
           <button
             class="ctrl-btn"
             :class="{ 'ctrl-btn-lock': store.lockLines }"
-            :title="store.lockLines ? 'Unlock line clicks' : 'Lock line clicks'"
-            :aria-label="store.lockLines ? 'Unlock line clicks' : 'Lock line clicks'"
+            :title="store.lockLines ? t('graph.ctrl.unlockLines') : t('graph.ctrl.lockLines')"
+            :aria-label="store.lockLines ? t('graph.ctrl.unlockLines') : t('graph.ctrl.lockLines')"
             :aria-pressed="store.lockLines"
             @click="store.lockLines = !store.lockLines"
           >
@@ -235,8 +257,8 @@
             <button
               class="ctrl-btn"
               :class="{ 'ctrl-btn-active': graph3dRef?.autoRotateOn }"
-              title="Auto-rotate (R)"
-              aria-label="Auto-rotate"
+              :title="t('graph.ctrl.autoRotateTitle')"
+              :aria-label="t('graph.ctrl.autoRotate')"
               @click="graph3dRef?.toggleAutoRotate()"
             >
               <UiIcon name="rotate-cw" :size="16" />
@@ -244,16 +266,16 @@
             <button
               class="ctrl-btn"
               :class="{ 'ctrl-btn-active': graph3dRef?.layeredOn }"
-              title="Generation layers (G)"
-              aria-label="Generation layers"
+              :title="t('graph.ctrl.layersTitle')"
+              :aria-label="t('graph.ctrl.layers')"
               @click="graph3dRef?.toggleLayers()"
             >
               <UiIcon name="layers" :size="16" />
             </button>
             <button
               class="ctrl-btn"
-              title="How to navigate in 3D (?)"
-              aria-label="How to navigate in 3D"
+              :title="t('graph.ctrl.help3dTitle')"
+              :aria-label="t('graph.ctrl.help3d')"
               @click="graph3dRef?.openHelp()"
             >
               <UiIcon name="circle-help" :size="16" />
@@ -265,10 +287,10 @@
           class="graph-scene-tabs"
           :scenes="graphScenes"
           :active-id="activeSceneId"
-          label="Scenes"
-          add-title="New scene"
-          duplicate-title="Duplicate current scene"
-          delete-title="Delete scene"
+          :label="t('graph.scenes.label')"
+          :add-title="t('graph.scenes.add')"
+          :duplicate-title="t('graph.scenes.duplicate')"
+          :delete-title="t('graph.scenes.delete')"
           @switch="switchScene"
           @create="addScene"
           @duplicate="duplicateActiveScene"
@@ -348,7 +370,7 @@
           ref="nameInputEl"
           v-model="nameBubble.value"
           class="name-bubble-input"
-          :placeholder="`Name this ${store.noun.toLowerCase()}…`"
+          :placeholder="t('graph.nameThis', { noun: nounLabel(store.noun).toLowerCase() })"
           @keydown.enter.prevent="commitNameBubble(true)"
           @keydown.esc.stop.prevent="commitNameBubble(false)"
         />
@@ -359,28 +381,28 @@
         <div
           v-if="editMode"
           class="wheel-hud"
-          :style="{ '--mc': editMode.color || 'var(--accent)' }"
+          :style="{ '--mc': liveEditMode.color || 'var(--accent)' }"
         >
           <span class="wheel-hud-badge">
             <span class="wheel-hud-ring"></span>
-            <UiIcon class="wheel-hud-ic" :name="editMode.icon" :size="16" />
+            <UiIcon class="wheel-hud-ic" :name="liveEditMode.icon" :size="16" />
           </span>
           <div class="wheel-hud-text">
-            <div class="wheel-hud-label">{{ editMode.label }}</div>
+            <div class="wheel-hud-label">{{ liveEditMode.label }}</div>
             <div class="wheel-hud-hint">{{ hudHint }}</div>
           </div>
           <button
             class="wheel-hud-btn"
-            title="Customize the wheel"
-            aria-label="Customize the wheel"
+            :title="t('graph.hud.customize')"
+            :aria-label="t('graph.hud.customize')"
             @click="openWheelConfig()"
           >
             <UiIcon name="settings" :size="14" />
           </button>
           <button
             class="wheel-hud-btn"
-            title="Exit edit mode (Esc)"
-            aria-label="Exit edit mode"
+            :title="t('graph.hud.exit')"
+            :aria-label="t('graph.hud.exitAria')"
             @click="exitEditMode"
           >
             <UiIcon name="x" :size="14" />
@@ -406,18 +428,29 @@
         <div v-if="pathAnchor && !pathInfo" key="armed" class="path-card path-armed">
           <span class="path-armed-beacon"></span>
           <span class="path-armed-name">{{ personName(pathAnchor) }}</span>
-          <span class="path-armed-hint">Ctrl-click another person to trace the connection</span>
-          <button class="path-close" title="Cancel (Esc)" aria-label="Cancel" @click="clearPath">
+          <span class="path-armed-hint">{{ t('graph.path.armedHint') }}</span>
+          <button
+            class="path-close"
+            :title="t('graph.path.cancel')"
+            :aria-label="t('dialog.cancel')"
+            @click="clearPath"
+          >
             <UiIcon name="x" :size="14" />
           </button>
         </div>
         <div v-else-if="pathInfo && pathInfo.none" key="none" class="path-card path-none">
           <UiIcon class="path-none-icon" name="satellite" :size="16" />
           <span>
-            No connection between <b>{{ personName(pathInfo.fromId) }}</b> and
-            <b>{{ personName(pathInfo.toId) }}</b>
+            {{ t('graph.path.noConnPre') }}<b>{{ personName(pathInfo.fromId) }}</b
+            >{{ t('graph.path.noConnMid') }}<b>{{ personName(pathInfo.toId) }}</b
+            >{{ t('graph.path.noConnPost') }}
           </span>
-          <button class="path-close" title="Dismiss (Esc)" aria-label="Dismiss" @click="clearPath">
+          <button
+            class="path-close"
+            :title="t('graph.path.dismiss')"
+            :aria-label="t('dialog.dismiss')"
+            @click="clearPath"
+          >
             <UiIcon name="x" :size="14" />
           </button>
         </div>
@@ -432,9 +465,13 @@
           <div class="path-row">
             <div class="path-title">
               <UiIcon class="path-title-icon" name="route" :size="14" />
-              Connection
+              {{ t('graph.path.title') }}
               <span class="path-count">
-                {{ pathHops.length - 1 }} hop{{ pathHops.length > 2 ? 's' : '' }}
+                {{
+                  t(pathHops.length > 2 ? 'graph.path.hopOther' : 'graph.path.hopOne', {
+                    n: pathHops.length - 1
+                  })
+                }}
               </span>
             </div>
             <div class="path-chain">
@@ -448,7 +485,7 @@
                 <button
                   class="path-person"
                   :style="{ '--i': i * 2, '--pc': hop.color }"
-                  :title="'View ' + hop.name"
+                  :title="t('graph.path.view', { name: hop.name })"
                   @click="store.selectPerson(hop.id)"
                 >
                   <span class="path-person-dot"></span>
@@ -457,7 +494,12 @@
               </template>
             </div>
           </div>
-          <button class="path-close" title="Clear (Esc)" aria-label="Clear" @click="clearPath">
+          <button
+            class="path-close"
+            :title="t('graph.path.clear')"
+            :aria-label="t('graph.path.clearAria')"
+            @click="clearPath"
+          >
             <UiIcon name="x" :size="14" />
           </button>
         </div>
@@ -489,9 +531,9 @@
             v-if="focusOpen && store.caps.focus && !spaceActive"
             class="canvas-pane highlights-panel"
           >
-            <div class="highlights-title">Focus</div>
+            <div class="highlights-title">{{ t('graph.focus.title') }}</div>
             <div class="highlight-row">
-              <div class="highlight-label">Lineage</div>
+              <div class="highlight-label">{{ t('graph.focus.lineage') }}</div>
               <div class="seg-slider">
                 <div class="seg-track">
                   <div class="seg-thumb" :class="'seg-pos-' + lineageIndex"></div>
@@ -503,12 +545,12 @@
                   :class="{ 'seg-active': activeEmphasis === opt.id }"
                   @click="cycleEmphasis(opt.id)"
                 >
-                  {{ opt.label }}
+                  {{ t(opt.labelKey) }}
                 </button>
               </div>
             </div>
             <div class="highlight-row">
-              <div class="highlight-label">Gender</div>
+              <div class="highlight-label">{{ t('data.fields.gender') }}</div>
               <div class="seg-slider">
                 <div class="seg-track">
                   <div class="seg-thumb seg-thumb-gender" :class="'seg-pos-' + genderIndex"></div>
@@ -520,12 +562,12 @@
                   :class="{ 'seg-active': activeGender === opt.id }"
                   @click="setGenderHighlight(opt.id)"
                 >
-                  {{ opt.label }}
+                  {{ t(opt.labelKey) }}
                 </button>
               </div>
             </div>
             <div class="highlight-row">
-              <div class="highlight-label">Marriage</div>
+              <div class="highlight-label">{{ t('graph.focus.marriage') }}</div>
               <div class="seg-slider">
                 <div class="seg-track">
                   <div class="seg-thumb seg-thumb-couples" :class="'seg-pos-' + couplesIndex"></div>
@@ -537,7 +579,7 @@
                   :class="{ 'seg-active': activeCouples === opt.id }"
                   @click="setCouplesHighlight(opt.id)"
                 >
-                  {{ opt.label }}
+                  {{ t(opt.labelKey) }}
                 </button>
               </div>
             </div>
@@ -545,9 +587,9 @@
             <div
               class="highlight-row"
               :class="{ 'highlight-disabled': !store.currentDate }"
-              :title="!store.currentDate ? 'Set current date first to use this filter' : ''"
+              :title="!store.currentDate ? t('graph.focus.needDate') : ''"
             >
-              <div class="highlight-label">Deceased</div>
+              <div class="highlight-label">{{ t('graph.focus.deceased') }}</div>
               <div class="seg-slider" :class="{ 'seg-disabled': !store.currentDate }">
                 <div class="seg-track">
                   <div
@@ -563,7 +605,7 @@
                   :disabled="!store.currentDate"
                   @click="setDeceasedHighlight(opt.id)"
                 >
-                  {{ opt.label }}
+                  {{ t(opt.labelKey) }}
                 </button>
               </div>
             </div>
@@ -572,9 +614,9 @@
             <div
               class="highlight-row"
               :class="{ 'highlight-disabled': !store.selectedPersonId }"
-              :title="!store.selectedPersonId ? 'Select a person first' : ''"
+              :title="!store.selectedPersonId ? t('graph.focus.needSel') : ''"
             >
-              <div class="highlight-label">Orbit</div>
+              <div class="highlight-label">{{ t('graph.focus.orbit') }}</div>
               <div class="orbit-opts">
                 <button
                   v-for="d in [0, 1, 2, 3]"
@@ -582,10 +624,10 @@
                   class="orbit-opt"
                   :class="{ on: egoDepth === d, rings: d > 0 }"
                   :disabled="!store.selectedPersonId && d > 0"
-                  :title="d === 0 ? 'Off' : `${d} hop${d > 1 ? 's' : ''} around the selection`"
+                  :title="orbitTitle(d)"
                   @click="egoDepth = d"
                 >
-                  <template v-if="d === 0">Off</template>
+                  <template v-if="d === 0">{{ t('graph.focus.off') }}</template>
                   <template v-else>
                     <span v-for="r in d" :key="r" class="orbit-ring" :style="{ '--r': r }"></span>
                     <span class="orbit-num">{{ d }}</span>
@@ -599,7 +641,7 @@
         <!-- Relationships: types, weight meters & the solo lens -->
         <Transition name="pane">
           <div v-if="relTypesOpen" class="canvas-pane reltypes-pane">
-            <div class="panel-title">Relationships</div>
+            <div class="panel-title">{{ t('rail.relationships') }}</div>
             <div class="rtl-scroll">
               <button
                 v-for="(row, i) in relTypeRows"
@@ -607,13 +649,13 @@
                 class="rtl-row cp-stagger"
                 :class="{ solo: soloType === row.key, faded: soloType && soloType !== row.key }"
                 :style="{ '--i': i, '--rc': row.color }"
-                :title="`${row.count} in use — click to isolate on the canvas`"
+                :title="t('graph.rel.rowTitle', { count: row.count })"
                 @click="toggleSolo(row.key)"
               >
                 <UiIcon class="rtl-glyph" :name="iconOr(row.glyph, 'link')" :size="14" />
                 <span class="rtl-name">{{ row.label }}</span>
                 <span class="rtl-count">{{ row.count }}</span>
-                <span class="rtl-meter" title="Weight — structural to the right, repel to the left">
+                <span class="rtl-meter" :title="t('graph.rel.weight')">
                   <span class="rtl-meter-axis"></span>
                   <span
                     class="rtl-meter-fill"
@@ -625,7 +667,7 @@
             </div>
             <!-- Romance intel: mutual sparks, longing, triangles & rivalries -->
             <div v-if="hasRomance" class="rtl-romance">
-              <div class="rtl-romance-title">Romance</div>
+              <div class="rtl-romance-title">{{ t('graph.rel.romance') }}</div>
               <div
                 v-for="(m, i) in romance.mutual"
                 :key="'m' + i"
@@ -647,18 +689,19 @@
               >
                 <UiIcon class="rtl-rom-icon rom-drift" name="heart-crack" :size="14" />
                 <span class="rtl-rom-text">
-                  <b>{{ personName(u.from) }}</b> pines for <b>{{ personName(u.to) }}</b>
+                  <b>{{ personName(u.from) }}</b> {{ t('graph.rel.pinesFor') }}
+                  <b>{{ personName(u.to) }}</b>
                 </span>
               </div>
               <div
-                v-for="(t, i) in romance.triangles"
+                v-for="(tri, i) in romance.triangles"
                 :key="'t' + i"
                 class="rtl-rom-row rtl-rom-triangle cp-stagger"
                 :style="{ '--i': romance.mutual.length + romance.unrequited.length + i }"
               >
                 <UiIcon class="rtl-rom-icon rom-spin" name="triangle" :size="14" />
                 <span class="rtl-rom-text">
-                  {{ t.map((id) => personName(id)).join(' → ') }} → …
+                  {{ tri.map((id) => personName(id)).join(' → ') }} → …
                 </span>
               </div>
               <div
@@ -672,21 +715,22 @@
               >
                 <UiIcon class="rtl-rom-icon rom-clash" name="swords" :size="14" />
                 <span class="rtl-rom-text">
-                  {{ rv.admirers.map((id) => personName(id)).join(' & ') }} vie for
+                  {{ rv.admirers.map((id) => personName(id)).join(' & ') }}
+                  {{ t('graph.rel.vieFor') }}
                   <b>{{ personName(rv.crush) }}</b>
                 </span>
               </div>
             </div>
 
             <!-- Social gravity: pull friend/crush clusters together (organic layout) -->
-            <div class="rtl-gravity" :title="'Boosts social-edge springs in the Organic layout'">
+            <div class="rtl-gravity" :title="t('graph.rel.gravityTitle')">
               <UiIcon
                 class="rtl-gravity-icon"
                 :class="{ pulling: socialPull > 1 }"
                 name="orbit"
                 :size="14"
               />
-              <span class="rtl-gravity-label">Social gravity</span>
+              <span class="rtl-gravity-label">{{ t('graph.rel.gravity') }}</span>
               <input
                 v-model.number="socialPull"
                 class="rtl-gravity-slider"
@@ -699,11 +743,7 @@
             </div>
 
             <div class="rtl-hint">
-              {{
-                soloType
-                  ? 'Isolating one type — click it again to reset'
-                  : 'Click a type to isolate · Ctrl-click two people to trace their connection'
-              }}
+              {{ soloType ? t('graph.rel.hintSolo') : t('graph.rel.hint') }}
             </div>
           </div>
         </Transition>
@@ -711,37 +751,37 @@
         <!-- Legend -->
         <Transition name="pane">
           <div v-if="legendOpen" class="canvas-pane graph-legend">
-            <div class="panel-title">Legend</div>
+            <div class="panel-title">{{ t('graph.legend.title') }}</div>
             <div class="leg-section">
-              <div class="leg-section-label">Nodes</div>
+              <div class="leg-section-label">{{ t('graph.legend.nodes') }}</div>
               <div class="leg-row cp-stagger" :style="{ '--i': 0 }">
                 <div class="leg-dot" :style="{ background: legendColors.male }"></div>
-                Male
+                {{ t('data.gender.male') }}
               </div>
               <div class="leg-row cp-stagger" :style="{ '--i': 1 }">
                 <div class="leg-dot" :style="{ background: legendColors.female }"></div>
-                Female
+                {{ t('data.gender.female') }}
               </div>
             </div>
             <div class="leg-section">
-              <div class="leg-section-label">Lines</div>
+              <div class="leg-section-label">{{ t('graph.legend.lines') }}</div>
               <div class="leg-row cp-stagger" :style="{ '--i': 2 }">
                 <div class="leg-line" :style="{ background: legendColors.parentChild }"></div>
-                Parent / child
+                {{ t('data.relTypes.parent_child') }}
               </div>
               <div class="leg-row cp-stagger" :style="{ '--i': 3 }">
                 <div
                   class="leg-line leg-dashed"
                   :style="{ borderColor: legendColors.spouse }"
                 ></div>
-                Spouse
+                {{ t('data.relTypes.spouse') }}
               </div>
               <div class="leg-row cp-stagger" :style="{ '--i': 4 }">
                 <div
                   class="leg-line leg-dashed"
                   :style="{ borderColor: legendColors.adopted }"
                 ></div>
-                Adopted
+                {{ t('data.relTypes.adopted') }}
               </div>
             </div>
           </div>
@@ -765,7 +805,7 @@ import {
   getDashArray,
   ENDED_STATUSES
 } from './graph/linkHelpers.js'
-import { computeAgeYPositions } from './graph/layoutAge.js'
+import { computeAgeYPositions, yearAtAgeY } from './graph/layoutAge.js'
 import { computeGenLayout } from './graph/familyTreeLayout'
 import {
   shortestPath,
@@ -781,6 +821,8 @@ import {
   updateGenPreview,
   removeGenPreview,
   resolveGenTarget,
+  nearestGenRowY,
+  getNewGenY,
   cleanupEmptyGenRows,
   reconcileGenRows,
   drawCurrentYearLine,
@@ -799,14 +841,23 @@ import {
   bendCurveAt,
   toCurveFrame
 } from './graph/linkRouting.js'
-import { screenToWorld, worldToScreen, nodesExtent, fitExtent } from './graph/webgl/coords.js'
+import {
+  screenToWorld,
+  worldToScreen,
+  nodesExtent,
+  fitExtent,
+  pickNodeOnScreen,
+  translateToPin,
+  TILT_MAX
+} from './graph/webgl/coords.js'
+import { shapeAnchor } from './graph/webgl/nodeShapes.js'
 import { viewRectXYK } from './webgl/minimapMath'
 import { withAlpha } from './webgl/overlayUtils.js'
 import SceneTabs from './SceneTabs.vue'
 import GraphActionPane from './graph/GraphActionPane.vue'
 import ActionWheel from './graph/ActionWheel.vue'
 import WheelConfigModal from './graph/WheelConfigModal.vue'
-import { resolveWheelSlots } from './graph/wheelModes.js'
+import { resolveWheelSlots, resolveWheelSlot } from './graph/wheelModes.js'
 // Lazy-loaded through the paid-features gate (its chunk only downloads when
 // the plan/caps switchboard allows the 3D view) — see src/renderer/src/paid/.
 import { Graph3DView } from '../paid'
@@ -824,10 +875,14 @@ import KinshipPane from './kinship/KinshipPane.vue'
 import KinshipCard from './kinship/KinshipCard.vue'
 import KinshipQuiz from './kinship/KinshipQuiz.vue'
 import { useKinship, kinClass, kinPalette } from './kinship/useKinship'
-import { confirmDialog } from '../lib/dialogs.js'
-import { translate as tr } from '../i18n'
+import { confirmDialog, toast } from '../lib/dialogs.js'
+import { undoToast } from '../lib/undoToast.js'
+import { shiftLivesUpdates } from './timeline/timelineEdit.js'
+import { translate as tr, useI18n } from '../i18n'
+import { relTypeLabel, relRoleLabel, nounLabel, defaultNameLabel } from '../lib/dataLabels'
 
 const store = useMainStore()
+const { t, locale } = useI18n()
 const tt = useTimeTravel()
 const glCanvasEl = ref(null)
 const inkBackdropEl = ref(null)
@@ -858,33 +913,20 @@ const pathInfo = ref(null) // { ids, rels } | { none, fromId, toId } — the tra
 const egoDepth = ref(0) // Orbit rings: 0 = off, 1..3 = hops kept lit around the selection
 const socialPull = ref(1) // Social gravity ×1..×4 — boosts affinity-edge springs (organic)
 
+/** The Orbit ring buttons' tooltip (0 = off, else N hops around the selection). */
+function orbitTitle(d) {
+  if (d === 0) return t('graph.focus.off')
+  return t(d > 1 ? 'graph.focus.orbitOther' : 'graph.focus.orbitOne', { n: d })
+}
+
+// `key` names the layout type's copy (graph.modes.<key>.label / .title).
 const modes = [
-  { id: 'custom', icon: 'hand', label: 'Free', title: 'Free — nodes stay where you put them' },
-  { id: 'auto', icon: 'atom', label: 'Organic', title: 'Organic — force-directed layout' },
-  {
-    id: 'age',
-    icon: 'calendar',
-    label: 'Birth',
-    title: 'Birth — vertical position by birth date'
-  },
-  {
-    id: 'generation',
-    icon: 'network',
-    label: 'Generations',
-    title: 'Generations — top-down hierarchy'
-  },
-  {
-    id: 'spotlight',
-    icon: 'star',
-    label: 'Spotlight',
-    title: 'Spotlight — a main character at centre stage, everyone else in rings by closeness'
-  },
-  {
-    id: 'space',
-    icon: 'orbit',
-    label: 'Space',
-    title: 'Space — experimental 3D layout (Labs)'
-  }
+  { id: 'custom', key: 'free', icon: 'hand' },
+  { id: 'auto', key: 'organic', icon: 'atom' },
+  { id: 'age', key: 'birth', icon: 'calendar' },
+  { id: 'generation', key: 'generations', icon: 'network' },
+  { id: 'spotlight', key: 'spotlight', icon: 'star' },
+  { id: 'space', key: 'space', icon: 'orbit' }
 ]
 
 // Program-mode gating: Simple offers the Organic type only; the experimental
@@ -1143,9 +1185,9 @@ function emphVisual() {
 }
 
 const lineageOptions = [
-  { id: 'neutral', label: 'Default' },
-  { id: 'paternal', label: 'Paternal' },
-  { id: 'maternal', label: 'Maternal' }
+  { id: 'neutral', labelKey: 'graph.focus.default' },
+  { id: 'paternal', labelKey: 'graph.focus.paternal' },
+  { id: 'maternal', labelKey: 'graph.focus.maternal' }
 ]
 const lineageIndex = computed(() => {
   const idx = lineageOptions.findIndex((o) => o.id === activeEmphasis.value)
@@ -1153,9 +1195,9 @@ const lineageIndex = computed(() => {
 })
 
 const genderOptions = [
-  { id: 'normal', label: 'Default' },
-  { id: 'male', label: 'Male' },
-  { id: 'female', label: 'Female' }
+  { id: 'normal', labelKey: 'graph.focus.default' },
+  { id: 'male', labelKey: 'data.gender.male' },
+  { id: 'female', labelKey: 'data.gender.female' }
 ]
 const activeGender = ref('normal')
 const genderIndex = computed(() => {
@@ -1195,7 +1237,7 @@ const relTypeRows = computed(() => {
   for (const r of store.relationships) counts.set(r.type, (counts.get(r.type) || 0) + 1)
   return store.relTypes.map((d) => ({
     key: d.key,
-    label: d.label,
+    label: relTypeLabel(d),
     glyph: d.glyph,
     weight: d.weight,
     directed: d.directed,
@@ -1246,7 +1288,7 @@ function clearPath() {
 }
 
 function personName(id) {
-  return store.persons.find((p) => p.id === id)?.name || 'Unnamed'
+  return store.persons.find((p) => p.id === id)?.name || tr('graph.unnamed')
 }
 function personColor(id) {
   const p = store.persons.find((x) => x.id === id)
@@ -1267,8 +1309,11 @@ const pathHops = computed(() => {
       else if (def.directed) {
         // rels[i-1] joins ids[i-1] → ids[i]; name the PREVIOUS person's role.
         const prevIsA = r.person_a_id === info.ids[i - 1]
-        via = { text: `${prevIsA ? def.role_a : def.role_b} of`, glyph: def.glyph }
-      } else via = { text: def.label, glyph: def.glyph }
+        via = {
+          text: tr('graph.path.roleOf', { role: relRoleLabel(def, prevIsA ? 'a' : 'b') }),
+          glyph: def.glyph
+        }
+      } else via = { text: relTypeLabel(def), glyph: def.glyph }
     }
     return { id, name: personName(id), color: personColor(id), via }
   })
@@ -1527,10 +1572,10 @@ function applyGenderHighlight() {
 
 // ── Couples highlight ────────────────────────────────────────────────────────
 const couplesOptions = [
-  { id: 'normal', label: 'Default' },
-  { id: 'married', label: 'Married' },
-  { id: 'divorced', label: 'Divorced' },
-  { id: 'single', label: 'Single' }
+  { id: 'normal', labelKey: 'graph.focus.default' },
+  { id: 'married', labelKey: 'graph.focus.married' },
+  { id: 'divorced', labelKey: 'data.relStatus.divorced' },
+  { id: 'single', labelKey: 'graph.focus.single' }
 ]
 const activeCouples = ref('normal')
 const couplesIndex = computed(() => {
@@ -1585,9 +1630,9 @@ function applyCouplesHighlight() {
 
 // ── Date & Deceased highlight ───────────────────────────────────────────────
 const deceasedOptions = [
-  { id: 'normal', label: 'Default' },
-  { id: 'deceased', label: 'Deceased' },
-  { id: 'living', label: 'Living' }
+  { id: 'normal', labelKey: 'graph.focus.default' },
+  { id: 'deceased', labelKey: 'graph.focus.deceased' },
+  { id: 'living', labelKey: 'graph.focus.living' }
 ]
 const activeDeceased = ref('normal')
 const deceasedIndex = computed(() => {
@@ -1779,7 +1824,7 @@ function resetCurveAt(e, w) {
     d._curve = null
     schedulePersist(activeSceneId.value)
     ticked()
-    showWheelFlash('rotate-ccw', 'Curve reset')
+    showWheelFlash('rotate-ccw', tr('graph.flash.curveReset'))
   }
   return true
 }
@@ -1922,29 +1967,40 @@ const wheelSlots = computed(() => resolveWheelSlots(store.wheelSlots, wheelEnv.v
 // empty ones and duplicates, each one click away.
 const pillModes = computed(() => {
   const seen = new Set()
-  return wheelSlots.value.filter((s) => {
+  const list = wheelSlots.value.filter((s) => {
     if (s.empty || seen.has(s.id)) return false
     seen.add(s.id)
     return true
   })
+  // The Birth layout's y axis IS time: Retime is always one click away there
+  // (wherever else it's only on the wheel, if the user put it there).
+  if (currentMode.value === 'age' && !seen.has('retime'))
+    list.push(resolveWheelSlot({ kind: 'retime' }, wheelEnv.value))
+  return list
 })
 
 function pickPillMode(s) {
   if (s.disabled) {
-    showWheelFlash('lock', s.disabledHint || 'Not available right now')
+    showWheelFlash('lock', s.disabledHint || tr('graph.flash.unavailable'))
     return
   }
   activateEditMode(s)
 }
 
-const hudHint = computed(() => {
+// The HUD reads the live resolved slot, so its label/hint follow a language
+// switch while the mode stays on (editMode itself is a snapshot).
+const liveEditMode = computed(() => {
   const m = editMode.value
+  return (m && wheelSlots.value.find((s) => s.id === m.id)) || m
+})
+
+const hudHint = computed(() => {
+  const m = liveEditMode.value
   if (!m) return ''
   if (m.kind === 'link' && linkAnchorId.value)
-    return `Now click who ${personName(linkAnchorId.value)} bonds with`
-  if (m.kind === 'delete' && deleteArm.value) return 'Click it again to confirm'
-  if (m.kind === 'pin' && currentMode.value !== 'auto')
-    return 'Pinning matters in the Organic layout'
+    return tr('graph.hud.linkNext', { name: personName(linkAnchorId.value) })
+  if (m.kind === 'delete' && deleteArm.value) return tr('graph.hud.deleteConfirm')
+  if (m.kind === 'pin' && currentMode.value !== 'auto') return tr('graph.hud.pinOrganic')
   return m.hint
 })
 
@@ -2021,7 +2077,7 @@ function commitWheel(idx) {
     return
   }
   if (s.disabled) {
-    showWheelFlash('lock', s.disabledHint || 'Not available right now')
+    showWheelFlash('lock', s.disabledHint || tr('graph.flash.unavailable'))
     return
   }
   spawnWheelBurst(pos, s.color)
@@ -2033,6 +2089,8 @@ function activateEditMode(s) {
     exitEditMode() // picking the running mode again turns it off
     return
   }
+  // Retime drags along the Birth layout's year axis — go there first.
+  if (s.kind === 'retime' && currentMode.value !== 'age') switchMode('age')
   editMode.value = s
   linkAnchorId.value = null
   deleteArm.value = null
@@ -2088,7 +2146,7 @@ function handleModeClick(w, node) {
   const m = editMode.value
   if (!m) return
   if (m.kind === 'add') {
-    if (node) showWheelFlash('plus', 'Click an empty spot')
+    if (node) showWheelFlash('plus', tr('graph.flash.emptySpot'))
     else addPersonAt(w)
     return
   }
@@ -2098,7 +2156,7 @@ function handleModeClick(w, node) {
     else if (m.kind === 'pin') pinClick(node)
     else if (m.kind === 'paint') paintClick(node, m)
     else if (m.kind === 'tag') tagClick(node, m)
-    else showWheelFlash(m.icon, 'Click a bond, not a node')
+    else showWheelFlash(m.icon, tr('graph.flash.bondNotNode'))
     return
   }
   // Empty canvas: the bond-targeting modes pick the line under the cursor.
@@ -2138,11 +2196,11 @@ function armOrDelete(target) {
 async function doWheelDelete(target) {
   if (target.isRel) {
     const res = await store.deleteRelationship(target.id)
-    if (res?.success) showWheelFlash('trash-2', 'Bond deleted')
+    if (res?.success) showWheelFlash('trash-2', tr('toasts.deletedBond'))
   } else {
     const name = personName(target.id)
     const res = await store.deletePerson(target.id)
-    if (res?.success) showWheelFlash('trash-2', `${name} deleted`)
+    if (res?.success) showWheelFlash('trash-2', tr('toasts.deletedPerson', { name }))
   }
   markNodeStyles()
   markLinkStyles()
@@ -2153,7 +2211,7 @@ async function doWheelDelete(target) {
 async function linkClick(node) {
   const m = editMode.value
   if (!store.relTypeByKey.has(m.slot.type)) {
-    showWheelFlash('triangle-alert', 'That bond type no longer exists')
+    showWheelFlash('triangle-alert', tr('graph.flash.typeGone'))
     exitEditMode()
     return
   }
@@ -2175,14 +2233,17 @@ async function linkClick(node) {
       ((r.person_a_id === a && r.person_b_id === b) || (r.person_a_id === b && r.person_b_id === a))
   )
   if (dup) {
-    showWheelFlash(m.icon, 'Already linked')
+    showWheelFlash(m.icon, tr('graph.flash.alreadyLinked'))
   } else {
     const res = await store.createRelationship({
       person_a_id: a,
       person_b_id: b,
       type: m.slot.type
     })
-    if (res?.success) showWheelFlash('check', `Linked — ${m.label}`)
+    if (res?.success) {
+      const def = store.relTypeByKey.get(m.slot.type)
+      showWheelFlash('check', tr('graph.flash.linked', { type: relTypeLabel(def) || m.label }))
+    }
   }
   linkAnchorId.value = b
   markNodeStyles()
@@ -2194,11 +2255,14 @@ function pinClick(node) {
     node.fx = null
     node.fy = null
     if (currentMode.value === 'auto') ctx.simulation?.alpha(0.15).restart()
-    showWheelFlash('pin-off', `${node.name || 'Node'} released`)
+    showWheelFlash(
+      'pin-off',
+      tr('graph.flash.released', { name: node.name || tr('graph.flash.node') })
+    )
   } else {
     node.fx = node.x
     node.fy = node.y
-    showWheelFlash('pin', `${node.name || 'Node'} pinned`)
+    showWheelFlash('pin', tr('graph.flash.pinned', { name: node.name || tr('graph.flash.node') }))
   }
   uiTick.value++
 }
@@ -2226,27 +2290,30 @@ async function tagClick(node, m) {
   const res = has
     ? await store.removeEntityTag(node.id, tagId)
     : await store.addEntityTag(node.id, tagId)
-  if (res?.success) showWheelFlash(m.icon, `${has ? 'Removed' : 'Added'} “${m.label}”`)
+  if (res?.success) {
+    const tag = defaultNameLabel(store.tags.find((x) => x.id === tagId)?.label) || m.label
+    showWheelFlash(m.icon, tr(has ? 'graph.flash.tagRemoved' : 'graph.flash.tagAdded', { tag }))
+  }
 }
 
 async function endBondClick(link) {
   if (link.ended?.year) {
-    showWheelFlash('hourglass', 'Already ended')
+    showWheelFlash('hourglass', tr('graph.flash.alreadyEnded'))
     return
   }
   const year = store.currentDate?.year
   if (!year) {
-    showWheelFlash('hourglass', 'Set a current year first')
+    showWheelFlash('hourglass', tr('graph.flash.needYear'))
     return
   }
   const res = await store.updateRelationship({ id: link.id, ended: { year } })
-  if (res?.success) showWheelFlash('hourglass', `Ended ${year}`)
+  if (res?.success) showWheelFlash('hourglass', tr('graph.flash.ended', { year }))
 }
 
 async function swapBondClick(link) {
   const def = store.relTypeByKey.get(link.type)
   if (!def?.directed) {
-    showWheelFlash('arrow-right-left', 'That bond has no direction')
+    showWheelFlash('arrow-right-left', tr('graph.flash.noDirection'))
     return
   }
   const res = await store.updateRelationship({
@@ -2254,13 +2321,20 @@ async function swapBondClick(link) {
     person_a_id: link.person_b_id,
     person_b_id: link.person_a_id
   })
-  if (res?.success) showWheelFlash('arrow-right-left', 'Direction flipped')
+  if (res?.success) showWheelFlash('arrow-right-left', tr('graph.flash.flipped'))
 }
 
 // Add mode: drop a new person where the click landed, then christen them via
 // the inline bubble (Enter saves, Esc keeps the placeholder name).
 async function addPersonAt(w) {
-  const res = await store.createPerson({ name: `New ${store.noun}` })
+  // Birth layout: the clicked height IS a year — the newcomer is born then.
+  const year = currentMode.value === 'age' ? yearAtAgeY(ctx.yearGuideCtx, w.y) : null
+  const res = await store.createPerson({
+    name: tr('graph.newNoun', { noun: nounLabel(store.noun) }),
+    ...(year != null && {
+      birth: { year, month: null, day: null, precision: 'year', calendar: 'gregorian' }
+    })
+  })
   if (!res?.success) return
   await nextTick() // let the persons watcher run updateGraph() first
   const node = ctx.nodesData.find((n) => n.id === res.data.id)
@@ -2417,7 +2491,11 @@ function restoreLayoutState(state) {
     // that type's own arrangement (visible when the user switches back).
     refreshActiveStyles()
     markNodeStyles()
-    showWheelFlash('rotate-ccw', `Restored the ${state.type} arrangement`)
+    const key = TYPE_TO_MODE[state.type] ? state.type : 'organic' // type ids = copy keys
+    showWheelFlash(
+      'rotate-ccw',
+      tr('graph.flash.restored', { type: tr(`graph.modes.${key}.label`) })
+    )
   }
   schedulePersist(state.sceneId)
   return inverse
@@ -2491,7 +2569,8 @@ function switchScene(id) {
 async function addScene() {
   graph3dRef.value?.writeBack?.()
   if (ctx.nodesData.length) saveCurrentState()
-  const res = await store.createScene('graph', `Scene ${graphScenes.value.length + 1}`, {
+  const name = tr('graph.scenes.nameN', { n: graphScenes.value.length + 1 })
+  const res = await store.createScene('graph', name, {
     type: 'organic',
     layouts: {},
     positions: {},
@@ -2519,7 +2598,7 @@ async function duplicateActiveScene() {
 async function removeScene(scene) {
   if (graphScenes.value.length <= 1) return
   const ok = await confirmDialog({
-    title: tr('confirm.deleteScene', { name: scene.name }),
+    title: tr('confirm.deleteScene', { name: defaultNameLabel(scene.name) }),
     message: tr('confirm.deleteSceneBody'),
     tone: 'danger'
   })
@@ -3084,7 +3163,12 @@ function initGraph() {
         y: e.transform.y,
         k: e.transform.k,
         sx: ctx.transform.sx ?? 1,
-        sy: ctx.transform.sy ?? 1
+        sy: ctx.transform.sy ?? 1,
+        // perspective tilt (see setViewTilt) rides along with the camera
+        tl: ctx.transform.tl ?? 0,
+        yw: ctx.transform.yw ?? 0,
+        vw: ctx.transform.vw,
+        vh: ctx.transform.vh
       }
       ctx.renderer.setCamera(ctx.transform)
       // Birth mode: the year guides re-derive their interval from the zoom, so
@@ -3097,6 +3181,7 @@ function initGraph() {
   // Double-click opens the profile card (see onDblClick) — not a d3 zoom step.
   ctx.zoomSelection.on('dblclick.zoom', null)
   overlayEl.value.addEventListener('wheel', onStretchWheel, { passive: false })
+  overlayEl.value.addEventListener('wheel', onTiltWheel, { passive: false })
   installPointerHandlers()
 
   ctx.simulation = d3
@@ -3120,6 +3205,7 @@ function initGraph() {
     if (!container) return
     const r = container.getBoundingClientRect()
     ctx.renderer.resize(r.width, r.height)
+    if (ctx.transform.tl || ctx.transform.yw) setViewTilt(ctx.transform.tl, ctx.transform.yw)
     if (currentMode.value === 'auto') {
       ctx.simulation.force('center', d3.forceCenter(r.width / 2, r.height / 2))
       ctx.simulation.alpha(0.1).restart()
@@ -3222,12 +3308,27 @@ function updateGraph() {
   })
 
   const hadNew = newNodes.length > ctx.nodesData.length
+  const hadNodes = ctx.nodesData.length > 0
+  // Incremental additions only (not the first load — entering a scene lays out).
+  const freshIds = ctx.nodesData.length
+    ? newNodes.filter((n) => !existingById[n.id]).map((n) => n.id)
+    : []
+  // …and loose newcomers whose first relationship just arrived re-anchor.
+  const prevLinkIds = new Set((ctx.linksData || []).map((l) => l.id))
+  for (const r of store.relationships) {
+    if (prevLinkIds.has(r.id)) continue
+    for (const id of [r.person_a_id, r.person_b_id])
+      if (looseNewcomers.has(id) && !freshIds.includes(id)) freshIds.push(id)
+  }
   ctx.nodesData = newNodes
   // Stamp the Time-travel ordinals: a person appears at their birth; a spouse
   // link at its formed date (else when both partners exist); a parent/child or
   // adopted link when the child (person_b) is born.
+  let birthMoved = false
   newNodes.forEach((n) => {
-    n._tBirth = toOrdinal(n.birth)
+    const t = toOrdinal(n.birth)
+    if (existingById[n.id] && n._tBirth !== t) birthMoved = true
+    n._tBirth = t
   })
   const birthOrdById = new Map(newNodes.map((n) => [n.id, n._tBirth]))
   ctx.linksData = store.relationships.map((r) => {
@@ -3266,6 +3367,34 @@ function updateGraph() {
   recomputeCouplesSet()
   ctx.renderer.setData(ctx.nodesData, ctx.linksData)
   minimapRef.value?.redraw()
+  if (freshIds.length) placeNewcomersOnRows(freshIds)
+  // Birth layout keeps Y on the year axis: newcomers land straight on their
+  // birth year's line, and a changed birth (Time drag / Retime, a form edit,
+  // undo/redo) re-seats everyone on it.
+  if (currentMode.value === 'age' && !drag) {
+    if (freshIds.length) placeNewcomersOnBirthAxis(freshIds)
+    else if (birthMoved) realignAgeAxis()
+  }
+  // (Arrivals into an empty graph are a load, not newcomers — unless the graph
+  // is already set up and this project simply had nobody yet.)
+  if (hadNodes || scenesInitialized) popNewcomers(newNodes.filter((n) => !existingById[n.id]))
+  else popProjectId = store.activeProjectId
+}
+
+// People who just joined the graph pop in (renderer: springy scale + ripple
+// ring + name fade). Not on a first load or a project switch — a whole cast
+// arriving at once isn't "someone new" — nor for people the Time slider hides.
+let popProjectId = null
+const POP_BATCH_MAX = 24
+function popNewcomers(born) {
+  const project = store.activeProjectId
+  const sameProject = popProjectId === project
+  popProjectId = project
+  if (!sameProject || !born.length || born.length > POP_BATCH_MAX || !ctx.renderer) return
+  const ids = born.filter((n) => !nodeTimeHidden(n)).map((n) => n.id)
+  if (!ids.length) return
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+  ctx.renderer.popNodes(ids, accent || null)
 }
 
 // ── Interaction: zoom + node drag + hover + click ────────────────────────────
@@ -3296,15 +3425,28 @@ function linkPickTol() {
 // Picker that ignores nodes hidden by the Time slider (they're invisible but
 // still live in the quadtree, since they never leave the simulation).
 function pickVisibleNode(wx, wy) {
-  const n = ctx.renderer?.pickNode(wx, wy, hitRadius())
+  const t = ctx.transform
+  const lift = shapeAnchor(store.graphSettings.nodeShape).hitLift
+  let n
+  if (t.tl || t.yw || lift) {
+    // Billboards shrink with depth and gravestones stand above their point, so
+    // hit-test in screen space against what is actually drawn.
+    const s = worldToScreen(wx, wy, t)
+    n = pickNodeOnScreen(s.x, s.y, ctx.nodesData, t, hitRadius, lift)
+  } else n = ctx.renderer?.pickNode(wx, wy, hitRadius())
   return n && nodeTimeHidden(n) ? null : n
 }
 
 function zoomFilter(event) {
   // Plain wheel → d3 uniform zoom. Holding X / Z arms directional stretch,
   // handled by onStretchWheel instead, so keep d3 out of it.
-  if (event.type === 'wheel') return !stretchArmed()
+  // Tilted / turned view: wheel-zoom and drag-pan are ours (onTiltWheel, the
+  // pending pan in onPointerMove) so the point under the cursor stays put.
+  if (event.type === 'wheel') return !stretchArmed() && !tiltActive()
   if (event.button != null && event.button !== 0) return false
+  // Alt-drag tilts the board (onPointerDown) — never pan with it.
+  if (event.altKey) return false
+  if (tiltActive() && (event.type === 'mousedown' || event.type === 'touchstart')) return false
   // Shift-drag is reserved for marquee select — never let d3 pan with it.
   if (event.shiftKey) return false
   const w = clientToWorld(event.clientX, event.clientY)
@@ -3516,6 +3658,7 @@ function removePointerHandlers() {
     el.removeEventListener('pointerleave', onHoverLeave)
     el.removeEventListener('dblclick', onDblClick)
     el.removeEventListener('wheel', onStretchWheel)
+    el.removeEventListener('wheel', onTiltWheel)
   }
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerup', onPointerUp)
@@ -3523,6 +3666,10 @@ function removePointerHandlers() {
 
 function onPointerDown(e) {
   if (e.button !== 0) return
+  if (e.altKey && !spaceActive.value) {
+    beginTiltDrag(e)
+    return
+  }
   // A pending christening commits with whatever was typed — the click moves on.
   if (nameBubble.value) commitNameBubble(true)
   // Modifier-clicks are graph gestures, never text-selection gestures — without
@@ -3556,7 +3703,8 @@ function onPointerDown(e) {
   }
   // An active action-wheel mode routes plain clicks to its verb — no drag,
   // no selection. Modifier gestures (trace, multi-select) keep working above.
-  if (editMode.value && !spaceActive.value) {
+  // (Retime is a drag, not a click verb — it falls through to the node drag.)
+  if (editMode.value && !spaceActive.value && !retimeOn.value) {
     handleModeClick(w, node)
     return
   }
@@ -3580,7 +3728,11 @@ function onPointerDown(e) {
       moved: false,
       downX: e.clientX,
       downY: e.clientY,
-      before: captureLayoutState() // undo memento, recorded on a real move
+      before: captureLayoutState(), // undo memento, recorded on a real move
+      time:
+        retimeOn.value || timeDragOn.value
+          ? beginTimeDrag(node, group, { birthOnly: retimeOn.value })
+          : null
     }
     grab = { dx: w.x - node.x, dy: w.y - node.y }
     try {
@@ -3593,7 +3745,195 @@ function onPointerDown(e) {
     if (group) for (const g of group) holdNode(g.n, m)
   } else {
     pending = { downX: e.clientX, downY: e.clientY, moved: false }
+    // Under the tilt the background drag pans here (d3 is filtered out): the
+    // ground point grabbed stays under the cursor, whatever the angle/turn.
+    if (tiltActive() && !e.shiftKey) pending.pan = clientToWorld(e.clientX, e.clientY)
   }
+}
+
+// ── Time drag (Birth layout) ─────────────────────────────────────────────────
+// With the header's Time drag toggle on, Birth-layout drags are vertical only:
+// the node (or the whole selection) snaps year by year along the axis, a badge
+// shows the birth year it will land on, and dropping writes the shifted lives
+// (birth + death move together) as ONE batch — one undo step. The data change
+// then re-seats everyone through realignAgeAxis (also what undo/redo trigger).
+const timeDragOn = computed(() => store.timeDrag && currentMode.value === 'age')
+// The Retime edit mode (Edit rail, Birth layout): the same drag, but only the
+// birth year moves — clamped at the death so a life never inverts.
+const retimeOn = computed(() => editMode.value?.kind === 'retime' && currentMode.value === 'age')
+watch(currentMode, (m) => {
+  if (m !== 'age' && editMode.value?.kind === 'retime') exitEditMode()
+})
+const timeBadge = ref(null) // { x, y, text } in container px | null
+
+function setTimeDrag(on) {
+  store.timeDrag = on
+  if (!on) return
+  if (currentMode.value !== 'age') switchMode('age')
+  showWheelFlash('calendar-clock', tr('graph.flash.timeDrag'))
+}
+
+function beginTimeDrag(node, group, { birthOnly = false } = {}) {
+  const info = ctx.yearGuideCtx
+  if (!info) return null
+  const members = [node, ...(group || []).map((g) => g.n)]
+  // People with no birth sit at the axis' latest year (computeAgeYPositions).
+  const undatedYear = Math.floor(info.maxYear)
+  return {
+    node,
+    members,
+    birthOnly,
+    y0: new Map(members.map((n) => [n, n.y])),
+    x0: new Map(members.map((n) => [n, n.x])),
+    // Birth-only: where each starts and the death it may not pass.
+    born: new Map(members.map((n) => [n, n.birth?.year ?? undatedYear])),
+    died: new Map(members.map((n) => [n, n.death?.year ?? null])),
+    ppy: info.usableHeight / (info.maxYear - info.minYear || 1),
+    undatedYear,
+    delta: 0
+  }
+}
+
+/** Years member `n` actually moves (birth-only drags stop at the death). */
+function timeDragShift(td, n, delta) {
+  if (!td.birthOnly) return delta
+  const b = td.born.get(n),
+    d = td.died.get(n)
+  return d != null && b + delta > d ? Math.max(0, d - b) : delta
+}
+
+function moveTimeDrag(ty, e) {
+  const td = drag.time
+  const delta = Math.round((ty - td.y0.get(td.node)) / td.ppy)
+  if (delta !== td.delta) {
+    td.delta = delta
+    for (const n of td.members) {
+      n.x = n.fx = td.x0.get(n)
+      n.y = n.fy = td.y0.get(n) + timeDragShift(td, n, delta) * td.ppy
+    }
+    ticked()
+  }
+  const rect = containerEl.value?.getBoundingClientRect()
+  if (!rect) return
+  const shown = td.members.length > 1 ? delta : timeDragShift(td, td.node, delta)
+  const sign = shown > 0 ? `+${shown}` : String(shown)
+  const text =
+    td.members.length > 1
+      ? tr(td.birthOnly ? 'graph.timeDrag.badgeBirths' : 'graph.timeDrag.badgeMany', {
+          n: td.members.length,
+          delta: sign
+        })
+      : tr('graph.timeDrag.badge', { year: td.born.get(td.node) + shown, delta: sign })
+  timeBadge.value = { x: e.clientX - rect.left + 16, y: e.clientY - rect.top + 12, text }
+}
+
+async function commitTimeDrag(td) {
+  const ids = td.members.map((n) => n.id)
+  const valueOf = (id, fid) => store.fieldValuesOf.get(id)?.get(fid)?.value
+  const { updates, unsupported } = shiftLivesUpdates(
+    store.fieldDefs,
+    valueOf,
+    ids,
+    td.delta,
+    () => td.undatedYear,
+    { birthOnly: td.birthOnly }
+  )
+  if (unsupported) toast(tr('timeline.toasts.calendarUnsupported'), { tone: 'warning' })
+  const res = updates.length ? await store.setFieldValuesBatch(updates) : null
+  if (!res?.success) {
+    realignAgeAxis() // nothing changed — glide everyone back onto their years
+    return
+  }
+  const n = Math.abs(td.delta)
+  const later = td.delta > 0
+  const name = td.node.name || nounLabel(store.noun)
+  let msg
+  if (td.birthOnly) {
+    // (Some of a selection may have been held back at their death year.)
+    const one = td.members.find((m) => m.id === updates[0].personId) || td.node
+    msg =
+      updates.length > 1
+        ? tr(later ? 'graph.timeDrag.birthsLater' : 'graph.timeDrag.birthsEarlier', {
+            count: updates.length,
+            n
+          })
+        : tr('timeline.toasts.bornIn', {
+            name: personName(one.id),
+            year: td.born.get(one) + timeDragShift(td, one, td.delta)
+          })
+  } else {
+    msg =
+      ids.length > 1
+        ? tr(later ? 'graph.timeDrag.movedManyLater' : 'graph.timeDrag.movedManyEarlier', {
+            count: ids.length,
+            n
+          })
+        : tr(later ? 'timeline.toasts.movedLater' : 'timeline.toasts.movedEarlier', { name, n })
+  }
+  undoToast(msg, 'fields:setValuesBatch')
+}
+
+/** Birth layout: people just created appear ON their birth year's line (no
+ *  glide in from wherever they spawned); everyone else re-seats in case the
+ *  newcomer stretched the axis. Undated people sit at the latest year, as on
+ *  entering the layout. */
+function placeNewcomersOnBirthAxis(ids) {
+  const prev = ctx.yearGuideCtx
+  const height = prev
+    ? prev.usableHeight + prev.padding * 2
+    : ctx.containerRef?.getBoundingClientRect().height
+  if (!height) return
+  finishAnimation()
+  const info = computeAgeYPositions(ctx.nodesData, height)
+  const fresh = new Set(ids)
+  for (const n of ctx.nodesData) {
+    if (!fresh.has(n.id)) continue
+    n.fx = n.x
+    n.y = n.fy = info.yMap[n.id]
+  }
+  ctx.renderer?.invalidatePicker()
+  ticked()
+  realignAgeAxis()
+}
+
+/** Birth layout: put every node back on its birth year's line (the axis may
+ *  have stretched if the earliest/latest birth moved), keeping x and camera. */
+function realignAgeAxis() {
+  if (currentMode.value !== 'age' || !ctx.nodesData.length) return
+  const prev = ctx.yearGuideCtx
+  // Same height the axis was built with (the view may be hidden right now).
+  const height = prev
+    ? prev.usableHeight + prev.padding * 2
+    : ctx.containerRef?.getBoundingClientRect().height
+  if (!height) return
+  finishAnimation()
+  const info = computeAgeYPositions(ctx.nodesData, height)
+  if (!prev || prev.minYear !== info.minYear || prev.maxYear !== info.maxYear) {
+    // Re-derive the guides in place (interval 0 forces it, kept labels keep
+    // their opacity — no fade-in flash of the whole axis).
+    const { minYear, maxYear, padding, usableHeight } = info
+    ctx.yearGuideCtx = { minYear, maxYear, padding, usableHeight, interval: 0 }
+    updateAdaptiveYearGuides(ctx)
+  }
+  drawCurrentYearLine(ctx, info, store.currentDate?.year ?? null, true)
+  const targets = {}
+  let off = false
+  for (const n of ctx.nodesData) {
+    targets[n.id] = { x: n.x, y: info.yMap[n.id] }
+    if (Math.abs(n.y - info.yMap[n.id]) > 0.5) off = true
+  }
+  if (!off) return
+  animateToPositionsWithReset(
+    targets,
+    () => {
+      ctx.nodesData.forEach((n) => {
+        n.fx = n.x
+        n.fy = n.y
+      })
+      reapplyDrag()
+    },
+    { keepCamera: true, duration: 420, ease: d3.easeCubicInOut }
+  )
 }
 
 // Per-node drag primitives shared by single- and group-drag. `hold` pins a node
@@ -3618,6 +3958,10 @@ function moveNodeTo(d, tx, ty, m) {
 }
 
 function onPointerMove(e) {
+  if (tiltDrag) {
+    moveTiltDrag(e)
+    return
+  }
   if (marqueeRaw) {
     moveMarquee(e)
     return
@@ -3630,6 +3974,10 @@ function onPointerMove(e) {
     if (!drag.moved && Math.hypot(e.clientX - drag.downX, e.clientY - drag.downY) > 3)
       drag.moved = true
     const w = clientToWorld(e.clientX, e.clientY)
+    if (drag.time) {
+      if (drag.moved) moveTimeDrag(w.y - grab.dy, e)
+      return
+    }
     const tx = w.x - grab.dx,
       ty = w.y - grab.dy
     const d = drag.node,
@@ -3640,10 +3988,15 @@ function onPointerMove(e) {
     if (m === 'generation') updateGenPreview(d.y, ctx)
   } else if (pending) {
     if (Math.hypot(e.clientX - pending.downX, e.clientY - pending.downY) > 3) pending.moved = true
+    if (pending.pan && pending.moved) panTiltedTo(pending.pan, e.clientX, e.clientY)
   }
 }
 
 function onPointerUp(e) {
+  if (tiltDrag) {
+    endTiltDrag()
+    return
+  }
   if (marqueeRaw) {
     const mr = marqueeRaw
     marqueeRaw = null
@@ -3653,6 +4006,19 @@ function onPointerUp(e) {
   }
   if (curveDrag) {
     endCurveDrag()
+    return
+  }
+  if (drag?.time) {
+    const d = drag.node,
+      td = drag.time,
+      moved = drag.moved
+    drag = null
+    timeBadge.value = null
+    ctx.renderer.invalidatePicker()
+    if (!moved) {
+      store.relPopup = null
+      store.selectPerson(d.id, { modal: false })
+    } else if (td.delta) commitTimeDrag(td)
     return
   }
   if (drag) {
@@ -3818,7 +4184,9 @@ function onHoverMove(e) {
   }
   if (overlayEl.value) {
     overlayEl.value.style.cursor = node
-      ? 'grab'
+      ? retimeOn.value
+        ? 'ns-resize'
+        : 'grab'
       : overLink
         ? overLink === cd
           ? 'move' // the selected bezier curve: drag to bend it
@@ -4218,7 +4586,7 @@ function setMainCharacter(id) {
   w.positions = {} // a new lead → a fresh arrangement around them
   if (!spotlightActive.value) switchMode('spotlight')
   else layoutSpotlight()
-  showWheelFlash('star', `${kinship.personName(id)} takes the spotlight`)
+  showWheelFlash('star', tr('graph.spot.takes', { name: kinship.personName(id) }))
 }
 function onSpotPick(p) {
   if (p?.id) setMainCharacter(p.id)
@@ -4561,7 +4929,11 @@ function exportImage({ width, height, light = null }) {
   // Generous zoom-in cap: a small tree may fill a large poster (everything is
   // drawn resolution-independently, so it stays crisp).
   const maxK = Math.max(2, (2.5 * width) / 1200)
-  const t = fitExtent(ext.minX, ext.minY, ext.maxX, ext.maxY, width, height, 80, maxK)
+  const fit = fitExtent(ext.minX, ext.minY, ext.maxX, ext.maxY, width, height, 80, maxK)
+  const t =
+    ctx.transform.tl || ctx.transform.yw
+      ? { ...fit, tl: ctx.transform.tl, yw: ctx.transform.yw, vw: width, vh: height }
+      : fit
   return ctx.renderer.exportFrame({
     width,
     height,
@@ -4575,6 +4947,238 @@ function exportImage({ width, height, light = null }) {
 defineExpose({ flushLayout, reloadScenes, exportImage })
 
 let scenesInitialized = false
+
+// ── Perspective tilt — the 3D view of the 2D layouts ─────────────────────────
+// The board (links, guides, the ground grid) tilts away like a table seen from
+// above while every node stands upright on it, shrinking with distance — the
+// same arrangement, now with depth. The tilt rides on the camera transform
+// (tl / vw / vh), so every worldToScreen / screenToWorld (overlay, picking,
+// dragging) follows it; the renderer folds it into the projection matrix.
+// Toggle: the bottom-bar button or T. Alt-drag up/down sets the angle by hand.
+const TILT_MAX_DEG = Math.round((TILT_MAX * 180) / Math.PI)
+const tiltOn = computed(() => !!store.graphSettings.viewTilt && !spaceActive.value)
+const tiltAngleDeg = () =>
+  Math.min(TILT_MAX_DEG, Math.max(8, Number(store.graphSettings.tiltAngle) || 48))
+const tiltYawDeg = () => Number(store.graphSettings.tiltYaw) || 0
+const tiltActive = () => !!(ctx.transform.tl || ctx.transform.yw)
+let tiltRaf = 0
+let tiltDrag = null // { x0, y0, a0, w0, angle, yaw } while Alt-dragging
+
+const DEG = Math.PI / 180
+// Wrap degrees into (-180, 180].
+const wrapDeg = (d) => ((((d + 180) % 360) + 360) % 360) - 180
+
+function setViewTilt(tl, yw = ctx.transform.yw || 0) {
+  const el = containerEl.value
+  ctx.transform = {
+    ...ctx.transform,
+    tl,
+    yw,
+    vw: el?.clientWidth || ctx.transform.vw || 1,
+    vh: el?.clientHeight || ctx.transform.vh || 1
+  }
+  ctx.renderer?.setCamera(ctx.transform)
+  minimapRef.value?.redraw()
+}
+
+function prefersReducedMotion() {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  } catch {
+    return false
+  }
+}
+
+// Glide tilt AND turn to their targets (ease-out with a whisper of overshoot,
+// ~0.7s). The turn takes the short way round.
+function animateTilt() {
+  cancelAnimationFrame(tiltRaf)
+  if (!ctx.renderer) return
+  const on = tiltOn.value
+  const toT = on ? tiltAngleDeg() * DEG : 0
+  const fromT = ctx.transform.tl || 0
+  const fromY = ctx.transform.yw || 0
+  const toY = fromY + wrapDeg((on ? tiltYawDeg() : 0) - fromY / DEG) * DEG
+  if ((Math.abs(toT - fromT) < 1e-4 && Math.abs(toY - fromY) < 1e-4) || prefersReducedMotion()) {
+    setViewTilt(toT, toY)
+    return
+  }
+  const t0 = performance.now()
+  const dur = 720
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / dur)
+    const c = 1.2 // easeOutBack, gentle
+    const e = 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2)
+    setViewTilt(Math.max(0, fromT + (toT - fromT) * e), fromY + (toY - fromY) * e)
+    if (k < 1) tiltRaf = requestAnimationFrame(step)
+  }
+  tiltRaf = requestAnimationFrame(step)
+}
+watch(tiltOn, animateTilt)
+watch(
+  () => [store.graphSettings.tiltAngle, store.graphSettings.tiltYaw],
+  () => {
+    if (tiltOn.value && !tiltDrag) animateTilt()
+  }
+)
+
+function toggleTilt() {
+  if (spaceActive.value) return
+  store.updateGraphSetting('viewTilt', !store.graphSettings.viewTilt)
+}
+
+// Turn the board by `deg` (Q / E). Turning a flat view tilts it first.
+function turnTilt(deg) {
+  if (spaceActive.value) return
+  const yaw = Math.round(wrapDeg(tiltYawDeg() + deg))
+  if (store.graphSettings.viewTilt) store.updateGraphSetting('tiltYaw', yaw)
+  else store.applyGraphSettings({ viewTilt: true, tiltYaw: yaw })
+}
+
+// Alt-drag: up/down tilts, left/right turns — the board follows the hand.
+function beginTiltDrag(e) {
+  e.preventDefault()
+  cancelAnimationFrame(tiltRaf)
+  const a = (ctx.transform.tl || 0) / DEG
+  const w = (ctx.transform.yw || 0) / DEG
+  tiltDrag = { x0: e.clientX, y0: e.clientY, a0: a, w0: w, angle: a, yaw: w }
+}
+function moveTiltDrag(e) {
+  const a = Math.min(TILT_MAX_DEG, Math.max(0, tiltDrag.a0 + (tiltDrag.y0 - e.clientY) * 0.32))
+  const w = tiltDrag.w0 - (e.clientX - tiltDrag.x0) * 0.4
+  tiltDrag.angle = a
+  tiltDrag.yaw = w
+  setViewTilt(a * DEG, w * DEG)
+}
+function endTiltDrag() {
+  const { angle: a, yaw } = tiltDrag
+  tiltDrag = null
+  const w = Math.round(wrapDeg(yaw))
+  // Nearly flat snaps flat (and switches the view off, keeping the turn for
+  // next time); otherwise keep both by hand.
+  if (a < 6) {
+    store.applyGraphSettings({ viewTilt: false, tiltYaw: w })
+    animateTilt()
+  } else store.applyGraphSettings({ viewTilt: true, tiltAngle: Math.round(a), tiltYaw: w })
+}
+
+// ── Exact pan / zoom under the tilt ─────────────────────────────────────────
+// d3.zoom works on the flat picture, so tilted it would slide the ground out
+// from under the cursor (and turned, pan sideways). These solve the camera
+// translate so the grabbed / hovered ground point stays exactly under it.
+function applyFlatCamera(tx, ty, k) {
+  ctx.zoomSelection
+    ?.interrupt()
+    .call(ctx.zoomBehavior.transform, d3.zoomIdentity.translate(tx, ty).scale(k))
+}
+function panTiltedTo(w, clientX, clientY) {
+  const r = overlayEl.value.getBoundingClientRect()
+  const p = translateToPin(w.x, w.y, clientX - r.left, clientY - r.top, ctx.transform)
+  applyFlatCamera(p.x, p.y, ctx.transform.k)
+}
+function onTiltWheel(e) {
+  if (!tiltActive() || stretchArmed() || spaceActive.value) return
+  if (isTypingTarget(document.activeElement)) return
+  e.preventDefault()
+  const r = overlayEl.value.getBoundingClientRect()
+  const mx = e.clientX - r.left,
+    my = e.clientY - r.top
+  // d3.zoom's default wheel curve, so the feel matches the flat view.
+  const delta =
+    -e.deltaY * (e.deltaMode === 1 ? 0.05 : e.deltaMode ? 1 : 0.002) * (e.ctrlKey ? 10 : 1)
+  const k = Math.min(4, Math.max(0.1, ctx.transform.k * Math.pow(2, delta)))
+  const w = screenToWorld(mx, my, ctx.transform)
+  const p = translateToPin(w.x, w.y, mx, my, ctx.transform, k)
+  applyFlatCamera(p.x, p.y, k)
+}
+
+function onTiltKey(e) {
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return
+  const k = e.key.toLowerCase()
+  if (k !== 't' && k !== 'q' && k !== 'e') return
+  if (store.activeView !== 'graph' || store.modalOpen || store.formOpen) return
+  if (isTypingTarget(e.target) || isTypingTarget(document.activeElement)) return
+  if (k === 't') toggleTilt()
+  else turnTilt(k === 'q' ? 30 : -30)
+}
+
+// ── Generations: newcomers land ON a row ────────────────────────────────────
+// People created outside the canvas (person form, Directory, Sheet, import)
+// arrive through updateGraph() next to a relative with a little jitter. In
+// Generations that left them hovering between rows. Put each on the row its
+// relationship implies — a child one row below its parent, a parent one row
+// above, a partner or sibling on the same row — opening a new row when the
+// tree grows past its first or last generation.
+// The person form creates the person FIRST and links them a moment later, so a
+// newcomer often has no relatives yet when it lands: it takes the nearest row
+// and is remembered here, then re-anchored when its first relationship arrives.
+const looseNewcomers = new Set()
+
+function placeNewcomersOnRows(newIds) {
+  if (currentMode.value !== 'generation' || !ctx.genRowYValues.length || !newIds.length) return
+  finishAnimation() // relatives must be on their rows before anyone joins them
+  const byId = new Map(ctx.nodesData.map((n) => [n.id, n]))
+  const roles = store.relTypeRoles
+  const step = ctx.genRowSpacing || 140
+  const placed = new Set()
+  // Relatives first: a newcomer related to another newcomer waits for it.
+  const queue = [...newIds]
+  for (let guard = 0; queue.length && guard < newIds.length * 3; guard++) {
+    const id = queue.shift()
+    const n = byId.get(id)
+    if (!n) continue
+    let want = null
+    let anchorX = null
+    for (const r of store.relationships) {
+      if (r.person_a_id !== id && r.person_b_id !== id) continue
+      const otherId = r.person_a_id === id ? r.person_b_id : r.person_a_id
+      const o = byId.get(otherId)
+      if (!o || (newIds.includes(otherId) && !placed.has(otherId))) continue
+      const role = roles?.get?.(r.type) ?? (r.type === 'spouse' ? 'horizontal' : 'vertical')
+      if (role === 'vertical') want = o.y + (r.person_b_id === id ? step : -step)
+      else if (role === 'horizontal') want = o.y
+      else continue
+      anchorX = o.x
+      break
+    }
+    if (want == null && queue.some((q) => q !== id) && guard < newIds.length) {
+      queue.push(id) // its relative is still waiting — try again after it
+      continue
+    }
+    let y = want ?? n.y
+    // Past the first / last row → open a new one; otherwise the nearest row.
+    const opened = getNewGenY(y, ctx)
+    if (
+      opened !== null &&
+      (y < Math.min(...ctx.genRowYValues) || y > Math.max(...ctx.genRowYValues))
+    ) {
+      ctx.genRowYValues.push(opened)
+      ctx.genRowYValues.sort((a, b) => a - b)
+      y = opened
+    } else y = nearestGenRowY(y, ctx)
+    // Take the nearest free spot on that row beside the relative (0, +d, -d,
+    // +2d …) so new siblings never stack on top of each other.
+    const gap = (store.graphSettings.nodeRadius || 22) * 3.4
+    const cx = anchorX ?? n.x
+    const taken = (x) =>
+      ctx.nodesData.some((m) => m !== n && Math.abs(m.y - y) < 1 && Math.abs(m.x - x) < gap * 0.9)
+    for (let i = 0; i < 60; i++) {
+      const x = cx + (i === 0 ? 0 : Math.ceil(i / 2) * gap * (i % 2 ? 1 : -1))
+      if (!taken(x)) {
+        n.x = x
+        break
+      }
+    }
+    if (want == null) looseNewcomers.add(id)
+    else looseNewcomers.delete(id)
+    n.y = y
+    n.fx = n.x
+    n.fy = y
+    placed.add(id)
+  }
+  ticked()
+  cleanupEmptyGenRows(ctx, snapshotGenMode, ticked)
+}
 
 // Esc peels back one layer at a time: wheel layers → trace → selected bond →
 // selected people. Overlays (modal/form) own Esc while they're up.
@@ -4614,7 +5218,10 @@ onMounted(() => {
   unregisterLayoutHistory = store.registerLayoutHistory(restoreLayoutState)
   initGraph()
   updateGraph()
+  // A saved tilt glides in as the graph opens.
+  if (tiltOn.value) animateTilt()
   window.addEventListener('keydown', onGlobalKeydown)
+  window.addEventListener('keydown', onTiltKey)
   window.addEventListener('keydown', onStretchKeyDown)
   window.addEventListener('keyup', onStretchKeyUp)
   window.addEventListener('keydown', onWheelKeyDown)
@@ -4625,6 +5232,8 @@ onMounted(() => {
 onUnmounted(() => {
   unregisterLayoutHistory?.()
   window.removeEventListener('keydown', onGlobalKeydown)
+  window.removeEventListener('keydown', onTiltKey)
+  cancelAnimationFrame(tiltRaf)
   window.removeEventListener('keydown', onStretchKeyDown)
   window.removeEventListener('keyup', onStretchKeyUp)
   window.removeEventListener('keydown', onWheelKeyDown)
@@ -4685,7 +5294,7 @@ watch(
   (id) => {
     curveHot = null
     if (id && curveEditLink()) {
-      showWheelFlash('spline', 'Drag the line or its handles · double-click to reset')
+      showWheelFlash('spline', tr('graph.flash.curveHint'))
     }
   }
 )
@@ -4723,6 +5332,9 @@ watch(
     refreshCurrentYearLine(true)
   }
 )
+// Canvas words (generation guides, the Now line, Spotlight rings) are
+// translated as the overlay draws them — repaint on a language switch.
+watch(locale, () => ctx.requestRedraw?.())
 watch([() => store.theme, () => store.accent], () => {
   if (!ctx.renderer) return
   ctx.renderer.setTheme(store.isLightTheme, store.theme) // marks node+link dirty + redraws; overlay recolours
@@ -6103,6 +6715,30 @@ watch(
   box-shadow: var(--shadow);
   pointer-events: none;
   white-space: nowrap;
+}
+.time-badge {
+  position: absolute;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(var(--accent-rgb), 0.5);
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--t1);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.time-badge-ic {
+  flex: none;
+  color: var(--accent);
 }
 .wheel-flash-ic {
   flex: none;

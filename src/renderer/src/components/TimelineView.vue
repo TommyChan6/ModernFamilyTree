@@ -3,20 +3,15 @@
     <!-- Toolbar -->
     <div class="tl-toolbar">
       <div class="tl-heading">
-        <span class="tl-title">Timeline</span>
+        <span class="tl-title">{{ tr('rail.timeline') }}</span>
         <span class="tl-count">{{ placedCount }}</span>
-        <span
-          v-if="undatedCount"
-          class="tl-undated"
-          :title="'People without a birth year cannot be placed on the timeline. Add a birth year in their profile to include them.'"
-          >{{ undatedCount }} undated</span
-        >
+        <span v-if="undatedCount" class="tl-undated" :title="tr('timeline.undatedHint')">{{
+          tr('timeline.undated', { n: undatedCount })
+        }}</span>
       </div>
 
       <div class="tl-actions">
-        <span class="tl-hint"
-          >Drag to pan · Scroll to zoom · Hold Z / X: one axis · 1–6: edit tools</span
-        >
+        <span class="tl-hint">{{ tr('timeline.hint') }}</span>
         <CanvasToggles
           show-focus
           show-chronicle
@@ -25,16 +20,19 @@
           :focus="focusOpen"
           :legend="legendOpen"
           :chronicle="chronicleOpen"
-          :style-pane="styleOpen"
+          :style-pane="store.settingsOpen"
           :kinship="kinOpen"
-          :modes="TIMELINE_TOOLS"
+          show-time-drag
+          :time-drag="store.timeDrag"
+          :modes="toolModes"
           :active-mode-id="tool"
           :mode-gear="false"
           @update:focus="focusOpen = $event"
           @update:legend="legendOpen = $event"
           @update:chronicle="chronicleOpen = $event"
-          @update:style-pane="styleOpen = $event"
+          @update:style-pane="toggleStyle"
           @update:kinship="kinOpen = $event"
+          @update:time-drag="store.timeDrag = $event"
           @pick-mode="pickTool"
         />
       </div>
@@ -50,6 +48,8 @@
           dragging: panning,
           hoverable: !!hoverId || !!hoverBadge,
           'tool-grab': retimeHover,
+          'lane-grab': !tool && !!hoverId,
+          'time-grab': !tool && !!hoverId && store.timeDrag,
           'tool-grabbing': handleDragging
         }
       ]"
@@ -69,13 +69,15 @@
       <div v-if="!placedCount" class="tl-empty">
         <UiIcon class="tl-empty-icon" name="calendar" :size="44" :stroke="1.6" />
         <div class="tl-empty-title">
-          {{ store.persons.length ? 'No datable people' : 'No people yet' }}
+          {{
+            store.persons.length ? tr('timeline.empty.noDatable') : tr('timeline.empty.noPeople')
+          }}
         </div>
         <div class="tl-empty-text">
           {{
             store.persons.length
-              ? 'Add birth years to your family members to see their lives unfold on the timeline.'
-              : 'Add family members from the graph view to see them here.'
+              ? tr('timeline.empty.noDatableText')
+              : tr('timeline.empty.noPeopleText')
           }}
         </div>
       </div>
@@ -101,7 +103,11 @@
         @click.stop
         @wheel.stop
       >
-        <SearchField v-model="searchQuery" class="tl-search-field" placeholder="Search people…" />
+        <SearchField
+          v-model="searchQuery"
+          class="tl-search-field"
+          :placeholder="tr('timeline.searchPh')"
+        />
       </div>
 
       <!-- Zoom controls (matches the tree view's control bar) -->
@@ -112,21 +118,36 @@
         @pointerdown.stop
         @click.stop
       >
-        <button class="tl-ctrl-btn" title="Zoom in" aria-label="Zoom in" @click="zoomBy(1.3333)">
+        <button
+          class="tl-ctrl-btn"
+          :title="tr('timeline.zoomIn')"
+          :aria-label="tr('timeline.zoomIn')"
+          @click="zoomBy(1.3333)"
+        >
           <UiIcon name="zoom-in" :size="16" />
         </button>
-        <button class="tl-ctrl-btn" title="Zoom out" aria-label="Zoom out" @click="zoomBy(0.75)">
+        <button
+          class="tl-ctrl-btn"
+          :title="tr('timeline.zoomOut')"
+          :aria-label="tr('timeline.zoomOut')"
+          @click="zoomBy(0.75)"
+        >
           <UiIcon name="zoom-out" :size="16" />
         </button>
         <div class="tl-ctrl-sep"></div>
-        <button class="tl-ctrl-btn" title="Fit all" aria-label="Fit all" @click="fitAll(true)">
+        <button
+          class="tl-ctrl-btn"
+          :title="tr('timeline.fitAll')"
+          :aria-label="tr('timeline.fitAll')"
+          @click="fitAll(true)"
+        >
           <UiIcon name="maximize" :size="16" />
         </button>
         <button
           class="tl-ctrl-btn tl-ctrl-refresh"
           :class="{ 'tl-ctrl-refreshing': refreshSpinning }"
-          title="Refresh layout — re-run the family tree algorithm"
-          aria-label="Refresh layout"
+          :title="tr('timeline.refresh')"
+          :aria-label="tr('timeline.refreshAria')"
           @click="refreshLayout"
         >
           <UiIcon class="tl-refresh-icon" name="refresh-cw" :size="16" />
@@ -136,7 +157,7 @@
         <span
           v-else
           class="tl-zoom-label"
-          :title="`Time axis ${zoomParts.v} · lanes ${zoomParts.h}`"
+          :title="tr('timeline.zoomAxes', { v: zoomParts.v, h: zoomParts.h })"
         >
           <UiIcon name="move-vertical" :size="12" />{{ zoomParts.v }}
           <UiIcon name="move-horizontal" :size="12" />{{ zoomParts.h }}
@@ -149,9 +170,7 @@
         class="canvas-pane-stack tl-pane-stack"
         :class="{ 'clean-hidden': store.cleanView }"
       >
-        <Transition name="pane">
-          <TimelineStylePane v-if="styleOpen" />
-        </Transition>
+        <Transition name="pane"> </Transition>
         <Transition name="pane">
           <KinshipPane
             v-if="kinOpen"
@@ -180,26 +199,26 @@
             @wheel.stop
             @click.stop
           >
-            <div class="tl-panel-title">Focus</div>
+            <div class="tl-panel-title">{{ tr('timeline.focus.title') }}</div>
             <div class="tl-focus-row">
-              <span class="tl-focus-label">Gender</span>
+              <span class="tl-focus-label">{{ tr('timeline.focus.gender') }}</span>
               <div class="tl-focus-chips">
                 <button
                   v-for="o in genderFocusOpts"
                   :key="o.id"
                   class="tl-focus-chip"
                   :class="{ on: focusGender === o.id, 'is-icon': !!o.icon }"
-                  :title="o.icon ? o.label : undefined"
-                  :aria-label="o.label"
+                  :title="o.icon ? tr(o.labelKey) : undefined"
+                  :aria-label="tr(o.labelKey)"
                   @click="focusGender = o.id"
                 >
                   <UiIcon v-if="o.icon" :name="o.icon" :size="14" />
-                  <template v-else>{{ o.label }}</template>
+                  <template v-else>{{ tr(o.labelKey) }}</template>
                 </button>
               </div>
             </div>
             <div class="tl-focus-row" :class="{ 'tl-focus-off': !store.currentDate }">
-              <span class="tl-focus-label">Life</span>
+              <span class="tl-focus-label">{{ tr('timeline.focus.life') }}</span>
               <div class="tl-focus-chips">
                 <button
                   v-for="o in lifeFocusOpts"
@@ -207,10 +226,10 @@
                   class="tl-focus-chip"
                   :class="{ on: focusLife === o.id }"
                   :disabled="o.id !== 'all' && !store.currentDate"
-                  :title="o.id !== 'all' && !store.currentDate ? 'Set the current year first' : ''"
+                  :title="o.id !== 'all' && !store.currentDate ? tr('timeline.focus.needYear') : ''"
                   @click="focusLife = o.id"
                 >
-                  {{ o.label }}
+                  {{ tr(o.labelKey) }}
                 </button>
               </div>
             </div>
@@ -219,39 +238,41 @@
 
         <Transition name="pane">
           <div v-if="legendOpen" class="canvas-pane tl-legend-panel" @pointerdown.stop @wheel.stop>
-            <div class="tl-panel-title">Legend</div>
+            <div class="tl-panel-title">{{ tr('timeline.legend.title') }}</div>
             <div class="tl-leg-section">
-              <div class="tl-leg-label">People</div>
+              <div class="tl-leg-label">{{ tr('timeline.legend.people') }}</div>
               <div class="tl-leg-row">
-                <span class="tl-leg-dot" :style="{ background: legendColors.male }"></span>Male
+                <span class="tl-leg-dot" :style="{ background: legendColors.male }"></span
+                >{{ tr('data.gender.male') }}
               </div>
               <div class="tl-leg-row">
-                <span class="tl-leg-dot" :style="{ background: legendColors.female }"></span>Female
+                <span class="tl-leg-dot" :style="{ background: legendColors.female }"></span
+                >{{ tr('data.gender.female') }}
               </div>
             </div>
             <div class="tl-leg-section">
-              <div class="tl-leg-label">Lines</div>
+              <div class="tl-leg-label">{{ tr('timeline.legend.lines') }}</div>
               <div class="tl-leg-row">
                 <span class="tl-leg-line" :style="{ background: legendColors.spouse }"></span
-                >Marriage
+                >{{ tr('timeline.legend.marriage') }}
               </div>
               <div class="tl-leg-row">
                 <span
                   class="tl-leg-line tl-leg-dashed"
                   :style="{ borderColor: legendColors.spouse }"
                 ></span
-                >Divorced
+                >{{ tr('timeline.legend.divorced') }}
               </div>
               <div class="tl-leg-row">
                 <span class="tl-leg-line" :style="{ background: legendColors.parentChild }"></span
-                >Birth
+                >{{ tr('timeline.legend.birth') }}
               </div>
               <div class="tl-leg-row">
                 <span
                   class="tl-leg-line tl-leg-dashed"
                   :style="{ borderColor: legendColors.parentChild }"
                 ></span
-                >Adopted
+                >{{ tr('timeline.legend.adopted') }}
               </div>
             </div>
           </div>
@@ -276,7 +297,7 @@
           </div>
           <div v-if="chronTip.text" class="tl-chtip-text">{{ chronTip.text }}</div>
           <div class="tl-chtip-hint">
-            {{ tool === 'retime' ? 'Drag to move' : 'Click to edit' }}
+            {{ tool === 'retime' ? tr('timeline.tip.dragToMove') : tr('timeline.tip.clickToEdit') }}
           </div>
         </div>
       </Transition>
@@ -300,20 +321,22 @@
               v-model.number="mEdit.year"
               type="number"
               class="tl-medit-input"
-              placeholder="Year"
+              :placeholder="tr('timeline.marriage.year')"
               min="1"
               max="2200"
               @keydown.enter="saveMarriageEdit"
               @keydown.escape="mEdit = null"
             />
             <select v-model="mEdit.status" class="tl-medit-select">
-              <option value="active">Married</option>
-              <option value="divorced">Divorced</option>
+              <option value="active">{{ tr('timeline.marriage.married') }}</option>
+              <option value="divorced">{{ tr('timeline.marriage.divorced') }}</option>
             </select>
           </div>
           <div class="tl-medit-actions">
-            <button class="tl-medit-btn" @click="mEdit = null">Cancel</button>
-            <button class="tl-medit-btn primary" @click="saveMarriageEdit">Save</button>
+            <button class="tl-medit-btn" @click="mEdit = null">{{ tr('dialog.cancel') }}</button>
+            <button class="tl-medit-btn primary" @click="saveMarriageEdit">
+              {{ tr('timeline.marriage.save') }}
+            </button>
           </div>
         </div>
       </Transition>
@@ -334,7 +357,7 @@
       <TraceCard
         :anchor-id="pathAnchor"
         :info="pathInfo"
-        armed-hint="ctrl-click another life to trace the connection"
+        :armed-hint="tr('timeline.traceArmed')"
         @close="clearPath"
         @pick="kinFocus"
       />
@@ -355,14 +378,14 @@
           </span>
           <div class="tl-hud-text">
             <div class="tl-hud-label">
-              {{ toolDef.label }} <kbd>{{ toolDef.key }}</kbd>
+              {{ tr(toolDef.labelKey) }} <kbd>{{ toolDef.key }}</kbd>
             </div>
             <div class="tl-hud-hint">{{ hudHint }}</div>
           </div>
           <button
             class="tl-hud-btn"
-            title="Exit the tool (Esc)"
-            aria-label="Exit the tool"
+            :title="tr('timeline.hud.exit')"
+            :aria-label="tr('timeline.hud.exitAria')"
             @click="setTool(null)"
           >
             <UiIcon name="x" :size="14" />
@@ -387,11 +410,11 @@
           ref="bubbleInputEl"
           v-model="nameBubble.value"
           class="tl-bubble-input"
-          :placeholder="`Name this ${store.noun.toLowerCase()}…`"
+          :placeholder="tr('timeline.bubble.namePh', { noun: nounLabel(store.noun).toLowerCase() })"
           @keydown.enter.prevent="commitBubble(true)"
         />
         <div v-if="nameBubble.coParents.length" class="tl-bubble-co">
-          <span class="tl-bubble-co-label">with</span>
+          <span class="tl-bubble-co-label">{{ tr('timeline.bubble.with') }}</span>
           <button
             v-for="c in nameBubble.coParents"
             :key="c.id"
@@ -404,9 +427,15 @@
           </button>
         </div>
         <div class="tl-bubble-actions">
-          <button class="btn btn-xs btn-ghost" @click="commitBubble(false)">Cancel</button>
-          <button class="btn btn-xs btn-primary" title="Create (Enter)" @click="commitBubble(true)">
-            Create
+          <button class="btn btn-xs btn-ghost" @click="commitBubble(false)">
+            {{ tr('dialog.cancel') }}
+          </button>
+          <button
+            class="btn btn-xs btn-primary"
+            :title="tr('timeline.bubble.createHint')"
+            @click="commitBubble(true)"
+          >
+            {{ tr('timeline.bubble.create') }}
           </button>
         </div>
       </div>
@@ -428,8 +457,8 @@
           }}</b>
           <button
             class="tl-lp-swap"
-            title="Swap direction (parent → child…)"
-            aria-label="Swap direction"
+            :title="tr('timeline.link.swap')"
+            :aria-label="tr('timeline.link.swapAria')"
             @click="swapLink"
           >
             <UiIcon name="arrow-right-left" :size="13" />
@@ -447,12 +476,16 @@
             :style="{ '--rc': relColor(d), '--i': i }"
             :title="
               d.directed
-                ? `${shortName(linkPick.a)} is ${d.role_a} of ${shortName(linkPick.b)}`
-                : d.label
+                ? tr('timeline.link.directed', {
+                    a: shortName(linkPick.a),
+                    role: relRoleLabel(d, 'a'),
+                    b: shortName(linkPick.b)
+                  })
+                : relTypeLabel(d)
             "
             @click="commitLink(d)"
           >
-            <UiIcon class="tl-lp-glyph" :name="d.glyph" :size="13" />{{ d.label }}
+            <UiIcon class="tl-lp-glyph" :name="d.glyph" :size="13" />{{ relTypeLabel(d) }}
           </button>
         </div>
       </div>
@@ -466,10 +499,10 @@
       v-if="store.caps.scenes"
       :scenes="store.timelineScenes"
       :active-id="store.activeSceneIds.timeline"
-      label="Scenes"
-      add-title="New scene"
-      duplicate-title="Duplicate current scene"
-      delete-title="Delete scene"
+      :label="tr('timeline.scenes.label')"
+      :add-title="tr('timeline.scenes.add')"
+      :duplicate-title="tr('timeline.scenes.duplicate')"
+      :delete-title="tr('timeline.scenes.delete')"
       @switch="(id) => store.setActiveScene('timeline', id)"
       @create="addTimelineScene"
       @duplicate="duplicateTimelineScene"
@@ -488,7 +521,9 @@ import {
   computeTimelineLayout,
   computeLaneOrder,
   GUTTER,
-  Y_PAD
+  Y_PAD,
+  X0,
+  LANE_W
 } from './timeline/timelineLayout.js'
 import { TimelineRenderer } from './timeline/TimelineRenderer.js'
 import ChroniclePane from './chronicle/ChroniclePane.vue'
@@ -506,17 +541,22 @@ import MiniMap from './MiniMap.vue'
 import CanvasToggles from './CanvasToggles.vue'
 import { confirmDialog, toast } from '../lib/dialogs.js'
 import { undoToast } from '../lib/undoToast.js'
-import { translate as tr } from '../i18n'
-import TimelineStylePane from './timeline/TimelineStylePane.vue'
+import { translate as tr, locale } from '../i18n'
+import { relTypeLabel, relRoleLabel, nounLabel, defaultNameLabel } from '../lib/dataLabels'
 import { TimelineFx } from './timeline/TimelineFx.js'
 import {
   TIMELINE_TOOLS,
   timelineTool,
   insertLane,
   retimeSlotValue,
+  shiftLivesUpdates,
   clampRetime,
   spanFromDrag,
-  traceSegments
+  traceSegments,
+  moveLanes,
+  laneSlotAt,
+  laneSlotOf,
+  sameOrder
 } from './timeline/timelineEdit.js'
 import GraphActionPane from './graph/GraphActionPane.vue'
 import KinshipPane from './kinship/KinshipPane.vue'
@@ -612,21 +652,24 @@ const searchSet = computed(() => {
 // ── Overlay panes (shared header toggle cluster) ────────────────────────────
 const focusOpen = ref(false)
 const legendOpen = ref(true)
-const styleOpen = ref(false) // Style pane (lifeline looks, canvas, atmosphere)
+// The toolbar's Style toggle opens the Style Studio on the timeline's own layer.
+function toggleStyle(open) {
+  store.toggleSettings(open, { layer: 'view' })
+}
 // Focus emphasis: dim the people who don't match. Applied through the same
 // dimming path the renderer already tweens (no renderer changes needed).
 const focusGender = ref('all') // 'all' | 'male' | 'female' | 'unknown'
 const focusLife = ref('all') // 'all' | 'living' | 'deceased'
 const genderFocusOpts = [
-  { id: 'all', label: 'All' },
-  { id: 'male', label: 'Male', icon: 'mars' },
-  { id: 'female', label: 'Female', icon: 'venus' },
-  { id: 'unknown', label: 'Unknown', icon: 'circle-help' }
+  { id: 'all', labelKey: 'timeline.focus.all' },
+  { id: 'male', labelKey: 'data.gender.male', icon: 'mars' },
+  { id: 'female', labelKey: 'data.gender.female', icon: 'venus' },
+  { id: 'unknown', labelKey: 'timeline.focus.unknown', icon: 'circle-help' }
 ]
 const lifeFocusOpts = [
-  { id: 'all', label: 'All' },
-  { id: 'living', label: 'Living' },
-  { id: 'deceased', label: 'Remembered' }
+  { id: 'all', labelKey: 'timeline.focus.all' },
+  { id: 'living', labelKey: 'timeline.focus.living' },
+  { id: 'deceased', labelKey: 'timeline.focus.remembered' }
 ]
 const focusActive = computed(() => focusGender.value !== 'all' || focusLife.value !== 'all')
 const personById = computed(() => {
@@ -715,6 +758,22 @@ const laneOrder = ref(null)
 // A life created from the canvas claims the lane it was placed in (instead of
 // appending on the far right): { before: Set<id>, opts } until it arrives.
 let pendingLane = null
+// Each timeline scene keeps its own lane arrangement (scene.config.laneOrder):
+// dragging lives around, a refresh, or a newcomer's chosen lane all persist,
+// and switching scenes switches arrangements.
+const activeTimelineScene = computed(
+  () => store.timelineScenes.find((sc) => sc.id === store.activeSceneIds.timeline) || null
+)
+const savedLaneOrder = computed(() => {
+  const o = activeTimelineScene.value?.config?.laneOrder
+  return Array.isArray(o) && o.length ? o : null
+})
+let lanesSaving = 0 // our own writes in flight — don't echo them back
+function freshLaneOrder() {
+  return savedLaneOrder.value
+    ? [...savedLaneOrder.value]
+    : computeLaneOrder(store.persons, store.relationships, store.relTypeRoles)
+}
 watch(
   () => store.activeProjectId,
   () => {
@@ -724,8 +783,7 @@ watch(
 watch(
   () => store.persons,
   () => {
-    if (store.persons.length && !laneOrder.value)
-      laneOrder.value = computeLaneOrder(store.persons, store.relationships, store.relTypeRoles)
+    if (store.persons.length && !laneOrder.value) laneOrder.value = freshLaneOrder()
     if (pendingLane && laneOrder.value) {
       const fresh = store.persons.filter((p) => !pendingLane.before.has(p.id))
       if (fresh.length === 1) {
@@ -736,16 +794,66 @@ watch(
           pendingLane.opts
         )
         pendingLane = null
+        persistLanes(laneOrder.value)
       }
     }
   },
   { immediate: true, deep: true }
 )
+watch([() => store.activeSceneIds.timeline, savedLaneOrder], ([sid, saved], [prevSid]) => {
+  if (lanesSaving || !store.persons.length) return
+  if (sid !== prevSid) laneOrder.value = freshLaneOrder()
+  else if (saved && !sameOrder(saved, laneOrder.value)) laneOrder.value = [...saved]
+})
+
+/** The full lane order as shown (dated lanes on screen, then undated ids). */
+function fullLaneOrder() {
+  const shown = layout.value.people.map((p) => p.id)
+  const set = new Set(shown)
+  return [...shown, ...(laneOrder.value || []).filter((id) => !set.has(id))]
+}
+async function persistLanes(order) {
+  const scene = activeTimelineScene.value
+  if (!scene || !order) return
+  lanesSaving++
+  try {
+    await store.saveScene({
+      id: scene.id,
+      config: JSON.parse(JSON.stringify({ ...(scene.config || {}), laneOrder: order }))
+    })
+  } finally {
+    lanesSaving--
+  }
+}
+/** Apply a new lane order as one undoable arrangement step. */
+function commitLanes(next, { prev = fullLaneOrder(), label = 'move' } = {}) {
+  if (sameOrder(prev, next)) return false
+  const scene = activeTimelineScene.value
+  if (scene) store.recordLayoutStep({ view: 'timeline', sceneId: scene.id, order: prev }, label)
+  laneOrder.value = next
+  persistLanes(next)
+  return true
+}
+/** Undo/redo of a lane step (the store calls this through the journal). */
+async function restoreLanes(state) {
+  if (!store.timelineScenes.some((sc) => sc.id === state.sceneId)) return null
+  store.activeView = 'timeline'
+  if (store.activeSceneIds.timeline !== state.sceneId) {
+    store.setActiveScene('timeline', state.sceneId)
+    await nextTick()
+  }
+  const inverse = { view: 'timeline', sceneId: state.sceneId, order: fullLaneOrder() }
+  laneOrder.value = [...state.order]
+  persistLanes(state.order)
+  return inverse
+}
 
 const refreshSpinning = ref(false)
 let refreshSpinTimer = 0
 function refreshLayout() {
-  laneOrder.value = computeLaneOrder(store.persons, store.relationships, store.relTypeRoles)
+  commitLanes(computeLaneOrder(store.persons, store.relationships, store.relTypeRoles), {
+    label: 'layout'
+  })
   refreshSpinning.value = true
   if (refreshSpinTimer) clearTimeout(refreshSpinTimer)
   refreshSpinTimer = setTimeout(() => {
@@ -789,6 +897,8 @@ watch(
   { immediate: true }
 )
 watch([chronModel, chronHover], () => renderer?.refreshChronicle())
+// Canvas text (names, years, badges, era headers) is translated at draw time.
+watch(locale, () => renderer?.refreshChronicle())
 
 function chronTipFor(hit, p) {
   if (!hit) return null
@@ -798,9 +908,9 @@ function chronTipFor(hit, p) {
     return {
       key: 'era:' + e.id,
       icon: hasIcon(e.icon) ? e.icon : 'diamond',
-      title: e.name,
+      title: defaultNameLabel(e.name),
       color: e.color,
-      when: `${fmtDate(e.start) || '…'} – ${fmtDate(e.end) || 'now'}`,
+      when: `${fmtDate(e.start) || '…'} – ${fmtDate(e.end) || tr('timeline.tip.now')}`,
       cast: '',
       text: e.description,
       x: Math.min(p.x + 14, stageW.value - 260),
@@ -815,14 +925,14 @@ function chronTipFor(hit, p) {
     ? fmtDate(ev.end)
       ? `${fmtDate(ev.date)} – ${fmtDate(ev.end)}`
       : fmtDate(ev.date)
-    : 'undated'
+    : tr('timeline.tip.undated')
   const era = erasAt(store.eras, toOrdinal(ev.date))[0]
   return {
     key: 'ev:' + ev.id,
     icon: hasIcon(m?.icon) ? m.icon : m?.kindIcon || 'sparkle',
-    title: ev.title,
+    title: defaultNameLabel(ev.title),
     color: m?.color || 'var(--accent)',
-    when: `${when}${ev.place ? ' · ' + ev.place : ''}${era ? ' · ' + era.name : ''}`,
+    when: `${when}${ev.place ? ' · ' + ev.place : ''}${era ? ' · ' + defaultNameLabel(era.name) : ''}`,
     cast:
       names.length > 4 ? `${names.slice(0, 3).join(', ')} +${names.length - 3}` : names.join(', '),
     text: ev.description,
@@ -887,18 +997,27 @@ function personVisual(p) {
   const selected = selectedSet.value.has(p.id)
   const onPath = pathIdSet.value.has(p.id)
   const anchored = linkAnchor.value?.id === p.id || pathAnchor.value === p.id
+  const lifted = !!liftedSet.value?.has(p.id)
   const notYet = p.birthYear > tt.gateYear.value || p.birthYear < tt.gateStartYear.value
   // Kinship lens: every relative rings in their kin colour.
   const k = kinLensMap.value ? kinLensMap.value.get(p.id) : null
   const ring = k && kinIncluded(k) ? kinColors.value[kinClass(k)] : null
-  const strong = hovered || lit || selected || onPath || anchored
+  const strong = hovered || lit || selected || onPath || anchored || lifted
   return {
     opacity: notYet ? 0 : isDimmed(p.id) ? 0.22 : 1,
     lineWidth: strong ? 9 : 6,
-    avatarScale: notYet ? 0.6 : hovered || anchored ? 1.15 : k?.kind === 'self' ? 1.12 : 1,
+    avatarScale: notYet
+      ? 0.6
+      : lifted
+        ? 1.3
+        : hovered || anchored
+          ? 1.15
+          : k?.kind === 'self'
+            ? 1.12
+            : 1,
     glow: hovered ? 0.5 : 0,
     selected,
-    halo: selected || onPath || anchored ? 1 : hovered ? 0.55 : 0,
+    halo: selected || onPath || anchored || lifted ? 1 : hovered ? 0.55 : 0,
     ring,
     color: genderColor(p.gender),
     imageUrl: p.image ? api.getImageUrl(p.image) || null : null
@@ -1026,6 +1145,13 @@ function clampPan() {
 // transition the DOM (and its listeners) outlives the component.
 function onPointerDown(e) {
   if (e.button !== 0 || !stageEl.value) return
+  if (!tool.value && renderer && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    const p = stagePoint(e)
+    if (p.x > GUTTER && !renderer.chronicleAt(p.x, p.y) && !renderer.badgeAt(p.x, p.y)) {
+      const person = livePersonAt(p)
+      if (person) return startLaneDrag(person, p, e)
+    }
+  }
   if (tool.value && renderer && !nameBubble.value && !linkPick.value) {
     const p = stagePoint(e)
     if (tool.value === 'retime') {
@@ -1301,7 +1427,7 @@ defineExpose({ exportImage })
 
 // ── Marriage year editing ───────────────────────────────────────────────────
 function trunc(s, n) {
-  s = s || 'Unnamed'
+  s = s || tr('timeline.canvas.unnamed')
   return s.length > n ? s.slice(0, n - 1) + '…' : s
 }
 
@@ -1346,7 +1472,7 @@ function livePersonAt(p) {
   return person
 }
 function shortName(id) {
-  return (personById.value.get(id)?.name || 'Unnamed').split(/\s+/)[0]
+  return (personById.value.get(id)?.name || tr('timeline.canvas.unnamed')).split(/\s+/)[0]
 }
 function cssVar(name, fallback = '#6c8ef5') {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -1565,6 +1691,10 @@ watch(
 // ── Edit tools (the "Edit" rail + keys 1–6) ─────────────────────────────────
 const tool = ref(null)
 const toolDef = computed(() => timelineTool(tool.value))
+// The Edit rail's catalog with labels / hints in the UI language.
+const toolModes = computed(() =>
+  TIMELINE_TOOLS.map((m) => ({ ...m, label: tr(m.labelKey), hint: tr(m.hintKey) }))
+)
 const nameBubble = ref(null) // { mode, x, y, year, title, value, color, … }
 const bubbleInputEl = ref(null)
 const linkAnchor = ref(null) // { id, year } — link tool's first life
@@ -1591,10 +1721,10 @@ function setTool(id) {
 const hudHint = computed(() => {
   const t = toolDef.value
   if (!t) return ''
-  if (t.id === 'link' && linkPick.value) return 'Pick what binds them — swap flips the direction'
+  if (t.id === 'link' && linkPick.value) return tr('timeline.hud.linkPick')
   if (t.id === 'link' && linkAnchor.value)
-    return `Now click the life ${shortName(linkAnchor.value.id)} is bound to — at the year it began`
-  return t.hint
+    return tr('timeline.hud.linkNext', { name: shortName(linkAnchor.value.id) })
+  return tr(t.hintKey)
 })
 const yearY = (y) => (renderer ? renderer.sy(y) : 0)
 
@@ -1618,7 +1748,7 @@ function toolGhost(p) {
         kind: 'yearline',
         y: yearY(year),
         icon: 'user-plus',
-        label: `born ${year}`,
+        label: tr('timeline.ghost.born', { year }),
         color: c,
         x0: GUTTER
       })
@@ -1632,7 +1762,7 @@ function toolGhost(p) {
           kind: 'yearline',
           y: yearY(y),
           icon: 'baby',
-          label: `born ${y}`,
+          label: tr('timeline.ghost.born', { year: y }),
           color: c,
           x0: GUTTER
         })
@@ -1712,7 +1842,7 @@ function onToolClick(p) {
         year,
         worldX: (p.x - tx.value) / laneScale.value,
         icon: 'user-plus',
-        title: `A new life · born ${year}`,
+        title: tr('timeline.bubble.newLife', { year }),
         color: t.color,
         coParents: []
       })
@@ -1732,7 +1862,7 @@ function onToolClick(p) {
         y: yearY(y),
         year: y,
         icon: 'baby',
-        title: `${shortName(person.id)}'s child · born ${y}`,
+        title: tr('timeline.bubble.childOf', { name: shortName(person.id), year: y }),
         color: t.color,
         coParents,
         coParentId: coParents.find((c) => c.likely)?.id || null
@@ -1795,7 +1925,7 @@ function partnersOf(id, year) {
       r.status !== 'divorced' && (from == null || from <= year) && (ended == null || ended >= year)
     out.push({
       id: other,
-      name: (p.name || 'Unnamed').split(/\s+/)[0],
+      name: (p.name || tr('timeline.canvas.unnamed')).split(/\s+/)[0],
       color: genderColor(p.gender),
       likely
     })
@@ -1858,11 +1988,11 @@ async function commitLink(d) {
   if (d.symmetryRole === 'horizontal') data.formed = yearDate(L.year)
   const res = await store.createRelationship(data)
   if (!res?.success) {
-    toast(res?.error || 'Could not link them', { tone: 'warning' })
+    toast(res?.error || tr('timeline.link.failed'), { tone: 'warning' })
     return
   }
   fx?.spark({ id: L.a, year: L.ay }, { id: L.b, year: L.year }, relColor(d))
-  undoToast(`${shortName(L.a)} & ${shortName(L.b)} — ${d.label}`, 'relationships:create')
+  undoToast(`${shortName(L.a)} & ${shortName(L.b)} — ${relTypeLabel(d)}`, 'relationships:create')
 }
 
 // ── Delete: lives, marriages, events ────────────────────────────────────────
@@ -1895,7 +2025,7 @@ function deleteTarget(p) {
 }
 async function deleteLife(id) {
   const rec = personById.value.get(id)
-  const name = rec?.name || 'Unnamed'
+  const name = rec?.name || tr('timeline.canvas.unnamed')
   const ok = await confirmDialog({
     title: tr('confirm.deletePerson', { name }),
     message: tr('confirm.deletePersonBody') + ' ' + tr('dialog.undoHint'),
@@ -1911,8 +2041,8 @@ async function deleteLife(id) {
 }
 async function deleteMarriage(m, rect) {
   const ok = await confirmDialog({
-    title: `Remove the marriage of ${m.names}?`,
-    message: 'Both lives stay — only the bond goes. ' + tr('dialog.undoHint'),
+    title: tr('timeline.confirm.deleteMarriage', { names: m.names }),
+    message: tr('timeline.confirm.deleteMarriageBody') + ' ' + tr('dialog.undoHint'),
     tone: 'danger'
   })
   if (!ok) return
@@ -1920,13 +2050,13 @@ async function deleteMarriage(m, rect) {
   if (!res?.success) return
   fx?.setGhost(null)
   fx?.ripple(rect.x + rect.w / 2, rect.y + rect.h / 2, cssVar('--danger', '#ef5350'))
-  undoToast('Marriage removed', 'relationships:delete')
+  undoToast(tr('timeline.toasts.marriageRemoved'), 'relationships:delete')
 }
 async function deleteEventItem(id, rect) {
   const ev = store.events.find((e) => e.id === id)
   if (!ev) return
   const ok = await confirmDialog({
-    title: `Delete “${ev.title}”?`,
+    title: tr('timeline.confirm.deleteEvent', { name: defaultNameLabel(ev.title) }),
     message: tr('dialog.undoHint'),
     tone: 'danger'
   })
@@ -1935,7 +2065,7 @@ async function deleteEventItem(id, rect) {
   if (!res?.success) return
   fx?.setGhost(null)
   fx?.ripple(rect.x + 10, rect.y + rect.h / 2, cssVar('--danger', '#ef5350'))
-  undoToast(`Deleted “${ev.title}”`, 'events:delete')
+  undoToast(tr('chronicle.deleted', { name: defaultNameLabel(ev.title) }), 'events:delete')
 }
 
 // ── Retime: drag births, deaths, whole lives, marriages and events ──────────
@@ -1950,7 +2080,7 @@ function retimeTarget(p) {
       y: badge.y + badge.h / 2,
       year: m.year,
       icon: 'heart-handshake',
-      label: m.realYear ? String(m.realYear) : 'drag to date it'
+      label: m.realYear ? String(m.realYear) : tr('timeline.ghost.dragToDate')
     }
   }
   const ch = renderer.chronicleAt(p.x, p.y)
@@ -1980,7 +2110,7 @@ function retimeTarget(p) {
       x: s.x,
       y: s.y0,
       year: person.birthYear,
-      label: `born ${Math.floor(person.birthYear)}`
+      label: tr('timeline.ghost.born', { year: Math.floor(person.birthYear) })
     }
   if (Math.abs(p.y - s.y1) <= 12)
     return {
@@ -1989,7 +2119,9 @@ function retimeTarget(p) {
       x: s.x,
       y: s.y1,
       year: person.endYear,
-      label: person.dead ? `died ${Math.floor(person.endYear)}` : 'drag up to end this life'
+      label: person.dead
+        ? tr('timeline.ghost.died', { year: Math.floor(person.endYear) })
+        : tr('timeline.ghost.dragToEnd')
     }
   return {
     kind: 'life',
@@ -1998,7 +2130,7 @@ function retimeTarget(p) {
     y: p.y,
     year: yearAtY(p.y),
     icon: 'move-vertical',
-    label: 'shift the whole life'
+    label: tr('timeline.ghost.shiftLife')
   }
 }
 
@@ -2012,14 +2144,29 @@ function startDrag(kind, p, data, e) {
   window.addEventListener('pointermove', onDragMove)
   window.addEventListener('pointerup', onDragUp)
   if (kind === 'span') spanGhost()
-  else retimeGhost()
+  else if (kind === 'retime') retimeGhost()
 }
 function onDragMove(e) {
   if (!drag || !stageEl.value) return
   const p = stagePoint(e)
   drag.last = p
-  if (!drag.moved && Math.hypot(p.x - drag.start.x, p.y - drag.start.y) > 4) drag.moved = true
+  if (!drag.moved && Math.hypot(p.x - drag.start.x, p.y - drag.start.y) > 4) {
+    drag.moved = true
+    // Time drag: a mostly-vertical pull on a life shifts it (and the selection
+    // it belongs to) in time; a sideways one still moves its lane.
+    if (
+      drag.kind === 'lane' &&
+      store.timeDrag &&
+      Math.abs(p.y - drag.start.y) > Math.abs(p.x - drag.start.x)
+    ) {
+      drag.kind = 'shift'
+      handleDragging.value = true
+      hoverId.value = null
+    }
+  }
   if (drag.kind === 'span') spanGhost()
+  else if (drag.kind === 'lane') laneDragMove()
+  else if (drag.kind === 'shift') shiftGhost()
   else retimeGhost()
 }
 function onDragUp() {
@@ -2028,19 +2175,214 @@ function onDragUp() {
   const d = drag
   drag = null
   handleDragging.value = false
-  // The click that follows this pointerup belongs to the drag.
-  suppressClick = true
-  setTimeout(() => (suppressClick = false), 0)
+  stopAutoPan()
+  // The click that follows this pointerup belongs to the drag (a lane grab
+  // that never moved is a plain click — it still selects).
+  if (d && (d.kind !== 'lane' || d.moved)) {
+    suppressClick = true
+    setTimeout(() => (suppressClick = false), 0)
+  }
   if (!d) return
   if (d.kind === 'span') finishSpan(d)
+  else if (d.kind === 'lane') finishLaneDrag(d)
+  else if (d.kind === 'shift') finishShift(d)
   else finishRetime(d)
 }
 function cancelDrag() {
   window.removeEventListener('pointermove', onDragMove)
   window.removeEventListener('pointerup', onDragUp)
+  const d = drag
   drag = null
   handleDragging.value = false
+  stopAutoPan()
   fx?.setGhost(null)
+  if (d?.kind === 'lane') {
+    laneOrder.value = d.orig // Esc: everyone glides back
+    renderer?.setLaneOverride(null)
+    liftedSet.value = null
+  }
+}
+
+// ── Lane drag: pick a life up and carry it to another lane ──────────────────
+// The life (or the whole selection, if it's part of one) follows the cursor in
+// a light column; the other lanes slide apart live to open its landing slot;
+// dropping commits one undoable arrangement step, saved with the scene.
+const liftedSet = ref(null) // ids being carried (Set) | null
+let autoPanRaf = 0
+function startLaneDrag(person, p, e) {
+  const display = layout.value.people.map((x) => x.id)
+  const sel = selectedSet.value
+  const group =
+    sel.has(person.id) && sel.size > 1 ? display.filter((id) => sel.has(id)) : [person.id]
+  const s = renderer.personScreen(person.id)
+  startDrag(
+    'lane',
+    p,
+    {
+      id: person.id,
+      group,
+      display,
+      orig: fullLaneOrder(),
+      grab: s ? p.x - s.x : 0,
+      idx: group.indexOf(person.id),
+      slot: laneSlotOf(display, group)
+    },
+    e
+  )
+}
+function laneDragMove() {
+  const d = drag
+  if (!d || !d.moved || !renderer) return
+  if (!liftedSet.value) {
+    liftedSet.value = new Set(d.group)
+    handleDragging.value = true
+    hoverId.value = null
+  }
+  // World x of the grabbed lane under the cursor.
+  const wx = (d.last.x - d.grab - tx.value) / laneScale.value
+  renderer.setLaneOverride(new Map(d.group.map((id, j) => [id, wx + (j - d.idx) * LANE_W])))
+  const others = d.display.length - d.group.length
+  const slot = laneSlotAt(wx, others, d.idx)
+  if (slot !== d.slot) {
+    d.slot = slot
+    laneOrder.value = moveLanes(d.orig, d.display, d.group, slot)
+  }
+  laneGhost(d, wx, slot)
+  // Near an edge: keep scrolling the lanes under the carried life.
+  const edge = d.last.x < GUTTER + 50 ? -1 : d.last.x > stageW.value - 50 ? 1 : 0
+  if (edge && !autoPanRaf) autoPanRaf = requestAnimationFrame(autoPanTick)
+}
+function autoPanTick() {
+  autoPanRaf = 0
+  const d = drag
+  if (!d || d.kind !== 'lane' || !d.moved) return
+  const edge = d.last.x < GUTTER + 50 ? -1 : d.last.x > stageW.value - 50 ? 1 : 0
+  if (!edge) return
+  tx.value -= edge * 9
+  clampPan()
+  syncCamera()
+  laneDragMove()
+  autoPanRaf = requestAnimationFrame(autoPanTick)
+}
+function stopAutoPan() {
+  if (autoPanRaf) cancelAnimationFrame(autoPanRaf)
+  autoPanRaf = 0
+}
+function laneGhost(d, wx, slot) {
+  if (!fx) return
+  const c = cssVar('--accent')
+  const others = d.display.filter((id) => !d.group.includes(id))
+  const left = others[slot - 1],
+    right = others[slot]
+  const where =
+    left && right
+      ? tr('timeline.ghost.between', { a: shortName(left), b: shortName(right) })
+      : left
+        ? tr('timeline.ghost.after', { name: shortName(left) })
+        : right
+          ? tr('timeline.ghost.before', { name: shortName(right) })
+          : tr('timeline.ghost.firstLane')
+  const n = d.group.length
+  const label = `↔ ${n > 1 ? tr('timeline.ghost.lives', { n, where }) : where}`
+  const sx = wx * laneScale.value + tx.value
+  const top = renderer.personScreen(d.id)?.y0 ?? d.last.y
+  // The landing slot: midway between the lanes the block will sit between.
+  const slotX = (X0 + (slot - 0.5) * LANE_W) * laneScale.value + tx.value
+  const g = [{ kind: 'column', x: sx, y: Math.max(40, top - 26), color: c, label }]
+  if (left || right) g.push({ kind: 'slot', x: slotX, y0: 30, y1: stageH.value - 30, color: c })
+  fx.setGhost(g)
+}
+function finishLaneDrag(d) {
+  fx?.setGhost(null)
+  liftedSet.value = null
+  if (!renderer) return
+  // Let go: the carried lanes glide from the drop point into their slot.
+  renderer.setLaneOverride(null)
+  if (!d.moved) return
+  const next = laneOrder.value
+  if (commitLanes(next, { prev: d.orig })) {
+    const s = renderer.personScreen(d.id)
+    if (s) fx?.ripple(d.last.x - d.grab, s.y0, cssVar('--accent'))
+  }
+}
+/** Shift+←/→: nudge the selected lives one lane over. */
+function nudgeLanes(dir) {
+  const display = layout.value.people.map((x) => x.id)
+  const group = display.filter((id) => selectedSet.value.has(id))
+  if (!group.length) return false
+  const others = display.length - group.length
+  const slot = laneSlotOf(display, group)
+  const next = Math.max(0, Math.min(others, slot + dir))
+  if (next === slot) return true
+  commitLanes(moveLanes(fullLaneOrder(), display, group, next))
+  return true
+}
+
+// ── Time drag: pull lives up/down to retime them ────────────────────────────
+// With the header's Time drag toggle on, a vertical drag on a life (or the
+// selection it's part of) shifts birth + death by whole years; dropping writes
+// every life as ONE batch, so a single Ctrl+Z puts them all back.
+const shiftDelta = (d) => Math.round((d.last.y - d.start.y) / pxPerYear.value)
+const signed = (n) => (n > 0 ? `+${n}` : String(n))
+function shiftGhost() {
+  const d = drag
+  if (!d || !fx || !renderer) return
+  const c = cssVar('--accent')
+  const delta = shiftDelta(d)
+  const dy = delta * pxPerYear.value
+  const g = []
+  for (const id of d.group) {
+    const s = renderer.personScreen(id)
+    if (s) g.push({ kind: 'life', x: s.x, y0: s.y0 + dy, y1: s.y1 + dy, color: c })
+  }
+  const s = renderer.personScreen(d.id)
+  if (!s) return fx.setGhost(g)
+  let label
+  if (d.group.length > 1) {
+    label = tr('graph.timeDrag.badgeMany', { n: d.group.length, delta: signed(delta) })
+  } else {
+    const b = personById.value.get(d.id)
+    const end = b?.death?.year != null ? b.death.year + delta : tr('timeline.tip.now')
+    label = `${(b?.birth?.year ?? Math.floor(s.p?.birthYear ?? 0)) + delta}–${end} (${signed(delta)})`
+  }
+  g.push({ kind: 'yearline', y: s.y0 + dy, label, color: c, x0: GUTTER })
+  g.push({ kind: 'handle', x: s.x, y: s.y0 + dy, color: c, active: true })
+  fx.setGhost(g)
+}
+async function finishShift(d) {
+  fx?.setGhost(null)
+  const delta = shiftDelta(d)
+  if (!delta) return
+  const placed = new Map(layout.value.people.map((x) => [x.id, x]))
+  const valueOf = (id, fid) => store.fieldValuesOf.get(id)?.get(fid)?.value
+  const { updates, unsupported } = shiftLivesUpdates(
+    store.fieldDefs,
+    valueOf,
+    d.group,
+    delta,
+    (id) => {
+      const y = placed.get(id)?.birthYear
+      return Number.isFinite(y) ? Math.floor(y) : null
+    }
+  )
+  if (unsupported) toast(tr('timeline.toasts.calendarUnsupported'), { tone: 'warning' })
+  if (!updates.length) return
+  const res = await store.setFieldValuesBatch(updates)
+  if (!res?.success) return
+  fx?.ripple(d.last.x, d.last.y, cssVar('--accent'))
+  const n = Math.abs(delta)
+  const later = delta > 0
+  const msg =
+    d.group.length > 1
+      ? tr(later ? 'graph.timeDrag.movedManyLater' : 'graph.timeDrag.movedManyEarlier', {
+          count: d.group.length,
+          n
+        })
+      : tr(later ? 'timeline.toasts.movedLater' : 'timeline.toasts.movedEarlier', {
+          name: shortName(d.id),
+          n
+        })
+  undoToast(msg, 'fields:setValuesBatch')
 }
 
 /** Years the drag has moved (rounded) and the retimed values it implies. */
@@ -2096,16 +2438,18 @@ function retimeGhost() {
     if (h.kind === 'birth') {
       y0 = yearY(r.year)
       hy = y0
-      text = `born ${r.year}`
+      text = tr('timeline.ghost.born', { year: r.year })
     } else if (h.kind === 'death') {
       y1 = r.living ? yearY(refYear.value) : yearY(r.year)
       hy = y1
-      text = r.living ? 'still living' : `died ${r.year}`
+      text = r.living
+        ? tr('timeline.ghost.stillLiving')
+        : tr('timeline.ghost.died', { year: r.year })
     } else {
       y0 += dy
       y1 += dy
       const b = personById.value.get(h.person.id)
-      text = `${(b?.birth?.year ?? 0) + r.delta}–${b?.death?.year != null ? b.death.year + r.delta : 'now'} (${sign(r.delta)})`
+      text = `${(b?.birth?.year ?? 0) + r.delta}–${b?.death?.year != null ? b.death.year + r.delta : tr('timeline.tip.now')} (${sign(r.delta)})`
     }
     g.push({ kind: 'life', x: s.x, y0, y1, color: c })
     g.push({ kind: 'yearline', y: hy, label: text, color: c, x0: GUTTER })
@@ -2164,21 +2508,24 @@ async function finishRetime(d) {
     const name = shortName(h.person.id)
     msg =
       h.kind === 'birth'
-        ? `${name} is now born in ${r.year}`
+        ? tr('timeline.toasts.bornIn', { name, year: r.year })
         : h.kind === 'death'
-          ? `${name} now dies in ${r.year}`
-          : `${name}'s life moved ${r.delta > 0 ? 'later' : 'earlier'} by ${Math.abs(r.delta)} yr`
+          ? tr('timeline.toasts.diesIn', { name, year: r.year })
+          : tr(r.delta > 0 ? 'timeline.toasts.movedLater' : 'timeline.toasts.movedEarlier', {
+              name,
+              n: Math.abs(r.delta)
+            })
   } else if (h.kind === 'marriage') {
     const rel = store.relationships.find((x) => x.id === h.m.id)
     const formed = rel?.formed ? { ...rel.formed, year: r.year } : yearDate(r.year)
     res = await store.updateRelationship({ id: h.m.id, formed })
     channel = 'relationships:update'
-    msg = `Married in ${r.year}`
+    msg = tr('timeline.toasts.marriedIn', { year: r.year })
   } else if (h.kind === 'event') {
     const shift = (v) => (v ? { ...v, year: v.year + r.delta } : null)
     res = await store.saveEvent({ id: h.ev.id, date: shift(h.ev.date), end: shift(h.ev.end) })
     channel = 'events:save'
-    msg = `“${h.ev.title}” moved to ${r.year}`
+    msg = tr('timeline.toasts.eventMoved', { name: defaultNameLabel(h.ev.title), year: r.year })
   }
   if (!res?.success) return
   fx?.ripple(d.last.x, d.last.y, c)
@@ -2194,7 +2541,7 @@ async function retimePerson(id, changes) {
     const cur = store.fieldValuesOf.get(id)?.get(def.id)?.value ?? null
     const value = retimeSlotValue(def, cur, year)
     if (value === undefined) {
-      toast('That date uses a calendar the timeline can’t move yet', { tone: 'warning' })
+      toast(tr('timeline.toasts.calendarUnsupported'), { tone: 'warning' })
       return null
     }
     values.push({ field_id: def.id, value })
@@ -2276,6 +2623,19 @@ function onToolKeydown(e) {
     }
     return
   }
+  if (
+    e.shiftKey &&
+    !tool.value &&
+    (e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !e.altKey &&
+    !isTypingTarget(e.target) &&
+    !isTypingTarget(document.activeElement)
+  ) {
+    if (nudgeLanes(e.key === 'ArrowLeft' ? -1 : 1)) e.preventDefault()
+    return
+  }
   if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return
   if (isTypingTarget(e.target) || isTypingTarget(document.activeElement)) return
   const t = TIMELINE_TOOLS.find((x) => x.key === e.key)
@@ -2295,6 +2655,7 @@ function syncFxTheme() {
 // ── Lifecycle ───────────────────────────────────────────────────────────────
 let ro = null
 let hasFitted = false
+let unregisterLaneHistory = null
 onMounted(() => {
   const measure = () => {
     stageW.value = stageEl.value?.clientWidth || 0
@@ -2353,6 +2714,7 @@ onMounted(() => {
   window.addEventListener('keyup', onStretchKeyUp)
   window.addEventListener('blur', clearStretchKeys)
   window.addEventListener('keydown', onToolKeydown, true)
+  unregisterLaneHistory = store.registerLayoutHistory(restoreLanes, 'timeline')
 
   watch(
     () => props.active,
@@ -2401,7 +2763,8 @@ watch(
     focusGender,
     focusLife,
     linkAnchor,
-    pathAnchor
+    pathAnchor,
+    liftedSet
   ],
   () => renderer?.markStylesDirty()
 )
@@ -2436,6 +2799,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('keyup', onStretchKeyUp)
   window.removeEventListener('blur', clearStretchKeys)
   window.removeEventListener('keydown', onToolKeydown, true)
+  unregisterLaneHistory?.()
+  stopAutoPan()
   window.removeEventListener('pointermove', onDragMove)
   window.removeEventListener('pointerup', onDragUp)
   fx?.dispose()
@@ -2575,6 +2940,13 @@ onBeforeUnmount(() => {
 }
 .tl-stage.tool-delete.hoverable {
   cursor: pointer;
+}
+.tl-stage.lane-grab:not(.dragging) {
+  cursor: grab;
+}
+/* Time drag on: a life goes sideways (lane) or up/down (retime) */
+.tl-stage.time-grab:not(.dragging) {
+  cursor: move;
 }
 .tl-stage.tool-retime.tool-grab {
   cursor: ns-resize;

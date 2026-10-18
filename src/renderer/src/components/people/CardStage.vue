@@ -14,8 +14,8 @@
     <!-- Empty roster -->
     <div v-if="!persons.length" class="stage-empty">
       <div class="stage-empty-icon"><UiIcon name="layers" :size="44" :stroke="1.5" /></div>
-      <div class="stage-empty-title">Nothing to deal</div>
-      <div class="stage-empty-text">No people match — clear the search or add someone.</div>
+      <div class="stage-empty-title">{{ t('directory.stage.emptyTitle') }}</div>
+      <div class="stage-empty-text">{{ t('directory.stage.emptyText') }}</div>
     </div>
 
     <!-- The 3D scene. Re-keyed per mode so switching re-deals the cards. -->
@@ -60,15 +60,15 @@
     <div v-if="persons.length" class="stage-hud" @pointerdown.stop>
       <Transition name="stage-cap" mode="out-in">
         <div :key="focused?.id" class="stage-caption">
-          <span class="stage-cap-name">{{ focused?.name || 'Unnamed' }}</span>
+          <span class="stage-cap-name">{{ focused?.name || t('directory.common.unnamed') }}</span>
           <span class="stage-cap-sub">{{ capSub }}</span>
         </div>
       </Transition>
       <div class="stage-scrub">
         <button
           class="stage-arrow"
-          title="Previous (Left arrow)"
-          aria-label="Previous"
+          :title="t('directory.stage.prevHint')"
+          :aria-label="t('directory.stage.prev')"
           @click="step(-1)"
         >
           <UiIcon name="chevron-left" :size="16" />
@@ -81,7 +81,12 @@
           :value="focusedIndex"
           @input="goTo(+$event.target.value)"
         />
-        <button class="stage-arrow" title="Next (Right arrow)" aria-label="Next" @click="step(1)">
+        <button
+          class="stage-arrow"
+          :title="t('directory.stage.nextHint')"
+          :aria-label="t('directory.stage.next')"
+          @click="step(1)"
+        >
           <UiIcon name="chevron-right" :size="16" />
         </button>
         <span class="stage-count">{{ focusedIndex + 1 }} / {{ persons.length }}</span>
@@ -93,6 +98,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useMainStore } from '../../store/index.js'
+import { useI18n } from '../../i18n'
 import PersonCard from './PersonCard.vue'
 import { CARD_W, CARD_H } from './peopleLayout.js'
 import UiIcon from '../ui/UiIcon.js'
@@ -118,6 +124,7 @@ const props = defineProps({
 })
 
 const store = useMainStore()
+const { t } = useI18n()
 const stageEl = ref(null)
 
 const reduceMotion =
@@ -347,7 +354,14 @@ const capSub = computed(() => {
   if (!p) return ''
   const b = p.birth?.year
   const dd = p.death?.year
-  const life = b && dd ? `${b} – ${dd}` : b ? `b. ${b}` : dd ? `d. ${dd}` : ''
+  const life =
+    b && dd
+      ? `${b} – ${dd}`
+      : b
+        ? t('directory.common.born', { year: b })
+        : dd
+          ? t('directory.common.died', { year: dd })
+          : ''
   return [life, p.occupation].filter(Boolean).join(' · ')
 })
 </script>

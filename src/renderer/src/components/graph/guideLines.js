@@ -342,6 +342,11 @@ function landGenRows(ctx) {
 }
 
 export function cleanupEmptyGenRows(ctx, snapshotFn, tickedFn) {
+  // A row glide still in flight has people between rows: land it first, or
+  // rows that merely look empty mid-glide get deleted (two quick edits in a
+  // row — e.g. the person form creating someone, then linking them — would
+  // collapse the tree onto one row).
+  landGenRows(ctx)
   const tolerance = 15
   ctx.genRowYValues = ctx.genRowYValues.filter((rowY) =>
     ctx.nodesData.some((n) => Math.abs(n.y - rowY) < tolerance)

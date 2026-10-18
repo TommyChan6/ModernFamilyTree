@@ -12,37 +12,40 @@
           type="color"
           class="chip-color"
           :value="tag.color"
-          title="Tag color"
+          :title="t('tagChips.color')"
           @input="store.updateTag({ id: tag.id, color: $event.target.value })"
         />
         <UiIcon v-if="tag.icon" class="chip-icon" :name="tag.icon" :size="13" />
-        <span class="chip-label">{{ tag.label }}</span>
-        <span v-if="tag.type" class="chip-type" :title="`Tag type: ${tag.type}`">{{
-          tag.type
-        }}</span>
+        <span class="chip-label">{{ defaultNameLabel(tag.label) }}</span>
+        <span
+          v-if="tag.type"
+          class="chip-type"
+          :title="t('tagChips.typeTitle', { type: tag.type })"
+          >{{ tag.type }}</span
+        >
         <button
           type="button"
           class="chip-remove"
-          title="Remove tag"
-          aria-label="Remove tag"
+          :title="t('tagChips.remove')"
+          :aria-label="t('tagChips.remove')"
           @click="removeTag(tag.id)"
         >
           <UiIcon name="x" :size="12" :stroke="2.4" />
         </button>
       </span>
     </div>
-    <div v-else class="tag-empty">No tags yet.</div>
+    <div v-else class="tag-empty">{{ t('tagChips.empty') }}</div>
 
     <!-- Assign an existing tag -->
     <div class="tag-add-row">
       <select v-model="selectedTagId" class="tag-select">
-        <option value="">Add existing tag…</option>
+        <option value="">{{ t('tagChips.addExisting') }}</option>
         <option v-for="tag in availableTags" :key="tag.id" :value="tag.id">
-          {{ tag.label }}
+          {{ defaultNameLabel(tag.label) }}
         </option>
       </select>
       <button class="btn btn-ghost btn-sm" :disabled="!selectedTagId" @click="assignSelected">
-        Assign
+        {{ t('tagChips.assign') }}
       </button>
     </div>
 
@@ -51,24 +54,24 @@
       <input
         v-model="newLabel"
         class="tag-new-input"
-        placeholder="New tag label…"
+        :placeholder="t('tagChips.newLabelPh')"
         @keydown.enter="createAndAssign"
       />
       <input
         v-model="newType"
         class="tag-new-input tag-type-input"
-        placeholder="Type (optional)"
+        :placeholder="t('tagChips.typePh')"
         list="tag-type-suggestions"
-        title="Tags with the same type can be compared in the Groups view (e.g. 'family')"
+        :title="t('tagChips.typeHint')"
         @keydown.enter="createAndAssign"
       />
       <datalist id="tag-type-suggestions">
-        <option v-for="t in knownTypes" :key="t" :value="t" />
+        <option v-for="ty in knownTypes" :key="ty" :value="ty" />
       </datalist>
-      <input v-model="newColor" type="color" class="tag-new-color" title="Tag color" />
+      <input v-model="newColor" type="color" class="tag-new-color" :title="t('tagChips.color')" />
       <button class="btn btn-ghost btn-sm" :disabled="!newLabel.trim()" @click="createAndAssign">
         <UiIcon name="plus" :size="14" />
-        Add
+        {{ t('tagChips.add') }}
       </button>
     </div>
   </div>
@@ -78,12 +81,15 @@
 import { ref, computed } from 'vue'
 import { useMainStore } from '../store/index.js'
 import UiIcon from './ui/UiIcon.js'
+import { useI18n } from '../i18n'
+import { defaultNameLabel } from '../lib/dataLabels'
 
 const props = defineProps({
   entityId: { type: String, required: true }
 })
 
 const store = useMainStore()
+const { t } = useI18n()
 const selectedTagId = ref('')
 const newLabel = ref('')
 const newType = ref('')
@@ -91,10 +97,10 @@ const newColor = ref('#6c8ef5')
 
 const assignedTags = computed(() => store.tagsOf.get(props.entityId) || [])
 /** Types already used in this project, for the datalist suggestions. */
-const knownTypes = computed(() => [...new Set(store.tags.map((t) => t.type).filter(Boolean))])
+const knownTypes = computed(() => [...new Set(store.tags.map((tg) => tg.type).filter(Boolean))])
 const availableTags = computed(() => {
-  const assigned = new Set(assignedTags.value.map((t) => t.id))
-  return store.tags.filter((t) => !assigned.has(t.id) && t.source !== 'derived')
+  const assigned = new Set(assignedTags.value.map((tg) => tg.id))
+  return store.tags.filter((tg) => !assigned.has(tg.id) && tg.source !== 'derived')
 })
 
 async function assignSelected() {

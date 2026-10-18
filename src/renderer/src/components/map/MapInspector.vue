@@ -13,6 +13,10 @@
             :placeholder="t('map.inspector.namePh')"
             @input="patch({ name: $event.target.value }, 'name')"
           />
+          <div v-if="measureText" class="mi-measure">
+            <UiIcon name="ruler" :size="12" />
+            {{ measureText }}
+          </div>
         </div>
         <button
           class="mi-x"
@@ -341,7 +345,9 @@ const props = defineProps({
   token: { type: Object, default: null },
   year: { type: Number, required: true },
   tags: { type: Array, default: () => [] },
-  following: { type: Boolean, default: false }
+  following: { type: Boolean, default: false },
+  /** The selection's length / area in the map style's unit (ready-translated). */
+  measureText: { type: String, default: '' }
 })
 const emit = defineEmits([
   'patch',
@@ -423,9 +429,13 @@ function isHere(i) {
 function onStopYear(i, raw) {
   const v = parseInt(raw)
   if (!Number.isFinite(v)) return
+  // one stop per year: moving a stop onto another's year replaces that one
   const keys = props.token.keys.map((k) => ({ ...k }))
   keys[i].t = v
-  emit('token-keys', keys)
+  emit(
+    'token-keys',
+    keys.filter((k, j) => j === i || k.t !== v)
+  )
 }
 function onStopNote(i, note) {
   const keys = props.token.keys.map((k) => ({ ...k }))
@@ -454,6 +464,15 @@ defineExpose({ focusName })
 </script>
 
 <style scoped>
+.mi-measure {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  font-size: var(--fs-xs);
+  color: var(--t3);
+  font-variant-numeric: tabular-nums;
+}
 .mi {
   position: absolute;
   right: 14px;

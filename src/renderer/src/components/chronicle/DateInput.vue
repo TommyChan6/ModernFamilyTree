@@ -6,7 +6,7 @@
       class="di-year"
       type="number"
       :value="year"
-      :placeholder="placeholder"
+      :placeholder="placeholder || t('chronicle.date.year')"
       step="1"
       @input="setYear($event.target.value)"
     />
@@ -16,8 +16,8 @@
       :disabled="!hasYear"
       @change="setMonth($event.target.value)"
     >
-      <option value="">month</option>
-      <option v-for="(m, i) in MONTHS" :key="m" :value="i + 1">{{ m }}</option>
+      <option value="">{{ t('chronicle.date.month') }}</option>
+      <option v-for="(m, i) in months" :key="i" :value="i + 1">{{ m }}</option>
     </select>
     <input
       v-if="month"
@@ -26,7 +26,7 @@
       min="1"
       max="31"
       :value="day || ''"
-      placeholder="day"
+      :placeholder="t('chronicle.date.day')"
       @input="setDay($event.target.value)"
     />
   </div>
@@ -34,14 +34,20 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from '../../i18n'
 
 const props = defineProps({
   modelValue: { type: Object, default: null },
-  placeholder: { type: String, default: 'Year' }
+  // Blank → the localized 'Year'.
+  placeholder: { type: String, default: '' }
 })
 const emit = defineEmits(['update:modelValue'])
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const { t } = useI18n()
+const months = computed(() => {
+  const list = t('chronicle.date.months')
+  return Array.isArray(list) ? list : []
+})
 const year = computed(() => props.modelValue?.year ?? '')
 const month = computed(() => props.modelValue?.month ?? null)
 const day = computed(() => props.modelValue?.day ?? null)

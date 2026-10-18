@@ -3,6 +3,8 @@
 // shape, decor ornament, link route system, palette and atmosphere so one
 // click restyles the whole canvas; every knob stays individually adjustable
 // afterwards (which flips the preset chip to "custom").
+// `name` / `tagline` are the English fallback: the Style panel renders the
+// i18n keys graphStyle.themes.<id>.name / .tagline instead.
 
 export const GRAPH_THEMES = [
   {
@@ -635,6 +637,34 @@ export const GRAPH_THEMES = [
       parentChildColor: '#b07cff',
       spouseColor: '#ff9ad5',
       adoptedColor: '#6fe0d0'
+    }
+  },
+  {
+    // Headstones standing on their own birth-year ground (the Birth layout's
+    // year axis is the earth they're planted in), moss-green lineage paths,
+    // old-brass marriages and a low mist drifting between the rows.
+    id: 'graveyard',
+    name: 'Graveyard',
+    tagline: 'Headstones on their birth-year ground — best in the Birth layout',
+    icon: 'flower-2',
+    swatch: ['#8d939f', '#667f3a', '#b39a62'],
+    settings: {
+      nodeShape: 'gravestone',
+      nodeDecor: 'none',
+      decorColor: '#b39a62',
+      linkRoute: 'organic',
+      lineFx: 'none',
+      lineCurvature: 0.05,
+      ambientFx: 'mist',
+      ambientColorA: '#c9d1dc',
+      ambientColorB: '#9fb0a0',
+      ambientDensity: 0.45,
+      maleColor: '#6f85a3',
+      femaleColor: '#a3788f',
+      unknownColor: '#7d8190',
+      parentChildColor: '#7f9468',
+      spouseColor: '#b39a62',
+      adoptedColor: '#6f9a8f'
     }
   }
 ]

@@ -17,6 +17,7 @@ import type { MapStyle } from './mapStyles'
 import { KIND_Z, LIVE_KINDS, MAP_KIND_GEOMETRY, PLACE_RANK } from './mapKinds'
 import { drawCompass, drawEventGlyph, drawPlaceGlyph, drawTerrainMark } from './mapGlyphs'
 import { rgba, sealCanvas } from '../../lib/inkArt'
+import { defaultNameLabel } from '../../lib/dataLabels'
 import {
   type Placement,
   PAINT_SPACING,
@@ -104,7 +105,26 @@ export interface RenderState {
   bursts: Burst[]
   /** Hide chrome (selection, handles) — used for PNG export. */
   exporting?: boolean
+  /** Feature kinds switched off in the Layers menu (+ a stable key for caching). */
+  hiddenKinds?: Set<string> | null
+  hiddenKey?: string
+  /** Changes whenever any tag colour does (realms linked to a Group recolour). */
+  tagColorsKey?: string
+  /** Where the pointer is magnetically snapped to while drawing / dragging. */
+  snap?: { x: number; y: number; type: 'point' | 'vertex' } | null
+  /** The ruler: a world polyline plus ready-translated distance labels. */
+  measure?: {
+    pts: number[]
+    labels: { x: number; y: number; text: string; total?: boolean }[]
+  } | null
+  /** The selected shape's handle under the pointer (drawn highlighted). */
+  hoverHandle?: { type: 'vertex' | 'mid'; i: number } | null
 }
+
+/** Midpoint (insert) handles only show on segments at least this long on
+ *  screen, and only while the shape draws every vertex handle. */
+export const HANDLE_MIN_SEG_PX = 26
+export const MAX_VERTEX_HANDLES = 80
 
 /** One painting sprite queued for the back-to-front terrain pass (world units). */
 interface PaintedSprite {
@@ -370,6 +390,9 @@ export class MapRenderer {
 
   // ── frame ───────────────────────────────────────────────────────────────────
   render(s: RenderState) {
+    // reduced motion: every time-driven effect (marching dashes, pulses,
+    // flowing arrows, bursts) holds still on its first frame
+    if (s.reducedMotion && !s.exporting && s.time) s = { ...s, time: 0 }
     const painted = !!(s.style.painting || s.style.calligraphy)
     if (painted && !this.assetsHooked) {
       this.assetsHooked = true
@@ -399,7 +422,8 @@ export class MapRenderer {
       s.showLabels ? 1 : 0,
       this.w,
       this.h,
-      s.tagColors.size,
+      s.tagColorsKey ?? s.tagColors.size,
+      s.hiddenKey || '',
       inkMapAssetsReady() ? 1 : 0
     ].join('|')
     if (key !== this.staticKey) {
@@ -412,6 +436,19 @@ export class MapRenderer {
     ctx.drawImage(this.stat, 0, 0)
     this.renderLive(s)
     if (this.reveal) this.drawReveal(s)
+  }
+
+  /** The doc's features minus the kinds hidden in the Layers menu. */
+  private shown(s: RenderState): MapFeature[] {
+    const hidden = s.hiddenKinds
+    return hidden && hidden.size
+      ? s.doc.features.filter((f) => !hidden.has(f.kind))
+      : s.doc.features
+  }
+
+  /** True while a style switch is still blooming in (the view keeps drawing). */
+  get revealing(): boolean {
+    return !!this.reveal
   }
 
   /** Force the static layer to re-render next frame (e.g. an avatar loaded). */
@@ -481,8 +518,8 @@ export class MapRenderer {
     // 水纹 — the sea as classical wave lines (land paints over it)
     if (style.seaWaves && doc.base === 'sea') this.seaWaves(ctx, style, k, 0, 0, W, H)
 
-    // time-filtered features, painter's order
-    const feats = doc.features
+    // time-filtered features, painter's order (minus hidden layers)
+    const feats = this.shown(s)
       .map((f) => ({ f, a: windowAlpha(f, s.year) }))
       .filter((e) => e.a > 0.01)
       .sort((a, b) => (KIND_Z[a.f.kind] ?? 0) - (KIND_Z[b.f.kind] ?? 0))
@@ -1192,7 +1229,7 @@ export class MapRenderer {
         ctx.roundRect(x - r * 0.84, y - r * 0.84, r * 1.68, r * 1.68, r * 0.12)
         ctx.stroke()
         // a seal carves characters — a Latin-named map gets 天下 ("all under heaven")
-        const cjk = [...(doc.name || '')].filter((c) => CJK.test(c))
+        const cjk = [...defaultNameLabel(doc.name)].filter((c) => CJK.test(c))
         const chars = (cjk.length ? cjk : ['天', '下']).slice(0, 4)
         ctx.fillStyle = 'rgba(255,244,236,0.95)'
         ctx.textAlign = 'center'
@@ -1287,7 +1324,7 @@ export class MapRenderer {
       const [sx, sy] = toScreen(cam, S * 0.07, S * 0.075)
       const px = clamp(S * 0.034 * k, 0, 80)
       if (px >= 9) {
-        this.text(ctx, doc.name, sx, sy, px, style, {
+        this.text(ctx, defaultNameLabel(doc.name), sx, sy, px, style, {
           title: true,
           align: 'left',
           spacing: style.upper ? 0.3 : 0.08,
@@ -1340,7 +1377,7 @@ export class MapRenderer {
     ctx.restore()
 
     // ── live features: zones, arrows, events ──────────────────────────────────
-    const live = doc.features.filter((f) => LIVE_KINDS.has(f.kind))
+    const live = this.shown(s).filter((f) => LIVE_KINDS.has(f.kind))
     for (const f of live) {
       const a = windowAlpha(f, s.year)
       if (a < 0.01 || !boxesOverlap(this.boxOf(f), vb, 120)) continue
@@ -1438,6 +1475,8 @@ export class MapRenderer {
         : null
       if (sel) this.outline(ctx, sel, s, true)
       if (s.preview) this.drawPreview(ctx, s)
+      if (s.measure) this.drawMeasure(ctx, s)
+      if (s.snap) this.drawSnap(ctx, s)
     }
 
     // high-tech scanlines over everything
@@ -1891,17 +1930,129 @@ export class MapRenderer {
       // vertex handles (only the raw control points — smoothing is derived)
       this.screenTransform(ctx)
       const pts = f.pts
-      const stride = pts.length / 2 > 80 ? Math.ceil(pts.length / 2 / 80) : 1
-      ctx.fillStyle = '#ffffff'
-      ctx.strokeStyle = style.accent
+      const n = pts.length / 2
+      const stride = n > MAX_VERTEX_HANDLES ? Math.ceil(n / MAX_VERTEX_HANDLES) : 1
+      const hh = s.hoverHandle
+      // midpoint handles: drag one to bend the edge with a new vertex
+      if (stride === 1) {
+        const segs = geo === 'area' ? n : n - 1
+        ctx.lineWidth = 1.5
+        for (let i = 0; i < segs; i++) {
+          const a = i * 2
+          const b = (a + 2) % pts.length
+          const [ax, ay] = toScreen(cam, pts[a], pts[a + 1])
+          const [bx, by] = toScreen(cam, pts[b], pts[b + 1])
+          if (Math.hypot(bx - ax, by - ay) < HANDLE_MIN_SEG_PX) continue
+          const mx = (ax + bx) / 2
+          const my = (ay + by) / 2
+          const hot = hh?.type === 'mid' && hh.i === i
+          ctx.globalAlpha = hot ? 1 : 0.75
+          ctx.fillStyle = hot ? style.accent : '#ffffff'
+          ctx.strokeStyle = style.accent
+          ctx.beginPath()
+          ctx.arc(mx, my, hot ? 6 : 3.5, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.stroke()
+          if (hot) {
+            // a small plus: "a new point goes here"
+            ctx.strokeStyle = '#ffffff'
+            ctx.beginPath()
+            ctx.moveTo(mx - 2.8, my)
+            ctx.lineTo(mx + 2.8, my)
+            ctx.moveTo(mx, my - 2.8)
+            ctx.lineTo(mx, my + 2.8)
+            ctx.stroke()
+          }
+        }
+        ctx.globalAlpha = 1
+      }
       ctx.lineWidth = 1.5
       for (let i = 0; i < pts.length; i += 2 * stride) {
         const [x, y] = toScreen(cam, pts[i], pts[i + 1])
+        const hot = hh?.type === 'vertex' && hh.i === i / 2
+        const r = hot ? 5 : 3.5
+        ctx.fillStyle = hot ? style.accent : '#ffffff'
+        ctx.strokeStyle = hot ? '#ffffff' : style.accent
         ctx.beginPath()
-        ctx.rect(x - 3.5, y - 3.5, 7, 7)
+        ctx.rect(x - r, y - r, r * 2, r * 2)
         ctx.fill()
         ctx.stroke()
       }
+    }
+    ctx.restore()
+  }
+
+  /** The magnet: a ring where the pointer is snapped to. */
+  private drawSnap(ctx: Ctx, s: RenderState) {
+    const sn = s.snap
+    if (!sn) return
+    const [x, y] = toScreen(s.cam, sn.x, sn.y)
+    ctx.save()
+    this.screenTransform(ctx)
+    ctx.beginPath()
+    ctx.arc(x, y, sn.type === 'point' ? 13 : 8, 0, Math.PI * 2)
+    ctx.strokeStyle = s.style.halo
+    ctx.lineWidth = 4.5
+    ctx.stroke()
+    ctx.strokeStyle = s.style.accent
+    ctx.lineWidth = 2
+    ctx.stroke()
+    ctx.fillStyle = s.style.accent
+    ctx.beginPath()
+    ctx.arc(x, y, 2.4, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+
+  /** The ruler: a dashed path with stop dots and distance pills. */
+  private drawMeasure(ctx: Ctx, s: RenderState) {
+    const m = s.measure
+    if (!m || m.pts.length < 2) return
+    const { cam, style } = s
+    ctx.save()
+    this.screenTransform(ctx)
+    ctx.lineJoin = 'round'
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    for (let i = 0; i < m.pts.length; i += 2) {
+      const [x, y] = toScreen(cam, m.pts[i], m.pts[i + 1])
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    }
+    ctx.strokeStyle = style.halo
+    ctx.lineWidth = 5
+    ctx.stroke()
+    ctx.strokeStyle = style.ink
+    ctx.lineWidth = 2
+    ctx.setLineDash([8, 5])
+    ctx.stroke()
+    ctx.setLineDash([])
+    for (let i = 0; i < m.pts.length; i += 2) {
+      const [x, y] = toScreen(cam, m.pts[i], m.pts[i + 1])
+      ctx.fillStyle = i === 0 ? style.accent : style.halo
+      ctx.strokeStyle = style.ink
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.arc(x, y, 4, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+    }
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    for (const l of m.labels) {
+      const [x, y] = toScreen(cam, l.x, l.y)
+      const px = l.total ? 12.5 : 11
+      ctx.font = `${l.total ? 700 : 600} ${px}px ${style.fontLabel}`
+      const tw = ctx.measureText(l.text).width
+      const ly = y - (l.total ? 20 : 13)
+      ctx.globalAlpha = 0.94
+      ctx.fillStyle = l.total ? style.accent : style.token.plate
+      ctx.beginPath()
+      ctx.roundRect(x - tw / 2 - 7, ly - px * 0.8, tw + 14, px * 1.6, px * 0.8)
+      ctx.fill()
+      ctx.globalAlpha = 1
+      ctx.fillStyle = l.total ? '#ffffff' : style.token.text
+      ctx.fillText(l.text, x, ly + 0.5)
     }
     ctx.restore()
   }
@@ -2223,7 +2374,7 @@ export class MapRenderer {
       ctx.drawImage(cs, S * 0.04, H - S * 0.04 - d, d, d)
       ctx.globalAlpha = 1
     }
-    const name = doc.name || ''
+    const name = defaultNameLabel(doc.name)
     if (!s.showLabels || !name) return
     const px = S * 0.034
     ctx.textAlign = 'center'

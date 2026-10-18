@@ -2,17 +2,21 @@
   <div class="rtp-backdrop ink-veil" @click.self="$emit('close')">
     <div class="rtp ink-mount ink-unroll">
       <div class="rtp-head">
-        <div class="rtp-title">Relationship types</div>
-        <button class="icon-btn sm rtp-x" title="Close" aria-label="Close" @click="$emit('close')">
+        <div class="rtp-title">{{ t('relTypesPanel.title') }}</div>
+        <button
+          class="icon-btn sm rtp-x"
+          :title="t('relTypesPanel.close')"
+          :aria-label="t('relTypesPanel.close')"
+          @click="$emit('close')"
+        >
           <UiIcon name="x" :size="16" />
         </button>
       </div>
       <div class="rtp-hint">
-        Every relationship points at a type. Tune a type's look here
+        {{ t('relTypesPanel.hint') }}
         <template v-if="store.caps.tuneAffinity">
-          — and its <b>structural ↔ affinity</b> weight: structural types pull hard on the layout
-          (family skeleton), affinity types are decorative overlays, negative weights push people
-          apart (rivals).
+          {{ t('relTypesPanel.hintAffinityPre') }} <b>{{ t('relTypesPanel.hintAffinityBold') }}</b>
+          {{ t('relTypesPanel.hintAffinityPost') }}
         </template>
       </div>
 
@@ -25,36 +29,36 @@
             </span>
             <input
               class="rtp-label"
-              :value="def.label"
+              :value="relTypeLabel(def)"
               @change="patch(def, { label: $event.target.value })"
             />
-            <span v-if="def.directed" class="rtp-badge" :title="`${def.role_a} → ${def.role_b}`">
-              {{ def.role_a }} → {{ def.role_b }}
+            <span v-if="def.directed" class="rtp-badge" :title="roleBadge(def)">
+              {{ roleBadge(def) }}
             </span>
-            <span v-else class="rtp-badge rtp-badge-sym">symmetric</span>
+            <span v-else class="rtp-badge rtp-badge-sym">{{ t('relTypesPanel.symmetric') }}</span>
             <input
               class="rtp-color"
               type="color"
               :value="swatchOf(def)"
-              :title="def.color ? 'Type color' : 'Colored by the Style panel'"
+              :title="def.color ? t('relTypesPanel.typeColor') : t('relTypesPanel.styleColor')"
               @change="patch(def, { color: $event.target.value })"
             />
             <button
               v-if="!def.builtin"
               class="icon-btn sm rtp-del"
-              title="Delete this type (removes its relationships)"
-              aria-label="Delete type"
+              :title="t('relTypesPanel.deleteType')"
+              :aria-label="t('relTypesPanel.deleteTypeAria')"
               @click="removeDef(def)"
             >
               <UiIcon name="trash-2" :size="14" />
             </button>
-            <span v-else class="rtp-builtin" title="Built-in — tunable, not deletable">
-              <UiIcon name="lock" :size="14" label="Built-in" />
+            <span v-else class="rtp-builtin" :title="t('relTypesPanel.builtinHint')">
+              <UiIcon name="lock" :size="14" :label="t('relTypesPanel.builtin')" />
             </span>
           </div>
           <div class="rtp-row-gen">
-            <span class="rtp-w-label" title="How the generations layout treats this type's edges">
-              Generations
+            <span class="rtp-w-label" :title="t('relTypesPanel.generationsHint')">
+              {{ t('relTypesPanel.generations') }}
             </span>
             <div class="rtp-seg">
               <button
@@ -62,16 +66,16 @@
                 :key="opt.role"
                 class="rtp-seg-btn"
                 :class="{ 'is-on': def.symmetryRole === opt.role }"
-                :title="opt.hint"
+                :title="t('relTypesPanel.roles.' + opt.role + '.hint')"
                 @click="patch(def, { symmetryRole: opt.role })"
               >
                 <UiIcon :name="opt.icon" :size="14" />
-                {{ opt.label }}
+                {{ t('relTypesPanel.roles.' + opt.role + '.label') }}
               </button>
             </div>
           </div>
           <div v-if="store.caps.tuneAffinity" class="rtp-row-weight">
-            <span class="rtp-w-label">Repel</span>
+            <span class="rtp-w-label">{{ t('relTypesPanel.repel') }}</span>
             <input
               class="rtp-slider"
               type="range"
@@ -81,7 +85,7 @@
               :value="def.weight"
               @input="patchWeight(def, $event.target.value)"
             />
-            <span class="rtp-w-label">Structural</span>
+            <span class="rtp-w-label">{{ t('relTypesPanel.structural') }}</span>
             <span class="rtp-w-val">{{ def.weight.toFixed(2) }}</span>
           </div>
         </div>
@@ -89,33 +93,50 @@
 
       <!-- New custom type -->
       <div v-if="store.caps.customRelTypes" class="rtp-new">
-        <div class="rtp-new-title">New custom type</div>
+        <div class="rtp-new-title">{{ t('relTypesPanel.newTitle') }}</div>
         <div class="rtp-new-grid">
-          <input v-model="draft.label" class="rtp-input" placeholder="Label (e.g. Sworn enemies)" />
+          <input
+            v-model="draft.label"
+            class="rtp-input"
+            :placeholder="t('relTypesPanel.labelPh')"
+          />
           <button
             type="button"
             class="rtp-icon-btn"
             :class="{ open: iconPickerOpen }"
-            :title="iconPickerOpen ? 'Hide icons' : 'Choose an icon'"
-            aria-label="Choose an icon"
+            :title="iconPickerOpen ? t('relTypesPanel.hideIcons') : t('relTypesPanel.chooseIcon')"
+            :aria-label="t('relTypesPanel.chooseIcon')"
             :aria-expanded="iconPickerOpen"
             @click="toggleIconPicker"
           >
             <UiIcon :name="draft.glyph || 'diamond'" :size="16" :style="{ color: draft.color }" />
             <UiIcon name="chevron-down" :size="14" class="rtp-icon-caret" />
           </button>
-          <input v-model="draft.color" type="color" class="rtp-color" title="Type color" />
+          <input
+            v-model="draft.color"
+            type="color"
+            class="rtp-color"
+            :title="t('relTypesPanel.typeColor')"
+          />
           <label class="rtp-check">
             <input v-model="draft.directed" type="checkbox" />
-            Directed
+            {{ t('relTypesPanel.directed') }}
           </label>
           <template v-if="draft.directed">
-            <input v-model="draft.role_a" class="rtp-input" placeholder="Role A (e.g. Master)" />
-            <input v-model="draft.role_b" class="rtp-input" placeholder="Role B (e.g. Servant)" />
+            <input
+              v-model="draft.role_a"
+              class="rtp-input"
+              :placeholder="t('relTypesPanel.roleAPh')"
+            />
+            <input
+              v-model="draft.role_b"
+              class="rtp-input"
+              :placeholder="t('relTypesPanel.roleBPh')"
+            />
           </template>
           <button class="btn btn-primary btn-sm" :disabled="!draft.label.trim()" @click="create">
             <UiIcon name="plus" :size="14" />
-            Add type
+            {{ t('relTypesPanel.addType') }}
           </button>
         </div>
         <IconPicker
@@ -123,11 +144,11 @@
           v-model="draft.glyph"
           class="rtp-icon-picker"
           :options="REL_ICON_OPTIONS"
-          aria-label="Type icon"
+          :aria-label="t('relTypesPanel.typeIcon')"
         />
         <div class="rtp-row-gen rtp-new-gen">
-          <span class="rtp-w-label" title="How the generations layout treats this type's edges">
-            Generations
+          <span class="rtp-w-label" :title="t('relTypesPanel.generationsHint')">
+            {{ t('relTypesPanel.generations') }}
           </span>
           <div class="rtp-seg">
             <button
@@ -135,16 +156,16 @@
               :key="opt.role"
               class="rtp-seg-btn"
               :class="{ 'is-on': draft.symmetryRole === opt.role }"
-              :title="opt.hint"
+              :title="t('relTypesPanel.roles.' + opt.role + '.hint')"
               @click="draft.symmetryRole = opt.role"
             >
               <UiIcon :name="opt.icon" :size="14" />
-              {{ opt.label }}
+              {{ t('relTypesPanel.roles.' + opt.role + '.label') }}
             </button>
           </div>
         </div>
         <div v-if="store.caps.tuneAffinity" class="rtp-row-weight rtp-new-weight">
-          <span class="rtp-w-label">Repel</span>
+          <span class="rtp-w-label">{{ t('relTypesPanel.repel') }}</span>
           <input
             v-model.number="draft.weight"
             class="rtp-slider"
@@ -153,7 +174,7 @@
             max="1"
             step="0.05"
           />
-          <span class="rtp-w-label">Structural</span>
+          <span class="rtp-w-label">{{ t('relTypesPanel.structural') }}</span>
           <span class="rtp-w-val">{{ draft.weight.toFixed(2) }}</span>
         </div>
       </div>
@@ -166,12 +187,19 @@ import { reactive, ref } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { inkRelColor, inkRelGlyph } from './ui/inkChrome'
 import { confirmDialog } from '../lib/dialogs.js'
-import { translate as tr } from '../i18n'
+import { translate as tr, useI18n } from '../i18n'
+import { relTypeLabel, relRoleLabel } from '../lib/dataLabels'
 import UiIcon from './ui/UiIcon.js'
 import IconPicker from './ui/IconPicker.vue'
 
 defineEmits(['close'])
 const store = useMainStore()
+const { t } = useI18n()
+
+/** 'Parent → Child' — the built-in roles translated until renamed. */
+function roleBadge(def) {
+  return `${relRoleLabel(def, 'a')} → ${relRoleLabel(def, 'b')}`
+}
 
 // Ink theme: each type is stamped with its brushed character (the same one the
 // Relationships view shows) — calligraphy, drawn as text; otherwise its own
@@ -223,25 +251,11 @@ function glyphColor(def) {
 
 // The generational role a type plays in the generations layout. Maps 1:1 to
 // RelationshipTypeDef.symmetryRole — the field the pure tree math reads.
+// Labels/hints: relTypesPanel.roles.<role>.*
 const GEN_ROLES = [
-  {
-    role: 'vertical',
-    icon: 'arrow-down',
-    label: 'Generational',
-    hint: 'Parent → child — the child sits one generation below.'
-  },
-  {
-    role: 'horizontal',
-    icon: 'arrow-left-right',
-    label: 'Same generation',
-    hint: 'A couple — both partners share a row, side by side.'
-  },
-  {
-    role: 'none',
-    icon: 'minus',
-    label: 'Non-generational',
-    hint: 'Ignored by the generations layout (still drawn and pulls in force layouts).'
-  }
+  { role: 'vertical', icon: 'arrow-down' },
+  { role: 'horizontal', icon: 'arrow-left-right' },
+  { role: 'none', icon: 'minus' }
 ]
 
 // The legacy trio has color '' (the Style panel drives it) — show the Style
@@ -271,7 +285,7 @@ function patchWeight(def, val) {
 async function removeDef(def) {
   const inUse = store.relationships.filter((r) => r.type === def.key).length
   const ok = await confirmDialog({
-    title: tr('confirm.deleteRelType', { name: def.label }),
+    title: tr('confirm.deleteRelType', { name: relTypeLabel(def) }),
     message:
       (inUse ? tr('confirm.deleteRelTypeBody', { count: inUse }) + ' ' : '') +
       tr('dialog.undoHint'),

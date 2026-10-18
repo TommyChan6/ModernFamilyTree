@@ -14,6 +14,7 @@ import {
 } from './kinshipGraph'
 import { kinName, type KinLang } from './kinshipNames'
 import { kinLang, setKinLang } from './kinshipLang'
+import { translate } from '../../i18n'
 
 /** Visual classes the lens colours by. */
 export type KinClass = 'self' | 'blood' | 'spouse' | 'marriage' | 'step' | 'social' | 'distant'
@@ -136,7 +137,8 @@ export function useKinship(): KinshipCtx {
 
     const byId = computed(() => new Map(store.persons.map((p: { id: string }) => [p.id, p])))
     const personName = (id: string | null | undefined) =>
-      (id && (byId.value.get(id) as { name?: string } | undefined)?.name) || 'Unnamed'
+      (id && (byId.value.get(id) as { name?: string } | undefined)?.name) ||
+      (translate('kinship.unnamed') as string)
 
     const hexMix = (a: string, b: string, t: number) => {
       const pa = parseInt(a.slice(1), 16)

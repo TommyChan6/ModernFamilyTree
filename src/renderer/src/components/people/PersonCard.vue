@@ -25,10 +25,11 @@
       <div class="pcard-banner">
         <span class="pcard-type">
           <UiIcon :name="genderIcon(person.gender)" :size="12" :stroke="2.4" />
-          {{ genderLabel(person.gender) }}
+          {{ genderText(person.gender) }}
         </span>
         <span v-if="age !== null" class="pcard-hp">
-          {{ age }}<small>{{ deceased ? 'yr†' : 'yr' }}</small>
+          {{ age
+          }}<small>{{ deceased ? t('directory.card.yrDeceased') : t('directory.card.yr') }}</small>
         </span>
       </div>
 
@@ -55,7 +56,7 @@
 
       <div class="pcard-body">
         <div class="pcard-name" :class="{ 'pcard-unnamed': !person.name }" :title="person.name">
-          {{ person.name || 'Unnamed' }}
+          {{ person.name || t('directory.card.unnamed') }}
         </div>
         <div class="pcard-underline"></div>
         <div class="pcard-life">
@@ -63,7 +64,7 @@
             {{ person.birth?.year || '?'
             }}<span v-if="person.death?.year"> – {{ person.death.year }}</span>
           </template>
-          <span v-else class="pcard-dim">Dates unknown</span>
+          <span v-else class="pcard-dim">{{ t('directory.card.datesUnknown') }}</span>
         </div>
 
         <div class="pcard-tags">
@@ -81,17 +82,17 @@
       <div class="pcard-stats">
         <div class="pcard-stat">
           <span class="pcard-stat-val">{{ kin }}</span>
-          <span class="pcard-stat-key">Relations</span>
+          <span class="pcard-stat-key">{{ t('directory.card.relations') }}</span>
         </div>
         <div class="pcard-stat">
           <span class="pcard-stat-val">{{ children }}</span>
-          <span class="pcard-stat-key">Children</span>
+          <span class="pcard-stat-key">{{ t('directory.card.children') }}</span>
         </div>
         <div class="pcard-stat">
           <span class="pcard-stat-val" style="text-transform: capitalize">{{
-            person.gender || '—'
+            person.gender ? dataGenderLabel(person.gender) : '—'
           }}</span>
-          <span class="pcard-stat-key">Gender</span>
+          <span class="pcard-stat-key">{{ t('data.fields.gender') }}</span>
         </div>
       </div>
     </template>
@@ -110,29 +111,33 @@
         <span class="po-chip po-glyph">
           <UiIcon :name="genderIcon(person.gender)" :size="12" :stroke="2.4" />
         </span>
-        <span v-if="deceased" class="po-chip" title="Deceased">
+        <span v-if="deceased" class="po-chip" :title="t('directory.card.deceased')">
           <UiIcon name="bird" :size="12" />
         </span>
-        <span v-if="age !== null" class="po-chip po-age">{{ age }} yr</span>
+        <span v-if="age !== null" class="po-chip po-age">{{
+          t('directory.card.ageYr', { age })
+        }}</span>
       </div>
 
       <div class="po-info">
         <div v-if="person.occupation" class="po-kicker">{{ person.occupation }}</div>
         <div class="po-name" :class="{ 'po-unnamed': !person.name }">
-          {{ person.name || 'Unnamed' }}
+          {{ person.name || t('directory.card.unnamed') }}
         </div>
         <div class="po-rule"></div>
         <div class="po-meta">
           {{ lifeText }}<span v-if="person.location"> · {{ person.location }}</span>
         </div>
         <div class="po-foot">
-          <span class="po-stat" title="Relations"><UiIcon name="link" :size="12" />{{ kin }}</span>
-          <span class="po-stat" title="Children">
+          <span class="po-stat" :title="t('directory.card.relations')"
+            ><UiIcon name="link" :size="12" />{{ kin }}</span
+          >
+          <span class="po-stat" :title="t('directory.card.children')">
             <UiIcon name="sprout" :size="12" />{{ children }}
           </span>
-          <span v-for="t in tagPills" :key="t.id" class="po-tag" :style="{ '--tc': t.color }">
-            <UiIcon v-if="t.icon" :name="t.icon" :size="11" />
-            {{ t.label }}
+          <span v-for="tp in tagPills" :key="tp.id" class="po-tag" :style="{ '--tc': tp.color }">
+            <UiIcon v-if="tp.icon" :name="tp.icon" :size="11" />
+            {{ tp.label }}
           </span>
         </div>
       </div>
@@ -142,8 +147,12 @@
     <template v-else-if="cardStyle === 'holo'">
       <div class="ho-inner">
         <div class="ho-head">
-          <span class="ho-stage">{{ deceased ? 'LEGEND' : 'BASIC' }}</span>
-          <span class="ho-name" :title="person.name">{{ person.name || 'Unnamed' }}</span>
+          <span class="ho-stage">{{
+            deceased ? t('directory.card.holo.legend') : t('directory.card.holo.basic')
+          }}</span>
+          <span class="ho-name" :title="person.name">{{
+            person.name || t('directory.card.unnamed')
+          }}</span>
           <span class="ho-hp"><i>HP</i>{{ hp }}</span>
         </div>
 
@@ -163,22 +172,22 @@
         <div class="ho-attack">
           <span class="ho-orb"><UiIcon name="link" :size="12" /></span>
           <span class="ho-atk">
-            <b>Kinship</b>
-            <small>Draws strength from every bond.</small>
+            <b>{{ t('directory.card.holo.kinship') }}</b>
+            <small>{{ t('directory.card.holo.kinshipText') }}</small>
           </span>
           <span class="ho-dmg">{{ kin * 10 }}</span>
         </div>
         <div class="ho-attack">
           <span class="ho-orb"><UiIcon name="sprout" :size="12" /></span>
           <span class="ho-atk">
-            <b>Legacy</b>
-            <small>Passes the story to the next age.</small>
+            <b>{{ t('directory.card.holo.legacy') }}</b>
+            <small>{{ t('directory.card.holo.legacyText') }}</small>
           </span>
           <span class="ho-dmg">{{ children * 10 }}</span>
         </div>
 
         <div class="ho-foot">
-          <span class="ho-stars" :title="`Rarity ${stars} of 5`">
+          <span class="ho-stars" :title="t('directory.card.holo.rarity', { n: stars })">
             <i v-for="n in stars" :key="n"><UiIcon name="star" :size="11" /></i>
           </span>
           <span class="ho-set">№ {{ person.birth?.year || '???' }} · {{ refYear }}</span>
@@ -196,7 +205,8 @@
       <div class="ne-head">
         <span class="ne-id">ID://{{ shortId }}</span>
         <span class="ne-status" :class="deceased ? 'ne-off' : 'ne-on'">
-          <i class="ne-dot"></i>{{ deceased ? 'ARCHIVED' : 'ONLINE' }}
+          <i class="ne-dot"></i
+          >{{ deceased ? t('directory.card.neon.archived') : t('directory.card.neon.online') }}
         </span>
       </div>
 
@@ -208,22 +218,26 @@
         </div>
       </div>
 
-      <div class="ne-name" :data-text="person.name || 'UNNAMED'">
-        {{ person.name || 'UNNAMED' }}
+      <div class="ne-name" :data-text="person.name || t('directory.card.neon.unnamed')">
+        {{ person.name || t('directory.card.neon.unnamed') }}
       </div>
 
       <div class="ne-rows">
         <div class="ne-row">
-          <span>AGE</span><i></i><b>{{ age ?? '——' }}</b>
+          <span>{{ t('directory.card.neon.age') }}</span
+          ><i></i><b>{{ age ?? '——' }}</b>
         </div>
         <div class="ne-row">
-          <span>LINKS</span><i></i><b>{{ kin }}</b>
+          <span>{{ t('directory.card.neon.links') }}</span
+          ><i></i><b>{{ kin }}</b>
         </div>
         <div class="ne-row">
-          <span>HEIRS</span><i></i><b>{{ children }}</b>
+          <span>{{ t('directory.card.neon.heirs') }}</span
+          ><i></i><b>{{ children }}</b>
         </div>
         <div class="ne-row">
-          <span>ORIGIN</span><i></i><b class="ne-clip">{{ person.location || 'UNKNOWN' }}</b>
+          <span>{{ t('directory.card.neon.origin') }}</span
+          ><i></i><b class="ne-clip">{{ person.location || t('directory.card.neon.unknown') }}</b>
         </div>
       </div>
 
@@ -244,8 +258,10 @@
         <div class="ar-arch-glow"></div>
       </div>
 
-      <div class="ar-name" :title="person.name">{{ person.name || 'Unnamed' }}</div>
-      <div class="ar-role">{{ person.occupation || genderLabel(person.gender) }}</div>
+      <div class="ar-name" :title="person.name">
+        {{ person.name || t('directory.card.unnamed') }}
+      </div>
+      <div class="ar-role">{{ person.occupation || genderText(person.gender) }}</div>
 
       <div class="ar-divider"><UiIcon name="sparkle" :size="11" /></div>
 
@@ -259,7 +275,7 @@
       :person="person"
       :avatar-src="avatarSrc || ''"
       :deceased="deceased"
-      :life-text="lifeText === 'Dates unknown' ? '' : lifeText"
+      :life-text="lifeSpanText"
       :kin="kin"
       :children="children"
     />
@@ -270,14 +286,16 @@
       :person="person"
       :avatar-src="avatarSrc || ''"
       :deceased="deceased"
-      :life-text="lifeText === 'Dates unknown' ? '' : lifeText"
+      :life-text="lifeSpanText"
     />
   </button>
 </template>
 
 <script setup>
 import { computed, reactive, ref, onBeforeUnmount } from 'vue'
-import { ageOf, isDeceased, genderLabel, genderIcon } from './peopleLayout.js'
+import { ageOf, isDeceased, genderIcon } from './peopleLayout.js'
+import { useI18n } from '../../i18n'
+import { genderLabel as dataGenderLabel, defaultNameLabel } from '../../lib/dataLabels'
 import UiIcon from '../ui/UiIcon.js'
 import { useThumbnail } from './useThumbnail.js'
 import ScrollCardFace from './ScrollCardFace.vue'
@@ -302,6 +320,13 @@ const props = defineProps({
   stagger: { type: Number, default: 0 }
 })
 defineEmits(['select'])
+
+const { t } = useI18n()
+
+/** The card's type line: Male / Female (translated), else the generic 'Person'. */
+function genderText(g) {
+  return g === 'male' || g === 'female' ? dataGenderLabel(g) : t('data.noun.person')
+}
 
 // ── Cursor-driven parallax tilt + spotlight ─────────────────────────────────
 // Only the hovered card runs this (pointermove fires on one card at a time), and
@@ -372,28 +397,32 @@ const initials = computed(() => {
   return (parts[0] || '?').substring(0, 2).toUpperCase()
 })
 
-const lifeText = computed(() => {
+// '' when no dates are known (the ink faces then leave the line out).
+const lifeSpanText = computed(() => {
   const b = props.person.birth?.year
   const d = props.person.death?.year
   if (b && d) return `${b} – ${d}`
-  if (b) return `b. ${b}`
-  if (d) return `d. ${d}`
-  return 'Dates unknown'
+  if (b) return t('directory.card.born', { year: b })
+  if (d) return t('directory.card.died', { year: d })
+  return ''
 })
+const lifeText = computed(() => lifeSpanText.value || t('directory.card.datesUnknown'))
 
 const tagPills = computed(() =>
-  (props.tags || []).slice(0, 2).map((t) => ({
-    id: t.id,
-    label: t.label,
-    icon: t.icon || '',
-    color: t.color || 'var(--accent)'
+  (props.tags || []).slice(0, 2).map((tag) => ({
+    id: tag.id,
+    label: defaultNameLabel(tag.label),
+    icon: tag.icon || '',
+    color: tag.color || 'var(--accent)'
   }))
 )
 
 // ── Holo (TCG) flavour ──────────────────────────────────────────────────────
 const hp = computed(() => Math.min(240, 60 + props.kin * 20))
 const stars = computed(() => Math.max(1, Math.min(5, 1 + Math.floor(props.kin / 2))))
-const typeLabel = computed(() => props.tags?.[0]?.label || genderLabel(props.person.gender))
+const typeLabel = computed(
+  () => defaultNameLabel(props.tags?.[0]?.label) || genderText(props.person.gender)
+)
 
 // ── Neon flavour ────────────────────────────────────────────────────────────
 const shortId = computed(() => (props.person.id || '').replace(/-/g, '').slice(0, 8).toUpperCase())

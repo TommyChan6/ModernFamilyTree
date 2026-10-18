@@ -6,18 +6,30 @@
     <div v-if="anchorId && !info" key="armed" class="path-card path-armed">
       <span class="path-armed-beacon"></span>
       <span class="path-armed-name">{{ personName(anchorId) }}</span>
-      <span class="path-armed-hint">{{ armedHint }}</span>
-      <button class="path-close" title="Cancel (Esc)" aria-label="Cancel" @click="emit('close')">
+      <span class="path-armed-hint">{{ armedHint || t('kinship.trace.armedHint') }}</span>
+      <button
+        class="path-close"
+        :title="t('kinship.trace.cancelEsc')"
+        :aria-label="t('dialog.cancel')"
+        @click="emit('close')"
+      >
         <UiIcon name="x" :size="14" />
       </button>
     </div>
     <div v-else-if="info && info.none" key="none" class="path-card path-none">
       <UiIcon class="path-none-icon" name="satellite" :size="16" />
       <span>
-        No connection between <b>{{ personName(info.fromId) }}</b> and
-        <b>{{ personName(info.toId) }}</b>
+        <template v-for="(part, i) in noneParts" :key="i">
+          <b v-if="part.who">{{ personName(part.who) }}</b>
+          <template v-else>{{ part.text }}</template>
+        </template>
       </span>
-      <button class="path-close" title="Dismiss (Esc)" aria-label="Dismiss" @click="emit('close')">
+      <button
+        class="path-close"
+        :title="t('kinship.trace.dismissEsc')"
+        :aria-label="t('dialog.dismiss')"
+        @click="emit('close')"
+      >
         <UiIcon name="x" :size="14" />
       </button>
     </div>
@@ -31,9 +43,13 @@
       <div class="path-row">
         <div class="path-title">
           <UiIcon class="path-title-icon" name="compass" :size="14" />
-          Connection
+          {{ t('kinship.trace.connection') }}
           <span class="path-count">
-            {{ hops.length - 1 }} hop{{ hops.length > 2 ? 's' : '' }}
+            {{
+              t(hops.length > 2 ? 'kinship.trace.hopsOther' : 'kinship.trace.hopsOne', {
+                n: hops.length - 1
+              })
+            }}
           </span>
         </div>
         <div class="path-chain">
@@ -47,7 +63,7 @@
             <button
               class="path-person"
               :style="{ '--i': i * 2, '--pc': hop.color }"
-              :title="'View ' + hop.name"
+              :title="t('kinship.trace.view', { name: hop.name })"
               @click="emit('pick', hop.id)"
             >
               <span class="path-person-dot"></span>
@@ -56,7 +72,12 @@
           </template>
         </div>
       </div>
-      <button class="path-close" title="Clear (Esc)" aria-label="Clear" @click="emit('close')">
+      <button
+        class="path-close"
+        :title="t('kinship.trace.clearEsc')"
+        :aria-label="t('kinship.trace.clear')"
+        @click="emit('close')"
+      >
         <UiIcon name="x" :size="14" />
       </button>
     </div>
@@ -69,24 +90,40 @@ import { useMainStore } from '../../store/index.js'
 import { nodeColor } from '../graph/linkHelpers.js'
 import KinshipCard from './KinshipCard.vue'
 import UiIcon from '../ui/UiIcon.js'
+import { useI18n } from '../../i18n'
+import { relRoleLabel, relTypeLabel } from '../../lib/dataLabels'
 
 const props = defineProps({
   /** Armed: the first person, waiting for the second. */
   anchorId: { type: String, default: null },
   /** { ids, rels } | { none, fromId, toId } | null */
   info: { type: Object, default: null },
-  armedHint: { type: String, default: 'shift-click another person to trace the connection' }
+  /** Overrides the default (translated) armed hint. */
+  armedHint: { type: String, default: '' }
 })
 const emit = defineEmits(['close', 'pick'])
 const store = useMainStore()
+const { t } = useI18n()
 
 function personName(id) {
-  return store.persons.find((p) => p.id === id)?.name || 'Unnamed'
+  return store.persons.find((p) => p.id === id)?.name || t('kinship.unnamed')
 }
 function personColor(id) {
   const p = store.persons.find((x) => x.id === id)
   return p ? nodeColor(p.gender, store.graphSettings, p.gender_t) : 'var(--accent)'
 }
+
+/** "No connection between {a} and {b}" split so the names render bold. */
+const noneParts = computed(() => {
+  const info = props.info
+  if (!info?.none) return []
+  return String(t('kinship.trace.noConnection'))
+    .split(/(\{a\}|\{b\})/)
+    .filter(Boolean)
+    .map((s) =>
+      s === '{a}' ? { who: info.fromId } : s === '{b}' ? { who: info.toId } : { text: s }
+    )
+})
 
 /** The traced chain as displayable hops: person chips + the joining role label. */
 const hops = computed(() => {
@@ -101,8 +138,9 @@ const hops = computed(() => {
       else if (!def) via = { text: r.type, glyph: '' }
       else if (def.directed) {
         const prevIsA = r.person_a_id === info.ids[i - 1]
-        via = { text: `${prevIsA ? def.role_a : def.role_b} of`, glyph: def.glyph }
-      } else via = { text: def.label, glyph: def.glyph }
+        const role = relRoleLabel(def, prevIsA ? 'a' : 'b')
+        via = { text: t('kinship.trace.roleOf', { role }), glyph: def.glyph }
+      } else via = { text: relTypeLabel(def), glyph: def.glyph }
     }
     return { id, name: personName(id), color: personColor(id), via }
   })

@@ -52,9 +52,12 @@ export function createLinkMaterial() {
       uFxSpeed: { value: 1 },
       uFxGlow: { value: 1 },
       uFxKeep: { value: 0 },
-      uFxLight: { value: 0 }
+      uFxLight: { value: 0 },
+      // Perspective-tilt depth haze (0 = flat view): far ground fades back.
+      uFog: { value: 0 }
     },
     vertexShader: /* glsl */ `
+      uniform float uFog;
       in vec3 aColor;
       in float aArc;
       in vec2 aDash;     // (dashLen, gapLen) in world units; dashLen<=0 => solid
@@ -77,6 +80,8 @@ export function createLinkMaterial() {
         vColor = aColor; vArc = aArc; vDash = aDash; vOpacity = aOpacity; vFlow = aFlow;
         vSide = aSide; vLen = aLen; vMeta = aMeta; vFx = aFx;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        // clip w is the tilt depth (1 = centre line): recede into a soft haze.
+        vOpacity *= 1.0 - uFog * 0.5 * smoothstep(1.0, 2.4, gl_Position.w);
       }
     `,
     fragmentShader: /* glsl */ `

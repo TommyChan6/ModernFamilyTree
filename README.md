@@ -87,3 +87,9 @@ Full developer and design documentation lives in [`docs/`](./docs/README.md):
   [IPC API](./docs/ipc-api.md) · [Graph engine](./docs/graph.md)
 - [Conventions](./docs/conventions.md) · [Developer guide](./docs/developer.md) ·
   [Contributing](./docs/contributing.md) · [Design](./docs/design.md)
+
+## License
+
+© 2026 Tommy Chan — all rights reserved. This is proprietary software, not open
+source: copying, redistributing, or re-hosting the code or the app is not
+permitted without written permission.

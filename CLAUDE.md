@@ -176,7 +176,7 @@ number_range/select/slider/date/date_range; `custom_date*` reserved for custom
 calendars) with per-person **FieldValue** rows — all optional. Defs are
 project-scoped; `locked` = rendered on every form; five **slots**
 (name/gender/birth/death/highlight) drive graph rendering — gender resolves to
-a 0..1 gradient position (`gender_t`) between the Style panel's male/female
+a 0..1 gradient position (`gender_t`) between the Style Studio palette's male/female
 colors. The legacy Person columns (`name`, `birth`, `death`, `gender`,
 bio/occupation/location, plus `graph_label` and `highlight`) are **derived
 snapshots** recomputed by `recomputeSnapshots()` on every trait write, so views
@@ -210,7 +210,7 @@ tells the hierarchy math (`familyTreeLayout.ts` — pure, takes an optional
 `typeRoles` map) which edges are parent→child vs couple vs invisible to the
 tree. `relationships:create/update` validate the type against the registry;
 rows also carry optional `label` (per-edge display text) and `ended`. The
-legacy trio keeps color '' → the Style panel's per-type colors. UI: PersonForm
+legacy trio keeps color '' → the Style Studio palette's per-type colors. UI: PersonForm
 intent chips are generated from the registry (grouped by `band`; Simple mode =
 family band only, per `caps.relTypePicker`/`customRelTypes`), and
 `RelTypesPanel.vue` (Relationships view → ⚙ Types) edits defs — the weight
@@ -273,6 +273,24 @@ flags, and `graphSettings`.
 Actions do the IPC round-trip and optimistically update reactive arrays only after
 `res.success`.
 
+**The Style Studio** (`components/style/`, left-rail Style button /
+`store.settingsOpen` + `store.styleLayer`; the Timeline toolbar's style toggle opens
+it too) is the one place for looks, split into two LAYERS drawn as a shuffleable
+deck: **Whole app** (`AppStyleSheet.vue`: theme + accent, the shared palette —
+gender + bond colours every view reads from `graphSettings` — and the profile
+style) and **this view** on top (`GraphStyleSheet` / `TimelineStyleSheet` /
+`DirectoryStyleSheet` / `MapStyleSheet`; views with nothing of their own show an
+"inherits the app" state). Each layer is split into chapters (one at a time); the
+scope ribbon says where a chapter is saved, tuned dots + per-chapter reset come
+from chapter `keys`. All chapters, their keys and the searchable control index
+live in the pure `styleCatalog.ts` (tests: `tests/styleCatalog.test.js`) — a new
+style control needs an entry there and a matching `data-skey` on its row so
+search can jump to it. Rows use `StSlider`/`StSwitch`/`StColor`/`StSeg` and the
+unscoped `studio.css` (`st-` classes). A map's style lives on the MapDoc, so the
+studio edits it through `styleBridge.js` (MapView lends its undo + autosave).
+Gotcha: a sheet's template must have ONE element root (no top-level comment) or
+the out-in chapter transition never finishes.
+
 **The graph engine** is the most complex area — see [docs/graph.md](docs/graph.md).
 `GraphCanvas.vue` keeps the d3-force simulation and all interaction logic and hands
 drawing to a **Three.js/WebGL renderer** (`components/graph/webgl/`) that draws every
@@ -291,7 +309,18 @@ Line Effects; `graph/webgl/lineFx.js`: Bloodstream, River, Neon, Helix, Ember,
 Aurora, Storm, Starlight, Gilded) are shader branches in the link material keyed by a
 per-link `aFx` attribute (effect id, core fraction, padded half-width); `linkVisual`
 picks them per `lineFxScope` (lineage / family / all) and they pause under the 水墨
-brush look. One graph
+brush look. **Perspective tilt**
+(Style → Perspective, bottom-bar rotate-3d / **T**, **Q/E** to turn, Alt-drag for angle/turn;
+`viewTilt`/`tiltAngle`/`tiltYaw` settings) lays any 2D layout down as a board: the tilt
+and turn ride on the camera transform (`tl`/`yw`/`vw`/`vh`) as a yaw + plane homography
+in `graph/webgl/coords.js` (pan/zoom under it solved exactly by `translateToPin`; standing
+nodes painted back-to-front via `depthOrder`, covered names dimmed by `occlusion.js`), so every
+`worldToScreen`/`screenToWorld` (overlay, picking, drag) follows it and
+`tiltProjection()` puts the same mapping in the GPU projection; nodes are screen-space
+billboards (NodeMaterial adds the corner offset in clip space), the atmosphere draws in a
+separate flat pass, and `GroundGrid.js` fades in a floor (tests: `tests/graphTilt.test.js`).
+Node shapes/anchors live in `graph/webgl/nodeShapes.js`; the `gravestone` shape stands ON
+its point (so in Birth it rests on its birth-year line) — the `graveyard` theme preset uses it. One graph
 **Scene** spans them all — `scene.layouts[type]` holds each type's own
 `{positions,config}` and `scene.type` names the active one, so switching type
 stays in the same scene and reveals that type's arrangement (flat
@@ -319,16 +348,30 @@ stay smooth with thousands of people:
   grid and an fg canvas for viewport-culled labels/badges/gutter. Hit tests are
   analytic; style changes tween. Lifelines are a `LifelineLayer` (looks: classic/
   tube/glass/glow + every graph line effect, a drop-shadow pass, selection halo),
-  styled by `store.timelineSettings` (`timeline_*` settings keys; 🎨
-  `TimelineStylePane.vue`: looks, canvas options, atmosphere via the graph's
-  `AmbientLayer`, one-click looks). Editing mirrors the graph: click = select (the
+  styled by `store.timelineSettings` (`timeline_*` settings keys; edited in the
+  Style Studio's Timeline layer, `style/TimelineStyleSheet.vue`: looks, canvas
+  options, atmosphere via the graph's `AmbientLayer`, one-click looks). Editing mirrors the graph: click = select (the
   shared `GraphActionPane`, graph-only verbs hidden), dblclick = profile, ctrl-click
   = trace (`kinship/TraceCard.vue`), 🧬 = KinshipPane + lens pills (`kinPills.js`).
   Edit tools (Edit rail / keys 1–6: add, child, link, event span, retime, delete) —
   pure helpers + catalog in `timeline/timelineEdit.js` (tests:
   `tests/timelineEdit.test.js`); ghosts, bursts and the traced chain draw on the
   canvas-2D `TimelineFx.js` layer. Retime writes through the birth/death **slot**
-  traits (`retimeSlotValue`), never the snapshot columns.
+  traits (`retimeSlotValue`), never the snapshot columns. Dragging a life (or the
+  selection) sideways moves its lane (`moveLanes`; renderer `setLaneOverride` pins
+  carried lanes to the cursor); Shift+←/→ nudges. The lane order is per timeline
+  scene (`scene.config.laneOrder`, also written by refresh + canvas-created
+  people) and each move is a journal arrangement step (`{ view: 'timeline' }`
+  mementos — the store keys restore handlers by view via `registerLayoutHistory(fn,
+  view)`). The header's **Time drag** toggle (`store.timeDrag`, shared with the
+  graph) turns a mostly-vertical drag on a life/selection into a retime: birth +
+  death shift together via `shiftLivesUpdates` → ONE `fields:setValuesBatch`
+  (one undo step). On the graph it applies in the Birth layout (turning it on
+  switches there): vertical-only, year-snapped, and `realignAgeAxis()` re-seats
+  Birth nodes whenever a birth year changes (so undo moves them back). The graph's
+  **Retime** edit mode (wheel kind `retime`, auto-added to the Edit rail in Birth)
+  is the same drag with `{ birthOnly: true }`: only the birth moves, clamped at the
+  death.
 - groups (`FactionsView`) — WebGL. Drag-and-drop clustering of people by their
   tags (a Group = a tag placed in a groups scene via `scene_tags`; membership is
   the shared `entity_tags` join), with switchable per-view scenes; pure math in
@@ -370,8 +413,19 @@ stay smooth with thousands of people:
   hit-testing, time interpolation), the seeded world generator in `map/mapGen.ts`,
   styles as data in `map/mapStyles.ts` (parchment/fantasy/ink/hightech/atlas),
   drawing in `map/MapRenderer.ts` (cached static layer + live layer for people,
-  events and ambient motion) and `map/mapGlyphs.ts`. Tests: `tests/mapMath.test.js`
-  + the Maps block in `tests/db.test.js`.
+  events and ambient motion) and `map/mapGlyphs.ts`. Editing aids: the selected
+  line/area shows vertex + midpoint handles (drag a midpoint = insert, Alt-click /
+  dblclick a vertex = remove; `insertVertex`/`removeVertex`/`hitMidpoint`), drawing
+  and vertex drags magnet-snap to places and corners (`snapPoint`; Alt or the Layers
+  switch turns it off), a ruler tool (U), right-click `MapContextMenu.vue`, feature
+  copy/paste across maps (clipboard in a plain `<script>` block), `MapFind.vue`
+  (Ctrl+F, `matchScore`), per-viewer layer visibility (`MAP_LAYERS` in
+  `mapKinds.ts`, localStorage `familytree.map.layers`; renderer `hiddenKinds`),
+  `MapShortcuts.vue` (?), PNG export of the whole sheet or the current view. Each
+  style names its distance `unit` (`MAP_UNITS`; labels via `map.units.*`). The frame
+  loop skips draws whose signature hasn't changed (idle = 0 draws, ambient-only
+  ~30 fps) and the renderer freezes all time-driven motion under reduced motion.
+  Tests: `tests/mapMath.test.js` + the Maps block in `tests/db.test.js`.
 - character (`character/CharacterView.vue`, Advanced + 🧪 Labs) — Canvas-2D character
   creator. Looks are renderer-agnostic `CharacterDoc`s (part ids + palette + morphs);
   art styles are data-only `StylePack`s in `character/styles/` (anime/realistic/simple/
@@ -453,6 +507,18 @@ expand it. Tests: `tests/inkArt.test.js`, `inkChrome`, `profileScroll`,
   store names; anything rendering a data `icon`/`glyph` goes through UiIcon (it
   also resolves legacy emoji saved in old DBs via `LEGACY_GLYPHS`). Users pick
   icons with `ui/IconPicker.vue`; every search box is `ui/SearchField.vue`.
+- **i18n:** every visible string — template text, `title`/`aria-label`/`placeholder`,
+  toasts, confirm texts AND canvas-drawn labels (e.g. the graph's "Gen N" guides) —
+  goes through `t()` from `i18n/`, with keys in all four locales (`en`, `zh-Hans`,
+  `zh-Hant`, `nb`). Catalog constants store ids/`labelKey`s and translate at render
+  time; canvas renderers redraw on a `locale` watch; pure layout modules stay
+  i18n-free (translate where they're drawn). Built-in DATA stored in English (built-in
+  relationship types/roles/statuses, the default traits, Male/Female, the 'Person'
+  noun, default names like 'Scene 1' / 'Untitled era') is shown through
+  `lib/dataLabels.ts` (`relTypeLabel`, `fieldLabel`, `nounLabel`, `defaultNameLabel`…),
+  which translates only while the stored text is still the seeded default.
+  `tests/i18n.test.js` fails on key drift between locales, lost `{placeholders}`, or a
+  `t('…')` key missing from `en.js`. `LegalModal.vue` (legal text) stays English.
 - Never use native `alert`/`confirm`: `await confirmDialog({...})` / `toast(msg,
   { tone })` from `lib/dialogs.js` (rendered by `components/ui/DialogHost.vue`), and
   `undoToast(msg, channel)` (`lib/undoToast.js`) after undoable deletes — its Undo

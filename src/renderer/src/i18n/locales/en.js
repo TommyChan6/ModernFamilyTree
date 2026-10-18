@@ -587,7 +587,7 @@ export default {
     character: 'Character',
     map: 'Map',
     addPerson: 'Add person',
-    style: 'Style'
+    style: 'Style studio'
   },
   map: {
     time: {
@@ -613,6 +613,7 @@ export default {
     tools: {
       select: 'Select & move',
       pan: 'Pan',
+      measure: 'Measure distance',
       erase: 'Eraser',
       land: 'Land',
       water: 'Water / lake',
@@ -691,6 +692,8 @@ export default {
     },
     inspector: {
       namePh: 'Give it a name…',
+      length: 'Length {d}',
+      area: 'Area {a} · edge {d}',
       close: 'Close',
       type: 'Type',
       icon: 'Icon',
@@ -788,8 +791,6 @@ export default {
       ground: 'Unpainted ground is…',
       groundSea: 'Sea',
       groundLand: 'Land',
-      labels: 'Show names',
-      journeys: 'Show journeys',
       export: 'Export as PNG',
       copyName: '{name} (copy)',
       confirmDelete: 'Delete the map “{name}”? This can’t be undone.'
@@ -797,6 +798,11 @@ export default {
     toast: {
       created: '{name} is ready',
       undo: 'Undone',
+      minPoints: 'Can’t remove that one — a shape keeps at least 3 corners, a line 2',
+      copied: 'Copied {name} — Ctrl+V pastes it, on any map',
+      nothingToPaste: 'Nothing copied yet — select something and press Ctrl+C',
+      layerShown: '{layer} layer shown again',
+      exportFailed: 'Couldn’t create the image — try the current view instead',
       redo: 'Redone',
       nothingToUndo: 'Nothing to undo',
       nothingToRedo: 'Nothing to redo',
@@ -812,6 +818,8 @@ export default {
     },
     zoom: {
       in: 'Zoom in (+)',
+      undo: 'Undo (Ctrl+Z)',
+      redo: 'Redo (Ctrl+X)',
       out: 'Zoom out (−)',
       fit: 'Fit the whole map (0)'
     },
@@ -822,10 +830,89 @@ export default {
     defaults: {
       label: 'Label'
     },
+    find: {
+      title: 'Find on this map (Ctrl+F)',
+      placeholder: 'Find a place, realm or person…',
+      none: 'Nothing by that name on this map.',
+      empty: 'Nothing named yet — name your places and realms and they show up here.',
+      foot: '↑ ↓ to choose · Enter flies there',
+      person: 'On the map'
+    },
+    layers: {
+      title: 'Layers',
+      terrain: 'Terrain',
+      realms: 'Realms',
+      routes: 'Routes & lines',
+      places: 'Places',
+      events: 'Events',
+      text: 'Labels',
+      people: 'People',
+      journeys: 'Journeys',
+      names: 'Names',
+      snap: 'Snap to places & corners',
+      snapHint:
+        'Lines and shapes you draw stick to nearby places and corners. Hold Alt to draw freely.',
+      showAll: 'Show everything'
+    },
+    export: {
+      sheet: 'Whole map',
+      sheetHint: 'The full sheet as it looks in {y}',
+      view: 'Current view',
+      viewHint: 'Exactly what’s on screen, twice as sharp'
+    },
+    keys: {
+      title: 'Keyboard shortcuts',
+      tools: 'Tools',
+      edit: 'Editing',
+      view: 'View & time',
+      undo: 'Undo',
+      redo: 'Redo',
+      copy: 'Copy',
+      paste: 'Paste at the pointer',
+      duplicate: 'Duplicate',
+      delete: 'Delete the selection',
+      nudge: 'Nudge (Shift = 10×)',
+      finish: 'Finish a line or ruler',
+      cancel: 'Cancel / deselect',
+      removePoint: 'Remove a corner',
+      noSnap: 'Draw without snapping (hold)',
+      pan: 'Pan',
+      zoom: 'Zoom in / out',
+      fit: 'Fit the whole map',
+      find: 'Find',
+      people: 'People drawer',
+      play: 'Play / pause time',
+      step: 'One year back / forward',
+      sheet: 'This cheat sheet'
+    },
+    units: {
+      league: '{n} leagues',
+      league2: '{n} sq leagues',
+      li: '{n} li',
+      li2: '{n} sq li',
+      km: '{n} km',
+      km2: '{n} km²'
+    },
+    ctx: {
+      deletePoint: 'Remove this corner',
+      rename: 'Rename',
+      duplicate: 'Duplicate',
+      copy: 'Copy',
+      delete: 'Delete',
+      pasteHere: 'Paste here',
+      labelHere: 'Add a label here',
+      measureFrom: 'Measure from here'
+    },
     hint: {
       select:
         'Click to select · drag to move · drag empty space to pan · scroll to zoom · double-click land or sea to edit it',
       pan: 'Drag to pan · scroll to zoom',
+      measure:
+        'Click to start measuring · keep clicking for a route · double-click or Enter to finish',
+      measuring: '{d} so far · click to add a stop · double-click or Enter to finish · Esc clears',
+      measured: 'Total {d} · click to measure again · Esc clears',
+      shape:
+        'Drag a square to move a corner · drag a dot on an edge to add one · Alt-click a corner to remove it',
       erase: 'Click or drag across things to erase them',
       area: '{name}: drag to paint a shape — or click points and press Enter',
       line: '{name}: drag to draw — or click points and double-click to finish',
@@ -1181,7 +1268,8 @@ export default {
     creatorLabel: 'Created by',
     contactLabel: 'Contact',
     tech: 'Built with Vue 3, Three.js, and Electron.',
-    privacy: 'Your data stays on your device — no accounts are required for local use.'
+    privacy: 'Your data stays on your device — no accounts are required for local use.',
+    copyright: '{holder} — all rights reserved.'
   },
   // The 3D character creator (Character view, 3D style)
   human3d: {
@@ -1757,6 +1845,3366 @@ export default {
       crown: 'Crown',
       headband: 'Headband',
       watch: 'Watch'
+    }
+  },
+  data: {
+    relTypes: {
+      parent_child: 'Parent / Child',
+      adopted: 'Adopted',
+      spouse: 'Spouse',
+      sibling: 'Sibling',
+      partner: 'Partner',
+      friends: 'Friend',
+      likes: 'Likes',
+      rival: 'Rival',
+      mentor: 'Mentor / Student',
+      subordinate: 'Subordinate'
+    },
+    relRoles: {
+      parent_child: {
+        a: 'Parent',
+        b: 'Child'
+      },
+      adopted: {
+        a: 'Adoptive parent',
+        b: 'Adopted child'
+      },
+      likes: {
+        a: 'Admirer',
+        b: 'Crush'
+      },
+      mentor: {
+        a: 'Mentor',
+        b: 'Student'
+      },
+      subordinate: {
+        a: 'Superior',
+        b: 'Subordinate'
+      }
+    },
+    relStatus: {
+      active: 'Active',
+      engaged: 'Engaged',
+      divorced: 'Divorced',
+      widowed: 'Widowed',
+      ended: 'Ended',
+      estranged: 'Estranged',
+      resolved: 'Resolved'
+    },
+    fields: {
+      name: 'Full name',
+      gender: 'Gender',
+      birth: 'Birth',
+      death: 'Death',
+      occupation: 'Occupation',
+      location: 'Location',
+      bio: 'Bio'
+    },
+    gender: {
+      male: 'Male',
+      female: 'Female'
+    },
+    noun: {
+      person: 'Person'
+    },
+    defaults: {
+      untitledEvent: 'Untitled event',
+      untitledEra: 'Untitled era',
+      untitledMap: 'Untitled map',
+      newTag: 'New Tag',
+      unnamedProject: 'Unnamed Project',
+      newScene: 'New Scene',
+      scene1: 'Scene 1',
+      guest: 'Guest',
+      timeline: 'Timeline'
+    }
+  },
+  graph: {
+    searchPh: 'Search family members…',
+    nameThis: 'Name this {noun}…',
+    newNoun: 'New {noun}',
+    unnamed: 'Unnamed',
+    spot: {
+      on: 'Spotlight on',
+      choose: 'Choose who takes the spotlight',
+      put: 'Put {name} in the spotlight',
+      titles: 'Titles — what everyone is to the main character',
+      titlesAria: 'Show titles',
+      pickerPh: 'Who takes the spotlight?',
+      takes: '{name} takes the spotlight'
+    },
+    ctrl: {
+      tiltOffTitle: 'Back to the flat view (T)',
+      tiltOnTitle:
+        'Tilt into 3D — lay the board down and stand everyone up (T · Q/E to turn · Alt-drag to adjust)',
+      tilt: '3D tilt',
+      zoomIn: 'Zoom in',
+      zoomOut: 'Zoom out',
+      stretchWideTitle: 'Horizontal zoom in — stretch the layout wider (or hold X and scroll)',
+      stretchWide: 'Stretch wider',
+      squeezeNarrowTitle: 'Horizontal zoom out — squeeze the layout narrower',
+      squeezeNarrow: 'Squeeze narrower',
+      stretchTallTitle: 'Vertical zoom in — stretch the layout taller (or hold Z and scroll)',
+      stretchTall: 'Stretch taller',
+      squeezeShortTitle: 'Vertical zoom out — squeeze the layout shorter',
+      squeezeShort: 'Squeeze shorter',
+      fitAll: 'Fit all',
+      resetView: 'Reset view',
+      refreshTitle: 'Refresh layout — re-run the family tree algorithm',
+      refresh: 'Refresh layout',
+      lockNodes: 'Lock node clicks',
+      unlockNodes: 'Unlock node clicks',
+      lockLines: 'Lock line clicks',
+      unlockLines: 'Unlock line clicks',
+      autoRotateTitle: 'Auto-rotate (R)',
+      autoRotate: 'Auto-rotate',
+      layersTitle: 'Generation layers (G)',
+      layers: 'Generation layers',
+      help3dTitle: 'How to navigate in 3D (?)',
+      help3d: 'How to navigate in 3D'
+    },
+    modes: {
+      free: {
+        label: 'Free',
+        title: 'Free — nodes stay where you put them'
+      },
+      organic: {
+        label: 'Organic',
+        title: 'Organic — force-directed layout'
+      },
+      birth: {
+        label: 'Birth',
+        title: 'Birth — vertical position by birth date'
+      },
+      generations: {
+        label: 'Generations',
+        title: 'Generations — top-down hierarchy'
+      },
+      spotlight: {
+        label: 'Spotlight',
+        title: 'Spotlight — a main character at centre stage, everyone else in rings by closeness'
+      },
+      space: {
+        label: 'Space',
+        title: 'Space — experimental 3D layout (Labs)'
+      }
+    },
+    scenes: {
+      label: 'Scenes',
+      add: 'New scene',
+      duplicate: 'Duplicate current scene',
+      delete: 'Delete scene',
+      nameN: 'Scene {n}'
+    },
+    hud: {
+      customize: 'Customize the wheel',
+      exit: 'Exit edit mode (Esc)',
+      exitAria: 'Exit edit mode',
+      linkNext: 'Now click who {name} bonds with',
+      deleteConfirm: 'Click it again to confirm',
+      pinOrganic: 'Pinning matters in the Organic layout'
+    },
+    path: {
+      armedHint: 'Ctrl-click another person to trace the connection',
+      cancel: 'Cancel (Esc)',
+      dismiss: 'Dismiss (Esc)',
+      clear: 'Clear (Esc)',
+      clearAria: 'Clear',
+      noConnPre: 'No connection between ',
+      noConnMid: ' and ',
+      noConnPost: '',
+      title: 'Connection',
+      hopOne: '{n} hop',
+      hopOther: '{n} hops',
+      view: 'View {name}',
+      roleOf: '{role} of'
+    },
+    focus: {
+      title: 'Focus',
+      lineage: 'Lineage',
+      marriage: 'Marriage',
+      deceased: 'Deceased',
+      orbit: 'Orbit',
+      default: 'Default',
+      paternal: 'Paternal',
+      maternal: 'Maternal',
+      married: 'Married',
+      single: 'Single',
+      living: 'Living',
+      needDate: 'Set current date first to use this filter',
+      needSel: 'Select a person first',
+      off: 'Off',
+      orbitOne: '{n} hop around the selection',
+      orbitOther: '{n} hops around the selection'
+    },
+    rel: {
+      rowTitle: '{count} in use — click to isolate on the canvas',
+      weight: 'Weight — structural to the right, repel to the left',
+      romance: 'Romance',
+      pinesFor: 'pines for',
+      vieFor: 'vie for',
+      gravityTitle: 'Boosts social-edge springs in the Organic layout',
+      gravity: 'Social gravity',
+      hintSolo: 'Isolating one type — click it again to reset',
+      hint: 'Click a type to isolate · Ctrl-click two people to trace their connection'
+    },
+    legend: {
+      title: 'Legend',
+      nodes: 'Nodes',
+      lines: 'Lines'
+    },
+    flash: {
+      curveReset: 'Curve reset',
+      unavailable: 'Not available right now',
+      emptySpot: 'Click an empty spot',
+      bondNotNode: 'Click a bond, not a node',
+      typeGone: 'That bond type no longer exists',
+      alreadyLinked: 'Already linked',
+      linked: 'Linked — {type}',
+      node: 'Node',
+      released: '{name} released',
+      pinned: '{name} pinned',
+      tagAdded: 'Added “{tag}”',
+      tagRemoved: 'Removed “{tag}”',
+      alreadyEnded: 'Already ended',
+      needYear: 'Set a current year first',
+      ended: 'Ended {year}',
+      noDirection: 'That bond has no direction',
+      flipped: 'Direction flipped',
+      restored: 'Restored the {type} arrangement',
+      curveHint: 'Drag the line or its handles · double-click to reset',
+      timeDrag: 'Drag people up or down to change their birth year'
+    },
+    canvas: {
+      gen: 'Gen {n}',
+      newGen: 'New Gen',
+      now: 'Now · {year}'
+    },
+    rings: {
+      main: 'Main character',
+      inner: 'Inner circle',
+      close: 'Close family',
+      extended: 'Extended family',
+      distant: 'Distant kin',
+      far: 'Far reaches',
+      edge: 'Edge of the story',
+      outside: 'Not connected'
+    },
+    timeDrag: {
+      badge: 'b. {year} ({delta})',
+      badgeMany: '{n} lives · {delta} yr',
+      movedManyLater: '{count} lives moved later by {n} yr',
+      movedManyEarlier: '{count} lives moved earlier by {n} yr',
+      badgeBirths: '{n} births · {delta} yr',
+      birthsLater: '{count} births moved {n} yr later',
+      birthsEarlier: '{count} births moved {n} yr earlier'
+    },
+    toggles: {
+      aria: 'Canvas overlays',
+      select: 'Select',
+      edit: 'Edit',
+      modeTitle: '{label} — {hint}',
+      gear: 'Customize edit modes (or hold Tab for the wheel)',
+      gearAria: 'Customize edit modes',
+      focus: 'Focus — highlight & emphasise people',
+      legend: 'Legend',
+      relTypes: 'Relationships — types, weights & lenses',
+      chronicle: 'Chronicle — eras & story events',
+      style: 'Style — lifeline looks, canvas & atmosphere',
+      kinship: 'Kinship — name every relative, see through their eyes',
+      clean: 'Clean view — hide canvas overlays',
+      box: 'Box select — hold Shift and drag on the canvas',
+      lasso: 'Lasso select — hold Shift and drag a freeform loop',
+      timeDrag:
+        'Time drag — drag people up or down to change their birth year (lifespans move with them)'
+    }
+  },
+  graphWheel: {
+    addMode: 'Add a mode…',
+    hubIdle: 'Edit',
+    tipRelease: 'Release to select',
+    tipCustomize: 'customize',
+    tipCancel: 'cancel',
+    empty: {
+      label: 'Empty',
+      hint: 'Nothing here'
+    },
+    kinds: {
+      add: {
+        label: 'Add {noun}',
+        hint: 'Click an empty spot to add a {noun}'
+      },
+      delete: {
+        label: 'Delete',
+        hint: 'Click a node or bond — click again to confirm'
+      },
+      pin: {
+        label: 'Pin',
+        hint: 'Click people to pin / release them'
+      },
+      end: {
+        label: 'End bond',
+        hint: 'Click a bond to mark it ended'
+      },
+      swap: {
+        label: 'Flip bond',
+        hint: 'Click a directed bond to reverse it'
+      },
+      retime: {
+        label: 'Retime',
+        hint: 'Drag a person up or down to change their birth year'
+      },
+      paint: {
+        label: 'Paint',
+        hint: 'Click people to paint them — same color again clears',
+        disabled: 'Node styling needs Standard mode'
+      },
+      tag: {
+        hint: 'Click people to toggle “{tag}”',
+        disabled: 'Tags need Standard mode'
+      },
+      link: {
+        hint: 'Click two people in a row to link them as {type}',
+        disabled: 'This bond type needs Standard mode'
+      }
+    },
+    config: {
+      aria: 'Customize the action wheel',
+      title: 'Action wheel',
+      subPre: 'Hold',
+      subPost:
+        'on the canvas, flick toward a mode, release. Pick a direction below and give it a job.',
+      close: 'Close (Esc)',
+      closeAria: 'Close',
+      emptySlot: 'Empty slot',
+      mode: 'Mode',
+      forge: 'Forge a bond',
+      forgeNote: "Click two people in a row and they're linked.",
+      paint: 'Paint nodes',
+      paintTitle: 'Paint people {color}',
+      tag: 'Toggle a tag',
+      reset: 'Reset to defaults',
+      done: 'Done'
+    },
+    dirs: {
+      N: 'N',
+      NE: 'NE',
+      E: 'E',
+      SE: 'SE',
+      S: 'S',
+      SW: 'SW',
+      W: 'W',
+      NW: 'NW'
+    }
+  },
+  graph3d: {
+    badge: 'Experimental · Space',
+    help: {
+      close: 'Close',
+      title: 'Navigating Space',
+      sub: 'Your tree in three dimensions — the same people and lines, one more axis. Controls follow the usual 3D conventions:',
+      mouse: 'Mouse',
+      keys: 'Keys',
+      leftDrag: {
+        key: 'Left-drag',
+        desc: 'Orbit around the family'
+      },
+      rightDrag: {
+        key: 'Right-drag',
+        desc: 'Pan sideways'
+      },
+      scroll: {
+        key: 'Scroll',
+        desc: 'Zoom in / out'
+      },
+      dragPerson: {
+        key: 'Drag person',
+        desc: 'Move them in space'
+      },
+      click: {
+        key: 'Click',
+        desc: 'Select a person or line'
+      },
+      dblClick: {
+        key: 'Dbl-click',
+        desc: 'Fly to a person'
+      },
+      frame: 'Frame everything',
+      rotate: 'Auto-rotate on / off',
+      layers: 'Generation layers',
+      hints: 'Show these hints',
+      tipLabel: 'Tip:',
+      tipMid: '(the layers button in the toolbar, or',
+      tipEnd: ') stacks each generation on its own floor — oldest on top.',
+      gotIt: 'Got it'
+    }
+  },
+  minimap: {
+    title: 'Overview — drag to move the view'
+  },
+  styleStudio: {
+    title: 'Style studio',
+    close: 'Close the style studio',
+    search: 'Find a style setting…',
+    noResults: 'No style setting matches “{q}”',
+    reach: 'Views this layer paints',
+    tuned: '{n} tuned · reset',
+    resetChapterHint: 'Put this chapter back to its defaults',
+    layers: {
+      app: 'Whole app',
+      appTag: 'Everywhere',
+      appDesc: 'The foundation every view paints on',
+      viewTag: 'This view',
+      viewDesc: 'Only changes the {view} view',
+      viewNone: 'Has no style of its own — follows the app',
+      bringForward: 'Bring this layer to the front'
+    },
+    chapters: {
+      theme: 'Theme',
+      palette: 'Palette',
+      profiles: 'Profiles',
+      looks: 'Looks',
+      nodes: 'Nodes',
+      lines: 'Lines',
+      effects: 'Effects',
+      air: 'Atmosphere',
+      camera: 'Camera',
+      physics: 'Physics',
+      lifelines: 'Lifelines',
+      canvas: 'Canvas',
+      cards: 'Cards',
+      mapStyle: 'Map style'
+    },
+    saved: {
+      deviceAll: 'Saved on this device · every project, every view',
+      projectAll: 'Saved with this project · every view',
+      projectView: 'Saved with this project · {view} only',
+      mapView: 'Saved with this map · each map keeps its own'
+    },
+    results: {
+      app: 'Whole app',
+      view: 'This view · {view}',
+      other: 'Other views'
+    },
+    inherit: {
+      title: '{view} paints with the app style',
+      body: 'This view has no style of its own yet. It uses the app layer: the theme, the accent and the shared palette.',
+      cta: 'Style the whole app'
+    },
+    palette: {
+      intro: 'Every view draws people and their bonds in these colours.',
+      specimen: 'A small family drawn in the shared palette',
+      people: 'People',
+      bonds: 'Bonds',
+      lookNote: 'Picking a graph look repaints this palette too.'
+    },
+    profile: {
+      title: 'Profile presentation',
+      intro: 'How a person’s profile opens, from any view.'
+    },
+    looks: {
+      paletteNote: 'Each look also repaints the shared palette.',
+      openPalette: 'Open the palette'
+    },
+    lines: {
+      colorsNote: 'Line colours are shared by every view.'
+    },
+    air: {
+      quality: 'Render quality'
+    },
+    map: {
+      none: 'Open a map to style it.'
+    },
+    directory: {
+      cardModesOnly: 'Card faces show in the Grid and card-stage modes.'
+    }
+  },
+  graphStyle: {
+    tiltHint:
+      'Lays the arrangement down like a board seen from above, with every person standing on it. T toggles; Q / E turn the board; hold Alt and drag up/down to tilt, left/right to turn.',
+    title: 'Style',
+    close: 'Close style panel',
+    quality: 'Quality',
+    qualityHint: 'Full resolution, ornaments, atmosphere and ambient motion',
+    performance: 'Performance',
+    performanceHint: 'Trimmed resolution, still ornaments, no atmosphere — for low-end machines',
+    groups: {
+      perspective: 'Perspective',
+      themes: 'Theme',
+      nodes: 'Node appearance',
+      colors: 'Node colors',
+      lines: 'Relationship lines',
+      fx: 'Line effects',
+      atmosphere: 'Atmosphere',
+      physics: 'Physics / layout'
+    },
+    chips: {
+      custom: 'custom',
+      live: 'live',
+      off: 'off'
+    },
+    atmosphereOffHint: 'Atmosphere is off in Performance mode',
+    inkNote:
+      '水墨 — in the Ink theme every look is painted in brush and wash on rice paper; shapes, routes and atmosphere still follow the theme you pick.',
+    labels: {
+      tiltYaw: 'Turn',
+      tiltAngle: 'Angle',
+      tilt: '3D tilt',
+      shape: 'Shape',
+      ornament: 'Ornament',
+      ornamentColor: 'Ornament color',
+      nodeSize: 'Node size',
+      nodeOpacity: 'Node opacity',
+      labelSize: 'Label size',
+      showLabels: 'Show labels',
+      showAge: 'Show age',
+      glowOnHover: 'Glow on hover',
+      unknown: 'Unknown',
+      lineStyle: 'Line style',
+      lineOpacity: 'Line opacity',
+      lineCurvature: 'Line curvature',
+      color: 'Color',
+      width: 'Width',
+      appliesTo: 'Applies to',
+      palette: 'Palette',
+      effectColors: 'Effect colors',
+      relColors: 'Relationship colors',
+      speed: 'Speed',
+      glow: 'Glow',
+      effect: 'Effect',
+      colors: 'Colors',
+      density: 'Density',
+      linkDistance: 'Link distance',
+      repulsion: 'Repulsion'
+    },
+    brushOwns: 'Brush strokes own the lines right now — effects resume on any other line style.',
+    useOrganic: 'Use Organic',
+    reset: 'Reset all',
+    shapes: {
+      gravestone: 'Gravestone',
+      circle: 'Circle',
+      square: 'Square',
+      diamond: 'Diamond',
+      hexagon: 'Hexagon',
+      shield: 'Shield',
+      oval: 'Oval',
+      octagon: 'Octagon',
+      heart: 'Heart'
+    },
+    decors: {
+      none: 'None',
+      aura: 'Aura',
+      runes: 'Runes',
+      orbit: 'Orbit',
+      burst: 'Burst',
+      pulse: 'Pulse',
+      enso: 'Ensō'
+    },
+    routes: {
+      organic: {
+        label: 'Organic',
+        hint: 'Soft curves with a natural per-line bend'
+      },
+      straight: {
+        label: 'Straight',
+        hint: 'Dead-straight lines'
+      },
+      arc: {
+        label: 'Arc',
+        hint: 'Sweeping half-moon curves'
+      },
+      elbow: {
+        label: 'Elbow',
+        hint: 'Right-angle runs, like a flowchart'
+      },
+      trident: {
+        label: 'Trident',
+        hint: 'Classic genealogy: couple bar → stem → sibling rail → children'
+      },
+      circuit: {
+        label: 'Circuit',
+        hint: 'Axis-then-45° traces, like a circuit board'
+      },
+      wave: {
+        label: 'Wave',
+        hint: 'A sinuous ripple between people'
+      },
+      bezier: {
+        label: 'Bezier',
+        hint: 'Smooth curves you shape yourself — select a line, then drag it or its handles (double-click resets)'
+      },
+      brush: {
+        label: 'Brush',
+        hint: '水墨 — calligraphic brush strokes with dry-brush flying white'
+      }
+    },
+    ambients: {
+      none: 'None',
+      fireflies: 'Fireflies',
+      stars: 'Stars',
+      petals: 'Petals',
+      snow: 'Snow',
+      embers: 'Embers',
+      rain: 'Rain',
+      motes: 'Motes',
+      mist: 'Mist',
+      plum: 'Plum'
+    },
+    fxScopes: {
+      lineage: {
+        label: 'Lineage',
+        hint: 'Parent → child lines (every vertical relationship type)'
+      },
+      family: {
+        label: 'Family',
+        hint: 'Lineage plus couples'
+      },
+      all: {
+        label: 'All',
+        hint: 'Every bond, social ones too'
+      }
+    },
+    fx: {
+      none: {
+        label: 'Classic',
+        hint: 'Plain lines'
+      },
+      blood: {
+        label: 'Bloodstream',
+        hint: 'A living vessel — red cells drift down the generations on a heartbeat'
+      },
+      river: {
+        label: 'River',
+        hint: 'Flowing water — caustic light, current streaks, foam at the banks'
+      },
+      neon: {
+        label: 'Neon',
+        hint: 'Cyber conduit — white-hot core, data packets racing, circuit ticks'
+      },
+      helix: {
+        label: 'Helix',
+        hint: 'A DNA double helix twisting along the line, base pairs glowing'
+      },
+      ember: {
+        label: 'Ember',
+        hint: 'A line of fire — licking flames and sparks thrown into the dark'
+      },
+      aurora: {
+        label: 'Aurora',
+        hint: 'Northern lights — shifting curtains of green and violet'
+      },
+      storm: {
+        label: 'Storm',
+        hint: 'Crackling lightning that re-strikes as you watch'
+      },
+      stars: {
+        label: 'Starlight',
+        hint: 'A constellation — twinkling stars strung on a silver thread'
+      },
+      gilded: {
+        label: 'Gilded',
+        hint: 'A royal gold rope with a shine that travels its length'
+      }
+    },
+    themes: {
+      graveyard: {
+        name: 'Graveyard',
+        tagline: 'Headstones on their birth-year ground — best in the Birth layout'
+      },
+      classic: {
+        name: 'Classic',
+        tagline: 'The signature look — clean discs, organic lines'
+      },
+      lineage: {
+        name: 'Lineage',
+        tagline: 'Formal genealogy — sibling rails and couple bars'
+      },
+      storybook: {
+        name: 'Storybook',
+        tagline: 'Fantasy — gilded shields and fireflies in the dark'
+      },
+      neon: {
+        name: 'Neon Circuit',
+        tagline: 'Sci-fi — hex cells on glowing traces under starlight'
+      },
+      noir: {
+        name: 'Noir',
+        tagline: 'Crime drama — hard edges, monochrome, endless rain'
+      },
+      dynasty: {
+        name: 'Dynasty',
+        tagline: '朝代 — vermillion, jade and gold; petals on the wind'
+      },
+      wuxia: {
+        name: 'Ink & Blade',
+        tagline: '武侠 — brush-stroke calm, ink motes drifting in water'
+      },
+      shuimo: {
+        name: 'Shuimo',
+        tagline: '水墨 — brush strokes, ink washes, mist over far mountains'
+      },
+      qinglu: {
+        name: 'Qinglü',
+        tagline: '青绿 — azurite and malachite washes, mist-veiled peaks'
+      },
+      meihua: {
+        name: 'Ink Plum',
+        tagline: '墨梅 — dry-brush branches, plum blossoms on the wind'
+      },
+      celestial: {
+        name: 'Celestial',
+        tagline: '仙侠 — jade crystals in arcs, spirit wisps ascending'
+      },
+      rosewater: {
+        name: 'Rosewater',
+        tagline: 'Romance — hearts, blush arcs and falling petals'
+      },
+      winter: {
+        name: 'Winterhold',
+        tagline: 'Northern saga — burst crowns and quiet snowfall'
+      },
+      minimal: {
+        name: 'Minimal',
+        tagline: 'Modern and quiet — clean lines, no ornament'
+      },
+      heirloom: {
+        name: 'Heirloom',
+        tagline: 'Family archive — sepia cameos and drifting dust'
+      },
+      blueprint: {
+        name: 'Blueprint',
+        tagline: 'Drafting table — crisp octagons on right-angle runs'
+      },
+      wildwood: {
+        name: 'Wildwood',
+        tagline: 'Enchanted forest — rune rings on winding vines'
+      },
+      harvest: {
+        name: 'Harvest',
+        tagline: 'Autumn — amber crests glowing by the hearth'
+      },
+      sakura: {
+        name: 'Sakura',
+        tagline: '桜 — blossoms in orbit on a spring breeze'
+      },
+      pharaoh: {
+        name: 'Sands of Time',
+        tagline: 'Ancient empire — lapis and gold on drifting sand'
+      },
+      ember: {
+        name: 'Ember Throne',
+        tagline: 'Dark fantasy war — burning crests and rising sparks'
+      },
+      nocturne: {
+        name: 'Nocturne',
+        tagline: 'Gothic — crimson crests beneath moonlit rain'
+      },
+      grimoire: {
+        name: 'Grimoire',
+        tagline: 'Arcane — sigil-bound crystals and wandering wisps'
+      },
+      abyss: {
+        name: 'Abyss',
+        tagline: 'Deep sea — bioluminescent pulses among plankton'
+      },
+      nebula: {
+        name: 'Nebula',
+        tagline: 'Space opera — orbiting worlds in a violet starfield'
+      }
+    }
+  },
+  graphActions: {
+    dismissHint: 'Dismiss (Esc)',
+    clearSelHint: 'Clear selection (Esc)',
+    clearSel: 'Clear selection',
+    status: 'Status',
+    pick: 'Pick',
+    size: 'Size',
+    color: 'Color',
+    link: 'Link',
+    swap: 'Swap',
+    swapHint: 'Reverse who is who in this bond',
+    isolate: 'Isolate',
+    isolateHint: 'Isolate this relationship type on the canvas',
+    allBonds: 'All bonds',
+    allBondsHint: 'Open the Relationships view',
+    deleteBond: 'Delete bond',
+    filters: {
+      both: {
+        label: 'Both',
+        title: 'Select nodes and bonds'
+      },
+      nodes: {
+        label: 'Nodes',
+        title: 'Select only people'
+      },
+      bonds: {
+        label: 'Bonds',
+        title: 'Select only relationships'
+      }
+    },
+    setAllStatus: 'Set all {count} bonds to {status}',
+    sizes: {
+      s: {
+        label: 'S',
+        title: 'Small'
+      },
+      m: {
+        label: 'M',
+        title: 'Default'
+      },
+      l: {
+        label: 'L',
+        title: 'Large'
+      },
+      xl: {
+        label: 'XL',
+        title: 'Huge'
+      }
+    },
+    autoColor: 'Auto — the gender gradient',
+    delete: 'Delete',
+    deleteN: 'Delete {n}',
+    clear: 'Clear',
+    clearKeepAll: 'Keep everything, drop the selection',
+    clearKeepPeople: 'Keep everyone, drop the selection',
+    details: 'Details',
+    detailsHint: 'Open the profile card',
+    edit: 'Edit',
+    editHint: 'Edit this {noun}',
+    focus: 'Focus',
+    focusHint: 'Glide the camera to this node',
+    trace: 'Trace',
+    traceHint: 'Trace a connection — then click another person',
+    kin: 'Kin',
+    kinHint: 'Kinship lens — label everyone by what they are to this person',
+    spotlight: 'Spotlight',
+    spotlightHint: 'Spotlight — make this the main character, everyone else in rings around them',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    pinHint: 'Pin the node in place',
+    unpinHint: 'Release the node back to the simulation',
+    pairKinHint: "Show how they're related",
+    swapDirHint: 'Swap direction (matters for parent → child, admirer → crush…)',
+    linked: 'Linked — {label}',
+    traceConnection: 'Trace connection',
+    traceConnectionHint: 'Light up the shortest chain between them',
+    selected: '{n} selected',
+    nounCountOne: '{n} {noun}',
+    nounCountOther: '{n} {noun}s',
+    bondCountOne: '{n} bond',
+    bondCountOther: '{n} bonds',
+    nothingInRange: 'Nothing in range',
+    pairTitle: '{a} & {b}',
+    born: 'b. {year}',
+    died: 'd. {year}',
+    pairSub: 'Forge a bond, or style them together',
+    multiSub: 'Styling applies to everyone selected',
+    unnamed: 'Unnamed',
+    alreadyLinked: 'Already linked',
+    becomes: '{a} becomes {role} of {b}',
+    linkAs: 'Link {a} and {b} as {type}',
+    married: 'Married',
+    marriedYear: 'Married {year}',
+    sinceYear: 'Since {year}',
+    range: '{from} — {to}',
+    endedYear: 'Ended {year}'
+  },
+  relTypesPanel: {
+    title: 'Relationship types',
+    close: 'Close',
+    hint: "Every relationship points at a type. Tune a type's look here",
+    hintAffinityPre: '— and its',
+    hintAffinityBold: 'structural ↔ affinity',
+    hintAffinityPost:
+      'weight: structural types pull hard on the layout (family skeleton), affinity types are decorative overlays, negative weights push people apart (rivals).',
+    symmetric: 'symmetric',
+    typeColor: 'Type color',
+    styleColor: 'Colored by the Style panel',
+    deleteType: 'Delete this type (removes its relationships)',
+    deleteTypeAria: 'Delete type',
+    builtinHint: 'Built-in — tunable, not deletable',
+    builtin: 'Built-in',
+    generations: 'Generations',
+    generationsHint: "How the generations layout treats this type's edges",
+    repel: 'Repel',
+    structural: 'Structural',
+    newTitle: 'New custom type',
+    labelPh: 'Label (e.g. Sworn enemies)',
+    hideIcons: 'Hide icons',
+    chooseIcon: 'Choose an icon',
+    directed: 'Directed',
+    roleAPh: 'Role A (e.g. Master)',
+    roleBPh: 'Role B (e.g. Servant)',
+    addType: 'Add type',
+    typeIcon: 'Type icon',
+    roles: {
+      vertical: {
+        label: 'Generational',
+        hint: 'Parent → child — the child sits one generation below.'
+      },
+      horizontal: {
+        label: 'Same generation',
+        hint: 'A couple — both partners share a row, side by side.'
+      },
+      none: {
+        label: 'Non-generational',
+        hint: 'Ignored by the generations layout (still drawn and pulls in force layouts).'
+      }
+    }
+  },
+  timeline: {
+    undated: '{n} undated',
+    undatedHint:
+      'People without a birth year cannot be placed on the timeline. Add a birth year in their profile to include them.',
+    hint: 'Drag a life to move it · Drag empty space to pan · Scroll to zoom · 1–6: edit tools',
+    empty: {
+      noDatable: 'No datable people',
+      noPeople: 'No people yet',
+      noDatableText:
+        'Add birth years to your family members to see their lives unfold on the timeline.',
+      noPeopleText: 'Add family members from the graph view to see them here.'
+    },
+    searchPh: 'Search people…',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
+    fitAll: 'Fit all',
+    refresh: 'Refresh layout — re-run the family tree algorithm',
+    refreshAria: 'Refresh layout',
+    zoomAxes: 'Time axis {v} · lanes {h}',
+    focus: {
+      title: 'Focus',
+      gender: 'Gender',
+      life: 'Life',
+      all: 'All',
+      unknown: 'Unknown',
+      living: 'Living',
+      remembered: 'Remembered',
+      needYear: 'Set the current year first'
+    },
+    legend: {
+      title: 'Legend',
+      people: 'People',
+      lines: 'Lines',
+      marriage: 'Marriage',
+      divorced: 'Divorced',
+      birth: 'Birth',
+      adopted: 'Adopted'
+    },
+    tip: {
+      dragToMove: 'Drag to move',
+      clickToEdit: 'Click to edit',
+      undated: 'undated',
+      now: 'now'
+    },
+    marriage: {
+      year: 'Year',
+      married: 'Married',
+      divorced: 'Divorced',
+      save: 'Save'
+    },
+    traceArmed: 'ctrl-click another life to trace the connection',
+    hud: {
+      exit: 'Exit the tool (Esc)',
+      exitAria: 'Exit the tool',
+      linkPick: 'Pick what binds them — swap flips the direction',
+      linkNext: 'Now click the life {name} is bound to — at the year it began'
+    },
+    tools: {
+      add: {
+        label: 'Add',
+        hint: 'Click anywhere — a new life begins at that year'
+      },
+      child: {
+        label: 'Child',
+        hint: 'Click a lifeline at the year the child is born'
+      },
+      link: {
+        label: 'Link',
+        hint: 'Click one life, then another — pick what binds them'
+      },
+      event: {
+        label: 'Event',
+        hint: 'Click for a moment · drag up/down for a span'
+      },
+      retime: {
+        label: 'Retime',
+        hint: 'Drag a birth, death, marriage or event — or a whole life'
+      },
+      delete: {
+        label: 'Delete',
+        hint: 'Click a life, marriage or event to remove it'
+      }
+    },
+    bubble: {
+      namePh: 'Name this {noun}…',
+      with: 'with',
+      create: 'Create',
+      createHint: 'Create (Enter)',
+      newLife: 'A new life · born {year}',
+      childOf: "{name}'s child · born {year}"
+    },
+    link: {
+      swap: 'Swap direction (parent → child…)',
+      swapAria: 'Swap direction',
+      directed: '{a} is {role} of {b}',
+      failed: 'Could not link them'
+    },
+    scenes: {
+      label: 'Scenes',
+      add: 'New scene',
+      duplicate: 'Duplicate current scene',
+      delete: 'Delete scene'
+    },
+    ghost: {
+      born: 'born {year}',
+      died: 'died {year}',
+      stillLiving: 'still living',
+      dragToDate: 'drag to date it',
+      dragToEnd: 'drag up to end this life',
+      shiftLife: 'shift the whole life',
+      between: 'between {a} & {b}',
+      after: 'after {name}',
+      before: 'before {name}',
+      firstLane: 'first lane',
+      lives: '{n} lives {where}'
+    },
+    confirm: {
+      deleteMarriage: 'Remove the marriage of {names}?',
+      deleteMarriageBody: 'Both lives stay — only the bond goes.',
+      deleteEvent: 'Delete “{name}”?'
+    },
+    toasts: {
+      marriageRemoved: 'Marriage removed',
+      bornIn: '{name} is now born in {year}',
+      diesIn: '{name} now dies in {year}',
+      movedLater: "{name}'s life moved later by {n} yr",
+      movedEarlier: "{name}'s life moved earlier by {n} yr",
+      marriedIn: 'Married in {year}',
+      eventMoved: '“{name}” moved to {year}',
+      calendarUnsupported: 'That date uses a calendar the timeline can’t move yet'
+    },
+    canvas: {
+      unnamed: 'Unnamed',
+      yearsDead: '{b}–{d} · {age} yr',
+      yearsLiving: 'b. {b} · {age} yr',
+      addYear: 'add year',
+      now: 'now'
+    },
+    style: {
+      title: 'Style',
+      reset: 'Reset',
+      resetHint: 'Back to the defaults',
+      tabs: {
+        lines: 'Lifelines',
+        canvas: 'Canvas',
+        air: 'Atmosphere'
+      },
+      inkLines: 'In the Ink theme lifelines are brushed — looks apply in every other theme.',
+      inkAir: 'The Ink theme brings its own mist — atmospheres apply in every other theme.',
+      thickness: 'Thickness',
+      portraits: 'Portraits',
+      shadows: 'Drop shadows',
+      shadowsHint: 'Shadows fall under the solid, lit looks',
+      flowSpeed: 'Flow speed',
+      glow: 'Glow',
+      palette: 'Palette',
+      paletteEffect: 'Effect',
+      palettePerson: 'Person',
+      ageTicks: 'Age ticks',
+      ageTicksHint: 'A notch every decade of each life',
+      eraWash: 'Era wash',
+      density: 'Density',
+      colours: 'Colours',
+      segs: {
+        connectors: 'Bonds',
+        grid: 'Year grid',
+        labels: 'Names',
+        eventMarkers: 'Events'
+      },
+      opts: {
+        curve: 'Curved',
+        straight: 'Straight',
+        hidden: 'Hidden',
+        bands: 'Bands',
+        lines: 'Lines',
+        none: 'None',
+        full: 'Full',
+        fullHint: 'Name + years',
+        compact: 'Compact',
+        compactHint: 'Short names only',
+        pills: 'Pills',
+        dots: 'Icons'
+      },
+      ambients: {
+        none: 'None',
+        fireflies: 'Fireflies',
+        stars: 'Stars',
+        petals: 'Petals',
+        snow: 'Snow',
+        embers: 'Embers',
+        rain: 'Rain',
+        motes: 'Motes',
+        mist: 'Mist',
+        plum: 'Plum'
+      },
+      looks: {
+        clean: {
+          label: 'Clean',
+          hint: 'Flat lines, no atmosphere'
+        },
+        bloodline: {
+          label: 'Bloodline',
+          hint: 'Blood pulsing down every life, embers drifting'
+        },
+        tides: {
+          label: 'Tides',
+          hint: 'Rivers of time under a drifting mist'
+        },
+        cosmos: {
+          label: 'Cosmos',
+          hint: 'Starlit lives in a twinkling night'
+        },
+        neon: {
+          label: 'Neon city',
+          hint: 'Data streams, rain and hard lines'
+        },
+        gilded: {
+          label: 'Gilded',
+          hint: 'Gold-leaf dynasties, motes of light'
+        },
+        glasshouse: {
+          label: 'Glasshouse',
+          hint: 'Glass rods catching the light, soft snow'
+        },
+        sakura: {
+          label: 'Sakura',
+          hint: 'Lit tubes under falling petals'
+        }
+      },
+      lifelines: {
+        classic: {
+          label: 'Classic',
+          hint: 'Flat, clean lines'
+        },
+        tube: {
+          label: 'Tube',
+          hint: 'Lit 3D cylinders with shadows'
+        },
+        glass: {
+          label: 'Glass',
+          hint: 'Glass rods — a sheen flows down each life'
+        },
+        glow: {
+          label: 'Glow',
+          hint: 'White-hot cores in a coloured glow'
+        }
+      }
+    }
+  },
+  timeSlider: {
+    activeHint: 'Time travel active',
+    presentHint: 'Showing the present',
+    capYear: 'YEAR',
+    capNow: 'NOW',
+    from: 'from {year}',
+    trackHint: 'Drag either handle to frame a span of time',
+    pause: 'Pause',
+    playBack: 'Play backwards',
+    play: 'Play through time',
+    stop: 'Stop — back to the present',
+    stopAria: 'Stop',
+    prevEvent: 'Previous event',
+    nextEvent: 'Next event',
+    backYear: 'Back one year',
+    fwdYear: 'Forward one year',
+    speed: 'Playback speed — {speed}',
+    reverse: 'Reverse playback direction',
+    loop: 'Loop playback'
+  },
+  chronicle: {
+    now: 'now',
+    undated: 'undated',
+    deleted: 'Deleted “{name}”',
+    pane: {
+      title: 'Chronicle',
+      era: 'Era',
+      event: 'Event',
+      eras: 'Eras',
+      events: 'Events',
+      quickStart: 'Quick start',
+      erasEmpty:
+        "Name the stretches of your story — a war, a reign, a golden age — and they'll band the Timeline and the Birth graph.",
+      searchPh: 'Search events…',
+      noMatch: 'Nothing matches.',
+      eventsEmpty:
+        'Battles, coronations, migrations, first meetings — add the moments that shaped your people.',
+      nothingNew: 'Nothing new from “{pack}” for {min}–{max}',
+      addedOne: 'Added {n} era',
+      addedMany: 'Added {n} eras',
+      addFailed: 'Could not add the eras'
+    },
+    editor: {
+      newEra: 'New era',
+      editEra: 'Edit era',
+      newEvent: 'New event',
+      editEvent: 'Edit event',
+      close: 'Close (Esc)',
+      closeAria: 'Close',
+      eraNamePh: 'Name this era — “The Regency”, “Age of Dragons”…',
+      from: 'From',
+      until: 'Until',
+      beginning: 'the beginning of time',
+      open: 'open',
+      ongoing: 'ongoing',
+      colour: 'Colour',
+      anyColour: 'Any colour',
+      icon: 'Icon',
+      eraIcon: 'Era icon',
+      eventTitlePh: 'What happened? — “The Long Winter”, “Grandma arrives in New York”…',
+      when: 'When',
+      lasts: 'lasts a while',
+      weight: 'Weight',
+      importance: {
+        minor: 'Minor',
+        minorHint: 'Shown when zoomed in',
+        notable: 'Notable',
+        notableHint: 'Shown at most zoom levels',
+        major: 'Major',
+        majorHint: 'Always shown, bold'
+      },
+      who: 'Who',
+      remove: 'Remove',
+      removeName: 'Remove {name}',
+      addNoun: 'Add {noun}',
+      whoPh: 'Who took part?',
+      where: 'Where',
+      placePh: 'Optional place',
+      eraDescPh: 'What defined this era?',
+      eventDescPh: 'The story of what happened…',
+      add: 'Add to the chronicle',
+      save: 'Save',
+      saveEraFailed: 'Could not save the era',
+      saveEventFailed: 'Could not save the event',
+      added: '{name} added',
+      saved: '{name} saved',
+      deleteEra: 'Delete era “{name}”?',
+      deleteEvent: 'Delete event “{name}”?',
+      deleteEraBody: 'The band leaves every view. People are not affected.',
+      deleteEventBody: 'It leaves the timeline and every profile.'
+    },
+    date: {
+      year: 'Year',
+      month: 'month',
+      day: 'day',
+      months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    },
+    kinds: {
+      milestone: 'Milestone',
+      battle: 'Battle',
+      war: 'War',
+      coronation: 'Coronation',
+      founding: 'Founding',
+      migration: 'Migration',
+      journey: 'Journey',
+      meeting: 'First meeting',
+      wedding: 'Wedding',
+      treaty: 'Treaty',
+      discovery: 'Discovery',
+      disaster: 'Disaster',
+      betrayal: 'Betrayal',
+      prophecy: 'Prophecy',
+      celebration: 'Celebration',
+      loss: 'Loss',
+      custom: 'Other'
+    },
+    packs: {
+      world: {
+        label: 'World history',
+        hint: 'Wars, reigns and revolutions, 1700 → today'
+      },
+      generations: {
+        label: 'Generations',
+        hint: 'Lost Generation → Gen Alpha'
+      },
+      centuries: {
+        label: 'Centuries',
+        hint: 'One band per century across your project'
+      },
+      fantasy: {
+        label: 'Fantasy ages',
+        hint: 'Myth → Kings → Iron → Twilight, fitted to your years'
+      }
+    },
+    presets: {
+      century: '{ord} century',
+      eras: {
+        ageOfEnlightenment: {
+          name: 'Age of Enlightenment',
+          description: 'Reason, science and the rights of man.'
+        },
+        industrialRevolution: {
+          name: 'Industrial Revolution',
+          description: 'Steam, mills and the move to the cities.'
+        },
+        napoleonicWars: {
+          name: 'Napoleonic Wars',
+          description: 'Europe at war with — and for — Napoleon.'
+        },
+        victorianEra: {
+          name: 'Victorian Era',
+          description: 'The reign of Queen Victoria.'
+        },
+        theGildedAge: {
+          name: 'The Gilded Age',
+          description: 'Railroads, fortunes and rapid change.'
+        },
+        worldWarI: {
+          name: 'World War I',
+          description: 'The Great War.'
+        },
+        theRoaringTwenties: {
+          name: 'The Roaring Twenties',
+          description: 'Jazz, prosperity and new freedoms.'
+        },
+        theGreatDepression: {
+          name: 'The Great Depression',
+          description: 'Hard times across the world.'
+        },
+        worldWarII: {
+          name: 'World War II',
+          description: 'The Second World War.'
+        },
+        coldWar: {
+          name: 'Cold War',
+          description: 'East against West, under the shadow of the bomb.'
+        },
+        spaceAge: {
+          name: 'Space Age',
+          description: 'Sputnik to the Moon landings.'
+        },
+        digitalAge: {
+          name: 'Digital Age',
+          description: 'The internet changes everything.'
+        },
+        lostGeneration: {
+          name: 'Lost Generation',
+          description: 'Came of age in World War I.'
+        },
+        greatestGeneration: {
+          name: 'Greatest Generation',
+          description: 'Grew up in the Depression, fought World War II.'
+        },
+        silentGeneration: {
+          name: 'Silent Generation',
+          description: 'Children of the Depression and the war.'
+        },
+        babyBoomers: {
+          name: 'Baby Boomers',
+          description: 'The post-war baby boom.'
+        },
+        generationX: {
+          name: 'Generation X',
+          description: 'Latchkey kids of the late Cold War.'
+        },
+        millennials: {
+          name: 'Millennials',
+          description: 'Came of age with the internet.'
+        },
+        generationZ: {
+          name: 'Generation Z',
+          description: 'The first truly digital natives.'
+        },
+        generationAlpha: {
+          name: 'Generation Alpha',
+          description: 'Born into smartphones and AI.'
+        },
+        ageOfMyth: {
+          name: 'Age of Myth',
+          description: 'When legends walked the land.'
+        },
+        ageOfKings: {
+          name: 'Age of Kings',
+          description: 'Crowns rise; houses are founded.'
+        },
+        ageOfIron: {
+          name: 'Age of Iron',
+          description: 'War, conquest and steel.'
+        },
+        ageOfTwilight: {
+          name: 'Age of Twilight',
+          description: 'The old powers fade.'
+        }
+      }
+    }
+  },
+  groups: {
+    title: 'Groups',
+    hint: 'Drag people into rings · Drag rings to arrange · Click a person to manage',
+    arrangeTitle: 'Arrange groups in a ring',
+    arrange: 'Arrange',
+    newGroup: 'New group',
+    emptySceneTitle: 'No groups in this scene',
+    emptyTitle: 'No groups yet',
+    emptyText:
+      'Group your people into families, companies, schools, guilds — any camps you like. People in several groups settle in the middle ground between them.',
+    createGroup: 'Create a group',
+    createFirstGroup: 'Create your first group',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
+    fitAll: 'Fit all',
+    focus: 'Focus',
+    gender: 'Gender',
+    life: 'Life',
+    all: 'All',
+    unknown: 'Unknown',
+    living: 'Living',
+    remembered: 'Remembered',
+    showGroup: 'Show group',
+    hideGroup: 'Hide group',
+    editGroup: 'Edit group',
+    sharedCount: '{n} in multiple groups',
+    unassigned: 'Unassigned',
+    trayHint: 'drag onto a ring',
+    trayMoreTitle: 'Filter the member list on the right and drag people in from there',
+    trayMore: '+{n} more',
+    groupName: 'Group name',
+    groupIcon: 'Group icon',
+    save: 'Save',
+    unnamed: 'Unnamed',
+    removeFromGroup: 'Remove from group',
+    addToGroup: 'Add to group…',
+    openProfile: 'Open profile',
+    close: 'Close',
+    scenes: 'Scenes',
+    scenesHint: 'Each scene keeps its own group placements — membership is shared',
+    addScene: 'New empty scene',
+    duplicateScene: 'Duplicate current scene',
+    deleteScene: 'Delete scene',
+    defaultGroupName: 'Group {n}',
+    unnamedGroup: 'Unnamed Group',
+    sceneGroupsOne: '{n} group',
+    sceneGroupsOther: '{n} groups',
+    sceneTooltip: '{groups} · {n} people in scene',
+    defaultSceneName: 'Scene {n}'
+  },
+  kinship: {
+    title: 'Kinship',
+    unnamed: 'Unnamed',
+    tabs: {
+      lens: 'Lens',
+      walk: 'Walk',
+      insights: 'Insights'
+    },
+    pane: {
+      quizTitle: 'Kinship quiz — how well do you know this family?',
+      quiz: 'Quiz',
+      throughEyes: 'Through the eyes of',
+      startingFrom: 'Starting from',
+      selectToBegin: 'Select someone on the graph to begin',
+      useName: 'Use {name}',
+      lensOn: 'Lens on',
+      lensOff: 'See the family through their eyes',
+      lensOnSub: 'Every node now says what it is to {name}',
+      lensOffSub: 'Labels every person with their relation',
+      closestKin: 'Closest kin'
+    },
+    filters: {
+      all: {
+        label: 'All',
+        title: 'Everyone, labelled'
+      },
+      blood: {
+        label: 'Blood',
+        title: 'Blood relatives only'
+      },
+      marriage: {
+        label: 'Marriage',
+        title: 'Spouses, in-laws and step-family'
+      },
+      ancestors: {
+        label: 'Ancestors',
+        title: 'The direct line upward'
+      },
+      descendants: {
+        label: 'Descendants',
+        title: 'Everyone descended from them'
+      }
+    },
+    classes: {
+      blood: 'Blood',
+      spouse: 'Spouse',
+      marriage: 'By marriage',
+      step: 'Step-family',
+      social: 'Social',
+      distant: 'Further out'
+    },
+    walk: {
+      up: 'Up',
+      across: 'Across',
+      down: 'Down',
+      married: 'Married',
+      removeStep: 'Remove this step',
+      tapSteps: 'Tap steps to build a chain…',
+      clear: 'Clear the chain',
+      found: '{n} found',
+      nobody: 'Nobody on record'
+    },
+    insights: {
+      family: 'family',
+      islands: 'islands',
+      linchpinsStat: 'linchpins',
+      tangledStat: 'tangled',
+      linchpinsTitle: 'Remove one of these people and the family splits apart',
+      linchpins: 'Linchpins',
+      cutOffOne: 'Without {name}, {n} person is cut off',
+      cutOffOther: 'Without {name}, {n} people are cut off',
+      holds: 'holds {n}',
+      founders: 'Dynasty founders',
+      founderStat: '{d} desc. · {g} gen',
+      tangledTitle: 'Couples who are also blood relatives',
+      tangled: 'Tangled roots',
+      islandsTitle: 'Groups with no connection to each other',
+      islandsHead: 'Islands',
+      islandOne: '{n} person — {name}…',
+      islandOther: '{n} people — {name}…',
+      empty: 'Add a few parents and children to see the structure.'
+    },
+    quiz: {
+      title: 'Kinship quiz',
+      score: 'Score',
+      streak: 'Streak',
+      closeEsc: 'Close (Esc)',
+      close: 'Close',
+      emptyTitle: 'Grow the tree a little first',
+      emptyText: 'The quiz needs a few parents, children and spouses to ask about.',
+      correct: 'correct',
+      bestStreak: 'Best streak:',
+      playAgain: 'Play again',
+      kinds: {
+        name: 'Name the bond',
+        who: 'Find the relative',
+        hops: 'Six degrees'
+      },
+      questions: {
+        name: 'What is {b} to {a}?',
+        who: 'Who is {a}’s {rel}?',
+        hops: 'How many links from {a} to {b}?'
+      },
+      notQuite: 'Not quite —',
+      hopsNoteOne: "It's {n} link — trace them on the graph to see the chain.",
+      hopsNoteOther: "It's {n} links — trace them on the graph to see the chain.",
+      seeResults: 'See results',
+      next: 'Next',
+      cheers: ['Spot on!', 'Nailed it!', 'Family historian!', 'Exactly right!', 'Yes!'],
+      grades: {
+        keeper: {
+          title: 'Keeper of the Family Tree',
+          sub: 'Nobody knows this family better.'
+        },
+        historian: {
+          title: 'Family Historian',
+          sub: 'You could run the reunion.'
+        },
+        cousin: {
+          title: 'Cousin Counter',
+          sub: 'Solid — the "removed" ones are tricky.'
+        },
+        distant: {
+          title: 'Distant Relative',
+          sub: 'You know the faces, not the bonds.'
+        },
+        stranger: {
+          title: 'Long-lost Stranger',
+          sub: 'Time to study the Kinship lens!'
+        }
+      }
+    },
+    card: {
+      flip: 'Flip the question',
+      notFamily: "{b} and {a} aren't family — {n} links apart",
+      noConnection: '{b} and {a} share no connection at all',
+      degree: 'Degree',
+      degreeValue: '{ord}-degree relative',
+      sharedDna: 'Shared DNA',
+      dnaNoneStep: 'none — family by a stepfamily',
+      dnaNoneMarriage: 'none — family by marriage',
+      also: 'Also',
+      bloodline: 'Bloodline',
+      commonAncestors: 'Common ancestors',
+      commonAncestor: 'Common ancestor',
+      through: 'Through',
+      explicitSibling: 'an explicit sibling bond',
+      directLine: 'a direct line'
+    },
+    section: {
+      groups: {
+        ancestors: 'Ancestors',
+        siblings: 'Siblings',
+        descendants: 'Descendants',
+        collateral: 'Aunts, uncles, nieces & nephews',
+        cousins: 'Cousins',
+        marriage: 'Spouse & in-laws',
+        step: 'Step-family'
+      },
+      less: 'Less',
+      empty: 'No family on record yet.',
+      pedigreeKnown: 'Pedigree known',
+      generationsBack: 'Generations back',
+      collapseTitle: 'Share of ancestor slots filled by someone who already appears elsewhere',
+      collapse: 'Pedigree collapse',
+      inbreeding: 'Own inbreeding (F)'
+    },
+    trace: {
+      armedHint: 'shift-click another person to trace the connection',
+      cancelEsc: 'Cancel (Esc)',
+      dismissEsc: 'Dismiss (Esc)',
+      clearEsc: 'Clear (Esc)',
+      clear: 'Clear',
+      noConnection: 'No connection between {a} and {b}',
+      connection: 'Connection',
+      hopsOne: '{n} hop',
+      hopsOther: '{n} hops',
+      view: 'View {name}',
+      roleOf: '{role} of'
+    },
+    blood: {
+      none: {
+        label: 'No shared blood',
+        note: 'Their child would carry no inbreeding.'
+      },
+      echo: {
+        label: 'Distant echoes',
+        note: 'Around third cousins — common in any old village.'
+      },
+      distant: {
+        label: 'Distant cousins',
+        note: 'About second cousins (1.56%).'
+      },
+      cousins: {
+        label: 'Cousin marriage',
+        note: 'First cousins sit at 6.25%.'
+      },
+      close: {
+        label: 'Close kin',
+        note: 'Uncle–niece or double-cousin territory (12.5%).'
+      },
+      royal: {
+        label: 'Royal-house territory',
+        note: 'Only generations of in-marriage get this high.'
+      },
+      habsburg: {
+        label: 'Habsburg jaw',
+        note: 'Charles II of Spain: 25.4%.'
+      }
+    },
+    fan: {
+      aria: 'Ancestor fan chart',
+      dup: '{name} — appears more than once',
+      unknown: 'Unknown'
+    },
+    lang: {
+      aria: 'Kinship naming language',
+      nameIn: 'Name relatives in {lang}'
+    }
+  },
+  profile: {
+    viewPortrait: 'View portrait',
+    present: 'present',
+    ageYears: '{n} years',
+    ageYrs: '{n} yrs',
+    datesUnrecorded: 'dates unrecorded',
+    inscription: 'Inscription',
+    scrollToUnroll: 'scroll to unroll',
+    unroll: 'unroll',
+    leaves: {
+      story: 'Story',
+      family: 'Family',
+      bonds: 'Bonds',
+      kin: 'Kinship',
+      traits: 'Traits',
+      chron: 'Chronicle',
+      gallery: 'Gallery'
+    },
+    withinTwoBonds: '{n} within two bonds',
+    endedYear: 'ended {year}',
+    familyNamed: 'family, named',
+    yes: 'Yes',
+    no: 'No',
+    primary: 'primary',
+    blankTitle: 'A scroll waiting for ink',
+    blankText: 'No traits, bonds or photos yet — open the editor to paint {name} in.',
+    blankTextAnon: 'No traits, bonds or photos yet — open the editor to paint them in.',
+    startEditing: 'Start editing',
+    unnamed: 'Unnamed',
+    stats: {
+      bonds: 'Bonds',
+      circle: 'Circle',
+      traits: 'Traits',
+      photos: 'Photos'
+    },
+    months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    dateDay: '{d} {m} {y}',
+    dateMonth: '{m} {y}'
+  },
+  directory: {
+    toolbar: {
+      search: 'Search people…',
+      filters: 'Filters'
+    },
+    sort: {
+      name: 'A–Z',
+      year: 'Year',
+      age: 'Age'
+    },
+    filters: {
+      life: 'Life',
+      all: 'All',
+      living: 'Living',
+      remembered: 'Remembered',
+      gender: 'Gender',
+      unknown: 'Unknown',
+      ties: 'Ties',
+      everyone: 'Everyone',
+      connected: 'Connected',
+      unlinked: 'Unlinked',
+      clearOne: 'Clear {n} filter',
+      clearOther: 'Clear {n} filters'
+    },
+    empty: {
+      noMatches: 'No matches',
+      noPeople: 'No people yet',
+      noMatchesHint: 'Try a different search term.',
+      noPeopleHint: 'Add family members from the graph view to see them here.'
+    },
+    modes: {
+      switchLabel: 'Directory view mode',
+      showcaseViews: 'Showcase views',
+      showcase: 'Showcase',
+      showcaseSub: 'Other ways to meet everyone',
+      showcaseTitle: 'Showcase — more ways to see everyone',
+      grid: {
+        label: 'Grid',
+        blurb: 'the classic scrolling wall of cards'
+      },
+      wheel: {
+        label: 'Carousel',
+        blurb: 'a 3D ring of cards — drag to spin it'
+      },
+      flow: {
+        label: 'Flow',
+        blurb: 'coverflow with floor reflections'
+      },
+      fan: {
+        label: 'Hand',
+        blurb: 'a fanned hand of cards'
+      },
+      deck: {
+        label: 'Deck',
+        blurb: 'swipe through the deck one card at a time'
+      },
+      hive: {
+        label: 'Hive',
+        blurb: 'a honeycomb — every person a hexagon'
+      },
+      reel: {
+        label: 'Reel',
+        blurb: 'a spinning drum of film strips'
+      },
+      sheet: {
+        label: 'Sheet',
+        blurb: 'a spreadsheet — type, paste and sort every trait'
+      },
+      roster: {
+        label: 'Roster',
+        blurb: 'a fighting-game select screen'
+      },
+      codex: {
+        label: 'Codex',
+        blurb: 'an illustrated bestiary, page by page'
+      },
+      board: {
+        label: 'Evidence',
+        blurb: 'polaroids and red yarn on a corkboard'
+      },
+      elements: {
+        label: 'Elements',
+        blurb: 'a periodic table of the family'
+      },
+      ranks: {
+        label: 'Ranks',
+        blurb: 'a podium and a leaderboard race'
+      },
+      bubbles: {
+        label: 'Bubbles',
+        blurb: 'packed bubbles that regroup'
+      },
+      handscroll: {
+        label: 'Handscroll',
+        blurb: '长卷 — the family as one painted scroll, read right to left'
+      }
+    },
+    common: {
+      unnamed: 'Unnamed',
+      born: 'b. {year}',
+      died: 'd. {year}',
+      deceased: 'Deceased'
+    },
+    stage: {
+      emptyTitle: 'Nothing to deal',
+      emptyText: 'No people match — clear the search or add someone.',
+      prev: 'Previous',
+      prevHint: 'Previous (Left arrow)',
+      next: 'Next',
+      nextHint: 'Next (Right arrow)'
+    },
+    cardStyle: {
+      current: 'Card style: {style}',
+      title: 'Card style',
+      sub: 'how the directory deals its deck',
+      styles: {
+        classic: {
+          label: 'Classic',
+          blurb: 'The original — banner, avatar, and stats.'
+        },
+        poster: {
+          label: 'Full Art',
+          blurb: 'The photo fills the card; info floats in front.'
+        },
+        holo: {
+          label: 'Holo',
+          blurb: 'Gold-foil trading card with HP, attacks, and rarity.'
+        },
+        neon: {
+          label: 'Neon',
+          blurb: 'Cyberpunk dossier — scanlines, glitches, barcodes.'
+        },
+        arcana: {
+          label: 'Arcana',
+          blurb: 'Tarot of the family — gilded frames and starlight.'
+        },
+        scroll: {
+          label: 'Scroll',
+          blurb: '立轴 — hanging ink scrolls with calligraphy and seals.'
+        },
+        moonfan: {
+          label: 'Moon Fan',
+          blurb: '团扇 — round silk fans painted with plum, bamboo and moon.'
+        }
+      }
+    },
+    hive: {
+      emptyTitle: 'The hive is empty'
+    },
+    reel: {
+      emptyTitle: 'The reel is blank',
+      relations: 'Relations',
+      prevHint: 'Previous (Up arrow)',
+      nextHint: 'Next (Down arrow)'
+    },
+    board: {
+      emptyTitle: 'No leads yet',
+      emptyText: 'No people match — clear the search or add someone.',
+      evidence: 'EVIDENCE',
+      subjects: {
+        one: '{n} subject',
+        other: '{n} subjects'
+      },
+      strings: {
+        one: '{n} string',
+        other: '{n} strings'
+      },
+      zoomIn: 'Zoom in',
+      zoomOut: 'Zoom out',
+      fit: 'Fit',
+      fitTitle: 'Fit everyone on screen',
+      tidy: 'Tidy up',
+      tidyTitle: 'Put every photo back in its family spot',
+      hint: 'Drag the board to pan · scroll to zoom · drag photos to rearrange',
+      deceasedStamp: 'DECEASED',
+      unnamed: 'Unnamed',
+      born: 'b. {year}',
+      died: 'd. {year}',
+      diedAt: '† at {age}',
+      age: 'Age {age}',
+      kin: '{n} kin',
+      children: {
+        one: '{n} child',
+        other: '{n} children'
+      }
+    },
+    bubbles: {
+      emptyTitle: 'No bubbles to blow',
+      emptyText: 'No people match — clear the search or add someone.',
+      unnamed: 'Unnamed',
+      size: 'Size',
+      group: 'Group',
+      sizeModes: {
+        kin: 'Connections',
+        children: 'Children',
+        age: 'Age',
+        equal: 'Equal'
+      },
+      groupModes: {
+        gender: 'Gender',
+        decade: 'Decade',
+        tag: 'Group',
+        life: 'Life',
+        family: 'Family',
+        none: 'None'
+      },
+      everyone: 'Everyone',
+      zoomIn: 'Zoom in',
+      zoomOut: 'Zoom out',
+      fitTitle: 'Fit everyone (Esc)',
+      fitAria: 'Fit everyone',
+      foot: {
+        people: {
+          one: 'person',
+          other: 'people'
+        },
+        groups: {
+          one: 'group',
+          other: 'groups'
+        }
+      },
+      footHint: 'Scroll to zoom · drag to pan · click a circle to dive in',
+      deceased: 'Deceased',
+      born: 'b. {year}',
+      died: 'd. {year}',
+      datesUnknown: 'Dates unknown',
+      metric: {
+        ageUnknown: 'Age unknown',
+        age: 'Age {n}',
+        children: {
+          one: '{n} child',
+          other: '{n} children'
+        },
+        connections: {
+          one: '{n} connection',
+          other: '{n} connections'
+        }
+      },
+      groups: {
+        other: 'Other / unknown',
+        deceased: 'Deceased',
+        living: 'Living',
+        unknownBirth: 'Unknown birth',
+        decade: '{n}s',
+        ungrouped: 'Ungrouped',
+        unconnected: 'Unconnected',
+        surnameFamily: '{name} family',
+        familyN: 'Family {n}'
+      }
+    },
+    card: {
+      unnamed: 'Unnamed',
+      datesUnknown: 'Dates unknown',
+      born: 'b. {year}',
+      died: 'd. {year}',
+      yr: 'yr',
+      yrDeceased: 'yr†',
+      ageYr: '{age} yr',
+      relations: 'Relations',
+      children: 'Children',
+      deceased: 'Deceased',
+      ties: {
+        one: 'tie',
+        other: 'ties'
+      },
+      heirs: {
+        one: 'heir',
+        other: 'heirs'
+      },
+      tiesCount: {
+        one: '{n} tie',
+        other: '{n} ties'
+      },
+      childrenCount: {
+        one: '{n} child',
+        other: '{n} children'
+      },
+      holo: {
+        legend: 'LEGEND',
+        basic: 'BASIC',
+        kinship: 'Kinship',
+        kinshipText: 'Draws strength from every bond.',
+        legacy: 'Legacy',
+        legacyText: 'Passes the story to the next age.',
+        rarity: 'Rarity {n} of 5'
+      },
+      neon: {
+        archived: 'ARCHIVED',
+        online: 'ONLINE',
+        unnamed: 'UNNAMED',
+        age: 'AGE',
+        links: 'LINKS',
+        heirs: 'HEIRS',
+        origin: 'ORIGIN',
+        unknown: 'UNKNOWN'
+      }
+    },
+    handscroll: {
+      emptyTitle: 'The scroll is blank',
+      emptyText: 'No people match — clear the search or add someone.',
+      decade: '{year}s',
+      undated: 'undated',
+      people: {
+        one: '{n} person',
+        other: '{n} people'
+      },
+      scenes: {
+        one: '{n} scene',
+        other: '{n} scenes'
+      },
+      hint: 'drag · wheel · arrow keys'
+    },
+    codex: {
+      title: 'Codex',
+      emptyTitle: 'The codex is unwritten',
+      emptyText: 'No entries match — clear the search or add someone.',
+      entries: {
+        one: '{n} entry',
+        other: '{n} entries'
+      },
+      chronicledCount: '{n} chronicled',
+      jumpTo: 'Jump to {ch}',
+      jumpNo: 'No.',
+      jumpToNumber: 'Jump to entry number',
+      entryNo: 'No. {n}',
+      unnamed: 'Unnamed',
+      deceased: 'Deceased',
+      living: 'Living',
+      openProfile: 'Open full profile',
+      born: 'Born',
+      died: 'Died',
+      age: 'Age',
+      unrecorded: 'Unrecorded',
+      lifespan: 'Lifespan',
+      spanUnrecorded: 'span unrecorded',
+      ageUnknown: 'Unknown',
+      ageYears: '{n} years',
+      ageLiving: '{n} · living',
+      captionUnrecorded: 'unrecorded',
+      caption: '{from} – {to} · {age} of {max} yrs',
+      now: 'now',
+      kinship: 'Kinship',
+      kinCap: 'KIN',
+      groups: {
+        parents: 'Parents',
+        partners: 'Partners',
+        children: 'Children',
+        siblings: 'Siblings'
+      },
+      bond: 'Bond',
+      turnTo: 'Turn to {name}',
+      notInFilter: 'Not in the current filter',
+      more: '+{n} more',
+      noBonds: 'A solitary soul — no bonds recorded.',
+      chronicle: 'Chronicle',
+      noBio: 'No records survive of this one’s deeds. The page waits for a chronicler.',
+      prev: 'Previous entry',
+      prevTitle: 'Previous entry (Up or Left arrow)',
+      next: 'Next entry',
+      nextTitle: 'Next entry (Down or Right arrow)',
+      folio: '— {i} of {n} —',
+      seal: {
+        undated: 'UNDATED',
+        discovered: 'DISCOVERED',
+        discoveredBce: 'DISCOVERED · BCE'
+      },
+      date: {
+        months: [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec'
+        ],
+        year: '{y}',
+        month: '{m} {y}',
+        day: '{d} {m} {y}',
+        bce: '{y} BCE'
+      }
+    },
+    roster: {
+      emptyTitle: 'No challengers',
+      emptyText: 'No people match — clear the search or add someone.',
+      no: 'No.{n}',
+      departed: 'Departed',
+      unnamed: 'Unnamed',
+      selected: 'Selected!',
+      lockIn: 'Lock in',
+      selectTitle: 'Select your character',
+      keys: {
+        left: 'Left',
+        up: 'Up',
+        down: 'Down',
+        right: 'Right'
+      },
+      hintMove: 'move',
+      hintLock: 'lock in',
+      fighters: {
+        one: '{n} fighter',
+        other: '{n} fighters'
+      },
+      life: {
+        span: '{b} – {d}',
+        born: 'b. {y}',
+        died: 'd. {y}'
+      },
+      diedAged: 'died aged {n}',
+      ageN: 'age {n}',
+      stats: {
+        age: 'Age',
+        kin: 'Kin',
+        children: 'Children'
+      }
+    },
+    ranks: {
+      metricAria: 'Ranking metric',
+      metrics: {
+        age: {
+          label: 'Age',
+          blurb: 'Age at the reference year — full lifespan for the departed',
+          unit: {
+            one: 'yr',
+            other: 'yrs'
+          }
+        },
+        connections: {
+          label: 'Connections',
+          blurb: 'Every relationship a person takes part in',
+          unit: {
+            one: 'link',
+            other: 'links'
+          }
+        },
+        children: {
+          label: 'Children',
+          blurb: 'Direct children on record',
+          unit: {
+            one: 'child',
+            other: 'children'
+          }
+        },
+        descendants: {
+          label: 'Descendants',
+          blurb: 'Children, grandchildren and every generation below',
+          unit: {
+            one: 'descendant',
+            other: 'descendants'
+          }
+        },
+        depth: {
+          label: 'Lineage',
+          blurb: 'Generations of recorded ancestors above them',
+          unit: {
+            one: 'gen',
+            other: 'gens'
+          }
+        },
+        siblings: {
+          label: 'Siblings',
+          blurb: 'People who share at least one parent',
+          unit: {
+            one: 'sibling',
+            other: 'siblings'
+          }
+        }
+      },
+      ranked: 'ranked',
+      unranked: 'unranked',
+      avg: 'avg',
+      emptyTitle: 'No contenders',
+      emptyText: 'No people match — clear the search or add someone.',
+      topThree: 'Top three',
+      unnamed: 'Unnamed',
+      deceased: 'Deceased',
+      podiumNote: 'Nobody scores on {metric} yet',
+      colName: 'Name',
+      unrankedDivider: 'Unranked · {n} — no {metric} on record',
+      tied: 'Tied',
+      deltaNew: 'NEW',
+      bornShort: 'b. {year}',
+      diedShort: 'd. {year}'
+    },
+    elements: {
+      emptyTitle: 'No elements discovered',
+      emptyText: 'No people match — clear the search or add someone.',
+      deceased: 'Deceased',
+      unnamed: 'Unnamed',
+      stats: {
+        born: 'Born',
+        died: 'Died',
+        age: 'Age',
+        kin: 'Kin',
+        children: 'Children',
+        group: 'Group'
+      },
+      groupByAria: 'Group columns by',
+      groupsLabel: 'Groups',
+      colourByAria: 'Colour tiles by',
+      colourLabel: 'Colour',
+      groupings: {
+        decade: 'Birth decade',
+        generation: 'Generation',
+        tag: 'Group tag'
+      },
+      colorings: {
+        gender: 'Gender',
+        life: 'Life status',
+        group: 'Group'
+      },
+      cats: {
+        other: 'Other / unknown',
+        living: 'Living',
+        deceased: 'Deceased',
+        undated: 'Undated',
+        untagged: 'Untagged'
+      },
+      tagFallback: 'Tag',
+      hint: '{elements} elements · {groups} groups · {periods} periods — hover to inspect, click to open',
+      gen: 'Gen {n}',
+      decade: '{d}s',
+      massYears: '{age} yr',
+      ageAtDeath: '{age} (at death)',
+      periodShort: 'P{n}',
+      monthsShort: [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
+      ],
+      dateDay: '{d} {m} {y}',
+      dateMonth: '{m} {y}'
+    }
+  },
+  dock: {
+    expand: 'Expand panel',
+    collapse: 'Collapse panel',
+    inspector: 'Inspector',
+    noDates: 'No dates recorded',
+    tags: 'Tags',
+    openProfile: 'Open profile',
+    edit: 'Edit',
+    emptyHint:
+      'Select a person on the canvas — or pick one from the Directory tab — to inspect and edit them here.',
+    noPeopleFound: 'No people found',
+    addNoun: 'Add {noun}'
+  },
+  sheet: {
+    aria: 'Spreadsheet',
+    bar: {
+      addRowTitle: 'Add a row (Enter on an empty sheet)',
+      addTraitTitle: 'Add a trait column',
+      trait: 'Trait',
+      columnsTitle: 'Show or hide columns',
+      columns: 'Columns',
+      hidden: '{n} hidden',
+      fillDownTitle: 'Fill down (Ctrl+D)',
+      confirmDelete: 'Click again to delete'
+    },
+    deleteRows: 'Delete {n} {nouns}',
+    head: {
+      selectAll: 'Select all (Ctrl+A)',
+      options: 'Column options',
+      resize: 'Drag to resize · double-click to fit',
+      titleAge: 'Age in {year} (calculated) — click to sort',
+      titleTies: 'Number of relationships (calculated) — click to sort',
+      titleGroups: 'Group memberships — click to sort',
+      titleField: '{label} ({type}) — click to sort',
+      titleFieldSlot: '{label} ({type} · {slot} slot) — click to sort'
+    },
+    typeNames: {
+      text: 'text',
+      boolean: 'boolean',
+      number: 'number',
+      number_range: 'number range',
+      select: 'select',
+      slider: 'slider',
+      date: 'date',
+      date_range: 'date range',
+      custom_date: 'custom date',
+      custom_date_range: 'custom date range'
+    },
+    slots: {
+      name: 'name',
+      gender: 'gender',
+      birth: 'birth',
+      death: 'death',
+      highlight: 'highlight'
+    },
+    types: {
+      text: 'Text',
+      number: 'Number',
+      date: 'Date',
+      select: 'Choice',
+      boolean: 'Yes / no',
+      slider: 'Slider',
+      number_range: 'Num range',
+      date_range: 'Date range'
+    },
+    cols: {
+      age: 'Age',
+      ties: 'Ties',
+      groups: 'Groups',
+      showAll: 'Show all columns'
+    },
+    people: {
+      one: 'person',
+      other: 'people'
+    },
+    customNoun: {
+      one: '{noun}',
+      other: '{noun}s'
+    },
+    addNoun: 'Add {noun}',
+    addRowHint: 'or paste rows below the last one',
+    unnamed: 'Unnamed',
+    empty: {
+      noMatches: 'No matches',
+      emptyTitle: 'An empty sheet',
+      noMatchesText: 'Nobody fits the current search or filters.',
+      emptyText: 'Add the first row — or paste a list of names from any spreadsheet.'
+    },
+    status: {
+      rows: '{n} {nouns}',
+      cols: {
+        one: '{n} column',
+        other: '{n} columns'
+      },
+      resort: 'Re-sort',
+      resortTitle: 'Values changed since the rows were ordered',
+      hint: 'Enter edit · Tab next · Ctrl+C / Ctrl+V · Del clear · Ctrl+D fill down · right-click for more',
+      saving: 'Saving…',
+      notSaved: 'Not saved',
+      saved: 'All changes saved'
+    },
+    addCol: {
+      title: 'New trait column',
+      placeholder: 'Trait name, e.g. Nickname',
+      add: 'Add column'
+    },
+    menu: {
+      confirm: 'Click again to confirm',
+      sortAsc: 'Sort ascending',
+      sortDesc: 'Sort descending',
+      clearSort: 'Clear sort',
+      fit: 'Fit width to content',
+      selectColumn: 'Select column',
+      rename: 'Rename trait',
+      hide: 'Hide column',
+      deleteTrait: 'Delete trait for everyone',
+      deleteTraitArmed: 'Click again — removes every value',
+      copy: 'Copy',
+      paste: 'Paste',
+      clear: 'Clear contents',
+      fillDown: 'Fill down',
+      openProfile: 'Open profile',
+      editForm: 'Edit in full form',
+      deleteRowsArmed: 'Click again to delete {n}'
+    },
+    summary: {
+      cells: '{n} cells',
+      count: 'Count {n}',
+      sum: 'Sum {n}',
+      avg: 'Avg {n}',
+      min: 'Min {n}',
+      max: 'Max {n}'
+    },
+    fx: {
+      selectCell: 'Select a cell',
+      pickGroups: 'Double-click the cell to pick groups',
+      calculated: 'Calculated',
+      pick: 'Double-click to pick',
+      empty: 'Empty — type to fill'
+    },
+    ref: {
+      cells: 'cells',
+      row: '{name} · row {n}'
+    },
+    notice: {
+      genericError: 'Something went wrong',
+      saveFailed: "Couldn't save — {error}",
+      projectChanged: 'The project changed before this edit saved',
+      calculated: "{label} is calculated — it can't be typed into",
+      cleared: 'Cleared {n} cells',
+      cantClear: 'Calculated and group cells can’t be cleared here',
+      filled: {
+        one: 'Filled {n} cell down',
+        other: 'Filled {n} cells down'
+      },
+      copied: {
+        one: 'Copied {n} cell',
+        other: 'Copied {n} cells'
+      },
+      pressCopy: 'Press Ctrl+C to copy',
+      pressPaste: 'Press Ctrl+V to paste',
+      pasted: {
+        one: 'Pasted {n} cell',
+        other: 'Pasted {n} cells'
+      },
+      pastedAdded: 'added {n} {nouns}',
+      pastedBad: "{n} didn't fit their trait type",
+      pastedSkipped: '{n} landed on calculated columns',
+      nothing: 'Nothing to change',
+      deletedRows: 'Deleted {n} {nouns} — Ctrl+Z to undo',
+      colAdded: 'Added “{label}” — every {noun} has it now',
+      traitDeleted: 'Deleted “{label}” — Ctrl+Z to undo',
+      discarded: 'That entry didn’t fit its trait type — change discarded'
+    },
+    parse: {
+      notNumber: 'Not a number',
+      numRangeShape: 'Use “low–high”',
+      numRangeNumbers: 'Use numbers, like “10–20”',
+      yesNo: 'Use yes / no',
+      notOption: "“{text}” isn't an option",
+      dateShape: 'Use a year, or YYYY-MM-DD',
+      dateRangeShape: 'Use “from–to”',
+      dateRangeDates: 'Use dates, like “1950–1960”',
+      notEditable: 'This trait type can’t be edited here yet'
+    },
+    picker: {
+      findGroup: 'Find or create a group…',
+      findOption: 'Find or add an option…',
+      newGroup: 'New group',
+      addOption: 'Add option',
+      empty: 'Nothing to pick yet',
+      clear: 'Clear',
+      hintMulti: 'move · Enter toggle · Esc close',
+      hintSingle: 'move · Enter pick · Esc close'
+    }
+  },
+  personForm: {
+    input: {
+      notSetHint: 'Not set — click to set',
+      notSet: 'Not set',
+      yes: 'Yes',
+      no: 'No',
+      clear: 'Clear',
+      from: 'From',
+      to: 'To',
+      year: 'Year',
+      reserved: 'Coming with custom calendars'
+    },
+    types: {
+      text: 'Text',
+      boolean: 'Yes / No',
+      number: 'Number',
+      number_range: 'Number range',
+      select: 'Selection',
+      slider: 'Slider',
+      date: 'Date',
+      date_range: 'Date range'
+    },
+    typeHints: {
+      text: 'Free text',
+      boolean: 'A true/false switch',
+      number: 'One number, optional unit',
+      number_range: 'Uncertain span (a–b)',
+      select: 'Pick one option',
+      slider: 'A value between two ends',
+      date: 'A point in time',
+      date_range: 'Uncertain time span'
+    },
+    slots: {
+      name: 'Name',
+      gender: 'Gender',
+      birth: 'Birth',
+      death: 'Death',
+      highlight: 'Highlight'
+    },
+    slotHints: {
+      name: 'Text traits · order = word order',
+      gender: 'Maps onto the color gradient',
+      birth: 'Dates, years or ranges',
+      death: 'Dates, years or ranges',
+      highlight: 'Any value rings the node'
+    },
+    addTrait: 'Add trait',
+    close: 'Close',
+    changeType: 'Change type',
+    nameTraitPh: 'Name this {type} trait…',
+    lock: 'Lock',
+    lockHint: "Locked traits appear on every person's form",
+    create: 'Create',
+    optionN: 'Option {n}',
+    row: {
+      dragHint: 'Drag to reorder — drop on a slot to assign',
+      templateHint: 'Template trait — on every form',
+      shownInGraph: 'Shown in the graph label',
+      timeframeHint: 'When this trait applied',
+      label: 'Label',
+      unit: 'Unit',
+      multiline: 'Multiline',
+      min: 'Min',
+      max: 'Max',
+      step: 'Step',
+      leftLabel: 'Left label',
+      rightLabel: 'Right label',
+      icon: 'Icon',
+      traitIcon: 'Trait icon',
+      optionColor: 'Option color',
+      optionPh: 'Option…',
+      removeOption: 'Remove option',
+      addOption: 'Add option',
+      apply: 'Apply',
+      options: 'Trait options',
+      editTrait: 'Edit trait',
+      editTraitHint: 'Label · icon · options',
+      unlock: 'Unlock',
+      thisPersonOnly: 'This {noun} only',
+      onEveryForm: 'On every form',
+      showInGraph: 'Show in graph',
+      applyAllHint: 'Apply to this trait on every person',
+      applyAll: 'Apply to all',
+      removeTimeframe: 'Remove timeframe',
+      setTimeframe: 'Set timeframe',
+      moveToSlot: 'Move to slot',
+      slotRejects: "{type} traits can't go here",
+      duplicate: 'Duplicate',
+      removeFromThis: 'Remove from this {noun}',
+      deleteTrait: 'Delete trait',
+      copyName: '{name} copy'
+    },
+    unnamed: 'Unnamed',
+    bornAbbr: 'b. {year}',
+    picker: {
+      placeholder: 'Type a name…',
+      noMatches: 'No one matches',
+      creating: 'Creating…',
+      createAs: 'Create “{name}” as a new {noun}'
+    },
+    dock: {
+      leftColor: 'Left gradient color',
+      rightColor: 'Right gradient color',
+      earlier: 'Earlier in the name',
+      later: 'Later in the name',
+      ringColor: 'Ring color',
+      ejectHint: 'Remove from slot (back to the trait list)',
+      eject: 'Remove from slot',
+      dropHere: 'Drop it here',
+      dragHere: 'Drag a trait here'
+    },
+    livePreview: 'Live preview',
+    identitySlots: 'Identity slots',
+    traits: 'Traits',
+    traitsHint: "Drag a row's handle to reorder · drop it on a slot to assign",
+    removeRel: 'Remove relationship',
+    status: 'Status',
+    married: 'Married',
+    since: 'Since',
+    ended: 'Ended',
+    siblings: 'Siblings',
+    siblingHint: 'Derived from a shared parent — no separate relationship needed',
+    viaSharedParents: 'via shared parents',
+    new: 'New',
+    discardLink: 'Discard this link',
+    images: 'Images',
+    imagesLater: 'Images can be added after creating — save first.',
+    removeImage: 'Remove image',
+    useAs: 'Use as {slot}',
+    deleteImage: 'Delete image',
+    addExtraImage: 'Add an extra image',
+    extra: 'Extra',
+    tags: 'Tags',
+    tagsLater: 'Tags can be added after creating — save first.',
+    saving: 'Saving…',
+    saveChanges: 'Save changes',
+    intentHintDirected: "Who is this {noun}'s {role}?",
+    intentHintSym: '{type}: pick the other {noun}',
+    bands: {
+      family: 'Family',
+      social: 'Social',
+      power: 'Power',
+      custom: 'Custom'
+    },
+    roleOf: '{role} of',
+    imageSlots: {
+      portrait: 'Portrait',
+      fullbody: 'Full body',
+      background: 'Background'
+    },
+    imageSlotHints: {
+      portrait: 'Head & shoulders — the avatar',
+      fullbody: 'Standing figure',
+      background: 'A scene or backdrop'
+    },
+    sections: {
+      identity: 'Identity',
+      traits: 'Traits',
+      relations: 'Relations',
+      images: 'Images',
+      tags: 'Tags'
+    },
+    editTitle: 'Edit: {name}',
+    addTitle: 'Add {noun}',
+    present: 'present',
+    onlyTextInName: 'Only text traits can appear in the graph name',
+    slotRejectsType: "That trait type can't go in the {slot} slot",
+    couldNotSave: 'Could not save',
+    couldNotCreate: 'Could not create'
+  },
+  tagChips: {
+    color: 'Tag color',
+    typeTitle: 'Tag type: {type}',
+    remove: 'Remove tag',
+    empty: 'No tags yet.',
+    addExisting: 'Add existing tag…',
+    assign: 'Assign',
+    newLabelPh: 'New tag label…',
+    typePh: 'Type (optional)',
+    typeHint: "Tags with the same type can be compared in the Groups view (e.g. 'family')",
+    add: 'Add'
+  },
+  personModal: {
+    inMemoriam: 'In memoriam',
+    present: 'Present',
+    ageYrs: '{n} yrs',
+    noDates: 'No dates recorded',
+    stats: {
+      bonds: 'Bonds',
+      circle: 'Circle',
+      traits: 'Traits',
+      photos: 'Photos'
+    },
+    constellation: 'Constellation',
+    withinTwo: '{n} within two bonds',
+    twoHops: '2 hops',
+    kinship: 'Kinship',
+    kinshipSub: 'family, named',
+    story: 'Story',
+    traits: 'Traits',
+    chronicle: 'Chronicle',
+    addEventHint: 'Add a story event they took part in',
+    addEvent: 'Add event',
+    livedThrough: 'Lived through',
+    bonds: 'Bonds',
+    endedYear: 'Ended {year}',
+    gallery: 'Gallery',
+    primaryPhoto: 'Primary photo',
+    blankTitle: 'A story waiting to be written',
+    blankText: 'No traits, bonds, or photos yet — open the editor to bring {name} to life.',
+    them: 'them',
+    startEditing: 'Start editing',
+    profileStyle: 'Profile style',
+    styles: {
+      cinematic: 'Cinematic',
+      scroll: 'Scroll'
+    },
+    styleTitles: {
+      cinematic: 'Cinematic profile',
+      scroll: 'Handscroll — an ink-painting profile'
+    },
+    editNoun: 'Edit {noun}',
+    edit: 'Edit',
+    deleteNoun: 'Delete {noun}',
+    closeProfile: 'Close profile',
+    prevPhoto: 'Previous photo',
+    nextPhoto: 'Next photo',
+    kin: {
+      husband: 'Husband',
+      wife: 'Wife',
+      spouse: 'Spouse',
+      son: 'Son',
+      daughter: 'Daughter',
+      child: 'Child',
+      father: 'Father',
+      mother: 'Mother',
+      parent: 'Parent',
+      adoptedChild: 'Adopted child',
+      adoptiveParent: 'Adoptive parent',
+      brother: 'Brother',
+      sister: 'Sister',
+      sibling: 'Sibling'
+    },
+    bands: {
+      family: 'Family',
+      social: 'Social',
+      power: 'Power',
+      custom: 'Other'
+    },
+    ev: {
+      born: 'Born',
+      married: 'Married {name}',
+      childBorn: '{name} born',
+      bond: '{role} — {name}',
+      bondEnded: '{role} ended — {name}',
+      with: 'with {names}',
+      eraBegins: '{name} begins',
+      aged: 'aged {n}',
+      died: 'Died',
+      atAge: 'at {n}'
+    },
+    listSep: ', ',
+    back: 'Back',
+    view: 'view',
+    backTo: 'Back to {view}'
+  },
+  relsView: {
+    searchPh: 'Search by name…',
+    issuesHint: 'Relationships that need attention',
+    issues: 'Issues',
+    filters: 'Filters',
+    manageTypes: 'Manage relationship types',
+    types: 'Types',
+    addRel: 'Add relationship',
+    dates: 'Dates',
+    any: 'Any',
+    dated: 'Dated',
+    undated: 'Undated',
+    marriage: 'Marriage',
+    together: 'Together',
+    groupLens: 'Group lens',
+    endpointsHint: 'Which endpoints must be in the group',
+    either: 'Either',
+    both: 'Both',
+    clearFilters: {
+      one: 'Clear {n} filter',
+      other: 'Clear {n} filters'
+    },
+    newRel: 'New relationship',
+    personA: 'Person A',
+    personB: 'Person B',
+    relationship: 'Relationship',
+    swapAB: 'Swap A and B',
+    marriedYear: 'Married (year)',
+    sinceYear: 'Since (year)',
+    endedYear: 'Ended (year)',
+    save: 'Save',
+    colFrom: 'From',
+    colRelation: 'Relation',
+    colTo: 'To',
+    viewPerson: 'View {name}',
+    unknown: 'Unknown',
+    toggleMarried: 'Click to toggle married / divorced',
+    formedHint: 'Year the relationship formed',
+    swapDirection: 'Swap direction',
+    editRel: 'Edit relationship',
+    deleteRel: 'Delete relationship',
+    empty: {
+      noIssues: 'No issues found',
+      noMatches: 'No matches',
+      noRels: 'No relationships yet',
+      noIssuesText: 'Every relationship looks consistent. Nice work!',
+      noMatchesText: 'Try a different search term or filter.',
+      noRelsText: 'Connect two family members to get started.'
+    },
+    selectPerson: 'Select person…',
+    nameBorn: '{name} ({born})',
+    parentOf: 'Parent of',
+    partner: 'Partner',
+    all: 'All',
+    issue: {
+      self: 'Links a person to themselves',
+      missing: 'References a person that no longer exists',
+      duplicate: 'Duplicate — this pair already has this relationship',
+      parentYounger: 'Parent (b. {a}) born after or same year as child (b. {b})',
+      tooManyParents: '{name} has more than two biological parents',
+      thisChild: 'This child',
+      redundantSibling: 'Redundant — these two are already siblings via a shared parent'
+    },
+    preview: {
+      divorced: '{a} and {b} were married, now divorced',
+      married: '{a} and {b} are married',
+      adopted: '{a} adopted {b}',
+      parent: '{a} is a parent of {b}',
+      generic: '{a} — {b}',
+      directed: "{a} is {b}'s {role}",
+      symmetric: '{a} and {b} are {type}s'
+    },
+    err: {
+      chooseBoth: 'Choose both people.',
+      self: 'A person cannot be linked to themselves.',
+      exists: 'This relationship already exists.',
+      couldNotSave: 'Could not save.'
+    },
+    kind: {
+      marriage: 'marriage',
+      adoption: 'adoption',
+      parentChild: 'parent–child'
+    }
+  },
+  app: {
+    homepage: 'Homepage',
+    exportFailed: 'Export failed',
+    langName: {
+      en: 'English',
+      'zh-Hans': 'Simplified Chinese',
+      'zh-Hant': 'Traditional Chinese',
+      nb: 'Norwegian'
+    }
+  },
+  scenes: {
+    label: 'Scenes',
+    add: 'New scene',
+    duplicate: 'Duplicate current scene',
+    remove: 'Delete scene'
+  },
+  commands: {
+    searchPh: 'Jump to a person…',
+    unnamed: 'Unnamed',
+    born: 'b. {year}',
+    noMatches: 'No matches'
+  },
+  exportModal: {
+    title: 'Export image',
+    sub: 'Compose a picture of your project and save it anywhere',
+    closeEsc: 'Close (Esc)',
+    dragReframe: 'Drag to reframe',
+    dragFrame: 'Drag to frame the part you want',
+    empty: 'Nothing to picture in the {view} view yet.',
+    cropped: 'Cropped',
+    reset: 'Reset',
+    view: 'View',
+    size: 'Size',
+    preset: {
+      fhd: 'Full HD',
+      qhd: 'QHD',
+      '4k': '4K UHD',
+      square: 'Square',
+      portrait: 'Portrait',
+      a4: 'Print A4 · 300dpi'
+    },
+    custom: 'Custom…',
+    format: 'Format',
+    quality: 'Quality',
+    colours: 'Colours',
+    noAlpha: 'JPEG has no transparency — pick PNG or WebP',
+    scheme: {
+      app: 'Match app',
+      none: 'None'
+    },
+    tint: 'Ambient colour wash',
+    margin: 'Margin',
+    text: 'Text',
+    titlePh: 'Title (shown in the image)',
+    subtitlePh: 'Subtitle (optional)',
+    stamp: 'Corner stamp — {stamp}',
+    crop: 'Crop',
+    done: 'Done',
+    saved: 'Saved',
+    rendering: 'Rendering…',
+    download: 'Download',
+    defaultStamp: 'Family tree'
+  },
+  auth: {
+    termsPrivacy: 'Terms & Privacy',
+    home: 'Home',
+    back: 'Back',
+    loginSubtitle: 'Welcome back — sign in to continue',
+    registerSubtitle: 'Create an account to start your tree',
+    signIn: 'Sign in',
+    createAccount: 'Create account',
+    username: 'Username',
+    password: 'Password',
+    hidePassword: 'Hide password',
+    showPassword: 'Show password',
+    confirmPassword: 'Confirm password',
+    agreePre: 'I agree to the',
+    terms: 'Terms',
+    agreeAnd: 'and',
+    privacyPolicy: 'Privacy Policy',
+    agreePost: '',
+    or: 'or',
+    guest: 'Continue as guest',
+    guestNote: 'Explore with sample data — Advanced mode stays locked.',
+    footPre: 'Your data stays on this device — see the',
+    footPost: '',
+    strength: {
+      tooShort: 'Too short',
+      okay: 'Okay',
+      good: 'Good',
+      strong: 'Strong'
+    },
+    err: {
+      mismatch: 'Passwords do not match',
+      acceptTerms: 'Please accept the Terms & Privacy Policy',
+      generic: 'Something went wrong',
+      guest: 'Could not start a guest session',
+      usernameMin: 'Username must be at least {n} characters',
+      usernameMax: 'Username must be at most {n} characters',
+      usernameChars: 'Username may only contain letters, numbers, dots, dashes and underscores',
+      passwordMin: 'Password must be at least {n} characters',
+      passwordMax: 'Password must be at most {n} characters',
+      taken: 'That username is already taken',
+      invalid: 'Invalid username or password',
+      locked: 'Too many failed attempts — try again in a few minutes'
+    },
+    email: 'Email',
+    emailPh: 'you@example.com',
+    sb: {
+      createTitle: 'Create your account',
+      welcomeTitle: 'Welcome back',
+      createSub: 'Sign up to start building your trees.',
+      welcomeSub: 'Sign in to your trees.',
+      wait: 'Please wait…',
+      signUp: 'Sign up',
+      haveAccount: 'Already have an account?',
+      noAccount: 'No account yet?',
+      genericError: 'Something went wrong. Please try again.',
+      confirmSent: 'We sent a confirmation link to {email}. Confirm it, then sign in.'
+    }
+  },
+  ui: {
+    search: 'Search…',
+    clearSearch: 'Clear search',
+    icon: 'Icon',
+    noIcon: 'No icon',
+    searchIcons: 'Search all icons…',
+    noIconMatch: 'No icon matches “{query}”.'
+  },
+  storeMsg: {
+    welcome: 'Welcome',
+    welcomeName: 'Welcome, {name}',
+    welcomeGuest: 'Welcome, guest',
+    growingTree: 'Growing your family tree…',
+    notProjectFile: 'Not a project file',
+    opening: 'Opening {name}',
+    switchingProject: 'Switching project…',
+    loadingData: 'Loading people & relationships…',
+    yourProfile: 'Your profile',
+    gatheringAccount: 'Gathering your account…',
+    signingOut: 'Signing out…',
+    seeYouSoon: 'See you soon'
+  },
+  home: {
+    born: 'b. {year}',
+    nav: {
+      features: 'Features',
+      views: 'Views',
+      explore: 'Explore',
+      about: 'About',
+      openEditor: 'Open editor',
+      signIn: 'Sign in',
+      getStarted: 'Get started'
+    },
+    hero: {
+      eyebrow: 'Every family is a universe',
+      titleWords: ['Turn', 'your', 'family', 'into', 'a', '*living', '*constellation.'],
+      titleLabel: 'Turn your family into a living constellation.',
+      sub: 'Map real ancestors or invented dynasties. Watch lifetimes unfold on a cinematic timeline, gather kin into glowing houses, and drift through your tree in 3D — silky smooth at thousands of people.',
+      ctaOpen: 'Open your tree',
+      ctaStart: 'Start your tree — free',
+      ctaDemo: 'Try the live demo',
+      demoError: 'Could not start the demo — try again',
+      trust: 'Free forever · Private by default · Desktop & web',
+      scroll: 'Scroll',
+      hint: 'Psst — click the sky'
+    },
+    features: {
+      kicker: 'Why it feels different',
+      titleLead: 'Ancestry, but ',
+      titleEm: 'alive',
+      titleTail: '.',
+      sub: 'Most family tree tools feel like tax software. This one feels like a night sky you get to arrange.',
+      items: {
+        breathes: {
+          title: 'A tree that breathes',
+          text: 'Physics-driven graphs: drag a grandparent and the whole family sways. Five layouts, from strict generations to free-floating space.'
+        },
+        time: {
+          title: 'Time travel',
+          text: 'Scrub the time slider and watch people appear, marry and grow old. Lifelines, marriage ribbons and birth sparks — all animated.'
+        },
+        houses: {
+          title: 'Houses & clans',
+          text: 'Tag anyone into groups — farms, dynasties, ship crews — and watch them gather into glowing clusters you can rearrange.'
+        },
+        faces: {
+          title: 'Faces & stories',
+          text: 'Portraits, photos, dates and notes on every person. Build the full cast of your family, not just a chart of names.'
+        },
+        smooth: {
+          title: 'Absurdly smooth',
+          text: 'Everything is WebGL. Ten thousand relatives glide at 60fps, ambient animations idle at 0% CPU, and views switch like scenes in a film.'
+        },
+        yours: {
+          title: 'Yours, full stop',
+          text: 'Private by default and works offline. Your data lives with you and exports to a plain file. No ads, no mining, no credit card.'
+        }
+      }
+    },
+    views: {
+      kicker: 'Five lenses',
+      titleLead: 'One family. ',
+      titleEm: 'Five ways to see it.',
+      sub: 'Watch the same twelve people rearrange themselves — this is live, go ahead and click.'
+    },
+    stats: {
+      people: 'people in one tree — still silky',
+      lenses: 'lenses on every family',
+      languages: 'languages, three themes',
+      fps: 'with ambient animation at 0% idle CPU'
+    },
+    marquee: {
+      title: 'Room for every kind of family'
+    },
+    explore: {
+      kicker: 'Community · coming soon',
+      titleLead: 'Explore family ',
+      titleEm: 'universes',
+      titleTail: '.',
+      sub: 'A peek at the kinds of trees people are growing. Browsing, likes, comments and follows launch with our hosted home — every cover below is generated art, not a screenshot.'
+    },
+    about: {
+      kicker: 'About the maker',
+      title: 'Handmade by one person who thinks family history deserves better software.',
+      body: "Hi — I'm Tommy. I built {app} because my own family refused to fit in a spreadsheet, and every tool I tried felt like filling out forms. No company behind this, no tracking, no venture capital — just a long labour of love, shipped from Norway. If it makes you map somebody you love (or a dynasty you invented at 2 a.m.), it's doing its job.",
+      hello: 'Say hello',
+      idea: 'Suggest a feature'
+    },
+    final: {
+      titleAuthed: 'Your family is waiting.',
+      titleGuest: "Begin your family's story.",
+      subAuthed: 'Jump back into the editor and keep the constellation growing.',
+      subGuest: 'Two minutes from now, your first three generations could be on the canvas.',
+      ctaAuthed: 'Back to your tree',
+      ctaGuest: "Start your tree — it's free",
+      note: 'No downloads required · No credit card · Just your people'
+    },
+    footer: {
+      tag: 'Every family is a constellation.',
+      product: 'Product',
+      maker: 'Maker',
+      legal: 'Legal',
+      contact: 'Contact',
+      terms: 'Terms of Use',
+      privacy: 'Privacy Policy',
+      madeWith: 'Made with',
+      madeAfter: 'and zero venture capital',
+      love: 'love'
+    },
+    showcase: {
+      live: 'Live',
+      sep: ' — ',
+      spaceName: '3D Space',
+      groups: {
+        farm: 'The farm',
+        seafarers: 'Seafarers',
+        musicians: 'Musicians'
+      },
+      views: {
+        tree: {
+          title: 'The living graph',
+          caption: 'a physics-driven web of everyone — drag someone and the whole family sways.'
+        },
+        timeline: {
+          title: 'Lifelines',
+          caption: 'every person becomes a lifespan — see who overlapped, who never met.'
+        },
+        groups: {
+          title: 'Houses & clans',
+          caption: 'tag people into groups and watch them gather into glowing constellations.'
+        },
+        grid: {
+          title: 'The directory',
+          caption: 'a searchable card index of your whole cast — built to scroll thousands.'
+        },
+        space: {
+          title: 'Space mode',
+          caption: 'the experimental lens — your dynasty floating in three dimensions.'
+        }
+      }
+    },
+    gallery: {
+      filters: {
+        all: 'All',
+        trending: 'Trending',
+        fictional: 'Fictional',
+        historical: 'Historical',
+        personal: 'Personal'
+      },
+      badges: {
+        trending: 'Trending',
+        staffPick: 'Staff pick',
+        new: 'New'
+      },
+      coverMeta: '{people} people · {generations} generations',
+      peoplePill: '{people} people',
+      liked: 'Liked! (community sync coming soon)',
+      like: 'Like',
+      comments: 'Comments',
+      favorites: 'Favorites',
+      followers: 'Followers',
+      close: 'Close',
+      peekTitle: 'Community browsing is almost here',
+      peekBody:
+        "Soon you'll be able to step inside trees like this one — explore them view by view, follow the makers, leave comments, and favorite the families you love.",
+      follow: 'Follow',
+      comment: 'Comment',
+      favorite: 'Favorite',
+      cta: 'Start your own tree instead',
+      ago: {
+        m: '{n}m ago',
+        h: '{n}h ago',
+        d: '{n}d ago'
+      }
+    },
+    projects: {
+      atreides: {
+        title: 'House Atreides',
+        blurb: 'From Duke Leto to Leto II — every bloodline on Arrakis, mapped.'
+      },
+      medici: {
+        title: 'The Medici Dynasty',
+        blurb: 'Bankers, popes and patrons — Renaissance Florence in one graph.'
+      },
+      vestlandet: {
+        title: 'Slekta mi — Vestlandet',
+        blurb: 'Four farms, seven generations, and one very stubborn great-aunt.'
+      },
+      westeros: {
+        title: 'Westeros: The Great Houses',
+        blurb: 'Stark, Targaryen, Lannister — alliances, betrayals and all.'
+      },
+      bronte: {
+        title: 'The Brontë Circle',
+        blurb: 'Haworth parsonage and everyone who ever walked through it.'
+      },
+      kattegat: {
+        title: 'Kattegat Bloodlines',
+        blurb: 'Ragnar’s sons and the sagas between them, raid by raid.'
+      },
+      village: {
+        title: "My Grandmother's Village",
+        blurb: 'Every family on one Cretan hillside, back to 1840.'
+      },
+      bridgerton: {
+        title: 'The Bridgerton Set',
+        blurb: 'Eight siblings, one queen, and the entire ton — dearest reader.'
+      },
+      romanov: {
+        title: 'Romanovs: The Last Tsars',
+        blurb: 'Three centuries of the imperial line, ending in Ekaterinburg.'
+      },
+      corleone: {
+        title: 'La Famiglia Corleone',
+        blurb: 'Business, never personal — from Sicily to Lake Tahoe.'
+      },
+      curie: {
+        title: 'The Curie Legacy',
+        blurb: 'Five Nobel prizes in one family tree. No pressure, kids.'
+      },
+      durin: {
+        title: 'Middle-earth: Line of Durin',
+        blurb: 'Seven fathers of the dwarves and every beard in between.'
+      }
+    }
+  },
+  characterX: {
+    parts: {
+      afro: 'Afro',
+      angry: 'Angry',
+      arched: 'Arched',
+      armor: 'Armor',
+      backpack: 'Backpack',
+      bags: 'Bags',
+      balloon: 'Balloon',
+      bandage: 'Bandage',
+      bandaid: 'Bandaid',
+      bandaids: 'Bandaids',
+      batwings: 'Batwings',
+      beanie: 'Beanie',
+      bell: 'Bell',
+      beret: 'Beret',
+      blazer: 'Blazer',
+      blep: 'Blep',
+      blush: 'Blush',
+      bob: 'Bob',
+      boots: 'Boots',
+      bow: 'Bow',
+      bowl: 'Bowl',
+      bowtie: 'Bowtie',
+      braid: 'Braid',
+      buns: 'Buns',
+      button: 'Button',
+      cap: 'Cap',
+      cape: 'Cape',
+      cat: 'Cat',
+      catears: 'Catears',
+      chin: 'Chin',
+      choker: 'Choker',
+      chubby: 'Chubby',
+      circlet: 'Circlet',
+      closed: 'Closed',
+      coat: 'Coat',
+      cowboy: 'Cowboy',
+      crown: 'Crown',
+      cuffed: 'Cuffed',
+      curly: 'Curly',
+      diamond: 'Diamond',
+      dot: 'Dot',
+      dots: 'Dots',
+      dress: 'Dress',
+      earrings: 'Earrings',
+      egg: 'Egg',
+      elf: 'Elf',
+      eyepatch: 'Eyepatch',
+      facemask: 'Facemask',
+      fang: 'Fang',
+      fedora: 'Fedora',
+      flattop: 'Flattop',
+      flower: 'Flower',
+      foxmask: 'Foxmask',
+      foxtail: 'Foxtail',
+      freckles: 'Freckles',
+      frown: 'Frown',
+      full: 'Full',
+      gakuran: 'Gakuran',
+      geta: 'Geta',
+      glasses: 'Glasses',
+      goatee: 'Goatee',
+      gown: 'Gown',
+      grin: 'Grin',
+      hairclip: 'Hairclip',
+      hakama: 'Hakama',
+      halo: 'Halo',
+      happy: 'Happy',
+      headband: 'Headband',
+      headphones: 'Headphones',
+      heart: 'Heart',
+      hearts: 'Hearts',
+      heels: 'Heels',
+      hime: 'Hime',
+      hooded: 'Hooded',
+      hoodie: 'Hoodie',
+      idol: 'Idol',
+      jacket: 'Jacket',
+      jeans: 'Jeans',
+      jetpack: 'Jetpack',
+      kimono: 'Kimono',
+      kneesocks: 'Kneesocks',
+      lash: 'Lash',
+      lashes: 'Lashes',
+      leggings: 'Leggings',
+      loafers: 'Loafers',
+      long: 'Long',
+      longbangs: 'Longbangs',
+      longskirt: 'Longskirt',
+      maryjanes: 'Maryjanes',
+      messy: 'Messy',
+      mohawk: 'Mohawk',
+      mole: 'Mole',
+      monocle: 'Monocle',
+      monolid: 'Monolid',
+      mustache: 'Mustache',
+      necklace: 'Necklace',
+      neutral: 'Neutral',
+      none: 'None',
+      o: 'O',
+      open: 'Open',
+      oval: 'Oval',
+      overalls: 'Overalls',
+      oxfords: 'Oxfords',
+      paint: 'Paint',
+      pants: 'Pants',
+      party: 'Party',
+      pearls: 'Pearls',
+      pirate: 'Pirate',
+      plaid: 'Plaid',
+      pleated: 'Pleated',
+      pointy: 'Pointy',
+      ponytail: 'Ponytail',
+      pout: 'Pout',
+      puffy: 'Puffy',
+      quiver: 'Quiver',
+      rainboots: 'Rainboots',
+      raised: 'Raised',
+      ribbon: 'Ribbon',
+      robe: 'Robe',
+      roman: 'Roman',
+      round: 'Round',
+      sad: 'Sad',
+      sailor: 'Sailor',
+      sandals: 'Sandals',
+      scar: 'Scar',
+      scarf: 'Scarf',
+      shades: 'Shades',
+      sharp: 'Sharp',
+      short: 'Short',
+      shorts: 'Shorts',
+      sidepart: 'Sidepart',
+      skirt: 'Skirt',
+      sleepy: 'Sleepy',
+      slickback: 'Slickback',
+      slim: 'Slim',
+      slippers: 'Slippers',
+      small: 'Small',
+      smile: 'Smile',
+      smirk: 'Smirk',
+      sneakers: 'Sneakers',
+      soft: 'Soft',
+      spark: 'Spark',
+      spiky: 'Spiky',
+      square: 'Square',
+      star: 'Star',
+      stars: 'Stars',
+      straight: 'Straight',
+      stripes: 'Stripes',
+      stubble: 'Stubble',
+      suit: 'Suit',
+      sweater: 'Sweater',
+      sword: 'Sword',
+      tail: 'Tail',
+      tank: 'Tank',
+      tareme: 'Tareme',
+      tee: 'Tee',
+      teeth: 'Teeth',
+      thick: 'Thick',
+      thighhigh: 'Thighhigh',
+      tights: 'Tights',
+      tiny: 'Tiny',
+      tongue: 'Tongue',
+      toothy: 'Toothy',
+      top: 'Top',
+      triangle: 'Triangle',
+      tsurime: 'Tsurime',
+      tunic: 'Tunic',
+      twintails: 'Twintails',
+      undercut: 'Undercut',
+      unibrow: 'Unibrow',
+      uniform: 'Uniform',
+      wavy: 'Wavy',
+      wide: 'Wide',
+      wings: 'Wings',
+      wink: 'Wink',
+      witch: 'Witch',
+      wizard: 'Wizard'
+    },
+    partIds: {
+      'beard-full': 'Full'
+    }
+  },
+  human3dX: {
+    reset: 'Reset'
+  },
+  pagesX: {
+    couldNotRename: 'Could not rename',
+    couldNotSave: 'Could not save',
+    couldNotDuplicate: 'Could not duplicate',
+    couldNotChangePassword: 'Could not change the password',
+    sandbox: 'SANDBOX',
+    quotaDetail: {
+      people: '{n} people',
+      projects: '{n} projects',
+      photos: '{n} photos'
     }
   }
 }

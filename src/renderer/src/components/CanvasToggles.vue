@@ -1,20 +1,20 @@
 <template>
-  <div class="ct-cluster" role="toolbar" aria-label="Canvas overlays">
+  <div class="ct-cluster" role="toolbar" :aria-label="t('graph.toggles.aria')">
     <!-- Overlay toggles: Focus / Legend / Relationships / Clean view -->
     <div class="ct-rail">
       <button
-        v-for="(t, i) in buttons"
-        :key="t.key"
+        v-for="(btn, i) in buttons"
+        :key="btn.key"
         class="ct-btn"
-        :class="{ on: t.active }"
-        :style="{ '--tint': t.tint, '--i': i }"
-        :title="t.title"
-        :aria-label="t.title"
-        :aria-pressed="t.active"
-        @click="t.toggle"
+        :class="{ on: btn.active }"
+        :style="{ '--tint': btn.tint, '--i': i }"
+        :title="btn.title"
+        :aria-label="btn.title"
+        :aria-pressed="btn.active"
+        @click="btn.toggle"
       >
         <span class="ct-aura" aria-hidden="true"></span>
-        <UiIcon class="ct-glyph" :name="t.icon" :size="16" />
+        <UiIcon class="ct-glyph" :name="btn.icon" :size="16" />
         <span class="ct-dot" aria-hidden="true"></span>
       </button>
     </div>
@@ -22,20 +22,20 @@
     <!-- Selection tools: their own pill so the box/lasso radio pair reads as a
          different kind of control than the overlay toggles above. -->
     <div v-if="showMarquee" class="ct-rail ct-rail-tools">
-      <span class="ct-rail-tag">Select</span>
+      <span class="ct-rail-tag">{{ t('graph.toggles.select') }}</span>
       <button
-        v-for="(t, i) in marqueeButtons"
-        :key="t.key"
+        v-for="(btn, i) in marqueeButtons"
+        :key="btn.key"
         class="ct-btn"
-        :class="{ on: t.active }"
-        :style="{ '--tint': t.tint, '--i': buttons.length + i }"
-        :title="t.title"
-        :aria-label="t.title"
-        :aria-pressed="t.active"
-        @click="t.toggle"
+        :class="{ on: btn.active }"
+        :style="{ '--tint': btn.tint, '--i': buttons.length + i }"
+        :title="btn.title"
+        :aria-label="btn.title"
+        :aria-pressed="btn.active"
+        @click="btn.toggle"
       >
         <span class="ct-aura" aria-hidden="true"></span>
-        <UiIcon class="ct-glyph" :name="t.icon" :size="16" />
+        <UiIcon class="ct-glyph" :name="btn.icon" :size="16" />
         <span class="ct-dot" aria-hidden="true"></span>
       </button>
     </div>
@@ -44,14 +44,14 @@
          radial version). The host view resolves the slots and owns the active
          mode; picking the running mode again turns it off. -->
     <div v-if="modes && modes.length" class="ct-rail ct-rail-modes">
-      <span class="ct-rail-tag">Edit</span>
+      <span class="ct-rail-tag">{{ t('graph.toggles.edit') }}</span>
       <button
         v-for="(m, i) in modes"
         :key="m.id + ':' + i"
         class="ct-btn ct-btn-mode"
         :class="{ on: activeModeId === m.id, 'ct-locked': m.disabled }"
         :style="{ '--tint': m.color || 'var(--accent)', '--i': buttons.length + 2 + i }"
-        :title="m.disabled ? m.disabledHint || m.label : `${m.label} — ${m.hint}`"
+        :title="m.disabled ? m.disabledHint || m.label : t('graph.toggles.modeTitle', m)"
         :aria-label="m.label"
         :aria-pressed="activeModeId === m.id"
         @click="emit('pick-mode', m)"
@@ -64,8 +64,8 @@
         v-if="modeGear"
         class="ct-btn ct-btn-mode ct-btn-gear"
         :style="{ '--tint': 'var(--accent)', '--i': buttons.length + 2 + modes.length }"
-        title="Customize edit modes (or hold Tab for the wheel)"
-        aria-label="Customize edit modes"
+        :title="t('graph.toggles.gear')"
+        :aria-label="t('graph.toggles.gearAria')"
         @click="emit('config-modes')"
       >
         <UiIcon class="ct-glyph" name="settings" :size="16" />
@@ -78,11 +78,13 @@
 import { computed } from 'vue'
 import { useMainStore } from '../store/index.js'
 import UiIcon from './ui/UiIcon.js'
+import { useI18n } from '../i18n'
 
 // The shared canvas-control cluster, dropped into the header of every spatial
 // view (graph / timeline / groups). It renders up to three pills: the overlay
 // toggles (Focus, Legend, Relationships open right-side panes the host view
-// renders; Clean view — owned globally by the store — fades every canvas
+// renders; Time drag lets vertical drags retime lives — the host owns it;
+// Clean view — owned globally by the store — fades every canvas
 // overlay away), the box/lasso selection-tool pair (`showMarquee`; the tool
 // choice lives in the store so other spatial views can adopt the same marquee
 // later), and the graph's edit modes (`modes` — the resolved action-wheel
@@ -96,6 +98,7 @@ const props = defineProps({
   showChronicle: { type: Boolean, default: false },
   showStyle: { type: Boolean, default: false },
   showClean: { type: Boolean, default: true },
+  showTimeDrag: { type: Boolean, default: false },
   showMarquee: { type: Boolean, default: false },
   focus: { type: Boolean, default: false },
   legend: { type: Boolean, default: false },
@@ -103,6 +106,7 @@ const props = defineProps({
   kinship: { type: Boolean, default: false },
   chronicle: { type: Boolean, default: false },
   stylePane: { type: Boolean, default: false },
+  timeDrag: { type: Boolean, default: false },
   /** Resolved wheel slots ({ id, icon, color, label, hint, disabled… }) or null. */
   modes: { type: Array, default: null },
   activeModeId: { type: String, default: null },
@@ -116,10 +120,12 @@ const emit = defineEmits([
   'update:kinship',
   'update:chronicle',
   'update:stylePane',
+  'update:timeDrag',
   'pick-mode',
   'config-modes'
 ])
 const store = useMainStore()
+const { t } = useI18n()
 
 const buttons = computed(() => {
   const list = []
@@ -127,7 +133,7 @@ const buttons = computed(() => {
     list.push({
       key: 'focus',
       icon: 'target',
-      title: 'Focus — highlight & emphasise people',
+      title: t('graph.toggles.focus'),
       tint: 'var(--accent)',
       active: props.focus,
       toggle: () => emit('update:focus', !props.focus)
@@ -137,7 +143,7 @@ const buttons = computed(() => {
     list.push({
       key: 'legend',
       icon: 'map',
-      title: 'Legend',
+      title: t('graph.toggles.legend'),
       tint: 'var(--green)',
       active: props.legend,
       toggle: () => emit('update:legend', !props.legend)
@@ -147,7 +153,7 @@ const buttons = computed(() => {
     list.push({
       key: 'relTypes',
       icon: 'link',
-      title: 'Relationships — types, weights & lenses',
+      title: t('graph.toggles.relTypes'),
       tint: 'var(--pink)',
       active: props.relTypes,
       toggle: () => emit('update:relTypes', !props.relTypes)
@@ -157,7 +163,7 @@ const buttons = computed(() => {
     list.push({
       key: 'chronicle',
       icon: 'scroll-text',
-      title: 'Chronicle — eras & story events',
+      title: t('graph.toggles.chronicle'),
       tint: 'var(--kin-blood)',
       active: props.chronicle,
       toggle: () => emit('update:chronicle', !props.chronicle)
@@ -167,7 +173,7 @@ const buttons = computed(() => {
     list.push({
       key: 'style',
       icon: 'palette',
-      title: 'Style — lifeline looks, canvas & atmosphere',
+      title: t('graph.toggles.style'),
       tint: 'var(--accent-2)',
       active: props.stylePane,
       toggle: () => emit('update:stylePane', !props.stylePane)
@@ -177,17 +183,27 @@ const buttons = computed(() => {
     list.push({
       key: 'kinship',
       icon: 'dna',
-      title: 'Kinship — name every relative, see through their eyes',
+      title: t('graph.toggles.kinship'),
       tint: 'var(--kin-blood)',
       active: props.kinship,
       toggle: () => emit('update:kinship', !props.kinship)
+    })
+  }
+  if (props.showTimeDrag) {
+    list.push({
+      key: 'timeDrag',
+      icon: 'calendar-clock',
+      title: t('graph.toggles.timeDrag'),
+      tint: 'var(--accent)',
+      active: props.timeDrag,
+      toggle: () => emit('update:timeDrag', !props.timeDrag)
     })
   }
   if (props.showClean) {
     list.push({
       key: 'clean',
       icon: 'sparkles',
-      title: 'Clean view — hide canvas overlays',
+      title: t('graph.toggles.clean'),
       tint: 'var(--amber)',
       active: store.cleanView,
       toggle: () => (store.cleanView = !store.cleanView)
@@ -201,7 +217,7 @@ const marqueeButtons = computed(() => [
   {
     key: 'box',
     icon: 'square-dashed',
-    title: 'Box select — hold Shift and drag on the canvas',
+    title: t('graph.toggles.box'),
     tint: 'var(--accent)',
     active: store.marqueeTool === 'box',
     toggle: () => (store.marqueeTool = 'box')
@@ -209,7 +225,7 @@ const marqueeButtons = computed(() => [
   {
     key: 'lasso',
     icon: 'lasso',
-    title: 'Lasso select — hold Shift and drag a freeform loop',
+    title: t('graph.toggles.lasso'),
     tint: 'var(--accent)',
     active: store.marqueeTool === 'lasso',
     toggle: () => (store.marqueeTool = 'lasso')

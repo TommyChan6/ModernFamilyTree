@@ -6,20 +6,19 @@
           class="wcfg-box"
           role="dialog"
           aria-modal="true"
-          aria-label="Customize the action wheel"
+          :aria-label="t('graphWheel.config.aria')"
         >
           <header class="wcfg-header">
             <div>
-              <h2 class="wcfg-h2">Action wheel</h2>
+              <h2 class="wcfg-h2">{{ t('graphWheel.config.title') }}</h2>
               <p class="wcfg-sub">
-                Hold <b>Tab</b> on the canvas, flick toward a mode, release. Pick a direction below
-                and give it a job.
+                {{ t('graphWheel.config.subPre') }} <b>Tab</b> {{ t('graphWheel.config.subPost') }}
               </p>
             </div>
             <button
               class="wcfg-close"
-              title="Close (Esc)"
-              aria-label="Close"
+              :title="t('graphWheel.config.close')"
+              :aria-label="t('graphWheel.config.closeAria')"
               @click="emit('close')"
             >
               <UiIcon name="x" :size="16" />
@@ -51,15 +50,17 @@
                 <UiIcon class="wcfg-hub-ic" name="move" :size="16" x="-8" y="-8" />
               </svg>
               <div class="wcfg-dir">
-                <span class="wcfg-dir-badge">{{ WHEEL_DIRECTIONS[sel] }}</span>
-                {{ resolved[sel].empty ? 'Empty slot' : resolved[sel].label }}
+                <span class="wcfg-dir-badge">{{
+                  t('graphWheel.dirs.' + WHEEL_DIRECTIONS[sel])
+                }}</span>
+                {{ resolved[sel].empty ? t('graphWheel.config.emptySlot') : resolved[sel].label }}
               </div>
             </div>
 
             <!-- ── Catalog for the selected direction ──────────────────────── -->
             <div class="wcfg-catalog">
               <section class="wcfg-group">
-                <h3 class="wcfg-label">Mode</h3>
+                <h3 class="wcfg-label">{{ t('graphWheel.config.mode') }}</h3>
                 <div class="wcfg-cards">
                   <button
                     v-for="c in coreCards"
@@ -77,8 +78,8 @@
               </section>
 
               <section class="wcfg-group">
-                <h3 class="wcfg-label">Forge a bond</h3>
-                <p class="wcfg-note">Click two people in a row and they're linked.</p>
+                <h3 class="wcfg-label">{{ t('graphWheel.config.forge') }}</h3>
+                <p class="wcfg-note">{{ t('graphWheel.config.forgeNote') }}</p>
                 <div class="wcfg-chips">
                   <button
                     v-for="d in linkDefs"
@@ -89,13 +90,13 @@
                     @click="assign({ kind: 'link', type: d.key })"
                   >
                     <UiIcon class="wcfg-chip-glyph" :name="iconOr(d.glyph, 'link')" :size="14" />
-                    {{ d.label }}
+                    {{ relTypeLabel(d) }}
                   </button>
                 </div>
               </section>
 
               <section v-if="store.caps.style !== 'none'" class="wcfg-group">
-                <h3 class="wcfg-label">Paint nodes</h3>
+                <h3 class="wcfg-label">{{ t('graphWheel.config.paint') }}</h3>
                 <div class="wcfg-swatches">
                   <button
                     v-for="c in WHEEL_PAINT_COLORS"
@@ -103,25 +104,25 @@
                     class="wcfg-swatch"
                     :class="{ on: currentId === 'paint:' + c }"
                     :style="{ background: c }"
-                    :title="'Paint people ' + c"
+                    :title="t('graphWheel.config.paintTitle', { color: c })"
                     @click="assign({ kind: 'paint', color: c })"
                   ></button>
                 </div>
               </section>
 
               <section v-if="store.caps.tags && store.tags.length" class="wcfg-group">
-                <h3 class="wcfg-label">Toggle a tag</h3>
+                <h3 class="wcfg-label">{{ t('graphWheel.config.tag') }}</h3>
                 <div class="wcfg-chips">
                   <button
-                    v-for="t in store.tags"
-                    :key="t.id"
+                    v-for="tg in store.tags"
+                    :key="tg.id"
                     class="wcfg-chip"
-                    :class="{ on: currentId === 'tag:' + t.id }"
-                    :style="{ '--sc': t.color || 'var(--accent)' }"
-                    @click="assign({ kind: 'tag', tagId: t.id })"
+                    :class="{ on: currentId === 'tag:' + tg.id }"
+                    :style="{ '--sc': tg.color || 'var(--accent)' }"
+                    @click="assign({ kind: 'tag', tagId: tg.id })"
                   >
-                    <UiIcon class="wcfg-chip-glyph" :name="iconOr(t.icon, 'tag')" :size="14" />
-                    {{ t.label }}
+                    <UiIcon class="wcfg-chip-glyph" :name="iconOr(tg.icon, 'tag')" :size="14" />
+                    {{ defaultNameLabel(tg.label) }}
                   </button>
                 </div>
               </section>
@@ -129,8 +130,12 @@
           </div>
 
           <footer class="wcfg-footer">
-            <button class="wcfg-btn" @click="resetDefaults">Reset to defaults</button>
-            <button class="wcfg-btn wcfg-btn-primary" @click="emit('close')">Done</button>
+            <button class="wcfg-btn" @click="resetDefaults">
+              {{ t('graphWheel.config.reset') }}
+            </button>
+            <button class="wcfg-btn wcfg-btn-primary" @click="emit('close')">
+              {{ t('graphWheel.config.done') }}
+            </button>
           </footer>
         </div>
       </div>
@@ -142,6 +147,8 @@
 import { ref, computed, watch } from 'vue'
 import { useMainStore } from '../../store/index.js'
 import UiIcon, { hasIcon } from '../ui/UiIcon.js'
+import { useI18n } from '../../i18n'
+import { relTypeLabel, nounLabel, defaultNameLabel } from '../../lib/dataLabels'
 import {
   DEFAULT_WHEEL_SLOTS,
   WHEEL_DIRECTIONS,
@@ -159,6 +166,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const store = useMainStore()
+const { t } = useI18n()
 const sel = ref(0)
 
 watch(
@@ -184,57 +192,35 @@ const rawSlots = computed(() => {
 const resolved = computed(() => resolveWheelSlots(store.wheelSlots, env.value))
 const currentId = computed(() => resolved.value[sel.value]?.id || 'empty')
 
+// Labels mirror resolveWheelSlot's (same keys), so the card and the slot it
+// fills always read alike.
+const CORE_KINDS = [
+  { id: 'add', icon: 'plus', color: '#4caf72' },
+  { id: 'delete', icon: 'trash-2', color: '#ef5350' },
+  { id: 'pin', icon: 'pin', color: '#f5a623' },
+  { id: 'end', icon: 'hourglass', color: '#8a93a6' },
+  { id: 'swap', icon: 'arrow-right-left', color: '#26c6da' },
+  { id: 'retime', icon: 'move-vertical', color: '#26c6da' }
+]
 const coreCards = computed(() => {
-  const noun = store.noun.toLowerCase()
+  const noun = nounLabel(store.noun).toLowerCase()
   return [
     {
       id: 'empty',
       slot: null,
       icon: 'circle-dashed',
-      label: 'Empty',
+      label: t('graphWheel.empty.label'),
       color: null,
-      hint: 'Nothing here'
+      hint: t('graphWheel.empty.hint')
     },
-    {
-      id: 'add',
-      slot: { kind: 'add' },
-      icon: 'plus',
-      label: `Add ${noun}`,
-      color: '#4caf72',
-      hint: `Click an empty spot to add a ${noun}`
-    },
-    {
-      id: 'delete',
-      slot: { kind: 'delete' },
-      icon: 'trash-2',
-      label: 'Delete',
-      color: '#ef5350',
-      hint: 'Click a node or bond, click again to confirm'
-    },
-    {
-      id: 'pin',
-      slot: { kind: 'pin' },
-      icon: 'pin',
-      label: 'Pin',
-      color: '#f5a623',
-      hint: 'Click people to pin / release them'
-    },
-    {
-      id: 'end',
-      slot: { kind: 'end' },
-      icon: 'hourglass',
-      label: 'End bond',
-      color: '#8a93a6',
-      hint: 'Click a bond to mark it ended'
-    },
-    {
-      id: 'swap',
-      slot: { kind: 'swap' },
-      icon: 'arrow-right-left',
-      label: 'Flip bond',
-      color: '#26c6da',
-      hint: 'Click a directed bond to reverse it'
-    }
+    ...CORE_KINDS.map((k) => ({
+      id: k.id,
+      slot: { kind: k.id },
+      icon: k.icon,
+      label: t(`graphWheel.kinds.${k.id}.label`, { noun }),
+      color: k.color,
+      hint: t(`graphWheel.kinds.${k.id}.hint`, { noun })
+    }))
   ]
 })
 

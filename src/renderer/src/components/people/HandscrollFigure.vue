@@ -5,7 +5,7 @@
   <button
     class="hf"
     :class="{ child: role === 'child', sel: selected, dead: deceased }"
-    :title="person.name || 'Unnamed'"
+    :title="person.name || t('directory.card.unnamed')"
     @click="$emit('open', person.id)"
   >
     <span class="hf-bloom" :style="{ backgroundImage: `url(${bloom})` }"></span>
@@ -27,7 +27,7 @@
     </span>
     <span class="hf-cols">
       <span class="hf-name" :class="{ cjk: cjkName, unnamed: !person.name }">{{
-        person.name || 'Unnamed'
+        person.name || t('directory.card.unnamed')
       }}</span>
       <span v-if="span" class="hf-dates">{{ span }}</span>
     </span>
@@ -37,6 +37,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from '../../i18n'
 import { hashStr } from '../../lib/inkArt'
 import { useThumbnail } from './useThumbnail.js'
 import { washMaskUrl, bloomUrl, ensoUrl, useInkSeal, isCjkName } from './inkPeopleArt'
@@ -50,6 +51,8 @@ const props = defineProps({
 })
 defineEmits(['open'])
 
+const { t } = useI18n()
+
 const seed = computed(() => hashStr(props.person.id || ''))
 const { src } = useThumbnail(() => props.person.primary_image || '', 192)
 const mask = computed(() => washMaskUrl(seed.value % 4))
@@ -58,7 +61,12 @@ const enso = computed(() => ensoUrl(seed.value))
 const glyph = computed(() => roundelGlyph(props.person.name))
 const cjkGlyph = computed(() => /[㐀-鿿]/.test(glyph.value))
 const cjkName = computed(() => isCjkName(props.person.name))
-const span = computed(() => lifeSpan(props.person))
+const span = computed(() =>
+  lifeSpan(props.person, {
+    born: (year) => t('directory.card.born', { year }),
+    died: (year) => t('directory.card.died', { year })
+  })
+)
 const seal = useInkSeal(
   () => props.person.name || '',
   () => props.person.id || '',

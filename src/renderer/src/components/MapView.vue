@@ -4,14 +4,14 @@
       icon="map"
       :title="t('rail.map')"
       :count="store.maps.length || null"
-      :hint="meta ? meta.name : ''"
+      :hint="meta ? defaultNameLabel(meta.name) : ''"
     >
       <div v-if="draft" class="mv-actions" @pointerdown.stop>
         <!-- map switcher -->
         <div class="mv-menu-wrap">
           <button class="mv-pill" :class="{ open: menu === 'maps' }" @click="toggleMenu('maps')">
             <UiIcon name="map" :size="16" />
-            <span class="mv-pill-text">{{ meta.name }}</span>
+            <span class="mv-pill-text">{{ defaultNameLabel(meta.name) }}</span>
             <UiIcon class="mv-caret" name="chevron-down" :size="14" />
           </button>
           <Transition name="mv-pop">
@@ -25,7 +25,7 @@
                 @click="openMap(m.id)"
               >
                 <UiIcon :name="styleIcon(m.style)" :size="16" />
-                <span class="mv-menu-name">{{ m.name }}</span>
+                <span class="mv-menu-name">{{ defaultNameLabel(m.name) }}</span>
                 <span class="mv-menu-meta">
                   <UiIcon name="shapes" :size="12" />{{ m.features.length }}
                   <UiIcon class="mv-menu-meta-gap" name="user" :size="12" />{{ m.tokens.length }}
@@ -104,33 +104,147 @@
           </Transition>
         </div>
 
+        <!-- find a place or a person -->
+        <div class="mv-menu-wrap">
+          <button
+            class="mv-toggle"
+            :class="{ open: menu === 'find' }"
+            :title="t('map.find.title')"
+            :aria-label="t('map.find.title')"
+            @click="toggleMenu('find')"
+          >
+            <UiIcon name="search" :size="16" />
+          </button>
+          <Transition name="mv-pop">
+            <div v-if="menu === 'find'" class="mv-menu mv-find-menu">
+              <MapFind :items="findItems" @pick="onFindPick" @close="menu = null" />
+            </div>
+          </Transition>
+        </div>
+
+        <!-- layers: what shows while you work -->
+        <div class="mv-menu-wrap">
+          <button
+            class="mv-toggle"
+            :class="{ open: menu === 'layers', on: layersFiltered }"
+            :title="t('map.layers.title')"
+            :aria-label="t('map.layers.title')"
+            @click="toggleMenu('layers')"
+          >
+            <UiIcon name="layers" :size="16" />
+          </button>
+          <Transition name="mv-pop">
+            <div v-if="menu === 'layers'" class="mv-menu mv-layers-menu">
+              <div class="mv-menu-title">{{ t('map.layers.title') }}</div>
+              <button
+                v-for="ly in MAP_LAYERS"
+                :key="ly.id"
+                class="mv-layer"
+                :class="{ off: hiddenLayers.includes(ly.id) }"
+                role="switch"
+                :aria-checked="!hiddenLayers.includes(ly.id)"
+                @click="toggleLayer(ly.id)"
+              >
+                <UiIcon :name="ly.icon" :size="16" />
+                <span class="mv-layer-name">{{ t('map.layers.' + ly.id) }}</span>
+                <span class="mv-layer-n">{{ layerCounts[ly.id] || '' }}</span>
+                <UiIcon
+                  class="mv-layer-eye"
+                  :name="hiddenLayers.includes(ly.id) ? 'eye-off' : 'eye'"
+                  :size="16"
+                />
+              </button>
+              <div class="mv-menu-sep"></div>
+              <button
+                class="mv-layer"
+                :class="{ off: !showPeople }"
+                role="switch"
+                :aria-checked="showPeople"
+                @click="showPeople = !showPeople"
+              >
+                <UiIcon name="users" :size="16" />
+                <span class="mv-layer-name">{{ t('map.layers.people') }}</span>
+                <span class="mv-layer-n">{{ tokenBase.length || '' }}</span>
+                <UiIcon class="mv-layer-eye" :name="showPeople ? 'eye' : 'eye-off'" :size="16" />
+              </button>
+              <button
+                class="mv-layer"
+                :class="{ off: !showTrails }"
+                role="switch"
+                :aria-checked="showTrails"
+                @click="showTrails = !showTrails"
+              >
+                <UiIcon name="footprints" :size="16" />
+                <span class="mv-layer-name">{{ t('map.layers.journeys') }}</span>
+                <span class="mv-layer-n"></span>
+                <UiIcon class="mv-layer-eye" :name="showTrails ? 'eye' : 'eye-off'" :size="16" />
+              </button>
+              <button
+                class="mv-layer"
+                :class="{ off: !showLabels }"
+                role="switch"
+                :aria-checked="showLabels"
+                @click="showLabels = !showLabels"
+              >
+                <UiIcon name="tag" :size="16" />
+                <span class="mv-layer-name">{{ t('map.layers.names') }}</span>
+                <span class="mv-layer-n"></span>
+                <UiIcon class="mv-layer-eye" :name="showLabels ? 'eye' : 'eye-off'" :size="16" />
+              </button>
+              <button v-if="layersFiltered" class="mv-menu-item mv-layers-reset" @click="showAll">
+                <UiIcon name="eye" :size="16" />
+                {{ t('map.layers.showAll') }}
+              </button>
+              <div class="mv-menu-sep"></div>
+              <label class="mv-layer mv-snap" :title="t('map.layers.snapHint')">
+                <UiIcon name="magnet" :size="16" />
+                <span class="mv-layer-name">{{ t('map.layers.snap') }}</span>
+                <input v-model="snapOn" type="checkbox" class="switch" />
+              </label>
+            </div>
+          </Transition>
+        </div>
+
+        <!-- export -->
+        <div class="mv-menu-wrap">
+          <button
+            class="mv-toggle"
+            :class="{ open: menu === 'export' }"
+            :title="t('map.menu.export')"
+            :aria-label="t('map.menu.export')"
+            @click="toggleMenu('export')"
+          >
+            <UiIcon name="download" :size="16" />
+          </button>
+          <Transition name="mv-pop">
+            <div v-if="menu === 'export'" class="mv-menu">
+              <div class="mv-menu-title">{{ t('map.menu.export') }}</div>
+              <button class="mv-menu-item mv-menu-rich" @click="exportPng('sheet')">
+                <UiIcon name="map" :size="16" />
+                <span class="mv-menu-rich-text">
+                  <span>{{ t('map.export.sheet') }}</span>
+                  <small>{{ t('map.export.sheetHint', { y: yearInt }) }}</small>
+                </span>
+              </button>
+              <button class="mv-menu-item mv-menu-rich" @click="exportPng('view')">
+                <UiIcon name="crop" :size="16" />
+                <span class="mv-menu-rich-text">
+                  <span>{{ t('map.export.view') }}</span>
+                  <small>{{ t('map.export.viewHint') }}</small>
+                </span>
+              </button>
+            </div>
+          </Transition>
+        </div>
+
         <button
           class="mv-toggle"
-          :class="{ on: showLabels }"
-          :title="t('map.menu.labels')"
-          :aria-label="t('map.menu.labels')"
-          :aria-pressed="showLabels"
-          @click="showLabels = !showLabels"
+          :class="{ on: keysOpen }"
+          :title="t('map.keys.title') + ' (?)'"
+          :aria-label="t('map.keys.title')"
+          @click="keysOpen = !keysOpen"
         >
-          <UiIcon name="tag" :size="16" />
-        </button>
-        <button
-          class="mv-toggle"
-          :class="{ on: showTrails }"
-          :title="t('map.menu.journeys')"
-          :aria-label="t('map.menu.journeys')"
-          :aria-pressed="showTrails"
-          @click="showTrails = !showTrails"
-        >
-          <UiIcon name="footprints" :size="16" />
-        </button>
-        <button
-          class="mv-toggle"
-          :title="t('map.menu.export')"
-          :aria-label="t('map.menu.export')"
-          @click="exportPng"
-        >
-          <UiIcon name="download" :size="16" />
+          <UiIcon name="keyboard" :size="16" />
         </button>
       </div>
     </ViewHeader>
@@ -189,6 +303,7 @@
             :year="yearInt"
             :tags="store.tags"
             :following="following"
+            :measure-text="selMeasure"
             @patch="patchSelected"
             @close="clearSelection"
             @delete="deleteSelected"
@@ -226,6 +341,23 @@
 
         <!-- zoom + scale -->
         <div class="mv-zoom" @pointerdown.stop>
+          <button
+            :title="t('map.zoom.undo')"
+            :aria-label="t('map.zoom.undo')"
+            :disabled="!histN.undo"
+            @click="undo"
+          >
+            <UiIcon name="undo-2" :size="16" />
+          </button>
+          <button
+            :title="t('map.zoom.redo')"
+            :aria-label="t('map.zoom.redo')"
+            :disabled="!histN.redo"
+            @click="redo"
+          >
+            <UiIcon name="redo-2" :size="16" />
+          </button>
+          <span class="mv-zoom-sep"></span>
           <button :title="t('map.zoom.in')" :aria-label="t('map.zoom.in')" @click="zoomBy(1.6)">
             <UiIcon name="plus" :size="16" />
           </button>
@@ -271,6 +403,19 @@
             <div v-if="hoverCard.note" class="mv-hover-note">{{ hoverCard.note }}</div>
           </div>
         </Transition>
+
+        <MapContextMenu
+          v-if="ctxMenu"
+          :key="ctxMenu.key"
+          :x="ctxMenu.x"
+          :y="ctxMenu.y"
+          :title="ctxMenu.title"
+          :items="ctxMenu.items"
+          :bounds="viewSize"
+          @pick="onCtxPick"
+        />
+
+        <MapShortcuts v-if="keysOpen" @close="keysOpen = false" />
       </template>
     </div>
 
@@ -284,10 +429,17 @@
   </div>
 </template>
 
+<script>
+// The feature clipboard lives outside the component instance so a copy
+// survives switching maps (and the view remounting): copy here, paste there.
+let clipboard = null
+</script>
+
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { useI18n } from '../i18n'
+import { defaultNameLabel } from '../lib/dataLabels'
 import { api } from '../api'
 import ViewHeader from './ViewHeader.vue'
 import UiIcon from './ui/UiIcon.js'
@@ -297,17 +449,38 @@ import MapTimeline from './map/MapTimeline.vue'
 import MapPeopleDrawer from './map/MapPeopleDrawer.vue'
 import MapNewDialog from './map/MapNewDialog.vue'
 import MapStyleThumb from './map/MapStyleThumb.vue'
-import { MapRenderer } from './map/MapRenderer'
-import { MAP_STYLE_LIST, styleOf } from './map/mapStyles'
+import MapFind from './map/MapFind.vue'
+import MapContextMenu from './map/MapContextMenu.vue'
+import MapShortcuts from './map/MapShortcuts.vue'
+import { mapStyleBridge } from './style/styleBridge.js'
+import { MapRenderer, HANDLE_MIN_SEG_PX, MAX_VERTEX_HANDLES } from './map/MapRenderer'
+import { MAP_STYLE_LIST, MAP_UNITS, styleOf } from './map/mapStyles'
 import { loadInkMapAssets } from './map/inkSprites'
-import { MAP_KIND_GEOMETRY, TOOL_BY_ID, ALL_TOOLS, LIVE_KINDS, toolKind } from './map/mapKinds'
+import {
+  MAP_KIND_GEOMETRY,
+  MAP_LAYERS,
+  TOOL_BY_ID,
+  ALL_TOOLS,
+  LIVE_KINDS,
+  PLACE_RANK,
+  hiddenKindsOf,
+  layerOf,
+  toolKind
+} from './map/mapKinds'
 import { KINGDOM_COLORS } from './map/mapGen'
 import {
+  bboxOf,
   centerOn,
   clamp,
   fitCamera,
   hitFeature,
+  hitMidpoint,
   hitVertex,
+  insertVertex,
+  removeVertex,
+  segmentMidpoint,
+  snapPoint,
+  windowAlpha,
   lerpCamera,
   lifeAlpha,
   mapTimeRange,
@@ -338,7 +511,7 @@ import { confirmDialog } from '../lib/dialogs.js'
 // math in map/mapMath.ts.
 const props = defineProps({ active: { type: Boolean, default: true } })
 const store = useMainStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const SPEEDS = [
   { label: '½×', yps: 1 },
@@ -361,8 +534,6 @@ const selectedTokenId = ref(null)
 const hoverFeatureId = ref(null)
 const hoverTokenId = ref(null)
 const peopleOpen = ref(false)
-const showLabels = ref(true)
-const showTrails = ref(true)
 const menu = ref(null)
 const newOpen = ref(false)
 const playing = ref(false)
@@ -375,6 +546,83 @@ const dropHover = ref(false)
 const strokeMode = ref(null) // null | 'free' | 'click' — drives the hint text
 const viewSize = ref({ w: 1, h: 1 })
 const camK = ref(1) // reactive mirror of the camera zoom (scale bar)
+const keysOpen = ref(false) // the shortcuts sheet
+const ctxMenu = ref(null) // { key, x, y, title, items, target }
+const histN = ref({ undo: 0, redo: 0 }) // undo/redo button state
+// the ruler: committed points + whether it's still being laid out
+const ruler = ref({ pts: [], live: false })
+const measureCursor = ref(null) // [wx, wy] while the ruler follows the pointer
+
+// ── per-viewer layer prefs (what shows while you work) ────────────────────────
+const LAYER_PREFS = 'familytree.map.layers'
+function readLayerPrefs() {
+  try {
+    return JSON.parse(localStorage.getItem(LAYER_PREFS) || '{}') || {}
+  } catch {
+    return {}
+  }
+}
+const layerPrefs = readLayerPrefs()
+const showLabels = ref(layerPrefs.labels !== false)
+const showTrails = ref(layerPrefs.trails !== false)
+const showPeople = ref(layerPrefs.people !== false)
+const snapOn = ref(layerPrefs.snap !== false)
+const hiddenLayers = ref(
+  Array.isArray(layerPrefs.hidden)
+    ? layerPrefs.hidden.filter((id) => MAP_LAYERS.some((l) => l.id === id))
+    : []
+)
+watch([showLabels, showTrails, showPeople, snapOn, hiddenLayers], () => {
+  try {
+    localStorage.setItem(
+      LAYER_PREFS,
+      JSON.stringify({
+        labels: showLabels.value,
+        trails: showTrails.value,
+        people: showPeople.value,
+        snap: snapOn.value,
+        hidden: hiddenLayers.value
+      })
+    )
+  } catch {
+    /* private window / storage off — prefs just won't stick */
+  }
+})
+const hiddenKinds = computed(() => hiddenKindsOf(hiddenLayers.value))
+const hiddenKey = computed(() => hiddenLayers.value.slice().sort().join(','))
+const layersFiltered = computed(
+  () => hiddenLayers.value.length > 0 || !showPeople.value || !showLabels.value || !showTrails.value
+)
+function toggleLayer(id) {
+  const on = hiddenLayers.value.includes(id)
+  hiddenLayers.value = on ? hiddenLayers.value.filter((x) => x !== id) : [...hiddenLayers.value, id]
+  // hidden things can't stay selected (you couldn't see what you're editing)
+  const f =
+    selectedFeatureId.value && draft.value?.features.find((x) => x.id === selectedFeatureId.value)
+  if (f && hiddenKinds.value.has(f.kind)) selectedFeatureId.value = null
+}
+/** How many features each layer holds (shown beside its switch). */
+const layerCounts = computed(() => {
+  version.value
+  const out = {}
+  for (const f of draft.value?.features || []) {
+    const ly = layerOf(f.kind)
+    if (ly) out[ly.id] = (out[ly.id] || 0) + 1
+  }
+  return out
+})
+function showAll() {
+  hiddenLayers.value = []
+  showPeople.value = true
+  showLabels.value = true
+  showTrails.value = true
+}
+watch(showPeople, (on) => {
+  if (!on && selectedTokenId.value) {
+    selectedTokenId.value = null
+    following.value = false
+  }
+})
 
 let renderer = null
 let cam = { x: 0, y: 0, k: 1 }
@@ -392,6 +640,11 @@ let spaceDown = false
 let resizeObs = null
 const undoStack = []
 const redoStack = []
+let snapHit = null // the magnet target under the pointer while drawing / dragging
+let hoverHandle = null // { type: 'vertex' | 'mid', i } on the selected shape
+let lastWorld = null // last pointer position over the map (paste lands here)
+let needsFrame = true // something changed that the frame signature can't see
+let lastSig = ''
 // ambient map life (mist, boats, geese, the style bloom) holds still for
 // people who asked the OS for less motion
 const motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)')
@@ -400,6 +653,12 @@ const onMotionPref = (e) => (reducedMotion.value = e.matches)
 motionQuery?.addEventListener?.('change', onMotionPref)
 
 const bump = () => version.value++
+/** Mirror the undo/redo stack depths into the buttons (only when they change). */
+function syncHist() {
+  const u = undoStack.length
+  const r = redoStack.length
+  if (histN.value.undo !== u || histN.value.redo !== r) histN.value = { undo: u, redo: r }
+}
 // The draft lives outside reactivity, so anything the template or a computed
 // reads from it goes through `meta` (re-derived whenever `version` bumps).
 const meta = computed(() => {
@@ -426,6 +685,9 @@ function loadMap(id) {
   draft.value = clone(doc)
   undoStack.length = 0
   redoStack.length = 0
+  syncHist()
+  clearMeasure()
+  ctxMenu.value = null
   selectedFeatureId.value = null
   selectedTokenId.value = null
   stroke = null
@@ -457,6 +719,11 @@ watch(
   },
   { immediate: true }
 )
+// the static layer caches the (possibly translated default) map title
+watch(locale, () => {
+  renderer?.invalidate()
+  needsFrame = true
+})
 // a map created/deleted elsewhere (or first load finishing)
 watch(
   () => store.maps.length,
@@ -533,7 +800,7 @@ function setStyle(id) {
   draft.value.style = id
   bump()
   scheduleSave()
-  toast(`${styleOf(id).icon} ${t('map.styles.' + id)}`)
+  toast(t('map.styles.' + id), null, styleOf(id).icon)
 }
 function setBase(b) {
   if (draft.value.base === b) return
@@ -558,6 +825,14 @@ const thumbDoc = computed(() => {
 const thumbH = computed(() =>
   draft.value ? Math.round((150 * draft.value.height) / draft.value.width) : 100
 )
+// The handle this map lends the Style Studio (components/style/styleBridge.js).
+const bridgeHandle = {
+  meta,
+  thumbDoc,
+  thumbH,
+  setStyle: (id) => draft.value && setStyle(id),
+  setBase: (b) => draft.value && setBase(b)
+}
 
 // ── autosave ─────────────────────────────────────────────────────────────────
 let saveTimer = null
@@ -623,6 +898,7 @@ function pushUndo(coalesce) {
   undoStack.push(snapshot())
   if (undoStack.length > 80) undoStack.shift()
   redoStack.length = 0
+  syncHist()
 }
 function restore(json) {
   const s = JSON.parse(json)
@@ -637,6 +913,7 @@ function restore(json) {
     selectedTokenId.value = null
   }
   lastCoalesce = null
+  syncHist()
   bump()
   scheduleSave()
 }
@@ -670,6 +947,7 @@ function imageFor(url) {
   if (!img) {
     img = new Image()
     img.decoding = 'async'
+    img.onload = () => (needsFrame = true)
     img.src = url
     imgCache.set(url, img)
   }
@@ -700,6 +978,14 @@ function personColor(p) {
 }
 
 const personById = computed(() => new Map(store.persons.map((p) => [p.id, p])))
+// realms linked to a Group take its colour; the key re-renders the static
+// layer whenever ANY tag colour changes (not just how many there are)
+const tagColors = computed(
+  () => new Map(store.tags.filter((tg) => tg.color).map((tg) => [tg.id, tg.color]))
+)
+const tagColorsKey = computed(() =>
+  [...tagColors.value].map(([id, c]) => id.slice(0, 8) + c).join(',')
+)
 
 function personInfo(p) {
   const url = p.primary_image ? api.getImageUrl(p.primary_image) || '' : ''
@@ -728,6 +1014,9 @@ const tokenBase = computed(() => {
   }
   return out
 })
+
+// a person renamed / recoloured / re-photographed → redraw their token
+watch(tokenBase, () => (needsFrame = true))
 
 const placedIds = computed(() => {
   version.value
@@ -1113,23 +1402,95 @@ function zoomBy(f) {
   flight = null
 }
 
+// one world unit = 1 km; each style measures in its own unit (MAP_UNITS)
+const unitPer = computed(() => MAP_UNITS[style.value.unit] || 1)
+const numFmt = computed(() => new Intl.NumberFormat(locale.value, { maximumFractionDigits: 1 }))
+/** A world distance in the style's unit, e.g. "12.5 leagues" / "25 里". */
+function fmtDistance(world) {
+  const v = world * unitPer.value
+  const n = numFmt.value.format(v >= 100 ? Math.round(v) : Math.round(v * 10) / 10)
+  return t('map.units.' + style.value.unit, { n })
+}
+/** A world area in the style's unit squared. */
+function fmtArea(world2) {
+  const v = world2 * unitPer.value * unitPer.value
+  const n = numFmt.value.format(v >= 100 ? Math.round(v) : Math.round(v * 10) / 10)
+  return t('map.units.' + style.value.unit + '2', { n })
+}
 const scaleBar = computed(() => {
-  // one world unit = 1 km; each style names its own unit
-  const unit = {
-    parchment: ['leagues', 1 / 4.8],
-    fantasy: ['leagues', 1 / 4.8],
-    ink: ['里', 2],
-    shanshui: ['里', 2],
-    qinglu: ['里', 2],
-    hightech: ['km', 1],
-    atlas: ['km', 1]
-  }[style.value.id] || ['km', 1]
-  const perPx = unit[1] / camK.value
+  const perPx = unitPer.value / camK.value
   const len = niceLength(110 * perPx)
-  return { px: Math.round(len / perPx), label: `${len} ${unit[0]}` }
+  return {
+    px: Math.round(len / perPx),
+    label: t('map.units.' + style.value.unit, { n: numFmt.value.format(len) })
+  }
 })
 
 // ── frame loop ───────────────────────────────────────────────────────────────
+// The loop runs every animation frame but only DRAWS when something changed
+// (the frame signature) or something is moving: interaction at full rate,
+// the slow ambient life (waves, clouds, flowing arrows) at ~30 fps, and an
+// untouched still map not at all.
+const liveCount = computed(() => {
+  version.value
+  return (draft.value?.features || []).filter((f) => LIVE_KINDS.has(f.kind)).length
+})
+const journeyCount = computed(() => tokenBase.value.filter((tk) => tk.keys.length > 1).length)
+let lastDraw = 0
+
+/** 'full' = draw every frame · 'slow' = ambient only (~30 fps) · 'idle' = only on change */
+function frameMode() {
+  if (playing.value || flight || camTarget || gesture || stroke) return 'full'
+  if (displayYear !== year.value || renderer.revealing) return 'full'
+  if (reducedMotion.value) return 'idle'
+  const now = (performance.now() - t0) / 1000
+  if (bursts.some((b) => now - b.t0 < 1.7)) return 'full'
+  if (following.value || ruler.value.live) return 'full'
+  if (selectedFeatureId.value || selectedTokenId.value) return 'slow'
+  if (hoverFeatureId.value || hoverTokenId.value) return 'slow'
+  const amb = style.value.ambient
+  if (Object.values(amb).some(Boolean) || liveCount.value) return 'slow'
+  if (showTrails.value && showPeople.value && journeyCount.value) return 'slow'
+  return 'idle'
+}
+
+/** Everything a still frame depends on — unchanged signature, nothing to draw. */
+function frameSig() {
+  const d = draft.value
+  let imgs = 0
+  for (const tk of tokenBase.value) if (tk.img?.complete) imgs++
+  const sn = snapHit
+  const hh = hoverHandle
+  const mc = measureCursor.value
+  return [
+    d.id,
+    version.value,
+    cam.x,
+    cam.y,
+    cam.k,
+    displayYear,
+    mapTheme(),
+    style.value.id,
+    viewSize.value.w,
+    viewSize.value.h,
+    showLabels.value,
+    showTrails.value,
+    showPeople.value,
+    hiddenKey.value,
+    tagColorsKey.value,
+    selectedFeatureId.value,
+    selectedTokenId.value,
+    hoverFeatureId.value,
+    hoverTokenId.value,
+    hh ? hh.type + hh.i : '',
+    sn ? sn.x + ',' + sn.y : '',
+    ruler.value.pts.length,
+    mc ? mc[0] + ',' + mc[1] : '',
+    imgs,
+    tokenBase.value.length
+  ].join('|')
+}
+
 function frame(now) {
   raf = requestAnimationFrame(frame)
   const d = draft.value
@@ -1183,40 +1544,62 @@ function frame(now) {
   }
   if (camK.value !== cam.k) camK.value = cam.k
 
-  const tokens = tokenBase.value.map((tk) => {
-    const life = lifeAlpha(tk.birth, tk.death, displayYear)
-    return {
-      id: tk.id,
-      name: tk.name,
-      color: tk.color,
-      initial: tk.initial,
-      img: tk.img,
-      keys: tk.keys,
-      life,
-      dead: tk.death != null && displayYear > tk.death + 0.5
-    }
-  })
-  const tagColors = new Map(store.tags.filter((tg) => tg.color).map((tg) => [tg.id, tg.color]))
+  // skip frames that would draw exactly what's already on screen
+  const mode = frameMode()
+  const sig = frameSig()
+  if (!needsFrame && sig === lastSig) {
+    if (mode === 'idle') return
+    if (mode === 'slow' && now - lastDraw < 32) return
+  }
+  needsFrame = false
+  lastSig = sig
+  lastDraw = now
+
   renderer.render({
-    doc: d,
-    version: version.value,
-    style: style.value,
+    ...sceneState(),
     cam,
     year: displayYear,
     time,
-    theme: mapTheme(),
-    tokens,
-    tagColors,
     selectedFeatureId: selectedFeatureId.value,
     selectedTokenId: selectedTokenId.value,
     hoverFeatureId: hoverFeatureId.value,
     hoverTokenId: hoverTokenId.value,
     preview: stroke ? previewOf(stroke) : null,
-    showTrails: showTrails.value,
-    showLabels: showLabels.value,
     bursts,
-    reducedMotion: reducedMotion.value
+    reducedMotion: reducedMotion.value,
+    snap: snapHit,
+    measure: measureView(),
+    hoverHandle
   })
+}
+
+/** What the map shows (shared by the live canvas and PNG export). */
+function sceneState() {
+  const tokens = showPeople.value
+    ? tokenBase.value.map((tk) => ({
+        id: tk.id,
+        name: tk.name,
+        color: tk.color,
+        initial: tk.initial,
+        img: tk.img,
+        keys: tk.keys,
+        life: lifeAlpha(tk.birth, tk.death, displayYear),
+        dead: tk.death != null && displayYear > tk.death + 0.5
+      }))
+    : []
+  return {
+    doc: draft.value,
+    version: version.value,
+    style: style.value,
+    theme: mapTheme(),
+    tokens,
+    tagColors: tagColors.value,
+    tagColorsKey: tagColorsKey.value,
+    hiddenKinds: hiddenKinds.value,
+    hiddenKey: hiddenKey.value,
+    showTrails: showTrails.value,
+    showLabels: showLabels.value
+  }
 }
 
 /** The renderer's desk tone: the paper theme gets its own. */
@@ -1234,6 +1617,74 @@ function previewOf(s) {
   return { kind: s.kind, pts, closed: geo === 'area', color }
 }
 
+// ── the ruler ────────────────────────────────────────────────────────────────
+function clearMeasure() {
+  ruler.value = { pts: [], live: false }
+  measureCursor.value = null
+}
+/** The ruler's polyline (with the rubber-band leg to the pointer). */
+function measurePts() {
+  const m = ruler.value
+  return m.live && measureCursor.value && m.pts.length ? [...m.pts, ...measureCursor.value] : m.pts
+}
+const measureTotal = computed(() => polylineLength(measurePts()))
+function measureView() {
+  const pts = measurePts()
+  if (pts.length < 4) return null
+  const labels = []
+  const segs = pts.length / 2 - 1
+  if (segs > 1) {
+    for (let i = 0; i < pts.length - 2; i += 2) {
+      const len = Math.hypot(pts[i + 2] - pts[i], pts[i + 3] - pts[i + 1])
+      if (len * cam.k < 70) continue // too short on screen to label
+      labels.push({
+        x: (pts[i] + pts[i + 2]) / 2,
+        y: (pts[i + 1] + pts[i + 3]) / 2,
+        text: fmtDistance(len)
+      })
+    }
+  }
+  labels.push({
+    x: pts[pts.length - 2],
+    y: pts[pts.length - 1],
+    text: fmtDistance(polylineLength(pts)),
+    total: true
+  })
+  return { pts, labels }
+}
+function measureClick(wx, wy) {
+  const m = ruler.value
+  if (!m.live) ruler.value = { pts: [wx, wy], live: true }
+  else ruler.value = { pts: [...m.pts, wx, wy], live: true }
+}
+function finishMeasure() {
+  if (!ruler.value.live) return
+  ruler.value = { pts: ruler.value.pts, live: false }
+  measureCursor.value = null
+  if (ruler.value.pts.length < 4) clearMeasure()
+}
+
+// ── snapping ─────────────────────────────────────────────────────────────────
+/** Pull a world point onto the nearest place / vertex (Alt or the Layers
+ *  switch turns the magnet off). Sets snapHit for the on-canvas ring. */
+function snapAt(wx, wy, e, excludeId = null) {
+  snapHit = null
+  if (!snapOn.value || e?.altKey || !draft.value) return [wx, wy]
+  const hit = snapPoint(draft.value.features, wx, wy, 11 / cam.k, displayYear, geoOf, {
+    excludeId,
+    hidden: hiddenKinds.value
+  })
+  if (!hit) return [wx, wy]
+  snapHit = hit
+  return [hit.x, hit.y]
+}
+/** Does the current tool draw something that should snap (lines, areas, ruler)? */
+function toolSnaps() {
+  if (tool.value === 'measure') return true
+  const { kind } = toolKind(tool.value)
+  return !!kind && geoOf(kind) !== 'point'
+}
+
 // ── hit testing ──────────────────────────────────────────────────────────────
 const geoOf = (k) => MAP_KIND_GEOMETRY[k]
 function localXY(e) {
@@ -1241,6 +1692,7 @@ function localXY(e) {
   return [e.clientX - r.left, e.clientY - r.top]
 }
 function hitToken(sx, sy) {
+  if (!showPeople.value) return null
   const hits = renderer?.tokenHits || []
   for (let i = hits.length - 1; i >= 0; i--) {
     const h = hits[i]
@@ -1248,17 +1700,53 @@ function hitToken(sx, sy) {
   }
   return null
 }
-function hitAt(wx, wy, opts) {
-  return hitFeature(draft.value.features, wx, wy, 9 / cam.k, displayYear, geoOf, opts)
+function hitAt(wx, wy, opts = {}) {
+  return hitFeature(draft.value.features, wx, wy, 9 / cam.k, displayYear, geoOf, {
+    ...opts,
+    hidden: hiddenKinds.value
+  })
+}
+/** The selected line/area — the only shape that shows edit handles. */
+function selectedShape() {
+  const f = draft.value?.features.find((x) => x.id === selectedFeatureId.value)
+  return f && geoOf(f.kind) !== 'point' ? f : null
+}
+/** Which handle of the selected shape sits under a world point, if any. */
+function handleAt(wx, wy) {
+  const f = selectedShape()
+  if (!f) return null
+  const vi = hitVertex(f.pts, wx, wy, 7 / cam.k)
+  if (vi >= 0) return { type: 'vertex', i: vi, f }
+  // midpoint handles exist only while every vertex shows one (see the renderer)
+  if (f.pts.length / 2 > MAX_VERTEX_HANDLES) return null
+  const closed = geoOf(f.kind) === 'area'
+  const mi = hitMidpoint(f.pts, closed, wx, wy, 7 / cam.k, HANDLE_MIN_SEG_PX / cam.k)
+  return mi >= 0 ? { type: 'mid', i: mi, f } : null
+}
+/** Remove one corner of the selected shape (one undo step). */
+function deleteVertex(f, vi) {
+  const pts = removeVertex(f.pts, vi, geoOf(f.kind) === 'area')
+  if (!pts) return toast(t('map.toast.minPoints'))
+  commit((d) => {
+    const i = d.features.findIndex((x) => x.id === f.id)
+    if (i !== -1) d.features[i] = { ...d.features[i], pts }
+  })
+  hoverHandle = null
+  burst(f.pts[vi * 2], f.pts[vi * 2 + 1], style.value.accent)
 }
 
 // ── pointer interaction ──────────────────────────────────────────────────────
+let pointerInside = false
+// reactive mirror of hoverHandle's type, for the cursor
+const hoverHandleType = ref(null)
+
 function onPointerDown(e) {
   if (!draft.value) return
   canvasEl.value.setPointerCapture?.(e.pointerId)
   const [sx, sy] = localXY(e)
   pointers.set(e.pointerId, { x: sx, y: sy })
   menu.value = null
+  ctxMenu.value = null
   hoverCard.value = null
   flight = null
   if (camTarget) {
@@ -1279,8 +1767,10 @@ function onPointerDown(e) {
     return
   }
   const [wx, wy] = toWorld(cam, sx, sy)
+  lastWorld = [wx, wy]
   if (e.button === 1 || e.button === 2 || spaceDown || tool.value === 'pan') {
-    gesture = { type: 'pan', sx, sy, cam0: { ...cam }, moved: false }
+    // a right-click that doesn't move opens the context menu (on release)
+    gesture = { type: 'pan', sx, sy, cam0: { ...cam }, moved: false, button: e.button }
     return
   }
 
@@ -1306,14 +1796,25 @@ function onPointerDown(e) {
       }
       return
     }
-    const sel = draft.value.features.find((f) => f.id === selectedFeatureId.value)
-    if (sel && geoOf(sel.kind) !== 'point') {
-      const vi = hitVertex(sel.pts, wx, wy, 7 / cam.k)
-      if (vi >= 0) {
-        pushUndo()
-        gesture = { type: 'moveVertex', id: sel.id, vi, sx, sy, moved: false }
-        return
-      }
+    const h = handleAt(wx, wy)
+    if (h?.type === 'vertex') {
+      // Alt-click a corner removes it; a plain press drags it
+      if (e.altKey) return deleteVertex(h.f, h.i)
+      pushUndo()
+      gesture = { type: 'moveVertex', id: h.f.id, vi: h.i, sx, sy, moved: false }
+      return
+    }
+    if (h?.type === 'mid') {
+      // pressing an edge's midpoint drops a new corner there and drags it
+      pushUndo()
+      const i = draft.value.features.findIndex((x) => x.id === h.f.id)
+      const [mx, my] = segmentMidpoint(h.f.pts, h.i)
+      draft.value.features[i] = { ...h.f, pts: insertVertex(h.f.pts, h.i, mx, my) }
+      hoverHandle = { type: 'vertex', i: h.i + 1 }
+      bump()
+      scheduleSave()
+      gesture = { type: 'moveVertex', id: h.f.id, vi: h.i + 1, sx, sy, moved: true }
+      return
     }
     // Land / water only take a single click once selected (double-click
     // selects them) — otherwise every click on the continent would grab it.
@@ -1346,6 +1847,16 @@ function onPointerDown(e) {
     return
   }
 
+  if (tool.value === 'measure') {
+    const [mx, my] = snapAt(wx, wy, e)
+    const fresh = !ruler.value.live
+    measureClick(mx, my)
+    measureCursor.value = [mx, my]
+    // press-drag-release measures one straight leg in a single gesture
+    gesture = { type: 'measure', sx, sy, fresh, moved: false }
+    return
+  }
+
   const { kind, glyph } = toolKind(tool.value)
   if (!kind) return
   const geo = geoOf(kind)
@@ -1353,6 +1864,7 @@ function onPointerDown(e) {
     placePoint(kind, glyph, wx, wy)
     return
   }
+  const [px, py] = snapAt(wx, wy, e)
   // click-to-place polyline in progress: add a vertex (or close the shape)
   if (stroke && stroke.mode === 'click' && stroke.kind === kind) {
     const [fx, fy] = [stroke.pts[0], stroke.pts[1]]
@@ -1361,14 +1873,14 @@ function onPointerDown(e) {
       stroke.pts.length >= 6 &&
       Math.hypot((fx - wx) * cam.k, (fy - wy) * cam.k) < 12
     if (closeHit) finishStroke()
-    else stroke.pts.push(wx, wy)
+    else stroke.pts.push(px, py)
     gesture = { type: 'clickVertex' }
     return
   }
   stroke = {
     kind,
     glyph,
-    pts: [wx, wy],
+    pts: [px, py],
     mode: 'pending',
     sx0: sx,
     sy0: sy,
@@ -1381,9 +1893,11 @@ function onPointerDown(e) {
 
 function onPointerMove(e) {
   if (!draft.value) return
+  pointerInside = true
   const [sx, sy] = localXY(e)
   if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: sx, y: sy })
   const [wx, wy] = toWorld(cam, sx, sy)
+  lastWorld = [wx, wy]
 
   if (gesture?.type === 'pinch' && pointers.size >= 2) {
     const [a, b] = [...pointers.values()]
@@ -1397,7 +1911,12 @@ function onPointerMove(e) {
   }
   if (!gesture) {
     updateHover(sx, sy, wx, wy)
-    if (stroke?.mode === 'click') stroke.cursor = [wx, wy]
+    // the magnet previews where the next click would land
+    if (toolSnaps()) {
+      const p = snapAt(wx, wy, e)
+      if (stroke?.mode === 'click') stroke.cursor = p
+      if (ruler.value.live) measureCursor.value = p
+    } else snapHit = null
     return
   }
   const g = gesture
@@ -1424,12 +1943,14 @@ function onPointerMove(e) {
       return
     }
     case 'moveVertex': {
+      if (!g.moved && !far()) return
       g.moved = true
       const i = draft.value.features.findIndex((f) => f.id === g.id)
       if (i === -1) return
+      const [vx, vy] = snapAt(wx, wy, e, g.id)
       const pts = draft.value.features[i].pts.slice()
-      pts[g.vi * 2] = Math.round(wx * 10) / 10
-      pts[g.vi * 2 + 1] = Math.round(wy * 10) / 10
+      pts[g.vi * 2] = Math.round(vx * 10) / 10
+      pts[g.vi * 2 + 1] = Math.round(vy * 10) / 10
       draft.value.features[i] = { ...draft.value.features[i], pts }
       bump()
       return
@@ -1447,6 +1968,11 @@ function onPointerMove(e) {
       bump()
       return
     }
+    case 'measure':
+      if (!g.moved && !far()) return
+      g.moved = true
+      measureCursor.value = snapAt(wx, wy, e)
+      return
     case 'draw': {
       const s = stroke
       if (!s) return
@@ -1455,10 +1981,14 @@ function onPointerMove(e) {
         s.mode = 'free'
         strokeMode.value = 'free'
       }
-      if (s.mode === 'free' && Math.hypot(sx - s.lsx, sy - s.lsy) >= 3) {
-        s.pts.push(wx, wy)
-        s.lsx = sx
-        s.lsy = sy
+      if (s.mode === 'free') {
+        // show where the stroke's end would snap; the point lands on release
+        snapAt(wx, wy, e)
+        if (Math.hypot(sx - s.lsx, sy - s.lsy) >= 3) {
+          s.pts.push(wx, wy)
+          s.lsx = sx
+          s.lsy = sy
+        }
       }
       return
     }
@@ -1483,6 +2013,12 @@ function onPointerUp(e) {
   switch (g.type) {
     case 'pan':
       if (g.moved) scheduleSave('view')
+      else if (g.button === 2) {
+        // right-click: finish whatever is being laid out, else the menu
+        if (stroke?.mode === 'click') finishStroke()
+        else if (ruler.value.live) finishMeasure()
+        else openContextMenu(...localXY(e))
+      }
       break
     case 'moveToken':
     case 'moveVertex':
@@ -1497,7 +2033,20 @@ function onPointerUp(e) {
               toast(t('map.toast.firstJourney'), null, 'footprints')
           }
         }
-      } else if (g.type !== 'moveFeature') undoStack.pop()
+      } else if (g.type !== 'moveFeature') {
+        undoStack.pop()
+        syncHist()
+      }
+      snapHit = null
+      break
+    case 'measure':
+      // a dragged first leg is a finished measurement on release
+      if (g.moved && g.fresh) {
+        const c = measureCursor.value
+        if (c) ruler.value = { pts: [...ruler.value.pts, ...c], live: false }
+        measureCursor.value = null
+        snapHit = null
+      }
       break
     case 'draw':
       if (!stroke) break
@@ -1505,27 +2054,58 @@ function onPointerUp(e) {
         stroke.mode = 'click'
         strokeMode.value = 'click'
         stroke.cursor = stroke.pts.slice(0, 2)
-      } else if (stroke.mode === 'free') finishStroke()
+      } else if (stroke.mode === 'free') {
+        // the stroke ends ON the snapped town / vertex, if there was one
+        if (snapHit) stroke.pts.push(snapHit.x, snapHit.y)
+        finishStroke()
+      }
       break
     case 'erase':
-      if (!g.erased) undoStack.pop()
-      else scheduleSave()
+      if (!g.erased) {
+        undoStack.pop()
+        syncHist()
+      } else scheduleSave()
       break
   }
 }
 
 function onPointerLeave() {
+  pointerInside = false
   if (!gesture) {
     hoverFeatureId.value = null
     hoverTokenId.value = null
     hoverCard.value = null
+    hoverHandle = null
+    hoverHandleType.value = null
+    snapHit = null
   }
+}
+
+/** Plain-language name of a feature's kind ("Castle", "River", "Battle"). */
+function kindLabelOf(f) {
+  return f.kind === 'place' || f.kind === 'event'
+    ? t('map.tools.' + f.kind + '_' + (f.icon || (f.kind === 'place' ? 'town' : 'star')))
+    : t('map.kinds.' + f.kind)
+}
+/** The icon a feature shows in lists (its glyph's tool icon, else its kind's). */
+function featureIcon(f) {
+  const byGlyph = f.icon && ALL_TOOLS.find((tl) => tl.glyph === f.icon)
+  return byGlyph?.icon || TOOL_BY_ID.get(f.kind)?.icon || 'map-pin'
+}
+function whenOf(f) {
+  return f.from != null || f.to != null ? `${f.from ?? '…'}–${f.to ?? '…'}` : ''
 }
 
 function updateHover(sx, sy, wx, wy) {
   const tid = hitToken(sx, sy)
   let fid = null
-  if (!tid && (tool.value === 'select' || tool.value === 'erase'))
+  hoverHandle = null
+  if (!tid && tool.value === 'select') {
+    const h = handleAt(wx, wy)
+    if (h) hoverHandle = { type: h.type, i: h.i }
+  }
+  hoverHandleType.value = hoverHandle?.type || null
+  if (!tid && !hoverHandle && (tool.value === 'select' || tool.value === 'erase'))
     fid = hitAt(wx, wy, { skipBase: tool.value === 'select' })
   hoverTokenId.value = tid
   hoverFeatureId.value = fid
@@ -1543,11 +2123,8 @@ function updateHover(sx, sy, wx, wy) {
     }
   } else if (fid) {
     const f = draft.value.features.find((x) => x.id === fid)
-    const when = f.from != null || f.to != null ? ` · ${f.from ?? '…'}–${f.to ?? '…'}` : ''
-    const kindLabel =
-      f.kind === 'place' || f.kind === 'event'
-        ? t('map.tools.' + f.kind + '_' + (f.icon || (f.kind === 'place' ? 'town' : 'star')))
-        : t('map.kinds.' + f.kind)
+    const when = whenOf(f) ? ` · ${whenOf(f)}` : ''
+    const kindLabel = kindLabelOf(f)
     hoverCard.value =
       f.name || f.note || when
         ? {
@@ -1575,10 +2152,15 @@ function eraseAt(sx, sy) {
   const f = draft.value.features.find((x) => x.id === fid)
   draft.value.features = draft.value.features.filter((x) => x.id !== fid)
   const c = geoOf(f.kind) === 'area' ? polygonCentroid(f.pts) : f.pts
-  burst(c[0], c[1], '#ef5350')
+  burst(c[0], c[1], dangerColor())
   if (selectedFeatureId.value === fid) selectedFeatureId.value = null
   gesture.erased++
   bump()
+}
+/** The theme's danger red, read from the design tokens (canvas can't use var()). */
+function dangerColor() {
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--danger').trim()
+  return v || '#ef5350'
 }
 
 function placePoint(kind, glyph, wx, wy) {
@@ -1600,9 +2182,20 @@ function finishStroke() {
   const s = stroke
   stroke = null
   strokeMode.value = null
+  snapHit = null
   if (!s) return
   const geo = geoOf(s.kind)
-  let pts = s.mode === 'free' ? simplify(s.pts, 1.4 / cam.k) : s.pts.slice()
+  let pts = s.pts.slice()
+  if (s.mode === 'free') {
+    // simplify the hand-drawn wobble, but keep a snapped start / end exact
+    const [x0, y0] = [pts[0], pts[1]]
+    const [x1, y1] = [pts[pts.length - 2], pts[pts.length - 1]]
+    pts = simplify(pts, 1.4 / cam.k)
+    pts[0] = x0
+    pts[1] = y0
+    pts[pts.length - 2] = x1
+    pts[pts.length - 1] = y1
+  }
   if (geo === 'area') {
     if (pts.length < 6 || Math.abs(polygonArea(pts)) * cam.k * cam.k < 200)
       return toast(t('map.toast.tooSmall'))
@@ -1626,12 +2219,14 @@ function finishStroke() {
 function cancelStroke() {
   stroke = null
   strokeMode.value = null
+  snapHit = null
 }
 
 function onWheel(e) {
   if (!draft.value) return
   const [sx, sy] = localXY(e)
   flight = null
+  ctxMenu.value = null
   const scale = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1
   if (e.shiftKey && !e.ctrlKey) {
     const base = camTarget || cam
@@ -1658,6 +2253,14 @@ function onDblClick(e) {
     }
     return
   }
+  if (tool.value === 'measure') {
+    const p = ruler.value.pts
+    const n = p.length
+    if (n >= 6 && Math.hypot(p[n - 2] - p[n - 4], p[n - 1] - p[n - 3]) * cam.k < 8)
+      ruler.value = { pts: p.slice(0, -2), live: true }
+    finishMeasure()
+    return
+  }
   if (tool.value !== 'select') return
   const tid = hitToken(sx, sy)
   if (tid) {
@@ -1666,6 +2269,9 @@ function onDblClick(e) {
     return
   }
   const [wx, wy] = toWorld(cam, sx, sy)
+  // double-clicking a corner removes it (the press before it started a no-op drag)
+  const h = handleAt(wx, wy)
+  if (h?.type === 'vertex') return deleteVertex(h.f, h.i)
   const fid = hitAt(wx, wy, { skipBase: true })
   if (fid) {
     selectFeature(fid)
@@ -1683,10 +2289,276 @@ function onDblClick(e) {
 const cursor = computed(() => {
   if (dropHover.value) return 'copy'
   if (tool.value === 'pan') return 'grab'
-  if (tool.value === 'erase') return 'crosshair'
-  if (tool.value === 'select')
-    return hoverTokenId.value || hoverFeatureId.value ? 'pointer' : 'default'
+  if (tool.value === 'erase' || tool.value === 'measure') return 'crosshair'
+  if (tool.value === 'select') {
+    if (hoverTokenId.value) return 'pointer'
+    if (hoverHandleType.value === 'vertex') return 'move'
+    if (hoverHandleType.value === 'mid') return 'copy'
+    return hoverFeatureId.value ? 'pointer' : 'default'
+  }
   return 'crosshair'
+})
+
+// ── context menu ─────────────────────────────────────────────────────────────
+let ctxN = 0
+function openContextMenu(sx, sy) {
+  const [wx, wy] = toWorld(cam, sx, sy)
+  const mod = /Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘' : 'Ctrl+'
+  const base = { key: ++ctxN, x: sx, y: sy, at: [wx, wy] }
+  const tid = hitToken(sx, sy)
+  if (tid) {
+    selectToken(tid)
+    const tk = tokenBase.value.find((x) => x.id === tid)
+    ctxMenu.value = {
+      ...base,
+      title: tk?.name || '',
+      items: [
+        { id: 'profile', icon: 'user', label: t('map.inspector.profile') },
+        {
+          id: 'follow',
+          icon: 'video',
+          label: following.value ? t('map.inspector.following') : t('map.inspector.follow')
+        },
+        { id: 'sep1', sep: true },
+        {
+          id: 'removeToken',
+          icon: 'trash-2',
+          label: t('map.inspector.removeFromMap'),
+          danger: true
+        }
+      ]
+    }
+    return
+  }
+  const h = handleAt(wx, wy)
+  if (h?.type === 'vertex') {
+    ctxMenu.value = {
+      ...base,
+      title: h.f.name || kindLabelOf(h.f),
+      vertex: h,
+      items: [
+        {
+          id: 'deleteVertex',
+          icon: 'circle-minus',
+          label: t('map.ctx.deletePoint'),
+          kbd: 'Alt+click'
+        }
+      ]
+    }
+    return
+  }
+  const fid = hitAt(wx, wy, { skipBase: true }) || hitAt(wx, wy)
+  if (fid) {
+    selectFeature(fid)
+    const f = draft.value.features.find((x) => x.id === fid)
+    const geo = geoOf(f.kind)
+    ctxMenu.value = {
+      ...base,
+      title: f.name || kindLabelOf(f),
+      items: [
+        { id: 'rename', icon: 'pencil', label: t('map.ctx.rename') },
+        { id: 'duplicate', icon: 'copy', label: t('map.ctx.duplicate'), kbd: mod + 'D' },
+        { id: 'copy', icon: 'clipboard', label: t('map.ctx.copy'), kbd: mod + 'C' },
+        { id: 'sep1', sep: true },
+        { id: 'front', icon: 'bring-to-front', label: t('map.inspector.front') },
+        { id: 'back', icon: 'send-to-back', label: t('map.inspector.back') },
+        ...(geo !== 'point'
+          ? [
+              {
+                id: 'era',
+                icon: 'scissors',
+                label: t('map.inspector.newEra', { y: yearInt.value })
+              }
+            ]
+          : []),
+        { id: 'sep2', sep: true },
+        { id: 'delete', icon: 'trash-2', label: t('map.ctx.delete'), kbd: 'Del', danger: true }
+      ]
+    }
+    return
+  }
+  ctxMenu.value = {
+    ...base,
+    title: '',
+    items: [
+      {
+        id: 'paste',
+        icon: 'clipboard-paste',
+        label: t('map.ctx.pasteHere'),
+        kbd: mod + 'V',
+        disabled: !clipboard
+      },
+      { id: 'label', icon: 'type', label: t('map.ctx.labelHere') },
+      { id: 'measure', icon: 'ruler', label: t('map.ctx.measureFrom') },
+      { id: 'sep1', sep: true },
+      { id: 'fit', icon: 'maximize', label: t('map.zoom.fit'), kbd: '0' }
+    ]
+  }
+}
+
+function onCtxPick(id) {
+  const m = ctxMenu.value
+  ctxMenu.value = null
+  if (!m) return
+  const [wx, wy] = m.at
+  switch (id) {
+    case 'profile':
+      return openPerson()
+    case 'follow':
+      following.value = !following.value
+      return
+    case 'removeToken':
+      return deleteSelected()
+    case 'deleteVertex':
+      return deleteVertex(m.vertex.f, m.vertex.i)
+    case 'rename':
+      return nextTick(() => inspectorRef.value?.focusName?.())
+    case 'duplicate':
+      return duplicateSelected()
+    case 'copy':
+      return copySelected()
+    case 'front':
+      return reorderSelected(1)
+    case 'back':
+      return reorderSelected(-1)
+    case 'era':
+      return forkEra()
+    case 'delete':
+      return deleteSelected()
+    case 'paste':
+      return pasteAt(wx, wy)
+    case 'label':
+      return placePoint('label', undefined, wx, wy)
+    case 'measure':
+      tool.value = 'measure'
+      ruler.value = { pts: [wx, wy], live: true }
+      measureCursor.value = [wx, wy]
+      return
+    case 'fit':
+      return fitView(true)
+  }
+}
+
+// ── copy / paste ─────────────────────────────────────────────────────────────
+function copySelected() {
+  const f = draft.value?.features.find((x) => x.id === selectedFeatureId.value)
+  if (!f) return false
+  clipboard = clone(f)
+  toast(t('map.toast.copied', { name: f.name || kindLabelOf(f) }), null, 'copy')
+  return true
+}
+/** Paste the copied feature centred on a world point (any map — the
+ *  clipboard outlives switching maps). One undo step. */
+function pasteAt(wx, wy) {
+  if (!clipboard || !draft.value) return toast(t('map.toast.nothingToPaste'))
+  const src = clipboard
+  const b = bboxOf(src.pts)
+  const copy = {
+    ...clone(src),
+    id: crypto.randomUUID(),
+    pts: translatePts(src.pts, wx - (b.x0 + b.x1) / 2, wy - (b.y0 + b.y1) / 2)
+  }
+  // a paste you can't see is a dead click: bring it into the current year
+  const y = Math.round(year.value)
+  if (windowAlpha(copy, y) < 0.3) {
+    copy.from = y
+    if (copy.to != null && copy.to < y) delete copy.to
+  }
+  if (hiddenKinds.value.has(copy.kind)) revealKind(copy.kind)
+  commit((d) => d.features.push(copy))
+  selectFeature(copy.id)
+  burst(wx, wy, style.value.accent)
+}
+function pasteHere() {
+  const { w, h } = viewSize.value
+  const [wx, wy] = pointerInside && lastWorld ? lastWorld : toWorld(cam, w / 2, h / 2)
+  pasteAt(wx, wy)
+}
+
+/** Switch a hidden layer back on (you just drew / pasted / found into it). */
+function revealKind(kind) {
+  const ly = layerOf(kind)
+  if (!ly || !hiddenLayers.value.includes(ly.id)) return
+  hiddenLayers.value = hiddenLayers.value.filter((x) => x !== ly.id)
+  toast(t('map.toast.layerShown', { layer: t('map.layers.' + ly.id) }), null, 'eye')
+}
+
+// ── find ─────────────────────────────────────────────────────────────────────
+const findItems = computed(() => {
+  if (menu.value !== 'find') return []
+  version.value
+  const out = []
+  for (const f of draft.value?.features || []) {
+    if (!f.name) continue
+    const when = whenOf(f)
+    out.push({
+      id: f.id,
+      type: 'feature',
+      name: f.name,
+      sub: kindLabelOf(f) + (when ? ' · ' + when : ''),
+      icon: featureIcon(f),
+      color: f.color || '',
+      faded: windowAlpha(f, yearInt.value) < 0.3 || hiddenKinds.value.has(f.kind),
+      rank: f.kind === 'place' ? -(PLACE_RANK[f.icon || 'town'] ?? 2) : 0
+    })
+  }
+  for (const tk of tokenBase.value) {
+    out.push({
+      id: tk.id,
+      type: 'token',
+      name: tk.name,
+      sub: tk.keys.length > 1 ? t('map.hover.stops', { n: tk.keys.length }) : t('map.find.person'),
+      color: tk.color,
+      imgUrl: tk.imgUrl,
+      initial: tk.initial,
+      faded: !showPeople.value
+    })
+  }
+  return out
+})
+
+function onFindPick(it) {
+  menu.value = null
+  if (it.type === 'token') {
+    showPeople.value = true
+    const tk = draft.value.tokens.find((x) => x.id === it.id)
+    if (tk) flyToPerson(tk.person_id)
+    return
+  }
+  const f = draft.value.features.find((x) => x.id === it.id)
+  if (f) flyToFeature(f)
+}
+
+/** Frame a feature (bringing it into time and out of a hidden layer first). */
+function flyToFeature(f) {
+  revealKind(f.kind)
+  if (windowAlpha(f, year.value) < 0.3) {
+    scrubTo(f.from ?? f.to)
+    onScrubEnd()
+  }
+  const { w, h } = viewSize.value
+  if (geoOf(f.kind) === 'point') {
+    flyTo(centerOn(f.pts[0], f.pts[1], Math.max(cam.k, 1.6), w, h))
+  } else {
+    const c = fitCamera(bboxOf(f.pts), w, h, Math.min(w, h) * 0.2)
+    // don't dive into a tiny shape — hold at a readable zoom
+    flyTo(c.k > 6 ? centerOn(...polygonCentroid(f.pts), 6, w, h) : c)
+  }
+  selectFeature(f.id)
+}
+
+/** The selection's size, in the style's unit, for the inspector. */
+const selMeasure = computed(() => {
+  const f = selFeature.value
+  if (!f) return ''
+  const geo = geoOf(f.kind)
+  if (geo === 'line') return t('map.inspector.length', { d: fmtDistance(polylineLength(f.pts)) })
+  if (geo === 'area')
+    return t('map.inspector.area', {
+      a: fmtArea(Math.abs(polygonArea(f.pts))),
+      d: fmtDistance(polylineLength(f.pts, true))
+    })
+  return ''
 })
 
 // ── hints ────────────────────────────────────────────────────────────────────
@@ -1696,7 +2568,16 @@ const hintText = computed(() => {
   if (strokeMode.value === 'click') return t('map.hint.clickMode')
   if (tl === 'select') {
     if (selToken.value) return t('map.hint.token', { name: selToken.value.name, y: yearInt.value })
+    if (selFeature.value && geoOf(selFeature.value.kind) !== 'point') return t('map.hint.shape')
     return t('map.hint.select')
+  }
+  if (tl === 'measure') {
+    const m = ruler.value
+    if (m.pts.length >= 2 && (m.live || m.pts.length >= 4))
+      return t(m.live ? 'map.hint.measuring' : 'map.hint.measured', {
+        d: fmtDistance(measureTotal.value)
+      })
+    return t('map.hint.measure')
   }
   if (tl === 'pan' || tl === 'erase') return t('map.hint.' + tl)
   const { kind } = toolKind(tl)
@@ -1706,10 +2587,15 @@ const hintText = computed(() => {
 })
 
 // remember hotkey-picked tools as their group's face; leaving a draw tool
-// abandons any half-drawn stroke
+// abandons any half-drawn stroke; drawing into a hidden layer reveals it
 watch(tool, (tl) => {
   toolbarRef.value?.remember(tl)
   if (stroke && toolKind(tl).kind !== stroke.kind) cancelStroke()
+  if (tl !== 'measure') clearMeasure()
+  snapHit = null
+  ctxMenu.value = null
+  const { kind } = toolKind(tl)
+  if (kind) revealKind(kind)
 })
 
 // ── keyboard ─────────────────────────────────────────────────────────────────
@@ -1753,34 +2639,54 @@ function onKeydown(e) {
       else redo()
       return
     }
-    if (key === 'd' && selectedFeatureId.value) {
+    let act = null
+    if (key === 'f') act = () => (menu.value = 'find')
+    else if (key === 'v' && clipboard) act = pasteHere
+    else if (key === 'c' && selectedFeatureId.value) act = copySelected
+    else if (key === 'd' && selectedFeatureId.value) act = duplicateSelected
+    if (act) {
       e.preventDefault()
       e.stopPropagation()
-      duplicateSelected()
+      act()
     }
     return
   }
   if (e.altKey) return
+  if (e.key === '?') {
+    // the map's own sheet instead of the app-wide Help page
+    e.preventDefault()
+    e.stopPropagation()
+    keysOpen.value = !keysOpen.value
+    return
+  }
   if (e.key === ' ') {
     spaceDown = true
     e.preventDefault()
     return
   }
   if (e.key === 'Escape') {
-    if (stroke) cancelStroke()
+    if (ctxMenu.value) ctxMenu.value = null
+    else if (keysOpen.value) keysOpen.value = false
+    else if (stroke) cancelStroke()
     else if (menu.value) menu.value = null
+    else if (ruler.value.pts.length) clearMeasure()
     else if (selectedFeatureId.value || selectedTokenId.value) clearSelection()
     else tool.value = 'select'
     return
   }
-  if (e.key === 'Enter' && stroke?.mode === 'click') {
-    finishStroke()
+  if (e.key === 'Enter') {
+    if (stroke?.mode === 'click') finishStroke()
+    else if (ruler.value.live) finishMeasure()
     return
   }
   if (e.key === 'Backspace' || e.key === 'Delete') {
     if (stroke?.mode === 'click') {
       if (stroke.pts.length > 2) stroke.pts.splice(-2, 2)
       else cancelStroke()
+    } else if (tool.value === 'measure' && ruler.value.pts.length) {
+      const p = ruler.value.pts
+      if (p.length > 2) ruler.value = { pts: p.slice(0, -2), live: ruler.value.live }
+      else clearMeasure()
     } else deleteSelected()
     e.preventDefault()
     return
@@ -1828,52 +2734,52 @@ function nudge(dx, dy) {
 }
 
 // ── export ───────────────────────────────────────────────────────────────────
-async function exportPng() {
+/** Save a PNG: 'sheet' = the whole map at up to 4096px, 'view' = exactly what
+ *  is on screen at 2× — both as the map looks now (year, layers, style). */
+async function exportPng(mode = 'sheet') {
+  menu.value = null
   const d = draft.value
   if (!d) return
   await flushSave()
   // painted styles need their sprites + calligraphy fonts before the still
   if (style.value.painting || style.value.calligraphy) await loadInkMapAssets()
-  const scale = Math.min(2, 4096 / Math.max(d.width, d.height))
   const c = document.createElement('canvas')
   const r = new MapRenderer(c)
-  r.resize(Math.round(d.width * scale), Math.round(d.height * scale), 1)
-  const tokens = tokenBase.value.map((tk) => ({
-    ...tk,
-    life: lifeAlpha(tk.birth, tk.death, displayYear),
-    dead: tk.death != null && displayYear > tk.death + 0.5
-  }))
+  let shotCam
+  if (mode === 'view') {
+    r.resize(viewSize.value.w, viewSize.value.h, 2)
+    shotCam = { ...cam }
+  } else {
+    const scale = Math.min(2, 4096 / Math.max(d.width, d.height))
+    r.resize(Math.round(d.width * scale), Math.round(d.height * scale), 1)
+    shotCam = { x: 0, y: 0, k: scale }
+  }
   r.render({
-    doc: d,
+    ...sceneState(),
     version: -1,
-    style: style.value,
-    cam: { x: 0, y: 0, k: scale },
+    cam: shotCam,
     year: displayYear,
     time: 0,
-    theme: mapTheme(),
-    tokens,
-    tagColors: new Map(store.tags.filter((tg) => tg.color).map((tg) => [tg.id, tg.color])),
     selectedFeatureId: null,
     selectedTokenId: null,
     hoverFeatureId: null,
     hoverTokenId: null,
     preview: null,
-    showTrails: showTrails.value,
-    showLabels: showLabels.value,
     bursts: [],
     exporting: true
   })
   c.toBlob((blob) => {
-    if (!blob) return
+    r.dispose()
+    if (!blob) return toast(t('map.toast.exportFailed'), null, 'triangle-alert')
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${(d.name || 'map').replace(/[\\/:*?"<>|]+/g, '_')} ${Math.round(year.value)}.png`
+    const base = defaultNameLabel(d.name) || 'map'
+    a.download = `${base.replace(/[\\/:*?"<>|]+/g, '_')} ${Math.round(year.value)}.png`
     document.body.appendChild(a)
     a.click()
     a.remove()
     setTimeout(() => URL.revokeObjectURL(url), 4000)
-    r.dispose()
     toast(t('map.toast.exported'), null, 'download')
   }, 'image/png')
 }
@@ -1890,11 +2796,13 @@ function measure() {
   const [cx, cy] = prev.w > 1 ? toWorld(cam, prev.w / 2, prev.h / 2) : [null, null]
   viewSize.value = { w, h }
   renderer.resize(w, h, Math.min(2, window.devicePixelRatio || 1))
+  needsFrame = true // resizing wiped the canvas
   if (cx != null) cam = centerOn(cx, cy, cam.k, w, h)
   else fitView(false)
 }
 
 function start() {
+  needsFrame = true
   if (!raf) {
     lastFrame = 0
     raf = requestAnimationFrame(frame)
@@ -1906,7 +2814,10 @@ function stop() {
 }
 
 onMounted(() => {
+  // the Style Studio edits this map's style through our undo + autosave
+  mapStyleBridge.value = bridgeHandle
   renderer = new MapRenderer(canvasEl.value)
+  renderer.onAssets = () => (needsFrame = true)
   resizeObs = new ResizeObserver(measure)
   resizeObs.observe(stageEl.value)
   measure()
@@ -1937,6 +2848,7 @@ watch(
   }
 )
 onBeforeUnmount(() => {
+  if (mapStyleBridge.value === bridgeHandle) mapStyleBridge.value = null
   stop()
   flushSave()
   resizeObs?.disconnect()
@@ -1965,6 +2877,10 @@ defineExpose({ undo, redo, flushSave })
   flex-direction: column;
   background: var(--bg);
   z-index: 2;
+}
+/* the header's dropdowns must open over the stage's panels (inspector, drawer) */
+.mv > .vh {
+  z-index: 20;
 }
 .mv-stage {
   position: relative;
@@ -2061,6 +2977,75 @@ defineExpose({ undo, redo, flushSave })
   color: var(--accent);
   background: var(--adim);
   border-color: var(--accent);
+}
+.mv-toggle.open {
+  background: var(--hover);
+  color: var(--t1);
+  border-color: var(--accent);
+}
+.mv-find-menu {
+  min-width: 0;
+}
+.mv-layers-menu {
+  width: 270px;
+}
+.mv-layer {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: var(--ctl-md);
+  padding: 0 9px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--t1);
+  font-family: var(--font);
+  font-size: var(--fs-md);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast);
+}
+.mv-layer:hover {
+  background: var(--hover);
+}
+.mv-layer.off {
+  color: var(--t3);
+}
+.mv-layer-name {
+  flex: 1;
+  white-space: nowrap;
+}
+.mv-layer-n {
+  font-size: var(--fs-xs);
+  color: var(--t3);
+  font-variant-numeric: tabular-nums;
+}
+.mv-layer-eye {
+  flex: 0 0 auto;
+  color: var(--t2);
+}
+.mv-layer.off .mv-layer-eye {
+  color: var(--t3);
+}
+.mv-layers-reset {
+  color: var(--accent);
+}
+.mv-menu-rich {
+  align-items: flex-start;
+  padding: 8px 9px;
+}
+.mv-menu-rich .ui-icon {
+  margin-top: 1px;
+  flex: 0 0 auto;
+}
+.mv-menu-rich-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mv-menu-rich-text small {
+  font-size: var(--fs-xs);
+  color: var(--t3);
 }
 .mv-menu {
   position: absolute;
@@ -2342,8 +3327,18 @@ defineExpose({ undo, redo, flushSave })
   color: var(--t1);
   cursor: pointer;
 }
-.mv-zoom button:hover {
+.mv-zoom button:hover:not(:disabled) {
   background: var(--hover);
+}
+.mv-zoom button:disabled {
+  color: var(--t3);
+  cursor: default;
+}
+.mv-zoom-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 3px;
+  background: var(--border);
 }
 .mv-scale {
   display: flex;

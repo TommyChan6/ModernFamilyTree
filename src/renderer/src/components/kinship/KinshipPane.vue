@@ -8,29 +8,27 @@
                   founders, couples who share blood, family islands. -->
   <div class="kp canvas-pane" @pointerdown.stop @wheel.stop>
     <div class="kp-head">
-      <span class="kp-title"><UiIcon class="kp-title-ic" name="dna" :size="14" />Kinship</span>
-      <KinLangPicker />
-      <button
-        class="kp-quiz"
-        title="Kinship quiz — how well do you know this family?"
-        @click="$emit('quiz')"
+      <span class="kp-title"
+        ><UiIcon class="kp-title-ic" name="dna" :size="14" />{{ t('kinship.title') }}</span
       >
-        <UiIcon name="dices" :size="14" />Quiz
+      <KinLangPicker />
+      <button class="kp-quiz" :title="t('kinship.pane.quizTitle')" @click="$emit('quiz')">
+        <UiIcon name="dices" :size="14" />{{ t('kinship.pane.quiz') }}
       </button>
     </div>
 
     <div class="kp-tabs" role="tablist">
       <span class="kp-tab-thumb" :style="{ transform: `translateX(${tabIdx * 100}%)` }"></span>
       <button
-        v-for="t in TABS"
-        :key="t.id"
+        v-for="tb in TABS"
+        :key="tb.id"
         class="kp-tab"
-        :class="{ on: tab === t.id }"
+        :class="{ on: tab === tb.id }"
         role="tab"
-        :aria-selected="tab === t.id"
-        @click="tab = t.id"
+        :aria-selected="tab === tb.id"
+        @click="tab = tb.id"
       >
-        <UiIcon :name="t.icon" :size="14" />{{ t.label }}
+        <UiIcon :name="tb.icon" :size="14" />{{ t(tb.labelKey) }}
       </button>
     </div>
 
@@ -42,19 +40,21 @@
         }}</span>
         <div class="kp-anchor-text">
           <span class="kp-anchor-k">{{
-            tab === 'lens' ? 'Through the eyes of' : 'Starting from'
+            tab === 'lens' ? t('kinship.pane.throughEyes') : t('kinship.pane.startingFrom')
           }}</span>
           <span class="kp-anchor-name">{{ personName(anchorId) }}</span>
         </div>
       </template>
-      <span v-else class="kp-hint">Select someone on the graph to begin</span>
+      <span v-else class="kp-hint">{{ t('kinship.pane.selectToBegin') }}</span>
       <button
         v-if="selectedId && selectedId !== anchorId"
         class="kp-use"
-        :title="`Use ${personName(selectedId)}`"
+        :title="t('kinship.pane.useName', { name: personName(selectedId) })"
         @click="$emit('update:anchorId', selectedId)"
       >
-        <UiIcon name="user-check" :size="14" />Use {{ firstName(selectedId) }}
+        <UiIcon name="user-check" :size="14" />{{
+          t('kinship.pane.useName', { name: firstName(selectedId) })
+        }}
       </button>
     </div>
 
@@ -70,11 +70,11 @@
           <span class="kp-eye-iris"></span>
         </span>
         <span class="kp-eye-text">
-          <b>{{ lensOn && anchorId ? 'Lens on' : 'See the family through their eyes' }}</b>
+          <b>{{ lensOn && anchorId ? t('kinship.pane.lensOn') : t('kinship.pane.lensOff') }}</b>
           <small>{{
             lensOn && anchorId
-              ? 'Every node now says what it is to ' + firstName(anchorId)
-              : 'Labels every person with their relation'
+              ? t('kinship.pane.lensOnSub', { name: firstName(anchorId) })
+              : t('kinship.pane.lensOffSub')
           }}</small>
         </span>
       </button>
@@ -85,10 +85,10 @@
           :key="f.id"
           class="kp-chip"
           :class="{ on: filter === f.id }"
-          :title="f.title"
+          :title="t(`kinship.filters.${f.id}.title`)"
           @click="$emit('update:filter', f.id)"
         >
-          {{ f.label }}
+          {{ t(`kinship.filters.${f.id}.label`) }}
         </button>
       </div>
 
@@ -106,7 +106,7 @@
         </div>
       </div>
 
-      <div v-if="closest.length" class="kp-sub">Closest kin</div>
+      <div v-if="closest.length" class="kp-sub">{{ t('kinship.pane.closestKin') }}</div>
       <div class="kp-list">
         <button
           v-for="(c, i) in closest"
@@ -125,16 +125,16 @@
     <!-- ── Kin walker ───────────────────────────────────────────────────── -->
     <div v-else-if="tab === 'walk'" key="walk" class="kp-body">
       <div class="kp-walk-grid">
-        <div v-for="row in WALK_ROWS" :key="row.label" class="kp-walk-row">
-          <span class="kp-walk-label">{{ row.label }}</span>
+        <div v-for="row in WALK_ROWS" :key="row.id" class="kp-walk-row">
+          <span class="kp-walk-label">{{ t(`kinship.walk.${row.id}`) }}</span>
           <button
-            v-for="t in row.toks"
-            :key="t"
+            v-for="tk in row.toks"
+            :key="tk"
             class="kp-tok"
             :disabled="!anchorId || chain.length >= 8"
-            @click="chain.push(t)"
+            @click="chain.push(tk)"
           >
-            {{ tokenLabel(t, kinLang) }}
+            {{ tokenLabel(tk, kinLang) }}
           </button>
         </div>
       </div>
@@ -142,21 +142,21 @@
       <div class="kp-chain" :class="{ empty: !chain.length }">
         <TransitionGroup name="tok">
           <button
-            v-for="(t, i) in chain"
-            :key="i + t"
+            v-for="(tk, i) in chain"
+            :key="i + tk"
             class="kp-chain-tok"
-            title="Remove this step"
+            :title="t('kinship.walk.removeStep')"
             @click="chain.splice(i, 1)"
           >
-            {{ tokenLabel(t, kinLang) }}<UiIcon class="kp-chain-x" name="x" :size="12" />
+            {{ tokenLabel(tk, kinLang) }}<UiIcon class="kp-chain-x" name="x" :size="12" />
           </button>
         </TransitionGroup>
-        <span v-if="!chain.length" class="kp-hint">Tap steps to build a chain…</span>
+        <span v-if="!chain.length" class="kp-hint">{{ t('kinship.walk.tapSteps') }}</span>
         <button
           v-else
           class="kp-clear"
-          title="Clear the chain"
-          aria-label="Clear the chain"
+          :title="t('kinship.walk.clear')"
+          :aria-label="t('kinship.walk.clear')"
           @click="chain.splice(0)"
         >
           <UiIcon name="delete" :size="14" />
@@ -165,7 +165,11 @@
       <div v-if="chain.length" class="kp-phrase">“{{ chainPhrase(chain, kinLang) }}”</div>
 
       <div v-if="chain.length" class="kp-sub">
-        {{ walkResults.length ? `${walkResults.length} found` : 'Nobody on record' }}
+        {{
+          walkResults.length
+            ? t('kinship.walk.found', { n: walkResults.length })
+            : t('kinship.walk.nobody')
+        }}
       </div>
       <div class="kp-list">
         <button
@@ -187,28 +191,37 @@
       <div class="kp-stat-row">
         <div class="kp-stat" style="--i: 0">
           <b>{{ insights.islands.length }}</b
-          ><span>{{ insights.islands.length === 1 ? 'family' : 'islands' }}</span>
+          ><span>{{
+            insights.islands.length === 1
+              ? t('kinship.insights.family')
+              : t('kinship.insights.islands')
+          }}</span>
         </div>
         <div class="kp-stat" style="--i: 1">
           <b>{{ insights.linchpins.length }}</b
-          ><span>linchpins</span>
+          ><span>{{ t('kinship.insights.linchpinsStat') }}</span>
         </div>
         <div class="kp-stat" style="--i: 2">
           <b>{{ insights.tangled.length }}</b
-          ><span>tangled</span>
+          ><span>{{ t('kinship.insights.tangledStat') }}</span>
         </div>
       </div>
 
       <template v-if="insights.linchpins.length">
-        <div class="kp-sub" title="Remove one of these people and the family splits apart">
-          <UiIcon name="link" :size="12" />Linchpins
+        <div class="kp-sub" :title="t('kinship.insights.linchpinsTitle')">
+          <UiIcon name="link" :size="12" />{{ t('kinship.insights.linchpins') }}
         </div>
         <button
           v-for="(l, i) in insights.linchpins"
           :key="l.id"
           class="kp-row cp-stagger"
           :style="{ '--i': i, '--kc': 'var(--accent)' }"
-          :title="`Without ${personName(l.id)}, ${l.cut} ${l.cut === 1 ? 'person is' : 'people are'} cut off`"
+          :title="
+            t(l.cut === 1 ? 'kinship.insights.cutOffOne' : 'kinship.insights.cutOffOther', {
+              name: personName(l.id),
+              n: l.cut
+            })
+          "
           @click="$emit('focus-person', l.id)"
         >
           <span class="kp-row-dot"></span>
@@ -216,12 +229,14 @@
           <span class="kp-row-meter"
             ><span :style="{ width: (l.cut / maxCut) * 100 + '%' }"></span
           ></span>
-          <span class="kp-row-rel">holds {{ l.cut }}</span>
+          <span class="kp-row-rel">{{ t('kinship.insights.holds', { n: l.cut }) }}</span>
         </button>
       </template>
 
       <template v-if="insights.founders.length">
-        <div class="kp-sub"><UiIcon name="crown" :size="12" />Dynasty founders</div>
+        <div class="kp-sub">
+          <UiIcon name="crown" :size="12" />{{ t('kinship.insights.founders') }}
+        </div>
         <button
           v-for="(f, i) in insights.founders"
           :key="f.id"
@@ -231,30 +246,32 @@
         >
           <span class="kp-row-dot"></span>
           <span class="kp-row-name">{{ personName(f.id) }}</span>
-          <span class="kp-row-rel">{{ f.descendants }} desc. · {{ f.generations }} gen</span>
+          <span class="kp-row-rel">{{
+            t('kinship.insights.founderStat', { d: f.descendants, g: f.generations })
+          }}</span>
         </button>
       </template>
 
       <template v-if="insights.tangled.length">
-        <div class="kp-sub" title="Couples who are also blood relatives">
-          <UiIcon name="git-merge" :size="12" />Tangled roots
+        <div class="kp-sub" :title="t('kinship.insights.tangledTitle')">
+          <UiIcon name="git-merge" :size="12" />{{ t('kinship.insights.tangled') }}
         </div>
         <button
-          v-for="(t, i) in insights.tangled"
-          :key="t.a + t.b"
+          v-for="(tc, i) in insights.tangled"
+          :key="tc.a + tc.b"
           class="kp-row cp-stagger"
           :style="{ '--i': i + 8, '--kc': 'var(--kin-spouse)' }"
-          @click="$emit('trace-pair', [t.a, t.b])"
+          @click="$emit('trace-pair', [tc.a, tc.b])"
         >
           <span class="kp-row-dot"></span>
-          <span class="kp-row-name">{{ firstName(t.a) }} &amp; {{ firstName(t.b) }}</span>
-          <span class="kp-row-rel">{{ (t.phi * 100).toFixed(t.phi < 0.01 ? 2 : 1) }}%</span>
+          <span class="kp-row-name">{{ firstName(tc.a) }} &amp; {{ firstName(tc.b) }}</span>
+          <span class="kp-row-rel">{{ (tc.phi * 100).toFixed(tc.phi < 0.01 ? 2 : 1) }}%</span>
         </button>
       </template>
 
       <template v-if="insights.islands.length > 1">
-        <div class="kp-sub" title="Groups with no connection to each other">
-          <UiIcon name="tree-palm" :size="12" />Islands
+        <div class="kp-sub" :title="t('kinship.insights.islandsTitle')">
+          <UiIcon name="tree-palm" :size="12" />{{ t('kinship.insights.islandsHead') }}
         </div>
         <div class="kp-islands">
           <span
@@ -265,13 +282,18 @@
               '--i': i,
               '--s': Math.max(6, Math.min(26, Math.sqrt(isl.length) * 5)) + 'px'
             }"
-            :title="`${isl.length} ${isl.length === 1 ? 'person' : 'people'} — ${personName(isl[0])}…`"
+            :title="
+              t(isl.length === 1 ? 'kinship.insights.islandOne' : 'kinship.insights.islandOther', {
+                n: isl.length,
+                name: personName(isl[0])
+              })
+            "
             @click="$emit('focus-person', isl[0])"
           ></span>
         </div>
       </template>
       <div v-if="!insights.linchpins.length && !insights.founders.length" class="kp-hint">
-        Add a few parents and children to see the structure.
+        {{ t('kinship.insights.empty') }}
       </div>
     </div>
   </div>
@@ -284,6 +306,9 @@ import { walkChain, linchpins, founders, tangledCouples, islands } from './kinsh
 import { chainPhrase, tokenLabel } from './kinshipNames'
 import KinLangPicker from './KinLangPicker.vue'
 import UiIcon from '../ui/UiIcon.js'
+import { useI18n } from '../../i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   anchorId: { type: String, default: null },
@@ -309,19 +334,20 @@ const palette = computed(() => {
 })
 
 const TABS = [
-  { id: 'lens', label: 'Lens', icon: 'eye' },
-  { id: 'walk', label: 'Walk', icon: 'footprints' },
-  { id: 'insights', label: 'Insights', icon: 'sparkle' }
+  { id: 'lens', labelKey: 'kinship.tabs.lens', icon: 'eye' },
+  { id: 'walk', labelKey: 'kinship.tabs.walk', icon: 'footprints' },
+  { id: 'insights', labelKey: 'kinship.tabs.insights', icon: 'sparkle' }
 ]
 const tab = ref('lens')
 const tabIdx = computed(() => TABS.findIndex((t) => t.id === tab.value))
 
+// Labels + tooltips: kinship.filters.<id>.label / .title
 const FILTERS = [
-  { id: 'all', label: 'All', title: 'Everyone, labelled' },
-  { id: 'blood', label: 'Blood', title: 'Blood relatives only' },
-  { id: 'marriage', label: 'Marriage', title: 'Spouses, in-laws and step-family' },
-  { id: 'ancestors', label: 'Ancestors', title: 'The direct line upward' },
-  { id: 'descendants', label: 'Descendants', title: 'Everyone descended from them' }
+  { id: 'all' },
+  { id: 'blood' },
+  { id: 'marriage' },
+  { id: 'ancestors' },
+  { id: 'descendants' }
 ]
 
 const firstName = (id) => personName(id).split(' ')[0]
@@ -334,14 +360,8 @@ function initials(id) {
 
 // ── Lens ──────────────────────────────────────────────────────────────────
 const lens = computed(() => K.lensOf(props.anchorId))
-const CLASS_LABELS = {
-  blood: 'Blood',
-  spouse: 'Spouse',
-  marriage: 'By marriage',
-  step: 'Step-family',
-  social: 'Social',
-  distant: 'Further out'
-}
+// Kin-class legend order; labels are kinship.classes.<key>.
+const CLASS_KEYS = ['blood', 'spouse', 'marriage', 'step', 'social', 'distant']
 const classRows = computed(() => {
   const counts = {}
   for (const [id, k] of lens.value) {
@@ -353,14 +373,12 @@ const classRows = computed(() => {
     1,
     Object.values(counts).reduce((a, b) => a + b, 0)
   )
-  return Object.keys(CLASS_LABELS)
-    .filter((k) => counts[k])
-    .map((k) => ({
-      key: k,
-      label: CLASS_LABELS[k],
-      count: counts[k],
-      pct: (counts[k] / total) * 100
-    }))
+  return CLASS_KEYS.filter((k) => counts[k]).map((k) => ({
+    key: k,
+    label: t(`kinship.classes.${k}`),
+    count: counts[k],
+    pct: (counts[k] / total) * 100
+  }))
 })
 const closest = computed(() => {
   if (!props.anchorId) return []
@@ -381,10 +399,10 @@ const closest = computed(() => {
 
 // ── Walker ────────────────────────────────────────────────────────────────
 const WALK_ROWS = [
-  { label: 'Up', toks: ['F', 'M', 'P'] },
-  { label: 'Across', toks: ['B', 'Z', 'X'] },
-  { label: 'Down', toks: ['S', 'D', 'C'] },
-  { label: 'Married', toks: ['H', 'W', 'E'] }
+  { id: 'up', toks: ['F', 'M', 'P'] },
+  { id: 'across', toks: ['B', 'Z', 'X'] },
+  { id: 'down', toks: ['S', 'D', 'C'] },
+  { id: 'married', toks: ['H', 'W', 'E'] }
 ]
 const chain = reactive([])
 watch(

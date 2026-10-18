@@ -13,6 +13,9 @@ export class NodeLayer {
     this.mesh.frustumCulled = false
     this.mesh.renderOrder = 2
     this._attr = {}
+    // Draw order: node index → instance slot. Instances draw in slot order, so
+    // the renderer can paint standing nodes back-to-front (null = identity).
+    this.slotOf = null
     this._allocate(16) // ensure attributes always exist (empty tree, first frame)
   }
 
@@ -50,6 +53,8 @@ export class NodeLayer {
     this.avatar = mk('iAvatar', 1)
     this.born = mk('iBorn', 1)
     this.born.fill(-1e4)
+    this.pop = mk('iPop', 1) // appear-pop start time (uTime clock); -1e4 = settled
+    this.pop.fill(-1e4)
 
     g.instanceCount = this.count
     this.geometry = g
@@ -60,17 +65,31 @@ export class NodeLayer {
 
   setCount(n) {
     if (n > this.capacity) this._allocate(Math.ceil(n * 1.3) + 16)
+    if (n !== this.count) this.slotOf = null
     this.count = n
     if (this.geometry) this.geometry.instanceCount = n
   }
 
+  /** `order` lists node indices back-to-front; null restores index order. */
+  setOrder(order) {
+    if (!order) {
+      this.slotOf = null
+      return
+    }
+    const slotOf = new Int32Array(order.length)
+    for (let j = 0; j < order.length; j++) slotOf[order[j]] = j
+    this.slotOf = slotOf
+  }
+
   setPosition(i, x, y) {
+    if (this.slotOf) i = this.slotOf[i]
     this.pos[i * 2] = x
     this.pos[i * 2 + 1] = y
   }
 
   // s: { radius, fill:[r,g,b], border:[r,g,b], borderPx, opacity, selected, glow, avatar }
   setStyle(i, s) {
+    if (this.slotOf) i = this.slotOf[i]
     this.radius[i] = s.radius
     this.fill[i * 3] = s.fill[0]
     this.fill[i * 3 + 1] = s.fill[1]
@@ -85,6 +104,7 @@ export class NodeLayer {
     this.glow[i] = s.glow || 0
     this.avatar[i] = s.avatar
     this.born[i] = s.born == null ? -1e4 : s.born
+    this.pop[i] = s.pop == null ? -1e4 : s.pop
   }
 
   commitPositions() {
@@ -105,13 +125,38 @@ export class NodeLayer {
       'iSelected',
       'iGlow',
       'iAvatar',
-      'iBorn'
+      'iBorn',
+      'iPop'
     ])
       this._attr[k].needsUpdate = true
   }
 
+  // Camera-dependent uniforms for the screen-space billboards: viewport size,
+  // zoom, how far standing shapes rise off their point, and the tilt haze.
+  setView(width, height, k, lift, fog) {
+    const u = this.material.uniforms
+    u.uViewScale.value.set(2 / Math.max(1, width), -2 / Math.max(1, height))
+    u.uZoom.value = k
+    u.uLift.value = lift
+    u.uFog.value = fog
+  }
+
   setThemeUniforms(isLight) {
     const u = this.material.uniforms
+    // Gravestone materials: cool granite on dark ground; warmer, paler on light.
+    if (isLight) {
+      u.uStoneColor.value.set('#a9adb6')
+      u.uSoilColor.value.set('#7a634b')
+      u.uGrassColor.value.set('#5f9446')
+      u.uMossColor.value.set('#70893f')
+      u.uFrameColor.value.set('#9c7a4c')
+    } else {
+      u.uStoneColor.value.set('#8d939f')
+      u.uSoilColor.value.set('#3a2f26')
+      u.uGrassColor.value.set('#56803c')
+      u.uMossColor.value.set('#667f3a')
+      u.uFrameColor.value.set('#a8875a')
+    }
     if (isLight) {
       u.uShadowStrength.value = 0.15
       u.uShadowOffset.value.set(0.045, 0.09)
@@ -140,6 +185,15 @@ export class NodeLayer {
       u.uInkPaper.value.set('#efe6d2')
     }
     u.uSealColor.value.set(sealHex || '#b3352a')
+    // Gravestones in ink: weathered stone in ink-and-paper tones (the theme's
+    // own palette comes back through setThemeUniforms when ink turns off).
+    if (on) {
+      u.uStoneColor.value.set(moon ? '#6e6a62' : '#b8b0a0')
+      u.uSoilColor.value.set(moon ? '#2e2a24' : '#6d5e4b')
+      u.uGrassColor.value.set(moon ? '#55624a' : '#66744f')
+      u.uMossColor.value.set(moon ? '#5f6a4a' : '#78805a')
+      u.uFrameColor.value.set(moon ? '#8f7a58' : '#8a6d45')
+    }
     if (on && mode === 'paper') u.uSilhouetteColor.value.set('#f4eddd')
     else if (on && moon) u.uSilhouetteColor.value.set('#e9e2d2')
     else u.uSilhouetteColor.value.setRGB(1, 1, 1)

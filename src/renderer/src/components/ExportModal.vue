@@ -2,16 +2,16 @@
   <Teleport to="body">
     <Transition name="exp">
       <div v-if="open" class="exp-backdrop" @click.self="onBackdrop">
-        <div class="exp-box" role="dialog" aria-modal="true" aria-label="Export image">
+        <div class="exp-box" role="dialog" aria-modal="true" :aria-label="t('exportModal.title')">
           <header class="exp-header">
             <div>
-              <h2 class="exp-h2">Export image</h2>
-              <p class="exp-sub">Compose a picture of your project and save it anywhere</p>
+              <h2 class="exp-h2">{{ t('exportModal.title') }}</h2>
+              <p class="exp-sub">{{ t('exportModal.sub') }}</p>
             </div>
             <button
               class="icon-btn exp-close"
-              title="Close (Esc)"
-              aria-label="Close"
+              :title="t('exportModal.closeEsc')"
+              :aria-label="t('settings.close')"
               @click="emit('close')"
             >
               <UiIcon name="x" :size="16" />
@@ -40,21 +40,23 @@
                   @pointercancel="onCropUp"
                 >
                   <div v-if="cropDraft" class="exp-crop-rect" :style="cropRectStyle">
-                    <span class="exp-crop-hint">Drag to reframe</span>
+                    <span class="exp-crop-hint">{{ t('exportModal.dragReframe') }}</span>
                   </div>
-                  <div v-else class="exp-crop-cta">Drag to frame the part you want</div>
+                  <div v-else class="exp-crop-cta">{{ t('exportModal.dragFrame') }}</div>
                 </div>
                 <div v-if="empty && !rendering" class="exp-empty">
                   <UiIcon class="exp-empty-icon" :name="viewMeta[srcView].icon" :size="34" />
-                  <p>Nothing to picture in the {{ viewMeta[srcView].label }} view yet.</p>
+                  <p>{{ t('exportModal.empty', { view: t(viewMeta[srcView].labelKey) }) }}</p>
                 </div>
                 <div v-if="rendering" class="exp-shimmer"></div>
               </div>
               <div class="exp-preview-meta">
                 <span class="exp-dims">{{ exportW }} × {{ exportH }} px</span>
                 <span v-if="crop && !cropMode" class="exp-crop-tag">
-                  Cropped
-                  <button class="exp-mini-btn" @click="resetCrop">Reset</button>
+                  {{ t('exportModal.cropped') }}
+                  <button class="exp-mini-btn" @click="resetCrop">
+                    {{ t('exportModal.reset') }}
+                  </button>
                 </span>
               </div>
             </div>
@@ -62,7 +64,7 @@
             <!-- ── Controls ────────────────────────────────────────────── -->
             <aside class="exp-controls">
               <section class="exp-group">
-                <h3 class="exp-label">View</h3>
+                <h3 class="exp-label">{{ t('exportModal.view') }}</h3>
                 <div class="exp-seg">
                   <button
                     v-for="v in exportableViews"
@@ -72,18 +74,18 @@
                     @click="srcView = v"
                   >
                     <UiIcon :name="viewMeta[v].icon" :size="14" />
-                    {{ viewMeta[v].label }}
+                    {{ t(viewMeta[v].labelKey) }}
                   </button>
                 </div>
               </section>
 
               <section class="exp-group">
-                <h3 class="exp-label">Size</h3>
+                <h3 class="exp-label">{{ t('exportModal.size') }}</h3>
                 <select v-model="presetId" class="exp-select">
                   <option v-for="p in RESOLUTION_PRESETS" :key="p.id" :value="p.id">
-                    {{ p.label }} — {{ p.hint }}
+                    {{ t('exportModal.preset.' + p.id) }} — {{ p.hint }}
                   </option>
-                  <option value="custom">Custom…</option>
+                  <option value="custom">{{ t('exportModal.custom') }}</option>
                 </select>
                 <div v-if="presetId === 'custom'" class="exp-row">
                   <input
@@ -108,7 +110,7 @@
               </section>
 
               <section class="exp-group">
-                <h3 class="exp-label">Format</h3>
+                <h3 class="exp-label">{{ t('exportModal.format') }}</h3>
                 <div class="exp-seg">
                   <button
                     v-for="f in EXPORT_FORMATS"
@@ -121,14 +123,14 @@
                   </button>
                 </div>
                 <label v-if="format.hasQuality" class="exp-slider-row">
-                  <span class="exp-slider-label">Quality</span>
+                  <span class="exp-slider-label">{{ t('exportModal.quality') }}</span>
                   <input v-model.number="quality" type="range" min="0.5" max="1" step="0.01" />
                   <span class="exp-slider-val">{{ Math.round(quality * 100) }}%</span>
                 </label>
               </section>
 
               <section class="exp-group">
-                <h3 class="exp-label">Colours</h3>
+                <h3 class="exp-label">{{ t('exportModal.colours') }}</h3>
                 <div class="exp-seg">
                   <button
                     v-for="s in schemeOptions"
@@ -138,20 +140,20 @@
                     :disabled="s.id === 'transparent' && !format.alpha"
                     :title="
                       s.id === 'transparent' && !format.alpha
-                        ? 'JPEG has no transparency — pick PNG or WebP'
-                        : s.label
+                        ? t('exportModal.noAlpha')
+                        : t(s.labelKey)
                     "
                     @click="scheme = s.id"
                   >
-                    {{ s.label }}
+                    {{ t(s.labelKey) }}
                   </button>
                 </div>
                 <label class="exp-check-row" :class="{ 'exp-disabled': scheme === 'transparent' }">
                   <input v-model="tintOn" type="checkbox" :disabled="scheme === 'transparent'" />
-                  Ambient colour wash
+                  {{ t('exportModal.tint') }}
                 </label>
                 <label class="exp-slider-row">
-                  <span class="exp-slider-label">Margin</span>
+                  <span class="exp-slider-label">{{ t('exportModal.margin') }}</span>
                   <input
                     v-model.number="paddingFrac"
                     type="range"
@@ -164,17 +166,21 @@
               </section>
 
               <section class="exp-group">
-                <h3 class="exp-label">Text</h3>
-                <input v-model="title" class="exp-input" placeholder="Title (shown in the image)" />
-                <input v-model="subtitle" class="exp-input" placeholder="Subtitle (optional)" />
+                <h3 class="exp-label">{{ t('exportModal.text') }}</h3>
+                <input v-model="title" class="exp-input" :placeholder="t('exportModal.titlePh')" />
+                <input
+                  v-model="subtitle"
+                  class="exp-input"
+                  :placeholder="t('exportModal.subtitlePh')"
+                />
                 <label class="exp-check-row">
                   <input v-model="stampOn" type="checkbox" />
-                  Corner stamp — {{ stampText }}
+                  {{ t('exportModal.stamp', { stamp: stampText }) }}
                 </label>
               </section>
 
               <section class="exp-group">
-                <h3 class="exp-label">Crop</h3>
+                <h3 class="exp-label">{{ t('exportModal.crop') }}</h3>
                 <div class="exp-row">
                   <button
                     class="btn btn-sm"
@@ -182,9 +188,11 @@
                     @click="toggleCropMode"
                   >
                     <UiIcon :name="cropMode ? 'check' : 'scissors'" :size="14" />
-                    {{ cropMode ? 'Done' : 'Crop' }}
+                    {{ cropMode ? t('exportModal.done') : t('exportModal.crop') }}
                   </button>
-                  <button v-if="crop" class="btn btn-ghost btn-sm" @click="resetCrop">Reset</button>
+                  <button v-if="crop" class="btn btn-ghost btn-sm" @click="resetCrop">
+                    {{ t('exportModal.reset') }}
+                  </button>
                 </div>
               </section>
             </aside>
@@ -200,7 +208,7 @@
               <span class="exp-ext">.{{ format.ext }}</span>
             </div>
             <div class="exp-actions">
-              <button class="btn btn-ghost" @click="emit('close')">Cancel</button>
+              <button class="btn btn-ghost" @click="emit('close')">{{ t('dialog.cancel') }}</button>
               <button
                 class="btn btn-primary exp-download"
                 :class="{ 'exp-saved': justSaved }"
@@ -209,12 +217,12 @@
               >
                 <template v-if="justSaved">
                   <UiIcon name="check" :size="16" />
-                  Saved
+                  {{ t('exportModal.saved') }}
                 </template>
-                <template v-else-if="exporting">Rendering…</template>
+                <template v-else-if="exporting">{{ t('exportModal.rendering') }}</template>
                 <template v-else>
                   <UiIcon name="download" :size="16" />
-                  Download
+                  {{ t('exportModal.download') }}
                 </template>
               </button>
             </div>
@@ -229,6 +237,8 @@
 import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useMainStore } from '../store/index.js'
 import UiIcon from './ui/UiIcon.js'
+import { useI18n } from '../i18n'
+import { defaultNameLabel } from '../lib/dataLabels'
 import {
   RESOLUTION_PRESETS,
   EXPORT_FORMATS,
@@ -251,21 +261,23 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const store = useMainStore()
+const { t } = useI18n()
 
+// `label` stays English (it names the downloaded file); `labelKey` is shown.
 const viewMeta = {
-  graph: { icon: 'graph', label: 'Graph' },
-  timeline: { icon: 'timeline', label: 'Timeline' },
-  groups: { icon: 'groups', label: 'Groups' }
+  graph: { icon: 'graph', label: 'Graph', labelKey: 'rail.graph' },
+  timeline: { icon: 'timeline', label: 'Timeline', labelKey: 'rail.timeline' },
+  groups: { icon: 'groups', label: 'Groups', labelKey: 'rail.groups' }
 }
 const exportableViews = computed(() =>
   ['graph', 'timeline', 'groups'].filter((v) => store.caps.views.includes(v))
 )
 
 const schemeOptions = [
-  { id: 'app', label: 'Match app' },
-  { id: 'dark', label: 'Dark' },
-  { id: 'light', label: 'Light' },
-  { id: 'transparent', label: 'None' }
+  { id: 'app', labelKey: 'exportModal.scheme.app' },
+  { id: 'dark', labelKey: 'settings.theme.dark' },
+  { id: 'light', labelKey: 'settings.theme.light' },
+  { id: 'transparent', labelKey: 'exportModal.scheme.none' }
 ]
 
 // The views' signature ambient wash colours (see each view's CSS background).
@@ -306,7 +318,8 @@ const exportH = computed(() =>
     : RESOLUTION_PRESETS.find((p) => p.id === presetId.value).height
 )
 const stampText = computed(() => {
-  const name = store.activeProject?.name || 'Family tree'
+  const raw = store.activeProject?.name
+  const name = raw ? defaultNameLabel(raw) : t('exportModal.defaultStamp')
   return `${name} · ${new Date().getFullYear()}`
 })
 

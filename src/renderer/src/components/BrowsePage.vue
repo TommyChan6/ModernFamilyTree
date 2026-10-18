@@ -305,7 +305,7 @@
                     <span class="bp-mine-mode">
                       <UiIcon :name="ACCESS_ICONS[p.access || 'glasshouse']" :size="20" />
                     </span>
-                    <span class="bp-mine-name">{{ p.name }}</span>
+                    <span class="bp-mine-name">{{ defaultNameLabel(p.name) }}</span>
                     <span class="bp-mine-sub">
                       {{ t('browse.modes.' + (p.access || 'glasshouse') + '.name') }} ·
                       {{ t('browse.modes.' + (p.access || 'glasshouse') + '.short') }}
@@ -411,6 +411,7 @@
 import { computed, reactive, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { useI18n } from '../i18n'
+import { defaultNameLabel } from '../lib/dataLabels'
 import BrowseCard from './browse/BrowseCard.vue'
 import BrowseDetail from './browse/BrowseDetail.vue'
 import CreatorProfile from './browse/CreatorProfile.vue'

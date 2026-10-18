@@ -10,6 +10,7 @@ const KEY = 'familytree.kinshipLang'
 const VALID: KinLang[] = ['en', 'no', 'zh-Hans', 'zh-Hant']
 
 function fromLocale(l: string): KinLang {
+  if (l === 'nb' || l === 'nn') return 'no' // Norwegian UI → Norsk kin names
   return (VALID as string[]).includes(l) ? (l as KinLang) : 'en'
 }
 

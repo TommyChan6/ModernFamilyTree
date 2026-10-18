@@ -11,11 +11,13 @@ import { ref } from 'vue'
 import en from './locales/en.js'
 import zhHans from './locales/zh-Hans.js'
 import zhHant from './locales/zh-Hant.js'
+import nb from './locales/nb.js'
 
 const messages = {
   en,
   'zh-Hans': zhHans,
-  'zh-Hant': zhHant
+  'zh-Hant': zhHant,
+  nb
 }
 
 // Advertised in the Settings > Language picker. `native` is shown in the
@@ -23,7 +25,8 @@ const messages = {
 export const SUPPORTED_LOCALES = [
   { code: 'en', label: 'English', native: 'English' },
   { code: 'zh-Hans', label: 'Simplified Chinese', native: '简体中文' },
-  { code: 'zh-Hant', label: 'Traditional Chinese', native: '繁體中文' }
+  { code: 'zh-Hant', label: 'Traditional Chinese', native: '繁體中文' },
+  { code: 'nb', label: 'Norwegian', native: 'Norsk bokmål' }
 ]
 
 const DEFAULT_LOCALE = 'en'

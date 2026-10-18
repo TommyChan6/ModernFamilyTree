@@ -18,6 +18,7 @@ import { inkFontsReady, paperCanvas, INK } from '../../lib/inkArt'
 import { writeInkBuffers, drawInkBg, drawInkFg } from './TimelineInk.js'
 import { drawChronicleBg, drawChronicleFg, chronicleAt } from './chronicleDraw.js'
 import { drawIcon } from '../../lib/canvasIcon.js'
+import { lifeName, lifeYears, badgeText } from './timelineText.js'
 
 const SEG = 16
 const TICK_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000, 2000, 5000]
@@ -176,6 +177,14 @@ export class TimelineRenderer {
     }
     this.markAllDirty()
     this.requestRedraw()
+  }
+
+  // The avatar pins are NodeMaterial billboards, sized in screen px through
+  // uViewScale (px → clip). The camera is 1 world unit = 1 px, so zoom is 1;
+  // without this the material's placeholder scale blows every pin up to cover
+  // the whole stage (the "white / pink timeline" bug).
+  _syncPinView() {
+    this.avatars.setView(this.width || 1, this.height || 1, 1, 0, 0)
   }
 
   setCamera(cam) {
@@ -353,8 +362,27 @@ export class TimelineRenderer {
     this.requestRedraw()
   }
 
-  // Current (possibly mid-glide) lane x for a person id.
+  /** Pin lanes to exact world x's while the user drags them (Map id → x).
+   *  null releases them: they glide from where they were dropped into their
+   *  (new) lanes. */
+  setLaneOverride(map) {
+    const prev = this._laneOverride
+    if (prev && !map) {
+      for (const [id, x] of prev) {
+        const a = this._laneX.get(id)
+        if (a) a.x = x
+      }
+      this._tweening = true
+    }
+    this._laneOverride = map && map.size ? map : null
+    this._geomDirty = true
+    this.requestRedraw()
+  }
+
+  // Current (possibly mid-glide, or dragged) lane x for a person id.
   _lane(id, fallback) {
+    const o = this._laneOverride?.get(id)
+    if (o != null) return o
     const a = this._laneX.get(id)
     return a ? a.x : fallback
   }
@@ -768,13 +796,14 @@ export class TimelineRenderer {
         ctx.font = `700 ${10.5 * s}px ${font}`
         const isz = 11 * s,
           gap = 4 * s
-        const tw = ctx.measureText(m.badge).width
+        const badge = badgeText(m)
+        const tw = ctx.measureText(badge).width
         const left = cx - (isz + gap + tw) / 2
         drawIcon(ctx, m.badgeIcon, left + isz / 2, midY, isz, { color: v.color, lineWidth: 2.3 })
         ctx.fillStyle = ink
         ctx.textAlign = 'left'
         ctx.textBaseline = 'middle'
-        ctx.fillText(m.badge, left + isz + gap, midY + 0.5)
+        ctx.fillText(badge, left + isz + gap, midY + 0.5)
         ctx.globalAlpha = 1
         this._badgeRects.push({ x: cx - bw / 2, y: midY - bh / 2, w: bw, h: bh, id: m.id, m })
       }
@@ -808,7 +837,7 @@ export class TimelineRenderer {
         ctx.lineWidth = 3
         ctx.font = `700 12.5px ${font}`
         ctx.fillStyle = v.selected ? c.accent : c.t1
-        const name = trunc(p.name, nameLen)
+        const name = trunc(lifeName(p), nameLen)
         // Beside the avatar: offset by its drawn radius (Style → Portraits).
         const lx = x + 15 * (st.avatarSize ?? 1) * (a.s ?? 1) + 6
         ctx.strokeText(name, lx, y0 - 1)
@@ -816,8 +845,9 @@ export class TimelineRenderer {
         if (ls >= 0.55 && !compact) {
           ctx.font = `600 11px ${font}`
           ctx.fillStyle = c.t3
-          ctx.strokeText(p.yearsLabel, lx, y0 + 12)
-          ctx.fillText(p.yearsLabel, lx, y0 + 12)
+          const years = lifeYears(p)
+          ctx.strokeText(years, lx, y0 + 12)
+          ctx.fillText(years, lx, y0 + 12)
         }
         ctx.globalAlpha = 1
       }
@@ -986,6 +1016,7 @@ export class TimelineRenderer {
       this.inkThreads.setTime(t)
       this.mist.setTime(t)
     }
+    this._syncPinView()
     this.renderer.render(this.scene, this.camera)
 
     // Keep animating for tweens/entrance; idle at pulse-only frames (uTime + render,
@@ -1079,6 +1110,7 @@ export class TimelineRenderer {
         this._drawBg()
         this._drawFg()
       }
+      this._syncPinView()
       this.renderer.render(this.scene, this.camera)
 
       const out = document.createElement('canvas')

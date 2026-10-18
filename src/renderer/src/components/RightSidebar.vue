@@ -2,13 +2,13 @@
   <aside class="right-sidebar">
     <!-- Header -->
     <div class="sidebar-header">
-      <h2 class="sidebar-title">Directory</h2>
+      <h2 class="sidebar-title">{{ t('rail.directory') }}</h2>
       <span class="badge">{{ store.personCount }}</span>
     </div>
 
     <!-- Search -->
     <div class="search-wrap">
-      <SearchField v-model="searchQuery" size="sm" placeholder="Search people…" />
+      <SearchField v-model="searchQuery" size="sm" :placeholder="t('directory.toolbar.search')" />
     </div>
 
     <!-- Person List (virtualized: only rows near the viewport are in the DOM) -->
@@ -38,10 +38,12 @@
           </div>
           <div class="person-info">
             <div class="person-name" :class="{ unnamed: !row.p.name }">
-              {{ row.p.name || 'Unnamed' }}
+              {{ row.p.name || t('directory.common.unnamed') }}
             </div>
             <div class="person-meta">
-              <span v-if="row.p.birth?.year">b. {{ row.p.birth.year }}</span>
+              <span v-if="row.p.birth?.year">{{
+                t('directory.common.born', { year: row.p.birth.year })
+              }}</span>
               <span v-if="row.p.birth?.year && row.p.occupation"> · </span>
               <span v-if="row.p.occupation" class="person-occ">{{ row.p.occupation }}</span>
             </div>
@@ -56,7 +58,7 @@
 
       <div v-if="filteredPersons.length === 0" class="empty-state">
         <div class="empty-icon"><UiIcon name="user" :size="28" :stroke="1.6" /></div>
-        <div class="empty-text">No people found</div>
+        <div class="empty-text">{{ t('dock.noPeopleFound') }}</div>
       </div>
     </div>
 
@@ -64,7 +66,7 @@
     <div class="sidebar-footer">
       <button class="btn btn-primary sidebar-add" @click="store.openForm()">
         <UiIcon name="plus" :size="16" />
-        Add {{ store.noun.toLowerCase() }}
+        {{ t('dock.addNoun', { noun: nounLabel(store.noun).toLowerCase() }) }}
       </button>
     </div>
   </aside>
@@ -73,12 +75,15 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useMainStore } from '../store/index.js'
+import { useI18n } from '../i18n'
+import { nounLabel } from '../lib/dataLabels'
 import { api } from '../api'
 import { inkAvatarBg } from './ui/inkChrome'
 import UiIcon from './ui/UiIcon.js'
 import SearchField from './ui/SearchField.vue'
 
 const store = useMainStore()
+const { t } = useI18n()
 const searchQuery = ref('')
 
 // Default human silhouette (Material "person" icon, 24×24 viewBox) — matches the graph nodes

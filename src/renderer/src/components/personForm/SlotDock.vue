@@ -29,7 +29,7 @@
           type="color"
           class="sd-grad-pick"
           :value="store.graphSettings.maleColor"
-          title="Left gradient color"
+          :title="t('personForm.dock.leftColor')"
           @input="store.updateGraphSetting('maleColor', $event.target.value)"
         />
         <div class="sd-grad-bar" :style="{ background: genderGradient }">
@@ -43,7 +43,7 @@
           type="color"
           class="sd-grad-pick"
           :value="store.graphSettings.femaleColor"
-          title="Right gradient color"
+          :title="t('personForm.dock.rightColor')"
           @input="store.updateGraphSetting('femaleColor', $event.target.value)"
         />
       </div>
@@ -53,14 +53,14 @@
         <div v-for="(def, i) in bay.defs" :key="def.id" class="sd-card">
           <div class="sd-card-head">
             <UiIcon v-if="def.icon" class="sd-card-icon" :name="def.icon" :size="13" />
-            <span class="sd-card-label">{{ def.label }}</span>
+            <span class="sd-card-label">{{ fieldLabel(def) }}</span>
             <template v-if="bay.slot === 'name' && bay.defs.length > 1">
               <button
                 class="sd-mini"
                 type="button"
                 :disabled="i === 0"
-                title="Earlier in the name"
-                aria-label="Earlier in the name"
+                :title="t('personForm.dock.earlier')"
+                :aria-label="t('personForm.dock.earlier')"
                 @click="reorderName(def, -1)"
               >
                 <UiIcon name="chevron-left" :size="14" />
@@ -69,8 +69,8 @@
                 class="sd-mini"
                 type="button"
                 :disabled="i === bay.defs.length - 1"
-                title="Later in the name"
-                aria-label="Later in the name"
+                :title="t('personForm.dock.later')"
+                :aria-label="t('personForm.dock.later')"
                 @click="reorderName(def, 1)"
               >
                 <UiIcon name="chevron-right" :size="14" />
@@ -81,14 +81,14 @@
               type="color"
               class="sd-hl-color"
               :value="def.config.slotColor || '#6c8ef5'"
-              title="Ring color"
+              :title="t('personForm.dock.ringColor')"
               @input="setSlotColor(def, $event.target.value)"
             />
             <button
               class="sd-mini sd-eject"
               type="button"
-              title="Remove from slot (back to the trait list)"
-              aria-label="Remove from slot"
+              :title="t('personForm.dock.ejectHint')"
+              :aria-label="t('personForm.dock.eject')"
               @click="store.setFieldSlot(def.id, null)"
             >
               <UiIcon name="corner-up-left" :size="14" />
@@ -98,14 +98,18 @@
             :def="def"
             :model-value="draft[def.id]?.value ?? null"
             :track-gradient="bay.slot === 'gender' ? genderGradient : ''"
-            :placeholder="bay.slot === 'name' ? def.label + '…' : ''"
+            :placeholder="bay.slot === 'name' ? fieldLabel(def) + '…' : ''"
             @update:model-value="emit('update', def.id, { value: $event })"
           />
         </div>
       </TransitionGroup>
 
       <div v-if="bay.defs.length === 0" class="sd-empty-hint">
-        {{ dragState.active && bay.accepts ? 'Drop it here' : 'Drag a trait here' }}
+        {{
+          dragState.active && bay.accepts
+            ? t('personForm.dock.dropHere')
+            : t('personForm.dock.dragHere')
+        }}
       </div>
     </div>
   </div>
@@ -118,6 +122,8 @@ import { genderInfo, lerpColorHex, slotAccepts } from '../../../../shared/fields
 import { SLOT_META } from './fieldUi.js'
 import FieldInput from './FieldInput.vue'
 import UiIcon from '../ui/UiIcon.js'
+import { useI18n } from '../../i18n'
+import { fieldLabel } from '../../lib/dataLabels'
 
 const props = defineProps({
   defs: { type: Array, required: true },
@@ -126,6 +132,7 @@ const props = defineProps({
   dragState: { type: Object, default: () => ({ active: false, defType: null, overSlot: null }) }
 })
 const emit = defineEmits(['update'])
+const { t } = useI18n()
 
 const store = useMainStore()
 const dockEl = ref(null)

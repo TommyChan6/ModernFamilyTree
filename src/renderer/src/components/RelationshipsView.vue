@@ -3,13 +3,13 @@
     <!-- Toolbar -->
     <div class="rv-toolbar">
       <div class="rv-heading">
-        <span class="rv-title">Relationships</span>
+        <span class="rv-title">{{ t('rail.relationships') }}</span>
         <span class="rv-count">{{ rows.length }}</span>
       </div>
 
       <div class="rv-controls">
         <div class="rv-search">
-          <SearchField v-model="query" placeholder="Search by name…" />
+          <SearchField v-model="query" :placeholder="t('relsView.searchPh')" />
         </div>
 
         <div class="rv-chips">
@@ -30,11 +30,11 @@
               v-if="issueCount > 0"
               class="rv-chip rv-chip-issues"
               :class="{ active: typeFilter === 'issues' }"
-              title="Relationships that need attention"
+              :title="t('relsView.issuesHint')"
               @click="typeFilter = 'issues'"
             >
               <UiIcon name="triangle-alert" :size="14" />
-              <span>Issues</span>
+              <span>{{ t('relsView.issues') }}</span>
               <span class="rv-chip-count">{{ issueCount }}</span>
             </button>
           </Transition>
@@ -46,7 +46,7 @@
           @click="filtersOpen = !filtersOpen"
         >
           <UiIcon name="sliders-horizontal" :size="16" />
-          Filters
+          {{ t('relsView.filters') }}
           <Transition name="rv-badge">
             <span v-if="activeFilterCount" class="rv-filter-badge">{{ activeFilterCount }}</span>
           </Transition>
@@ -56,16 +56,16 @@
           v-if="store.caps.customRelTypes"
           class="rv-filter-btn"
           :class="{ active: typesOpen }"
-          title="Manage relationship types"
+          :title="t('relsView.manageTypes')"
           @click="typesOpen = true"
         >
           <UiIcon name="settings" :size="16" />
-          Types
+          {{ t('relsView.types') }}
         </button>
 
         <button class="btn btn-primary rv-add-btn" @click="toggleAdd">
           <UiIcon :name="editing?.id === 'new' ? 'x' : 'plus'" :size="16" />
-          {{ editing?.id === 'new' ? 'Cancel' : 'Add relationship' }}
+          {{ editing?.id === 'new' ? t('dialog.cancel') : t('relsView.addRel') }}
         </button>
       </div>
     </div>
@@ -80,14 +80,14 @@
     <div class="rv-filters" :class="{ open: filtersOpen }">
       <div class="rv-filters-inner">
         <div class="rv-facet">
-          <span class="rv-facet-label">Dates</span>
+          <span class="rv-facet-label">{{ t('relsView.dates') }}</span>
           <div class="rv-facet-chips">
             <button
               class="rv-fchip"
               :class="{ on: dateFilter === 'all' }"
               @click="dateFilter = 'all'"
             >
-              Any
+              {{ t('relsView.any') }}
             </button>
             <button
               class="rv-fchip"
@@ -95,7 +95,7 @@
               @click="dateFilter = dateFilter === 'dated' ? 'all' : 'dated'"
             >
               <UiIcon name="calendar" :size="14" />
-              Dated
+              {{ t('relsView.dated') }}
             </button>
             <button
               class="rv-fchip"
@@ -103,20 +103,20 @@
               @click="dateFilter = dateFilter === 'undated' ? 'all' : 'undated'"
             >
               <UiIcon name="circle-dashed" :size="14" />
-              Undated
+              {{ t('relsView.undated') }}
             </button>
           </div>
         </div>
 
         <div v-if="hasSpouses" class="rv-facet">
-          <span class="rv-facet-label">Marriage</span>
+          <span class="rv-facet-label">{{ t('relsView.marriage') }}</span>
           <div class="rv-facet-chips">
             <button
               class="rv-fchip"
               :class="{ on: marriageFilter === 'all' }"
               @click="marriageFilter = 'all'"
             >
-              Any
+              {{ t('relsView.any') }}
             </button>
             <button
               class="rv-fchip m-current"
@@ -124,7 +124,7 @@
               @click="marriageFilter = marriageFilter === 'current' ? 'all' : 'current'"
             >
               <UiIcon name="heart" :size="14" />
-              Together
+              {{ t('relsView.together') }}
             </button>
             <button
               class="rv-fchip m-ended"
@@ -132,13 +132,13 @@
               @click="marriageFilter = marriageFilter === 'ended' ? 'all' : 'ended'"
             >
               <UiIcon name="heart-crack" :size="14" />
-              Ended
+              {{ t('personForm.ended') }}
             </button>
           </div>
         </div>
 
         <div v-if="store.caps.tags && groupOptions.length" class="rv-facet rv-facet-groups">
-          <span class="rv-facet-label">Group lens</span>
+          <span class="rv-facet-label">{{ t('relsView.groupLens') }}</span>
           <div class="rv-facet-chips">
             <button
               v-for="g in groupOptions"
@@ -150,28 +150,24 @@
             >
               <span class="rv-fchip-dot" :style="{ background: g.color }"></span>
               <UiIcon v-if="g.icon" class="rv-fchip-icon" :name="g.icon" :size="14" />
-              {{ g.label }}
+              {{ defaultNameLabel(g.label) }}
             </button>
           </div>
           <Transition name="rv-clear">
-            <div
-              v-if="groupSel.size"
-              class="rv-endpoints"
-              title="Which endpoints must be in the group"
-            >
+            <div v-if="groupSel.size" class="rv-endpoints" :title="t('relsView.endpointsHint')">
               <button
                 class="rv-seg"
                 :class="{ on: groupMode === 'either' }"
                 @click="groupMode = 'either'"
               >
-                Either
+                {{ t('relsView.either') }}
               </button>
               <button
                 class="rv-seg"
                 :class="{ on: groupMode === 'both' }"
                 @click="groupMode = 'both'"
               >
-                Both
+                {{ t('relsView.both') }}
               </button>
             </div>
           </Transition>
@@ -180,7 +176,14 @@
         <Transition name="rv-clear">
           <button v-if="activeFilterCount" class="rv-clear" @click="clearFilters">
             <UiIcon name="x" :size="14" />
-            Clear {{ activeFilterCount }} filter{{ activeFilterCount > 1 ? 's' : '' }}
+            {{
+              t(
+                activeFilterCount > 1 ? 'relsView.clearFilters.other' : 'relsView.clearFilters.one',
+                {
+                  n: activeFilterCount
+                }
+              )
+            }}
           </button>
         </Transition>
       </div>
@@ -189,10 +192,10 @@
     <!-- New relationship editor -->
     <Transition name="rv-expand">
       <div v-if="editing && editing.id === 'new'" class="rv-editor rv-editor-new">
-        <div class="rv-editor-label">New relationship</div>
+        <div class="rv-editor-label">{{ t('relsView.newRel') }}</div>
         <div class="rv-editor-grid">
           <div class="rv-field rv-field-picker">
-            <label>Person A</label>
+            <label>{{ t('relsView.personA') }}</label>
             <button class="rv-pick-btn" type="button" @click="togglePicker('a')">
               {{ pickedLabel(editing.person_a_id) }}
             </button>
@@ -206,14 +209,14 @@
           </div>
           <button
             class="rv-swap-btn"
-            title="Swap A and B"
-            aria-label="Swap A and B"
+            :title="t('relsView.swapAB')"
+            :aria-label="t('relsView.swapAB')"
             @click="swapEditing"
           >
             <UiIcon name="arrow-left-right" :size="16" />
           </button>
           <div class="rv-field">
-            <label>Relationship</label>
+            <label>{{ t('relsView.relationship') }}</label>
             <select v-model="editing.type">
               <option v-for="d in store.relTypes" :key="d.key" :value="d.key">
                 {{ typeOptionLabel(d) }}
@@ -221,7 +224,7 @@
             </select>
           </div>
           <div class="rv-field rv-field-picker">
-            <label>Person B</label>
+            <label>{{ t('relsView.personB') }}</label>
             <button class="rv-pick-btn" type="button" @click="togglePicker('b')">
               {{ pickedLabel(editing.person_b_id) }}
             </button>
@@ -234,18 +237,20 @@
             />
           </div>
           <div class="rv-field rv-field-sm">
-            <label>{{ editing.type === 'spouse' ? 'Married (year)' : 'Since (year)' }}</label>
+            <label>{{
+              editing.type === 'spouse' ? t('relsView.marriedYear') : t('relsView.sinceYear')
+            }}</label>
             <input
               v-model="editing.formed_year"
               type="number"
-              placeholder="Year"
+              :placeholder="t('personForm.input.year')"
               min="1"
               max="2200"
               @keydown.enter="saveEdit"
             />
           </div>
           <div v-if="statusesOf(editing.type).length > 1" class="rv-field rv-field-sm">
-            <label>Ended (year)</label>
+            <label>{{ t('relsView.endedYear') }}</label>
             <input
               v-model="editing.ended_year"
               type="number"
@@ -256,7 +261,7 @@
             />
           </div>
           <div v-if="statusesOf(editing.type).length > 1" class="rv-field rv-field-sm">
-            <label>Status</label>
+            <label>{{ t('personForm.status') }}</label>
             <select v-model="editing.status">
               <option v-for="s in statusesOf(editing.type)" :key="s" :value="s">
                 {{ statusLabel(editing.type, s) }}
@@ -271,8 +276,10 @@
           <Transition name="rv-fade">
             <span v-if="editError" class="rv-editor-error">{{ editError }}</span>
           </Transition>
-          <button class="btn btn-ghost btn-sm" @click="cancelEdit">Cancel</button>
-          <button class="btn btn-primary btn-sm" @click="saveEdit">Create</button>
+          <button class="btn btn-ghost btn-sm" @click="cancelEdit">{{ t('dialog.cancel') }}</button>
+          <button class="btn btn-primary btn-sm" @click="saveEdit">
+            {{ t('personForm.create') }}
+          </button>
         </div>
       </div>
     </Transition>
@@ -283,7 +290,7 @@
         <!-- Header -->
         <div class="rv-head">
           <button class="rv-th" @click="setSort('from')">
-            From
+            {{ t('relsView.colFrom') }}
             <UiIcon
               class="rv-sort-arrow"
               :class="arrowClass('from')"
@@ -292,7 +299,7 @@
             />
           </button>
           <button class="rv-th rv-th-center" @click="setSort('type')">
-            Relation
+            {{ t('relsView.colRelation') }}
             <UiIcon
               class="rv-sort-arrow"
               :class="arrowClass('type')"
@@ -301,11 +308,11 @@
             />
           </button>
           <button class="rv-th" @click="setSort('to')">
-            To
+            {{ t('relsView.colTo') }}
             <UiIcon class="rv-sort-arrow" :class="arrowClass('to')" name="chevron-up" :size="12" />
           </button>
           <button class="rv-th" @click="setSort('since')">
-            Since
+            {{ t('personForm.since') }}
             <UiIcon
               class="rv-sort-arrow"
               :class="arrowClass('since')"
@@ -341,7 +348,7 @@
               <button
                 class="rv-person"
                 :disabled="!row.a"
-                :title="row.a ? 'View ' + row.a.name : ''"
+                :title="row.a ? t('relsView.viewPerson', { name: row.a.name }) : ''"
                 @click.stop="row.a && store.selectPerson(row.a.id)"
               >
                 <div class="rv-avatar" :style="{ background: avatarGradient(row.a?.gender) }">
@@ -357,11 +364,13 @@
                 </div>
                 <div class="rv-pinfo">
                   <div class="rv-pname" :class="{ unknown: !row.a }">
-                    {{ row.a?.name || 'Unknown' }}
+                    {{ row.a?.name || t('relsView.unknown') }}
                   </div>
                   <div class="rv-psub">
                     {{ roleLabel(row.rel.type, 'a')
-                    }}<template v-if="row.a?.birth?.year"> · b. {{ row.a.birth.year }}</template>
+                    }}<template v-if="row.a?.birth?.year">
+                      · {{ t('personForm.bornAbbr', { year: row.a.birth.year }) }}</template
+                    >
                   </div>
                 </div>
               </button>
@@ -371,7 +380,7 @@
                 <button
                   class="rv-conn-pill"
                   :class="{ toggleable: row.rel.type === 'spouse' }"
-                  :title="row.rel.type === 'spouse' ? 'Click to toggle married / divorced' : ''"
+                  :title="row.rel.type === 'spouse' ? t('relsView.toggleMarried') : ''"
                   @click.stop="row.rel.type === 'spouse' ? toggleStatus(row) : startEdit(row.rel)"
                 >
                   <span v-if="relGlyph(row.rel.type)" class="rv-glyph" aria-hidden="true">{{
@@ -434,7 +443,7 @@
               <button
                 class="rv-person"
                 :disabled="!row.b"
-                :title="row.b ? 'View ' + row.b.name : ''"
+                :title="row.b ? t('relsView.viewPerson', { name: row.b.name }) : ''"
                 @click.stop="row.b && store.selectPerson(row.b.id)"
               >
                 <div class="rv-avatar" :style="{ background: avatarGradient(row.b?.gender) }">
@@ -450,11 +459,13 @@
                 </div>
                 <div class="rv-pinfo">
                   <div class="rv-pname" :class="{ unknown: !row.b }">
-                    {{ row.b?.name || 'Unknown' }}
+                    {{ row.b?.name || t('relsView.unknown') }}
                   </div>
                   <div class="rv-psub">
                     {{ roleLabel(row.rel.type, 'b')
-                    }}<template v-if="row.b?.birth?.year"> · b. {{ row.b.birth.year }}</template>
+                    }}<template v-if="row.b?.birth?.year">
+                      · {{ t('personForm.bornAbbr', { year: row.b.birth.year }) }}</template
+                    >
                   </div>
                 </div>
               </button>
@@ -468,7 +479,7 @@
                   placeholder="—"
                   min="1"
                   max="2200"
-                  title="Year the relationship formed"
+                  :title="t('relsView.formedHint')"
                   @change="setSince(row, $event.target.value)"
                 />
               </div>
@@ -476,29 +487,29 @@
               <!-- Actions -->
               <div class="rv-actions" @click.stop>
                 <span v-if="row.issues.length" class="rv-warn" :title="row.issues.join('\n')">
-                  <UiIcon name="triangle-alert" :size="16" label="Issues" />
+                  <UiIcon name="triangle-alert" :size="16" :label="t('relsView.issues')" />
                 </span>
                 <button
                   v-if="isDirected(row.rel.type)"
                   class="rv-action-btn"
-                  title="Swap direction"
-                  aria-label="Swap direction"
+                  :title="t('relsView.swapDirection')"
+                  :aria-label="t('relsView.swapDirection')"
                   @click="swapRel(row)"
                 >
                   <UiIcon name="arrow-left-right" :size="14" />
                 </button>
                 <button
                   class="rv-action-btn"
-                  title="Edit"
-                  aria-label="Edit relationship"
+                  :title="t('personModal.edit')"
+                  :aria-label="t('relsView.editRel')"
                   @click="startEdit(row.rel)"
                 >
                   <UiIcon name="pencil" :size="14" />
                 </button>
                 <button
                   class="rv-action-btn rv-action-del"
-                  title="Delete"
-                  aria-label="Delete relationship"
+                  :title="t('dialog.delete')"
+                  :aria-label="t('relsView.deleteRel')"
                   @click="removeRel(row)"
                 >
                   <UiIcon name="trash-2" :size="14" />
@@ -511,7 +522,7 @@
               <div v-if="editing?.id === row.rel.id" class="rv-editor" @click.stop>
                 <div class="rv-editor-grid">
                   <div class="rv-field rv-field-picker">
-                    <label>Person A</label>
+                    <label>{{ t('relsView.personA') }}</label>
                     <button class="rv-pick-btn" type="button" @click="togglePicker('a')">
                       {{ pickedLabel(editing.person_a_id) }}
                     </button>
@@ -525,14 +536,14 @@
                   </div>
                   <button
                     class="rv-swap-btn"
-                    title="Swap A and B"
-                    aria-label="Swap A and B"
+                    :title="t('relsView.swapAB')"
+                    :aria-label="t('relsView.swapAB')"
                     @click="swapEditing"
                   >
                     <UiIcon name="arrow-left-right" :size="16" />
                   </button>
                   <div class="rv-field">
-                    <label>Relationship</label>
+                    <label>{{ t('relsView.relationship') }}</label>
                     <select v-model="editing.type">
                       <option v-for="d in store.relTypes" :key="d.key" :value="d.key">
                         {{ typeOptionLabel(d) }}
@@ -540,7 +551,7 @@
                     </select>
                   </div>
                   <div class="rv-field rv-field-picker">
-                    <label>Person B</label>
+                    <label>{{ t('relsView.personB') }}</label>
                     <button class="rv-pick-btn" type="button" @click="togglePicker('b')">
                       {{ pickedLabel(editing.person_b_id) }}
                     </button>
@@ -554,19 +565,21 @@
                   </div>
                   <div class="rv-field rv-field-sm">
                     <label>{{
-                      editing.type === 'spouse' ? 'Married (year)' : 'Since (year)'
+                      editing.type === 'spouse'
+                        ? t('relsView.marriedYear')
+                        : t('relsView.sinceYear')
                     }}</label>
                     <input
                       v-model="editing.formed_year"
                       type="number"
-                      placeholder="Year"
+                      :placeholder="t('personForm.input.year')"
                       min="1"
                       max="2200"
                       @keydown.enter="saveEdit"
                     />
                   </div>
                   <div v-if="statusesOf(editing.type).length > 1" class="rv-field rv-field-sm">
-                    <label>Ended (year)</label>
+                    <label>{{ t('relsView.endedYear') }}</label>
                     <input
                       v-model="editing.ended_year"
                       type="number"
@@ -577,7 +590,7 @@
                     />
                   </div>
                   <div v-if="statusesOf(editing.type).length > 1" class="rv-field rv-field-sm">
-                    <label>Status</label>
+                    <label>{{ t('personForm.status') }}</label>
                     <select v-model="editing.status">
                       <option v-for="s in statusesOf(editing.type)" :key="s" :value="s">
                         {{ statusLabel(editing.type, s) }}
@@ -592,8 +605,12 @@
                   <Transition name="rv-fade">
                     <span v-if="editError" class="rv-editor-error">{{ editError }}</span>
                   </Transition>
-                  <button class="btn btn-ghost btn-sm" @click="cancelEdit">Cancel</button>
-                  <button class="btn btn-primary btn-sm" @click="saveEdit">Save</button>
+                  <button class="btn btn-ghost btn-sm" @click="cancelEdit">
+                    {{ t('dialog.cancel') }}
+                  </button>
+                  <button class="btn btn-primary btn-sm" @click="saveEdit">
+                    {{ t('relsView.save') }}
+                  </button>
                 </div>
               </div>
             </Transition>
@@ -610,18 +627,18 @@
           {{
             store.relationships.length
               ? typeFilter === 'issues'
-                ? 'No issues found'
-                : 'No matches'
-              : 'No relationships yet'
+                ? t('relsView.empty.noIssues')
+                : t('relsView.empty.noMatches')
+              : t('relsView.empty.noRels')
           }}
         </div>
         <div class="rv-empty-text">
           {{
             store.relationships.length
               ? typeFilter === 'issues'
-                ? 'Every relationship looks consistent. Nice work!'
-                : 'Try a different search term or filter.'
-              : 'Connect two family members to get started.'
+                ? t('relsView.empty.noIssuesText')
+                : t('relsView.empty.noMatchesText')
+              : t('relsView.empty.noRelsText')
           }}
         </div>
         <button
@@ -630,7 +647,7 @@
           @click="startAdd"
         >
           <UiIcon name="plus" :size="14" />
-          Add relationship
+          {{ t('relsView.addRel') }}
         </button>
       </div>
     </div>
@@ -649,10 +666,12 @@ import SearchField from './ui/SearchField.vue'
 import { derivedSiblings } from './graph/graphInsights.js'
 import { confirmDialog } from '../lib/dialogs.js'
 import { undoToast } from '../lib/undoToast.js'
-import { translate as tr } from '../i18n'
+import { translate as tr, useI18n } from '../i18n'
+import { defaultNameLabel, relRoleLabel, relStatusLabel, relTypeLabel } from '../lib/dataLabels'
 import { inkAvatarBg, inkRelColor, inkRelGlyph, isRomanticType } from './ui/inkChrome'
 
 const store = useMainStore()
+const { t } = useI18n()
 const typesOpen = ref(false)
 
 // ── searchable person picking (replaces the old scroll-forever dropdowns) ────
@@ -664,8 +683,11 @@ function togglePicker(side) {
 
 function pickedLabel(id) {
   const p = id ? store.persons.find((x) => x.id === id) : null
-  if (!p) return 'Select person…'
-  return `${p.name || 'Unnamed'}${p.birth?.year ? ` (b. ${p.birth.year})` : ''}`
+  if (!p) return tr('relsView.selectPerson')
+  const name = p.name || tr('personForm.unnamed')
+  return p.birth?.year
+    ? tr('relsView.nameBorn', { name, born: tr('personForm.bornAbbr', { year: p.birth.year }) })
+    : name
 }
 
 function onPickPerson(person) {
@@ -764,11 +786,13 @@ function meta(type) {
 function baseMeta(type) {
   const gs = store.graphSettings
   // The legacy trio keeps following the Style panel's colors.
-  if (type === 'spouse') return { label: 'Spouse', color: gs.spouseColor }
-  if (type === 'adopted') return { label: 'Adopted', color: gs.adoptedColor }
-  if (type === 'parent_child') return { label: 'Parent of', color: gs.parentChildColor }
+  if (type === 'spouse') return { label: tr('personModal.kin.spouse'), color: gs.spouseColor }
+  if (type === 'adopted') return { label: tr('data.relTypes.adopted'), color: gs.adoptedColor }
+  if (type === 'parent_child') {
+    return { label: tr('relsView.parentOf'), color: gs.parentChildColor }
+  }
   const def = store.relTypeByKey.get(type)
-  return { label: def?.label || type, color: def?.color || gs.parentChildColor }
+  return { label: relTypeLabel(def) || type, color: def?.color || gs.parentChildColor }
 }
 // Ink theme: romantic bonds are drawn as the red thread of fate (红线), and
 // every pill is stamped with the type's brushed character.
@@ -794,25 +818,29 @@ function statusesOf(type) {
   return defOf(type)?.statuses || ['active']
 }
 function statusLabel(type, s) {
-  if (type === 'spouse' && s === 'active') return 'Married'
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
+  if (type === 'spouse' && s === 'active') return tr('personForm.married')
+  return s ? relStatusLabel(s) : s
 }
 function typeOptionLabel(def) {
-  return def.directed ? `${def.role_a || 'A'} → ${def.role_b || 'B'}` : def.label
+  return def.directed
+    ? `${relRoleLabel(def, 'a') || 'A'} → ${relRoleLabel(def, 'b') || 'B'}`
+    : relTypeLabel(def)
 }
 function connLabel(rel) {
   if (rel.label) return rel.label // per-edge custom label wins
-  if (rel.type === 'spouse') return rel.status === 'divorced' ? 'Divorced' : 'Married'
-  if (rel.type === 'parent_child') return 'Parent of'
-  if (rel.type === 'adopted') return 'Adopted'
+  if (rel.type === 'spouse') {
+    return rel.status === 'divorced' ? relStatusLabel('divorced') : tr('personForm.married')
+  }
+  if (rel.type === 'parent_child') return tr('relsView.parentOf')
+  if (rel.type === 'adopted') return tr('data.relTypes.adopted')
   return meta(rel.type).label
 }
 function roleLabel(type, side) {
-  if (type === 'spouse') return 'Partner'
+  if (type === 'spouse') return tr('relsView.partner')
   const def = defOf(type)
-  if (!def) return side === 'a' ? 'Parent' : 'Child'
-  if (def.directed) return (side === 'a' ? def.role_a : def.role_b) || def.label
-  return def.label
+  if (!def) return side === 'a' ? tr('personModal.kin.parent') : tr('personModal.kin.child')
+  if (def.directed) return relRoleLabel(def, side) || relTypeLabel(def)
+  return relTypeLabel(def)
 }
 
 // ── Consistency checks ──────────────────────────────────────────────────────
@@ -835,10 +863,9 @@ const issuesByRel = computed(() => {
   rels.forEach((r) => {
     const a = personById.value[r.person_a_id]
     const b = personById.value[r.person_b_id]
-    if (r.person_a_id === r.person_b_id) add(r.id, 'Links a person to themselves')
-    if (!a || !b) add(r.id, 'References a person that no longer exists')
-    if (byPairType[pairKey(r) + '~' + r.type].length > 1)
-      add(r.id, 'Duplicate — this pair already has this relationship')
+    if (r.person_a_id === r.person_b_id) add(r.id, tr('relsView.issue.self'))
+    if (!a || !b) add(r.id, tr('relsView.issue.missing'))
+    if (byPairType[pairKey(r) + '~' + r.type].length > 1) add(r.id, tr('relsView.issue.duplicate'))
     // A pair holding several DIFFERENT bonds (married + parent, mentor +
     // rival…) is deliberate and allowed — only exact duplicates are flagged.
     if (
@@ -847,10 +874,13 @@ const issuesByRel = computed(() => {
       b?.birth?.year &&
       a.birth.year >= b.birth.year
     ) {
-      add(r.id, `Parent (b. ${a.birth.year}) born after or same year as child (b. ${b.birth.year})`)
+      add(r.id, tr('relsView.issue.parentYounger', { a: a.birth.year, b: b.birth.year }))
     }
     if (r.type === 'parent_child' && parentCount[r.person_b_id] > 2) {
-      add(r.id, `${b?.name || 'This child'} has more than two biological parents`)
+      add(
+        r.id,
+        tr('relsView.issue.tooManyParents', { name: b?.name || tr('relsView.issue.thisChild') })
+      )
     }
     // Siblinghood is derived from shared parents — an explicit row on top of
     // that is redundant (explicit rows are for half/step cases the tree can't see).
@@ -859,7 +889,7 @@ const issuesByRel = computed(() => {
       derivedSibs.value.get(r.person_a_id)?.has(r.person_b_id) &&
       r.person_a_id !== r.person_b_id
     ) {
-      add(r.id, 'Redundant — these two are already siblings via a shared parent')
+      add(r.id, tr('relsView.issue.redundantSibling'))
     }
   })
   return out
@@ -885,13 +915,15 @@ const chips = computed(() => {
   const rels = store.relationships
   const counts = new Map()
   rels.forEach((r) => counts.set(r.type, (counts.get(r.type) || 0) + 1))
-  const list = [{ id: 'all', label: 'All', count: rels.length, color: 'var(--accent)' }]
+  const list = [
+    { id: 'all', label: tr('relsView.all'), count: rels.length, color: 'var(--accent)' }
+  ]
   for (const def of store.relTypes) {
     const count = counts.get(def.key) || 0
     if (!count) continue
     list.push({
       id: def.key,
-      label: def.key === 'parent_child' ? 'Parent' : def.label,
+      label: def.key === 'parent_child' ? tr('personModal.kin.parent') : relTypeLabel(def),
       count,
       color: meta(def.key).color
     })
@@ -1100,32 +1132,33 @@ watch(
 const previewSentence = computed(() => {
   const e = editing.value
   if (!e) return ''
-  const a = personById.value[e.person_a_id]?.name || 'Person A'
-  const b = personById.value[e.person_b_id]?.name || 'Person B'
+  const a = personById.value[e.person_a_id]?.name || tr('relsView.personA')
+  const b = personById.value[e.person_b_id]?.name || tr('relsView.personB')
   if (e.type === 'spouse') {
     return e.status === 'divorced'
-      ? `${a} and ${b} were married, now divorced`
-      : `${a} and ${b} are married`
+      ? tr('relsView.preview.divorced', { a, b })
+      : tr('relsView.preview.married', { a, b })
   }
-  if (e.type === 'adopted') return `${a} adopted ${b}`
-  if (e.type === 'parent_child') return `${a} is a parent of ${b}`
+  if (e.type === 'adopted') return tr('relsView.preview.adopted', { a, b })
+  if (e.type === 'parent_child') return tr('relsView.preview.parent', { a, b })
   const def = defOf(e.type)
-  if (!def) return `${a} — ${b}`
+  if (!def) return tr('relsView.preview.generic', { a, b })
   if (def.directed) {
-    return `${a} is ${b}'s ${(def.role_a || def.label).toLowerCase()}`
+    const role = (relRoleLabel(def, 'a') || relTypeLabel(def)).toLowerCase()
+    return tr('relsView.preview.directed', { a, b, role })
   }
-  return `${a} and ${b} are ${def.label.toLowerCase()}s`
+  return tr('relsView.preview.symmetric', { a, b, type: relTypeLabel(def).toLowerCase() })
 })
 
 async function saveEdit() {
   const e = editing.value
   if (!e) return
   if (!e.person_a_id || !e.person_b_id) {
-    editError.value = 'Choose both people.'
+    editError.value = tr('relsView.err.chooseBoth')
     return
   }
   if (e.person_a_id === e.person_b_id) {
-    editError.value = 'A person cannot be linked to themselves.'
+    editError.value = tr('relsView.err.self')
     return
   }
   const dup = store.relationships.some(
@@ -1136,7 +1169,7 @@ async function saveEdit() {
         (r.person_a_id === e.person_b_id && r.person_b_id === e.person_a_id))
   )
   if (dup) {
-    editError.value = 'This relationship already exists.'
+    editError.value = tr('relsView.err.exists')
     return
   }
 
@@ -1154,7 +1187,7 @@ async function saveEdit() {
       ? await store.createRelationship(payload)
       : await store.updateRelationship({ id: e.id, ...payload })
   if (!res.success) {
-    editError.value = res.error || 'Could not save.'
+    editError.value = res.error || tr('relsView.err.couldNotSave')
     return
   }
   cancelEdit()
@@ -1162,16 +1195,16 @@ async function saveEdit() {
 
 // ── Quick row actions ───────────────────────────────────────────────────────
 async function removeRel(row) {
-  const aName = row.a?.name || 'Unknown'
-  const bName = row.b?.name || 'Unknown'
+  const aName = row.a?.name || tr('relsView.unknown')
+  const bName = row.b?.name || tr('relsView.unknown')
   const kind =
     row.rel.type === 'spouse'
-      ? 'marriage'
+      ? tr('relsView.kind.marriage')
       : row.rel.type === 'adopted'
-        ? 'adoption'
+        ? tr('relsView.kind.adoption')
         : row.rel.type === 'parent_child'
-          ? 'parent–child'
-          : (meta(row.rel.type).label || 'this').toLowerCase()
+          ? tr('relsView.kind.parentChild')
+          : (meta(row.rel.type).label || '').toLowerCase()
   const ok = await confirmDialog({
     title: tr('confirm.deleteBond', { kind }),
     message: tr('confirm.deleteBondBetween', { a: aName, b: bName }) + ' ' + tr('dialog.undoHint'),

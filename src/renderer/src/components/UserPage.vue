@@ -184,7 +184,7 @@
                   @click="openProject(p.id)"
                 >
                   <div class="up-project-head">
-                    <span class="up-project-name">{{ p.name }}</span>
+                    <span class="up-project-name">{{ defaultNameLabel(p.name) }}</span>
                     <span v-if="p.id === store.activeProjectId" class="up-project-current">{{
                       t('account.projects.current')
                     }}</span>
@@ -285,6 +285,7 @@ import InkBackdrop from './ui/InkBackdrop.vue'
 import UiIcon from './ui/UiIcon.js'
 import { useMainStore } from '../store/index.js'
 import { useI18n } from '../i18n'
+import { defaultNameLabel, userNameLabel } from '../lib/dataLabels'
 import { derivedHue, gradientForHue } from '../lib/avatar.js'
 
 const store = useMainStore()
@@ -333,7 +334,7 @@ async function saveProfile() {
     savedTimer = setTimeout(() => (saveState.value = 'idle'), 2200)
   } else {
     saveState.value = 'idle'
-    profileError.value = res.error || 'Could not save'
+    profileError.value = res.error || t('pagesX.couldNotSave')
   }
 }
 
@@ -362,15 +363,17 @@ async function submitPassword() {
     pwCurrent.value = pwNew.value = pwConfirm.value = ''
   } else {
     pwState.value = 'error'
-    pwMessage.value = res.error || 'Could not change the password'
+    pwMessage.value = res.error || t('pagesX.couldNotChangePassword')
   }
 }
 
 // ── Hero / avatar ────────────────────────────────────────────────────────────
-const shownName = computed(() => store.authUser?.display_name || store.authUser?.username || '')
+const shownName = computed(() => userNameLabel(store.authUser))
 const initial = computed(() => (shownName.value[0] || '?').toUpperCase())
 const planLabel = computed(() =>
-  store.authUser?.plan === 'free' ? t('account.planFree') : store.authUser?.plan
+  store.authUser?.plan === 'free'
+    ? t('account.planFree')
+    : t(`billing.plans.${store.authUser?.plan}.name`)
 )
 // The hero avatar previews the DRAFT hue so swatch clicks feel immediate.
 const previewHue = computed(() => draftHue.value ?? derivedHue(store.authUser?.username))
@@ -430,7 +433,7 @@ const shareMocks = computed(() => {
   const base = overview.value.slice(0, 2)
   const mocks = base.map((p, i) => ({
     kindLabel: t(i === 0 ? 'account.sharing.kindProject' : 'account.sharing.kindImage'),
-    name: p.name,
+    name: defaultNameLabel(p.name),
     visibility: i === 0 ? 'link' : 'private',
     url: `familytree.app/s/${p.id.slice(0, 8)}`
   }))

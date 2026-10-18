@@ -4,7 +4,7 @@
     <button
       class="fr-handle"
       type="button"
-      title="Drag to reorder — drop on a slot to assign"
+      :title="t('personForm.row.dragHint')"
       @pointerdown.prevent="emit('drag-start', $event)"
     >
       <span></span><span></span>
@@ -13,12 +13,16 @@
     <div class="fr-main">
       <div class="fr-head">
         <UiIcon v-if="def.icon" class="fr-icon" :name="def.icon" :size="14" />
-        <span class="fr-label">{{ def.label }}</span>
+        <span class="fr-label">{{ fieldLabel(def) }}</span>
         <span class="fr-type" :title="meta.label"><UiIcon :name="meta.icon" :size="12" /></span>
-        <span v-if="def.locked" class="fr-lock" title="Template trait — on every form">
+        <span v-if="def.locked" class="fr-lock" :title="t('personForm.row.templateHint')">
           <UiIcon name="lock" :size="12" />
         </span>
-        <span v-if="draft.display_in_graph" class="fr-eye" title="Shown in the graph label">
+        <span
+          v-if="draft.display_in_graph"
+          class="fr-eye"
+          :title="t('personForm.row.shownInGraph')"
+        >
           <UiIcon name="eye" :size="13" />
         </span>
       </div>
@@ -31,13 +35,13 @@
 
       <!-- timeframe (Advanced) -->
       <div v-if="def.has_timeframe && advanced" class="fr-timeframe">
-        <span class="fr-tf-glyph" title="When this trait applied">
+        <span class="fr-tf-glyph" :title="t('personForm.row.timeframeHint')">
           <UiIcon name="hourglass" :size="14" />
         </span>
         <input
           class="fr-tf-input"
           type="number"
-          placeholder="From"
+          :placeholder="t('personForm.input.from')"
           :value="draft.timeframe?.from?.year ?? ''"
           @input="setTimeframe('from', $event.target.value)"
         />
@@ -45,7 +49,7 @@
         <input
           class="fr-tf-input"
           type="number"
-          placeholder="To"
+          :placeholder="t('personForm.input.to')"
           :value="draft.timeframe?.to?.year ?? ''"
           @input="setTimeframe('to', $event.target.value)"
         />
@@ -56,43 +60,48 @@
         <div v-if="editing" class="fr-config">
           <div class="fr-cfg-grid">
             <label class="fr-cfg-field">
-              <span>Label</span>
+              <span>{{ t('personForm.row.label') }}</span>
               <input v-model="cfg.label" type="text" />
             </label>
             <label v-if="hasUnit" class="fr-cfg-field fr-cfg-sm">
-              <span>Unit</span>
+              <span>{{ t('personForm.row.unit') }}</span>
               <input v-model="cfg.unit" type="text" maxlength="8" placeholder="cm" />
             </label>
             <label v-if="def.type === 'text'" class="fr-cfg-field fr-cfg-check">
               <input v-model="cfg.multiline" type="checkbox" />
-              <span>Multiline</span>
+              <span>{{ t('personForm.row.multiline') }}</span>
             </label>
             <template v-if="hasMinMax">
               <label class="fr-cfg-field fr-cfg-sm">
-                <span>Min</span><input v-model.number="cfg.min" type="number" />
+                <span>{{ t('personForm.row.min') }}</span
+                ><input v-model.number="cfg.min" type="number" />
               </label>
               <label class="fr-cfg-field fr-cfg-sm">
-                <span>Max</span><input v-model.number="cfg.max" type="number" />
+                <span>{{ t('personForm.row.max') }}</span
+                ><input v-model.number="cfg.max" type="number" />
               </label>
               <label class="fr-cfg-field fr-cfg-sm">
-                <span>Step</span><input v-model.number="cfg.step" type="number" />
+                <span>{{ t('personForm.row.step') }}</span
+                ><input v-model.number="cfg.step" type="number" />
               </label>
             </template>
             <template v-if="def.type === 'slider' || def.type === 'boolean'">
               <label class="fr-cfg-field">
-                <span>Left label</span><input v-model="cfg.leftLabel" type="text" />
+                <span>{{ t('personForm.row.leftLabel') }}</span
+                ><input v-model="cfg.leftLabel" type="text" />
               </label>
               <label class="fr-cfg-field">
-                <span>Right label</span><input v-model="cfg.rightLabel" type="text" />
+                <span>{{ t('personForm.row.rightLabel') }}</span
+                ><input v-model="cfg.rightLabel" type="text" />
               </label>
             </template>
             <div class="fr-cfg-field fr-cfg-icon">
-              <span>Icon</span>
+              <span>{{ t('personForm.row.icon') }}</span>
               <IconPicker
                 v-model="cfg.icon"
                 :options="TRAIT_ICONS"
                 allow-none
-                aria-label="Trait icon"
+                :aria-label="t('personForm.row.traitIcon')"
               />
             </div>
           </div>
@@ -100,13 +109,23 @@
           <!-- select options editor -->
           <div v-if="def.type === 'select'" class="fr-options">
             <div v-for="(opt, i) in cfg.options" :key="i" class="fr-opt-row">
-              <input v-model="opt.color" type="color" class="fr-opt-color" title="Option color" />
-              <input v-model="opt.label" type="text" class="fr-opt-label" placeholder="Option…" />
+              <input
+                v-model="opt.color"
+                type="color"
+                class="fr-opt-color"
+                :title="t('personForm.row.optionColor')"
+              />
+              <input
+                v-model="opt.label"
+                type="text"
+                class="fr-opt-label"
+                :placeholder="t('personForm.row.optionPh')"
+              />
               <button
                 class="fr-opt-x"
                 type="button"
-                title="Remove option"
-                aria-label="Remove option"
+                :title="t('personForm.row.removeOption')"
+                :aria-label="t('personForm.row.removeOption')"
                 @click="cfg.options.splice(i, 1)"
               >
                 <UiIcon name="x" :size="14" />
@@ -114,15 +133,17 @@
             </div>
             <button class="fr-opt-add" type="button" @click="addOption">
               <UiIcon name="plus" :size="14" />
-              Add option
+              {{ t('personForm.row.addOption') }}
             </button>
           </div>
 
           <div class="fr-cfg-actions">
             <button class="btn btn-ghost btn-sm" type="button" @click="editing = false">
-              Cancel
+              {{ t('dialog.cancel') }}
             </button>
-            <button class="btn btn-primary btn-sm" type="button" @click="saveConfig">Apply</button>
+            <button class="btn btn-primary btn-sm" type="button" @click="saveConfig">
+              {{ t('personForm.row.apply') }}
+            </button>
           </div>
         </div>
       </Transition>
@@ -133,8 +154,8 @@
       <button
         class="fr-menu-btn"
         type="button"
-        title="Trait options"
-        aria-label="Trait options"
+        :title="t('personForm.row.options')"
+        :aria-label="t('personForm.row.options')"
         @pointerdown.stop
         @click.stop="menuOpen = !menuOpen"
       >
@@ -143,47 +164,52 @@
       <Transition name="fr-pop">
         <div v-if="menuOpen" class="fr-menu" @pointerdown.stop @click.stop>
           <button class="fr-mi" @click="openEditor">
-            <UiIcon class="fr-mi-ic" name="pencil" :size="14" />Edit trait<span class="fr-mi-hint"
-              >Label · icon · options</span
-            >
+            <UiIcon class="fr-mi-ic" name="pencil" :size="14" />{{ t('personForm.row.editTrait')
+            }}<span class="fr-mi-hint">{{ t('personForm.row.editTraitHint') }}</span>
           </button>
           <button class="fr-mi" @click="toggleLock">
             <UiIcon class="fr-mi-ic" :name="def.locked ? 'lock-open' : 'lock'" :size="14" />{{
-              def.locked ? 'Unlock' : 'Lock'
+              def.locked ? t('personForm.row.unlock') : t('personForm.lock')
             }}
-            <span class="fr-mi-hint">{{ def.locked ? 'This person only' : 'On every form' }}</span>
+            <span class="fr-mi-hint">{{
+              def.locked
+                ? t('personForm.row.thisPersonOnly', { noun: nounLabel(store.noun).toLowerCase() })
+                : t('personForm.row.onEveryForm')
+            }}</span>
           </button>
           <div class="fr-mi" role="button" tabindex="0" @click="toggleDisplay">
             <UiIcon
               class="fr-mi-ic"
               :name="draft.display_in_graph ? 'eye' : 'eye-off'"
               :size="14"
-            />Show in graph
+            />{{ t('personForm.row.showInGraph') }}
             <button
               v-if="def.locked"
               class="fr-mi-apply"
               type="button"
-              title="Apply to this trait on every person"
+              :title="t('personForm.row.applyAllHint')"
               @click.stop="applyAll"
             >
-              Apply to all
+              {{ t('personForm.row.applyAll') }}
             </button>
           </div>
           <button v-if="advanced" class="fr-mi" @click="toggleTimeframe">
             <UiIcon class="fr-mi-ic" name="hourglass" :size="14" />{{
-              def.has_timeframe ? 'Remove timeframe' : 'Set timeframe'
+              def.has_timeframe
+                ? t('personForm.row.removeTimeframe')
+                : t('personForm.row.setTimeframe')
             }}
           </button>
           <div class="fr-mi-sep"></div>
           <div class="fr-mi-slots">
-            <span class="fr-mi-slots-label">Move to slot</span>
+            <span class="fr-mi-slots-label">{{ t('personForm.row.moveToSlot') }}</span>
             <div class="fr-mi-slot-chips">
               <button
                 v-for="s in slotTargets"
                 :key="s.slot"
                 class="fr-mi-slot"
                 :disabled="!s.ok"
-                :title="s.ok ? s.label : `${meta.label} traits can't go here`"
+                :title="s.ok ? s.label : t('personForm.row.slotRejects', { type: meta.label })"
                 :aria-label="s.label"
                 @click="moveToSlot(s.slot)"
               >
@@ -193,14 +219,17 @@
           </div>
           <div class="fr-mi-sep"></div>
           <button class="fr-mi" @click="duplicate">
-            <UiIcon class="fr-mi-ic" name="copy" :size="14" />Duplicate
+            <UiIcon class="fr-mi-ic" name="copy" :size="14" />{{ t('personForm.row.duplicate') }}
           </button>
           <button v-if="!def.locked && attached" class="fr-mi" @click="removeFromPerson">
-            <UiIcon class="fr-mi-ic" name="circle-minus" :size="14" />Remove from this
-            {{ store.noun.toLowerCase() }}
+            <UiIcon class="fr-mi-ic" name="circle-minus" :size="14" />{{
+              t('personForm.row.removeFromThis', { noun: nounLabel(store.noun).toLowerCase() })
+            }}
           </button>
           <button class="fr-mi fr-mi-danger" @click="deleteDef">
-            <UiIcon class="fr-mi-ic" name="trash-2" :size="14" />Delete trait
+            <UiIcon class="fr-mi-ic" name="trash-2" :size="14" />{{
+              t('personForm.row.deleteTrait')
+            }}
           </button>
         </div>
       </Transition>
@@ -218,7 +247,8 @@ import FieldInput from './FieldInput.vue'
 import UiIcon from '../ui/UiIcon.js'
 import IconPicker from '../ui/IconPicker.vue'
 import { confirmDialog } from '../../lib/dialogs.js'
-import { translate as tr } from '../../i18n'
+import { translate as tr, useI18n } from '../../i18n'
+import { fieldLabel, nounLabel } from '../../lib/dataLabels'
 
 const props = defineProps({
   def: { type: Object, required: true },
@@ -227,6 +257,7 @@ const props = defineProps({
   attached: { type: Boolean, default: false }
 })
 const emit = defineEmits(['update', 'drag-start', 'remove-from-person'])
+const { t } = useI18n()
 
 // Curated trait icons for the config editor (search widens to every icon).
 const TRAIT_ICONS = [
@@ -362,7 +393,7 @@ async function moveToSlot(slot) {
 async function duplicate() {
   menuOpen.value = false
   await store.createFieldDef({
-    label: `${props.def.label} copy`,
+    label: t('personForm.row.copyName', { name: fieldLabel(props.def) }),
     type: props.def.type,
     config: JSON.parse(JSON.stringify(props.def.config)),
     icon: props.def.icon,
@@ -380,7 +411,7 @@ async function deleteDef() {
   menuOpen.value = false
   const n = store.fieldValues.filter((v) => v.field_id === props.def.id).length
   const ok = await confirmDialog({
-    title: tr('confirm.deleteTrait', { name: props.def.label }),
+    title: tr('confirm.deleteTrait', { name: fieldLabel(props.def) }),
     message: (n ? tr('confirm.deleteTraitBody', { count: n }) + ' ' : '') + tr('dialog.undoHint'),
     tone: 'danger'
   })

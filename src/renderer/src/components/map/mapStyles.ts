@@ -27,8 +27,15 @@ export interface LinePaint {
   width: number
 }
 
+/** One world unit is one kilometre; each style measures in its own unit. */
+export type MapUnitId = 'league' | 'li' | 'km'
+/** Units per world unit (a league ≈ 4.8 km, a 里 ≈ 0.5 km). */
+export const MAP_UNITS: Record<MapUnitId, number> = { league: 1 / 4.8, li: 2, km: 1 }
+
 export interface MapStyle {
   id: string
+  /** The distance unit its scale bar and ruler speak (see MAP_UNITS). */
+  unit: MapUnitId
   icon: string
   /** The desk around the sheet in dark / light (and, optionally, ink) app themes. */
   desk: { dark: string; light: string; ink?: string }
@@ -106,6 +113,7 @@ export const MAP_STYLES: Record<string, MapStyle> = {
   // ── Parchment: an explorer's chart in sepia ink ─────────────────────────────
   parchment: {
     id: 'parchment',
+    unit: 'league',
     icon: 'scroll',
     desk: { dark: '#17130e', light: '#d9cfbd' },
     sea: '#d9c7a1',
@@ -156,6 +164,7 @@ export const MAP_STYLES: Record<string, MapStyle> = {
   // ── Fantasy: a storybook atlas in watercolor ────────────────────────────────
   fantasy: {
     id: 'fantasy',
+    unit: 'league',
     icon: 'wand-sparkles',
     desk: { dark: '#0c1418', light: '#c9d8dc' },
     sea: '#5f9fb3',
@@ -206,6 +215,7 @@ export const MAP_STYLES: Record<string, MapStyle> = {
   // ── Ink: 水墨 — a Chinese ink-wash landscape on rice paper ──────────────────
   ink: {
     id: 'ink',
+    unit: 'li',
     icon: 'brush',
     eastern: true,
     desk: { dark: '#121212', light: '#dcd6c8' },
@@ -257,6 +267,7 @@ export const MAP_STYLES: Record<string, MapStyle> = {
   // ── Shanshui 山水: a Song ink landscape mounted as a scroll ─────────────────
   shanshui: {
     id: 'shanshui',
+    unit: 'li',
     icon: 'mountain',
     eastern: true,
     painting: 'ink',
@@ -313,6 +324,7 @@ export const MAP_STYLES: Record<string, MapStyle> = {
   // ── Qinglü 青绿: Wang Ximeng's mineral blue-green on aged silk ──────────────
   qinglu: {
     id: 'qinglu',
+    unit: 'li',
     icon: 'mountain-snow',
     eastern: true,
     painting: 'qinglu',
@@ -369,6 +381,7 @@ export const MAP_STYLES: Record<string, MapStyle> = {
   // ── High-tech: a holographic tactical display ───────────────────────────────
   hightech: {
     id: 'hightech',
+    unit: 'km',
     icon: 'satellite',
     desk: { dark: '#03060b', light: '#0b1220', ink: '#0b1220' },
     sea: '#061321',
@@ -419,6 +432,7 @@ export const MAP_STYLES: Record<string, MapStyle> = {
   // ── Atlas: a clean modern political map ─────────────────────────────────────
   atlas: {
     id: 'atlas',
+    unit: 'km',
     icon: 'map',
     desk: { dark: '#10141c', light: '#e6eaf0' },
     sea: '#a9d3ec',

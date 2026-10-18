@@ -14,11 +14,16 @@
     @dblclick.stop
   >
     <!-- Year readout -->
-    <div class="ts-readout" :title="active ? 'Time travel active' : 'Showing the present'">
-      <div class="ts-readout-cap">{{ active ? 'YEAR' : 'NOW' }}</div>
+    <div
+      class="ts-readout"
+      :title="active ? t('timeSlider.activeHint') : t('timeSlider.presentHint')"
+    >
+      <div class="ts-readout-cap">
+        {{ active ? t('timeSlider.capYear') : t('timeSlider.capNow') }}
+      </div>
       <div class="ts-readout-year">{{ readoutYear }}</div>
       <div v-if="active && startYear != null" class="ts-readout-span">
-        from {{ Math.floor(startYear) }}
+        {{ t('timeSlider.from', { year: Math.floor(startYear) }) }}
       </div>
       <!-- The era this moment belongs to (the chronicle) -->
       <Transition name="ts-era" mode="out-in">
@@ -27,10 +32,10 @@
           :key="currentEra.id"
           class="ts-era"
           :style="{ '--ec': currentEra.color }"
-          :title="currentEra.name"
+          :title="defaultNameLabel(currentEra.name)"
         >
           <UiIcon class="ts-era-ic" :name="eraIcon" :size="11" />
-          <span class="ts-era-name">{{ currentEra.name }}</span>
+          <span class="ts-era-name">{{ defaultNameLabel(currentEra.name) }}</span>
         </div>
       </Transition>
     </div>
@@ -42,7 +47,7 @@
       <div
         ref="trackEl"
         class="ts-track"
-        title="Drag either handle to frame a span of time"
+        :title="t('timeSlider.trackHint')"
         @pointerdown="onTrackDown"
       >
         <div class="ts-rail"></div>
@@ -52,7 +57,7 @@
           :key="e.id"
           class="ts-era-stripe"
           :style="{ top: e.top + '%', height: e.h + '%', '--ec': e.color, '--lane': e.lane }"
-          :title="e.name"
+          :title="defaultNameLabel(e.name)"
         ></div>
         <div class="ts-density">
           <div
@@ -89,8 +94,8 @@
     <div class="ts-controls">
       <button
         class="ts-btn ts-btn-play"
-        :title="playing ? 'Pause' : reversed ? 'Play backwards' : 'Play through time'"
-        :aria-label="playing ? 'Pause' : reversed ? 'Play backwards' : 'Play through time'"
+        :title="playLabel"
+        :aria-label="playLabel"
         @click="tt.togglePlay()"
       >
         <UiIcon
@@ -102,8 +107,8 @@
       <button
         class="ts-btn"
         :disabled="!active"
-        title="Stop — back to the present"
-        aria-label="Stop"
+        :title="t('timeSlider.stop')"
+        :aria-label="t('timeSlider.stopAria')"
         @click="tt.stop()"
       >
         <UiIcon name="square" :size="13" />
@@ -113,32 +118,40 @@
         <div class="ts-btn-row">
           <button
             class="ts-btn ts-btn-sm"
-            title="Previous event"
-            aria-label="Previous event"
+            :title="t('timeSlider.prevEvent')"
+            :aria-label="t('timeSlider.prevEvent')"
             @click="tt.skipEvent(-1)"
           >
             <UiIcon name="skip-back" :size="12" />
           </button>
           <button
             class="ts-btn ts-btn-sm"
-            title="Next event"
-            aria-label="Next event"
+            :title="t('timeSlider.nextEvent')"
+            :aria-label="t('timeSlider.nextEvent')"
             @click="tt.skipEvent(1)"
           >
             <UiIcon name="skip-forward" :size="12" />
           </button>
         </div>
         <div class="ts-btn-row">
-          <button class="ts-btn ts-btn-sm" title="Back one year" @click="tt.stepYears(-1)">
+          <button
+            class="ts-btn ts-btn-sm"
+            :title="t('timeSlider.backYear')"
+            @click="tt.stepYears(-1)"
+          >
             −1
           </button>
-          <button class="ts-btn ts-btn-sm" title="Forward one year" @click="tt.stepYears(1)">
+          <button
+            class="ts-btn ts-btn-sm"
+            :title="t('timeSlider.fwdYear')"
+            @click="tt.stepYears(1)"
+          >
             +1
           </button>
         </div>
         <button
           class="ts-btn ts-btn-speed"
-          :title="'Playback speed — ' + speedLabel"
+          :title="t('timeSlider.speed', { speed: speedLabel })"
           @click="tt.cycleSpeed()"
         >
           {{ speedLabel }}
@@ -147,8 +160,8 @@
           <button
             class="ts-btn ts-btn-sm"
             :class="{ 'ts-btn-active': reversed }"
-            title="Reverse playback direction"
-            aria-label="Reverse playback direction"
+            :title="t('timeSlider.reverse')"
+            :aria-label="t('timeSlider.reverse')"
             @click="tt.toggleReversed()"
           >
             <UiIcon name="arrow-down-up" :size="12" />
@@ -156,8 +169,8 @@
           <button
             class="ts-btn ts-btn-sm"
             :class="{ 'ts-btn-active': looping }"
-            title="Loop playback"
-            aria-label="Loop playback"
+            :title="t('timeSlider.loop')"
+            :aria-label="t('timeSlider.loop')"
             @click="tt.toggleLooping()"
           >
             <UiIcon name="infinity" :size="12" />
@@ -169,14 +182,14 @@
     <!-- Event feed: what just happened while time flows -->
     <div class="ts-feed">
       <TransitionGroup name="ts-toast">
-        <div v-for="t in toasts" :key="t.key" class="ts-toast" :class="'ts-toast-' + t.kind">
+        <div v-for="n in toasts" :key="n.key" class="ts-toast" :class="'ts-toast-' + n.kind">
           <UiIcon
             class="ts-toast-icon"
-            :name="t.kind === 'birth' ? 'baby' : 'heart-handshake'"
+            :name="n.kind === 'birth' ? 'baby' : 'heart-handshake'"
             :size="14"
           />
-          <span class="ts-toast-label">{{ t.label }}</span>
-          <span class="ts-toast-year">{{ t.year }}</span>
+          <span class="ts-toast-label">{{ n.label }}</span>
+          <span class="ts-toast-year">{{ n.year }}</span>
         </div>
       </TransitionGroup>
     </div>
@@ -192,8 +205,11 @@ import { erasAt, eraLanes } from '../../../../shared/chronicle'
 import { toOrdinal } from '../../../../shared/calendarMath'
 import UiIcon from '../ui/UiIcon.js'
 import { hasIcon } from '../ui/icons.js'
+import { useI18n } from '../../i18n'
+import { defaultNameLabel } from '../../lib/dataLabels'
 
 const store = useMainStore()
+const { t } = useI18n()
 const tt = useTimeTravel()
 // Destructured refs auto-unwrap in the template; methods stay on `tt`.
 const { year, startYear, playing, reversed, looping, speedIdx } = tt
@@ -261,6 +277,13 @@ const eraStripes = computed(() => {
 })
 const readoutYear = computed(() => (active.value ? Math.floor(year.value) : range.value.maxYear))
 const speedLabel = computed(() => TIME_SPEEDS[speedIdx.value].label)
+const playLabel = computed(() =>
+  playing.value
+    ? t('timeSlider.pause')
+    : reversed.value
+      ? t('timeSlider.playBack')
+      : t('timeSlider.play')
+)
 
 const DENSITY_BUCKETS = 48
 const density = computed(() =>
@@ -323,16 +346,19 @@ watch(year, (ny, oy) => {
   const crossed = eventsCrossed(tt.events.value, oy, ny)
   if (!crossed.length) return
   for (const e of crossed.slice(-3)) {
-    const t = {
+    // A nameless birth reads 'Unnamed' from the pure event index.
+    const label =
+      e.kind === 'birth' && e.label === 'Unnamed' ? t('timeline.canvas.unnamed') : e.label
+    const item = {
       key: ++toastSeq,
       kind: e.kind,
-      label: e.label.length > 26 ? e.label.slice(0, 25) + '…' : e.label,
+      label: label.length > 26 ? label.slice(0, 25) + '…' : label,
       year: Math.floor(e.year)
     }
-    toasts.value.push(t)
+    toasts.value.push(item)
     const timer = setTimeout(() => {
       toastTimers.delete(timer)
-      const i = toasts.value.indexOf(t)
+      const i = toasts.value.indexOf(item)
       if (i >= 0) toasts.value.splice(i, 1)
     }, 2600)
     toastTimers.add(timer)

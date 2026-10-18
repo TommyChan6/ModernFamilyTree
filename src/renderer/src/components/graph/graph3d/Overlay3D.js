@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { INK_FONTS, inkFontsReady } from '../../../lib/inkArt'
+import { guideLabelText } from '../webgl/TextGuideOverlay.js'
 
 // Transparent 2D canvas over the 3D scene: node name/age labels projected from
 // world space (distance-faded, LOD-culled) and generation-layer captions when
@@ -89,7 +90,7 @@ export class Overlay3D {
       ctx.textAlign = 'right'
       ctx.textBaseline = 'middle'
       ctx.fillStyle = c.layer
-      ctx.fillText(L.label, p.x - 10, p.y)
+      ctx.fillText(guideLabelText(L.label), p.x - 10, p.y) // 'Gen 3' → 第3代 …
     }
     ctx.globalAlpha = 1
 

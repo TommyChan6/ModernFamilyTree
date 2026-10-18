@@ -6,10 +6,14 @@
 import { X0, LANE_W } from './timelineLayout.js'
 
 /** The Timeline's edit tools (rendered in the canvas-toggle "Edit" rail);
- *  `icon` is an icon name (components/ui/icons.js). */
+ *  `icon` is an icon name (components/ui/icons.js). `labelKey` / `hintKey`
+ *  are i18n keys translated where rendered; `label` / `hint` stay as the
+ *  English fallback. */
 export const TIMELINE_TOOLS = [
   {
     id: 'add',
+    labelKey: 'timeline.tools.add.label',
+    hintKey: 'timeline.tools.add.hint',
     icon: 'user-plus',
     label: 'Add',
     color: '#4caf72',
@@ -18,6 +22,8 @@ export const TIMELINE_TOOLS = [
   },
   {
     id: 'child',
+    labelKey: 'timeline.tools.child.label',
+    hintKey: 'timeline.tools.child.hint',
     icon: 'baby',
     label: 'Child',
     color: '#f5a623',
@@ -26,6 +32,8 @@ export const TIMELINE_TOOLS = [
   },
   {
     id: 'link',
+    labelKey: 'timeline.tools.link.label',
+    hintKey: 'timeline.tools.link.hint',
     icon: 'link',
     label: 'Link',
     color: '#f06292',
@@ -34,6 +42,8 @@ export const TIMELINE_TOOLS = [
   },
   {
     id: 'event',
+    labelKey: 'timeline.tools.event.label',
+    hintKey: 'timeline.tools.event.hint',
     icon: 'calendar-plus',
     label: 'Event',
     color: '#a06cf5',
@@ -42,6 +52,8 @@ export const TIMELINE_TOOLS = [
   },
   {
     id: 'retime',
+    labelKey: 'timeline.tools.retime.label',
+    hintKey: 'timeline.tools.retime.hint',
     icon: 'move-vertical',
     label: 'Retime',
     color: '#26c6da',
@@ -50,6 +62,8 @@ export const TIMELINE_TOOLS = [
   },
   {
     id: 'delete',
+    labelKey: 'timeline.tools.delete.label',
+    hintKey: 'timeline.tools.delete.hint',
     icon: 'trash-2',
     label: 'Delete',
     color: '#ef5350',
@@ -138,6 +152,56 @@ export function retimeSlotValue(def, value, year) {
   }
 }
 
+/**
+ * The trait writes that shift whole lives `delta` years (the graph's and
+ * timeline's Time drag): birth AND death move together, so a life keeps its
+ * length and never inverts. One entry per person, shaped for
+ * store.setFieldValuesBatch (one atomic write = one undo step).
+ * `valueOf(personId, fieldId)` reads a stored value; a person with no birth
+ * value is dated `fallbackYear(id) + delta` (kept before their death).
+ * `unsupported` = a slot def whose type can't be retimed (custom calendars) —
+ * nothing is returned then, so a selection never moves half-way.
+ * `birthOnly` (the graph's Retime mode): only the birth moves, clamped so it
+ * never passes the death; people whose birth wouldn't change are left out.
+ */
+export function shiftLivesUpdates(
+  defs,
+  valueOf,
+  ids,
+  delta,
+  fallbackYear = () => null,
+  { birthOnly = false } = {}
+) {
+  const birthDef = defs.find((d) => d.slot === 'birth')
+  const deathDef = defs.find((d) => d.slot === 'death')
+  const none = { updates: [], unsupported: false }
+  if (!delta || !birthDef) return none
+  const updates = []
+  for (const id of ids) {
+    const b = valueOf(id, birthDef.id) ?? null
+    const by = slotYear(birthDef, b)
+    // A stored birth this module can't read (custom calendars) can't move.
+    if (b != null && by == null) return { updates: [], unsupported: true }
+    const dv = deathDef ? (valueOf(id, deathDef.id) ?? null) : null
+    const dy = deathDef ? slotYear(deathDef, dv) : null
+    const base = by ?? fallbackYear(id)
+    if (base == null) continue
+    const year =
+      by != null && !birthOnly ? base + delta : clampRetime('birth', base + delta, { end: dy })
+    if (by != null && year === by) continue // clamped against the death: no change
+    const nb = retimeSlotValue(birthDef, b, year)
+    if (nb === undefined) return { updates: [], unsupported: true }
+    const values = [{ field_id: birthDef.id, value: nb }]
+    if (!birthOnly && by != null && dy != null) {
+      const nd = retimeSlotValue(deathDef, dv, dy + delta)
+      if (nd === undefined) return { updates: [], unsupported: true }
+      values.push({ field_id: deathDef.id, value: nd })
+    }
+    updates.push({ personId: id, values })
+  }
+  return { updates, unsupported: false }
+}
+
 /** Clamp a dragged year so a life never inverts (birth ≤ death). */
 export function clampRetime(kind, year, { birth = null, end = null } = {}) {
   const y = Math.round(year)
@@ -192,4 +256,49 @@ export function traceSegments(path, people, roleOf = () => 'none') {
     })
   }
   return out
+}
+
+/**
+ * Move a group of lanes so the block lands at display slot `k` among the
+ * OTHER dated lanes. `display` = dated ids in on-screen order; `order` = the
+ * frozen lane order (it may hold undated ids, which keep their spots, and may
+ * miss newcomers, which take their on-screen spot). The group keeps its own
+ * on-screen order. Returns the new full order.
+ */
+export function moveLanes(order, display, group, k) {
+  const g = new Set(group)
+  const moving = display.filter((id) => g.has(id))
+  const known = new Set(order)
+  const full = [...order, ...display.filter((id) => !known.has(id))]
+  if (!moving.length) return full
+  const others = display.filter((id) => !g.has(id))
+  const base = full.filter((id) => !g.has(id))
+  const kk = Math.max(0, Math.min(others.length, Math.round(k)))
+  let at = base.length
+  if (kk < others.length) at = base.indexOf(others[kk])
+  else if (others.length) at = base.indexOf(others[others.length - 1]) + 1
+  base.splice(at, 0, ...moving)
+  return base
+}
+
+/**
+ * The display slot a dragged block lands in: the grabbed lane sits at world x
+ * `worldX` and is `idx` lanes into a block; `others` = lanes not moving.
+ */
+export function laneSlotAt(worldX, others, idx = 0) {
+  const k = Math.round((worldX - X0) / LANE_W) - idx
+  return Math.max(0, Math.min(others, k))
+}
+
+/** The slot a block currently occupies (how many other lanes precede it). */
+export function laneSlotOf(display, group) {
+  const g = new Set(group)
+  const first = display.findIndex((id) => g.has(id))
+  return first < 0 ? -1 : display.slice(0, first).filter((id) => !g.has(id)).length
+}
+
+export function sameOrder(a, b) {
+  if (!a || !b || a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+  return true
 }

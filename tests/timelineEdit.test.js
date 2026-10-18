@@ -5,9 +5,14 @@ import {
   insertLane,
   slotYear,
   retimeSlotValue,
+  shiftLivesUpdates,
   clampRetime,
   spanFromDrag,
-  traceSegments
+  traceSegments,
+  moveLanes,
+  laneSlotAt,
+  laneSlotOf,
+  sameOrder
 } from '../src/renderer/src/components/timeline/timelineEdit.js'
 import { X0, LANE_W } from '../src/renderer/src/components/timeline/timelineLayout.js'
 
@@ -141,5 +146,135 @@ describe('traceSegments', () => {
     )
     expect(segs).toHaveLength(1)
     expect(segs[0].year).toBe((1945 + 2010) / 2)
+  })
+})
+
+describe('moving lanes', () => {
+  const display = ['a', 'b', 'c', 'd']
+  const order = ['a', 'u', 'b', 'c', 'd'] // 'u' = undated
+
+  it('moves one lane to any slot among the others', () => {
+    expect(moveLanes(order, display, ['d'], 0)).toEqual(['d', 'a', 'u', 'b', 'c'])
+    expect(moveLanes(order, display, ['a'], 3)).toEqual(['u', 'b', 'c', 'd', 'a'])
+    expect(moveLanes(order, display, ['a'], 1)).toEqual(['u', 'b', 'a', 'c', 'd'])
+    expect(moveLanes(order, display, ['b'], 1)).toEqual(order)
+  })
+  it('moves a selected block together, keeping its order', () => {
+    expect(moveLanes(order, display, ['d', 'a'], 1)).toEqual(['u', 'b', 'a', 'd', 'c'])
+  })
+  it('adopts newcomers missing from the frozen order', () => {
+    expect(moveLanes(['a', 'b'], ['a', 'b', 'n'], ['n'], 0)).toEqual(['n', 'a', 'b'])
+  })
+  it('finds slots from world x and from the current block', () => {
+    expect(laneSlotAt(X0 + LANE_W * 2.4, 3)).toBe(2)
+    expect(laneSlotAt(X0 + LANE_W * 9, 3)).toBe(3)
+    expect(laneSlotAt(X0 - 500, 3)).toBe(0)
+    expect(laneSlotAt(X0 + LANE_W * 2, 3, 1)).toBe(1)
+    expect(laneSlotOf(display, ['c'])).toBe(2)
+    expect(laneSlotOf(display, ['d', 'b'])).toBe(1)
+    expect(sameOrder(['a'], ['a'])).toBe(true)
+    expect(sameOrder(['a', 'b'], ['b', 'a'])).toBe(false)
+  })
+})
+
+describe('shiftLivesUpdates (Time drag)', () => {
+  const defs = [
+    { id: 'fb', slot: 'birth', type: 'date' },
+    { id: 'fd', slot: 'death', type: 'date' }
+  ]
+  const store = {
+    a: { fb: Y(1900, { month: 3, day: 4, precision: 'day' }), fd: Y(1960) },
+    b: { fb: Y(1950) },
+    c: { fd: Y(1930) },
+    d: {}
+  }
+  const valueOf = (id, fid) => store[id]?.[fid]
+
+  it('moves birth and death together, keeping month/day precision', () => {
+    const { updates, unsupported } = shiftLivesUpdates(defs, valueOf, ['a', 'b'], 5)
+    expect(unsupported).toBe(false)
+    expect(updates).toEqual([
+      {
+        personId: 'a',
+        values: [
+          { field_id: 'fb', value: Y(1905, { month: 3, day: 4, precision: 'day' }) },
+          { field_id: 'fd', value: Y(1965) }
+        ]
+      },
+      { personId: 'b', values: [{ field_id: 'fb', value: Y(1955) }] }
+    ])
+  })
+
+  it('dates an undated birth from the fallback year, kept before a known death', () => {
+    const { updates } = shiftLivesUpdates(defs, valueOf, ['c', 'd'], 10, () => 1925)
+    expect(updates).toEqual([
+      { personId: 'c', values: [{ field_id: 'fb', value: Y(1930) }] },
+      { personId: 'd', values: [{ field_id: 'fb', value: Y(1935) }] }
+    ])
+    // No fallback → people without a birth are skipped
+    expect(shiftLivesUpdates(defs, valueOf, ['d'], 3).updates).toEqual([])
+  })
+
+  it('does nothing for a zero shift or a project without a birth slot', () => {
+    expect(shiftLivesUpdates(defs, valueOf, ['a'], 0).updates).toEqual([])
+    expect(shiftLivesUpdates([], valueOf, ['a'], 4).updates).toEqual([])
+  })
+
+  it('refuses the whole batch when a slot type cannot be retimed', () => {
+    const custom = [{ id: 'fb', slot: 'birth', type: 'custom_date' }]
+    expect(shiftLivesUpdates(custom, valueOf, ['a', 'b'], 2)).toEqual({
+      updates: [],
+      unsupported: true
+    })
+  })
+
+  it('shifts number-typed slots too', () => {
+    const nums = [
+      { id: 'nb', slot: 'birth', type: 'number' },
+      { id: 'nd', slot: 'death', type: 'number_range' }
+    ]
+    const vals = { p: { nb: 1800, nd: { a: 1860, b: 1864 } } }
+    const { updates } = shiftLivesUpdates(nums, (id, f) => vals[id]?.[f], ['p'], -20)
+    expect(updates[0].values).toEqual([
+      { field_id: 'nb', value: 1780 },
+      { field_id: 'nd', value: { a: 1840, b: 1844 } }
+    ])
+  })
+})
+
+describe('shiftLivesUpdates birthOnly (graph Retime mode)', () => {
+  const defs = [
+    { id: 'fb', slot: 'birth', type: 'date' },
+    { id: 'fd', slot: 'death', type: 'date' }
+  ]
+  const vals = {
+    a: { fb: Y(1900, { month: 5, precision: 'month' }), fd: Y(1960) },
+    b: { fb: Y(1950) },
+    c: { fb: Y(1958), fd: Y(1960) }
+  }
+  const valueOf = (id, fid) => vals[id]?.[fid]
+  const opt = { birthOnly: true }
+
+  it('moves only the birth, keeping its precision; death stays put', () => {
+    const { updates } = shiftLivesUpdates(defs, valueOf, ['a', 'b'], 10, () => null, opt)
+    expect(updates).toEqual([
+      {
+        personId: 'a',
+        values: [{ field_id: 'fb', value: Y(1910, { month: 5, precision: 'month' }) }]
+      },
+      { personId: 'b', values: [{ field_id: 'fb', value: Y(1960) }] }
+    ])
+  })
+
+  it('clamps a birth at the death year, and skips people already there', () => {
+    const { updates } = shiftLivesUpdates(defs, valueOf, ['a', 'c'], 80, () => null, opt)
+    expect(updates[0].values[0].value.year).toBe(1960)
+    expect(updates[1].values[0].value.year).toBe(1960)
+    vals.c.fb = Y(1960)
+    expect(shiftLivesUpdates(defs, valueOf, ['c'], 5, () => null, opt).updates).toEqual([])
+    // moving earlier is never clamped
+    expect(shiftLivesUpdates(defs, valueOf, ['c'], -5, () => null, opt).updates[0].values).toEqual([
+      { field_id: 'fb', value: Y(1955) }
+    ])
   })
 })

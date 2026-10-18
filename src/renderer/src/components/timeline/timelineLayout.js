@@ -78,6 +78,12 @@ export function computeTimelineLayout(
       dead,
       gender: p.gender,
       name: p.name || 'Unnamed',
+      // Raw parts of the label below, so the drawing code can format it in
+      // the UI language (this module stays i18n-free).
+      unnamed: !p.name,
+      bYear: p.birth.year,
+      dYear: dead ? p.death.year : null,
+      age,
       image: p.primary_image || null,
       yearsLabel: dead
         ? `${p.birth.year}–${p.death.year} · ${age} yr`

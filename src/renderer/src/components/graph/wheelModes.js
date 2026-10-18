@@ -10,6 +10,8 @@
 //   { kind: 'pin' }                  — click people to pin / release them
 //   { kind: 'end' }                  — click a bond to mark it ended
 //   { kind: 'swap' }                 — click a directed bond to flip it
+//   { kind: 'retime' }               — Birth layout: drag people up/down to
+//                                      change their birth year (death stays)
 //   null                             — empty slot (release opens the editor)
 //
 // `resolveWheelSlot` turns a stored descriptor into everything the UI needs
@@ -18,6 +20,8 @@
 // and the config editor draw identical rings.
 
 import { hasIcon } from '../ui/icons.js'
+import { translate as t } from '../../i18n'
+import { relTypeLabel, nounLabel, defaultNameLabel } from '../../lib/dataLabels'
 
 export const WHEEL_SLOT_COUNT = 8
 
@@ -55,6 +59,7 @@ const KIND_META = {
   tag: { icon: 'tag', color: '#26c6da' },
   end: { icon: 'hourglass', color: '#8a93a6' },
   swap: { icon: 'arrow-right-left', color: '#26c6da' },
+  retime: { icon: 'move-vertical', color: '#26c6da' },
   link: { icon: 'link', color: '#6c8ef5' }
 }
 
@@ -82,10 +87,17 @@ function linkTypeColor(def, graphSettings) {
  * Returns { id, kind, slot, label, icon, color, hint, empty?, disabled?, disabledHint? }
  */
 export function resolveWheelSlot(slot, env) {
-  const noun = (env.noun || 'Person').toLowerCase()
-  if (!slot || !slot.kind) {
-    return { id: 'empty', empty: true, slot: null, label: 'Add a mode…', icon: 'plus', color: null }
+  // Labels are translated here, at resolve time — callers resolve inside a
+  // computed, so a language switch re-resolves every slot.
+  const noun = nounLabel(env.noun).toLowerCase()
+  const empty = {
+    id: 'empty',
+    empty: true,
+    slot: null,
+    label: t('graphWheel.addMode'),
+    icon: 'plus'
   }
+  if (!slot || !slot.kind) return { ...empty, color: null }
   const meta = KIND_META[slot.kind] || KIND_META.link
   const base = {
     id: slot.kind,
@@ -98,58 +110,86 @@ export function resolveWheelSlot(slot, env) {
   }
   switch (slot.kind) {
     case 'add':
-      return { ...base, label: `Add ${noun}`, hint: `Click an empty spot to add a ${noun}` }
+      return {
+        ...base,
+        label: t('graphWheel.kinds.add.label', { noun }),
+        hint: t('graphWheel.kinds.add.hint', { noun })
+      }
     case 'delete':
-      return { ...base, label: 'Delete', hint: 'Click a node or bond — click again to confirm' }
+      return {
+        ...base,
+        label: t('graphWheel.kinds.delete.label'),
+        hint: t('graphWheel.kinds.delete.hint')
+      }
     case 'pin':
-      return { ...base, label: 'Pin', hint: 'Click people to pin / release them' }
+      return {
+        ...base,
+        label: t('graphWheel.kinds.pin.label'),
+        hint: t('graphWheel.kinds.pin.hint')
+      }
     case 'end':
-      return { ...base, label: 'End bond', hint: 'Click a bond to mark it ended' }
+      return {
+        ...base,
+        label: t('graphWheel.kinds.end.label'),
+        hint: t('graphWheel.kinds.end.hint')
+      }
     case 'swap':
-      return { ...base, label: 'Flip bond', hint: 'Click a directed bond to reverse it' }
+      return {
+        ...base,
+        label: t('graphWheel.kinds.swap.label'),
+        hint: t('graphWheel.kinds.swap.hint')
+      }
+    case 'retime':
+      return {
+        ...base,
+        label: t('graphWheel.kinds.retime.label'),
+        hint: t('graphWheel.kinds.retime.hint')
+      }
     case 'paint': {
       const color = slot.color || WHEEL_PAINT_COLORS[2]
       return {
         ...base,
         id: `paint:${color}`,
         color,
-        label: 'Paint',
-        hint: 'Click people to paint them — same color again clears',
+        label: t('graphWheel.kinds.paint.label'),
+        hint: t('graphWheel.kinds.paint.hint'),
         disabled: env.caps && env.caps.style === 'none',
-        disabledHint: 'Node styling needs Standard mode'
+        disabledHint: t('graphWheel.kinds.paint.disabled')
       }
     }
     case 'tag': {
       const tag = env.tagById?.get(slot.tagId)
-      if (!tag) return { id: 'empty', empty: true, slot: null, label: 'Add a mode…', icon: 'plus' }
+      if (!tag) return empty
+      const label = defaultNameLabel(tag.label)
       return {
         ...base,
         id: `tag:${tag.id}`,
         icon: iconOr(tag.icon, meta.icon),
         color: tag.color || meta.color,
-        label: tag.label,
-        hint: `Click people to toggle “${tag.label}”`,
+        label,
+        hint: t('graphWheel.kinds.tag.hint', { tag: label }),
         disabled: env.caps ? !env.caps.tags : false,
-        disabledHint: 'Tags need Standard mode'
+        disabledHint: t('graphWheel.kinds.tag.disabled')
       }
     }
     case 'link': {
       const def = env.relTypeByKey?.get(slot.type)
-      if (!def) return { id: 'empty', empty: true, slot: null, label: 'Add a mode…', icon: 'plus' }
+      if (!def) return empty
       const gated = env.caps && !env.caps.relTypePicker && def.band !== 'family'
+      const label = relTypeLabel(def)
       return {
         ...base,
         id: `link:${def.key}`,
         icon: iconOr(def.glyph, meta.icon),
         color: linkTypeColor(def, env.graphSettings),
-        label: def.label,
-        hint: `Click two people in a row to link them as ${def.label.toLowerCase()}`,
+        label,
+        hint: t('graphWheel.kinds.link.hint', { type: label.toLowerCase() }),
         disabled: !!gated,
-        disabledHint: 'This bond type needs Standard mode'
+        disabledHint: t('graphWheel.kinds.link.disabled')
       }
     }
     default:
-      return { id: 'empty', empty: true, slot: null, label: 'Add a mode…', icon: 'plus' }
+      return empty
   }
 }
 

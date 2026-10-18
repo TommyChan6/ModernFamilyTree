@@ -3,7 +3,7 @@
     <button
       class="account-chip"
       :class="{ open }"
-      :title="store.authUser.username"
+      :title="shownName"
       aria-haspopup="menu"
       :aria-expanded="open"
       @click="toggle"
@@ -26,7 +26,7 @@
         </div>
 
         <div v-if="store.authUsage" class="menu-usage">
-          <div v-for="row in usageRows" :key="row.label" class="usage-row">
+          <div v-for="row in usageRows" :key="row.id" class="usage-row">
             <div class="usage-top">
               <span class="usage-label">{{ row.label }}</span>
               <span class="usage-count">{{ row.used }} / {{ row.max }}</span>
@@ -61,11 +61,11 @@
         </button>
         <button class="menu-item" @click="openLegal">
           <UiIcon name="file-text" :size="16" />
-          Terms &amp; Privacy
+          {{ t('auth.termsPrivacy') }}
         </button>
         <button class="menu-item danger" @click="signOut">
           <UiIcon name="log-out" :size="16" />
-          Sign out
+          {{ t('account.security.signOut') }}
         </button>
       </div>
     </Transition>
@@ -75,6 +75,7 @@
 </template>
 
 <script setup>
+import { userNameLabel } from '../lib/dataLabels'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { useI18n } from '../i18n'
@@ -89,7 +90,7 @@ const open = ref(false)
 const legalOpen = ref(false)
 const rootRef = ref(null)
 
-const shownName = computed(() => store.authUser?.display_name || store.authUser?.username || '')
+const shownName = computed(() => userNameLabel(store.authUser))
 const initial = computed(() => (shownName.value[0] || '?').toUpperCase())
 // Per-username hue, overridable from the profile page (lib/avatar.js)
 const avatarStyle = computed(() => avatarStyleFor(store.authUser))
@@ -98,9 +99,27 @@ const usageRows = computed(() => {
   const u = store.authUsage
   if (!u) return []
   return [
-    { label: 'People', used: u.persons, max: u.maxPersons, ratio: u.persons / u.maxPersons },
-    { label: 'Projects', used: u.projects, max: u.maxProjects, ratio: u.projects / u.maxProjects },
-    { label: 'Photos', used: u.images, max: u.maxImages, ratio: u.images / u.maxImages }
+    {
+      id: 'people',
+      label: t('account.usage.people'),
+      used: u.persons,
+      max: u.maxPersons,
+      ratio: u.persons / u.maxPersons
+    },
+    {
+      id: 'projects',
+      label: t('account.usage.projects'),
+      used: u.projects,
+      max: u.maxProjects,
+      ratio: u.projects / u.maxProjects
+    },
+    {
+      id: 'photos',
+      label: t('account.usage.photos'),
+      used: u.images,
+      max: u.maxImages,
+      ratio: u.images / u.maxImages
+    }
   ]
 })
 

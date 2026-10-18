@@ -3,7 +3,7 @@
     <!-- Toolbar -->
     <div class="pv-toolbar">
       <div class="pv-heading">
-        <span class="pv-title">Directory</span>
+        <span class="pv-title">{{ t('rail.directory') }}</span>
         <span class="pv-count">{{ displayed.length }}</span>
       </div>
 
@@ -15,7 +15,7 @@
         </Transition>
 
         <div class="pv-search">
-          <SearchField v-model="query" placeholder="Search people…" />
+          <SearchField v-model="query" :placeholder="t('directory.toolbar.search')" />
         </div>
 
         <!-- The Sheet sorts by its own column headers; the Handscroll is
@@ -35,7 +35,7 @@
               :class="{ active: sortBy === opt.id }"
               @click="sortBy = opt.id"
             >
-              {{ opt.label }}
+              {{ t(opt.labelKey) }}
             </button>
           </div>
         </Transition>
@@ -46,7 +46,7 @@
           @click="filtersOpen = !filtersOpen"
         >
           <UiIcon name="sliders-horizontal" :size="16" />
-          Filters
+          {{ t('directory.toolbar.filters') }}
           <Transition name="pv-badge">
             <span v-if="activeFilterCount" class="pv-filter-badge">{{ activeFilterCount }}</span>
           </Transition>
@@ -58,21 +58,21 @@
     <div class="pv-filters" :class="{ open: filtersOpen }">
       <div class="pv-filters-inner">
         <div class="pv-facet">
-          <span class="pv-facet-label">Life</span>
+          <span class="pv-facet-label">{{ t('directory.filters.life') }}</span>
           <div class="pv-chips">
             <button
               class="pv-chip"
               :class="{ on: lifeFilter === 'all' }"
               @click="lifeFilter = 'all'"
             >
-              All
+              {{ t('directory.filters.all') }}
             </button>
             <button
               class="pv-chip life-living"
               :class="{ on: lifeFilter === 'living' }"
               @click="lifeFilter = lifeFilter === 'living' ? 'all' : 'living'"
             >
-              <span class="pv-chip-dot"></span>Living
+              <span class="pv-chip-dot"></span>{{ t('directory.filters.living') }}
               <span class="pv-chip-n">{{ lifeCounts.living }}</span>
             </button>
             <button
@@ -80,14 +80,14 @@
               :class="{ on: lifeFilter === 'deceased' }"
               @click="lifeFilter = lifeFilter === 'deceased' ? 'all' : 'deceased'"
             >
-              <span class="pv-chip-dot"></span>Remembered
+              <span class="pv-chip-dot"></span>{{ t('directory.filters.remembered') }}
               <span class="pv-chip-n">{{ lifeCounts.deceased }}</span>
             </button>
           </div>
         </div>
 
         <div v-if="genderOptions.length > 1" class="pv-facet">
-          <span class="pv-facet-label">Gender</span>
+          <span class="pv-facet-label">{{ t('directory.filters.gender') }}</span>
           <div class="pv-chips">
             <button
               v-for="g in genderOptions"
@@ -105,14 +105,14 @@
         </div>
 
         <div class="pv-facet">
-          <span class="pv-facet-label">Ties</span>
+          <span class="pv-facet-label">{{ t('directory.filters.ties') }}</span>
           <div class="pv-chips">
             <button
               class="pv-chip"
               :class="{ on: connFilter === 'all' }"
               @click="connFilter = 'all'"
             >
-              Everyone
+              {{ t('directory.filters.everyone') }}
             </button>
             <button
               class="pv-chip"
@@ -120,7 +120,7 @@
               @click="connFilter = connFilter === 'connected' ? 'all' : 'connected'"
             >
               <UiIcon name="link" :size="14" />
-              Connected
+              {{ t('directory.filters.connected') }}
             </button>
             <button
               class="pv-chip"
@@ -128,26 +128,26 @@
               @click="connFilter = connFilter === 'isolated' ? 'all' : 'isolated'"
             >
               <UiIcon name="unlink" :size="14" />
-              Unlinked
+              {{ t('directory.filters.unlinked') }}
             </button>
           </div>
         </div>
 
         <div v-if="store.caps.tags && tagOptions.length" class="pv-facet">
-          <span class="pv-facet-label">Groups</span>
+          <span class="pv-facet-label">{{ t('rail.groups') }}</span>
           <div class="pv-chips">
             <button
-              v-for="t in tagOptions"
-              :key="t.id"
+              v-for="tg in tagOptions"
+              :key="tg.id"
               class="pv-chip"
-              :class="{ on: tagSel.has(t.id) }"
-              :style="{ '--chip-c': t.color }"
-              @click="toggleSet(tagSel, t.id)"
+              :class="{ on: tagSel.has(tg.id) }"
+              :style="{ '--chip-c': tg.color }"
+              @click="toggleSet(tagSel, tg.id)"
             >
-              <span class="pv-chip-dot" :style="{ background: t.color }"></span>
-              <UiIcon v-if="t.icon" class="pv-chip-icon" :name="t.icon" :size="14" />
-              {{ t.label }}
-              <span class="pv-chip-n">{{ t.count }}</span>
+              <span class="pv-chip-dot" :style="{ background: tg.color }"></span>
+              <UiIcon v-if="tg.icon" class="pv-chip-icon" :name="tg.icon" :size="14" />
+              {{ defaultNameLabel(tg.label) }}
+              <span class="pv-chip-n">{{ tg.count }}</span>
             </button>
           </div>
         </div>
@@ -155,7 +155,14 @@
         <Transition name="pv-clear">
           <button v-if="activeFilterCount" class="pv-clear" @click="clearFilters">
             <UiIcon name="x" :size="14" />
-            Clear {{ activeFilterCount }} filter{{ activeFilterCount > 1 ? 's' : '' }}
+            {{
+              t(
+                activeFilterCount > 1
+                  ? 'directory.filters.clearOther'
+                  : 'directory.filters.clearOne',
+                { n: activeFilterCount }
+              )
+            }}
           </button>
         </Transition>
       </div>
@@ -179,13 +186,15 @@
           <UiIcon :name="store.persons.length ? 'search' : 'users'" :size="44" :stroke="1.5" />
         </div>
         <div class="pv-empty-title">
-          {{ store.persons.length ? 'No matches' : 'No people yet' }}
+          {{
+            store.persons.length ? t('directory.empty.noMatches') : t('directory.empty.noPeople')
+          }}
         </div>
         <div class="pv-empty-text">
           {{
             store.persons.length
-              ? 'Try a different search term.'
-              : 'Add family members from the graph view to see them here.'
+              ? t('directory.empty.noMatchesHint')
+              : t('directory.empty.noPeopleHint')
           }}
         </div>
       </div>
@@ -257,6 +266,8 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useMainStore } from '../store/index.js'
+import { useI18n } from '../i18n'
+import { genderLabel, defaultNameLabel } from '../lib/dataLabels'
 import PersonCard from './people/PersonCard.vue'
 import CardStylePicker from './people/CardStylePicker.vue'
 import ViewModeSwitch from './people/ViewModeSwitch.vue'
@@ -278,6 +289,7 @@ import { useDragScroll } from './people/useDragScroll.js'
 import { ageOf, CARD_W, CARD_H, GAP, PAD } from './people/peopleLayout.js'
 
 const store = useMainStore()
+const { t } = useI18n()
 
 const refYear = computed(() => store.currentDate?.year ?? new Date().getFullYear())
 
@@ -302,9 +314,9 @@ const OWN_ORDER = new Set(['sheet', 'handscroll'])
 const query = ref('')
 const sortBy = ref('name')
 const sortOptions = [
-  { id: 'name', label: 'A–Z' },
-  { id: 'birth', label: 'Year' },
-  { id: 'age', label: 'Age' }
+  { id: 'name', labelKey: 'directory.sort.name' },
+  { id: 'birth', labelKey: 'directory.sort.year' },
+  { id: 'age', labelKey: 'directory.sort.age' }
 ]
 
 // ── Filters ───────────────────────────────────────────────────────────────
@@ -321,11 +333,18 @@ const isDeceased = (p) => !!(p.death && (p.death.year != null || p.death.precisi
 
 const genderKey = (p) => (p.gender || '').trim().toLowerCase()
 function genderMeta(k) {
-  if (k === 'male') return { label: 'Male', color: store.graphSettings.maleColor, icon: 'mars' }
-  if (k === 'female')
-    return { label: 'Female', color: store.graphSettings.femaleColor, icon: 'venus' }
+  if (k === 'male') {
+    return { label: genderLabel('male'), color: store.graphSettings.maleColor, icon: 'mars' }
+  }
+  if (k === 'female') {
+    return { label: genderLabel('female'), color: store.graphSettings.femaleColor, icon: 'venus' }
+  }
   if (k === '') {
-    return { label: 'Unknown', color: store.graphSettings.unknownColor, icon: 'circle-help' }
+    return {
+      label: t('directory.filters.unknown'),
+      color: store.graphSettings.unknownColor,
+      icon: 'circle-help'
+    }
   }
   return {
     label: k[0].toUpperCase() + k.slice(1),

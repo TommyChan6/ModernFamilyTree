@@ -1,25 +1,18 @@
 import * as THREE from 'three'
+import { POP_DUR, POP_OVERSHOOT } from './popAnim.js'
+import { NODE_SHAPES, nodeShapeId, shapeAnchor } from './nodeShapes.js'
 
 // Half-extent of each node quad, in units of the node radius. The shape (radius r)
 // sits at corner-distance 1/QUAD_SCALE; the surrounding margin holds the drop shadow,
 // selection ring, glow and decor ornaments.
 export const QUAD_SCALE = 1.6
 
-// Shape ids consumed by the fragment shader's SDF switch (uShape).
-export const NODE_SHAPES = [
-  'circle',
-  'square',
-  'diamond',
-  'hexagon',
-  'shield',
-  'oval',
-  'octagon',
-  'heart'
-]
-export function nodeShapeId(name) {
-  const i = NODE_SHAPES.indexOf(name)
-  return i < 0 ? 0 : i
-}
+// Shape ids live in nodeShapes.js (pure, shared with the overlay + tests).
+export { NODE_SHAPES, nodeShapeId }
+
+// The gravestone's base sits on the node point: its quad is raised by `lift`
+// radii, so in corner units (-1..1 across the quad) the base is at +STONE_BASE.
+const STONE_BASE = shapeAnchor('gravestone').lift / QUAD_SCALE
 
 // Decor ids (uDecor): procedural ornaments drawn around the shape rim.
 // 'enso' is not a rim ornament: it switches the node to the 水墨 ink-wash roundel
@@ -66,10 +59,29 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
       uInkColor: { value: new THREE.Color(0x1f1b16) }, // ensō / brush ink
       uInkPaper: { value: new THREE.Color(0xece3cf) }, // portrait highlight tone
       uSealColor: { value: new THREE.Color(0xb3352a) }, // cinnabar selection seal
-      uBloomDur: { value: 1.3 }
+      uBloomDur: { value: 1.3 },
+      uPopDur: { value: POP_DUR }, // appear-pop length (s) — popAnim.js
+      // Screen-space billboarding: nodes are drawn as upright cards around their
+      // projected point, so under the perspective tilt they stand up (and shrink
+      // with distance) instead of lying flat on the ground plane.
+      uViewScale: { value: new THREE.Vector2(2, -2) }, // (2/W, -2/H) px -> clip
+      uZoom: { value: 1 }, // camera k (world -> px)
+      uLift: { value: 0 }, // shape stands on its point (radii; gravestone)
+      uFog: { value: 0 }, // tilt depth haze 0..1
+      // Gravestone materials (theme-set by NodeLayer).
+      uStoneColor: { value: new THREE.Color(0x8d939f) },
+      uSoilColor: { value: new THREE.Color(0x3a2f26) },
+      uGrassColor: { value: new THREE.Color(0x56803c) },
+      uMossColor: { value: new THREE.Color(0x667f3a) },
+      uFrameColor: { value: new THREE.Color(0xb48a52) }
     },
     vertexShader: /* glsl */ `
       // Three injects: in vec3 position; (the quad corner in [-1,1]) + matrices.
+      uniform vec2 uViewScale;
+      uniform float uZoom;
+      uniform float uLift;
+      uniform float uTime;
+      uniform float uPopDur;
       in vec2 iPos;
       in float iRadius;
       in vec3 iFill;
@@ -81,6 +93,7 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
       in float iGlow;       // 0..1 hover/select glow amount
       in float iAvatar;     // atlas layer index, or -1
       in float iBorn;       // ink bloom birth time (uTime clock; very negative = settled)
+      in float iPop;        // appear-pop start (uTime clock; very negative = settled)
 
       out vec2 vCorner;     // -1..1 across the quad
       out vec3 vFill;
@@ -93,6 +106,7 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
       out float vAvatar;
       out float vSeed;      // stable per-instance phase for decor animation
       out float vBorn;
+      out float vDepth;     // tilt depth (clip w): 1 = centre line, >1 receding
 
       void main() {
         vBorn = iBorn;
@@ -106,8 +120,23 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
         vGlow = iGlow;
         vAvatar = iAvatar;
         vSeed = fract(float(gl_InstanceID) * 0.61803398875);
-        vec2 world = iPos + position.xy * (iRadius * ${QUAD_SCALE.toFixed(4)});
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(world, 0.0, 1.0);
+        // Project the node POINT, then grow the quad around it in screen space.
+        // Adding the offset in clip space lets the GPU's divide by w apply the
+        // perspective shrink for free; with no tilt (w = 1) this is exactly the old
+        // world-space quad. uLift raises standing shapes so they rest ON the point.
+        vec4 c = projectionMatrix * modelViewMatrix * vec4(iPos, 0.0, 1.0);
+        vec2 offPx = (position.xy * ${QUAD_SCALE.toFixed(4)} - vec2(0.0, uLift)) * iRadius * uZoom;
+        // A newcomer pops in: easeOutBack from nothing, ~15% past full size,
+        // settling at 1 (popAnim.popScale). Scaling the whole offset grows the
+        // shape around its anchor, so standing shapes rise from their foot.
+        if (iPop > -100.0) {
+          float pk = clamp((uTime - iPop) / uPopDur, 0.0, 1.0);
+          float pq = pk - 1.0;
+          offPx *= 1.0 + ${(POP_OVERSHOOT + 1).toFixed(2)} * pq * pq * pq + ${POP_OVERSHOOT.toFixed(2)} * pq * pq;
+        }
+        c.xy += offPx * uViewScale;
+        gl_Position = c;
+        vDepth = c.w;
       }
     `,
     fragmentShader: /* glsl */ `
@@ -132,8 +161,15 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
       uniform vec3 uInkPaper;
       uniform vec3 uSealColor;
       uniform float uBloomDur;
+      uniform float uFog;
+      uniform vec3 uStoneColor;
+      uniform vec3 uSoilColor;
+      uniform vec3 uGrassColor;
+      uniform vec3 uMossColor;
+      uniform vec3 uFrameColor;
 
       in float vBorn;
+      in float vDepth;
       in vec2 vCorner;
       in vec3 vFill;
       in vec3 vBorder;
@@ -207,6 +243,20 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
         return sdHeartRaw(q) * s;
       }
 
+      // Headstone standing on its base (+YB): a round-arched upright on a slightly
+      // wider plinth. Proportions in shape radii (R).
+      const float YB = ${STONE_BASE.toFixed(4)};
+      const float ST_HW = 0.70 * R;            // upright half-width (= arch radius)
+      const float ST_TOP = YB - 1.85 * R;      // crown
+      const float ST_ARC = ST_TOP + ST_HW;     // arch centre
+      const float ST_PLINTH = YB - 0.16 * R;   // top of the plinth
+      float sdStone(vec2 p) {
+        float arch = length(p - vec2(0.0, ST_ARC)) - ST_HW;
+        float slab = sdBox(p - vec2(0.0, (ST_ARC + ST_PLINTH) * 0.5), vec2(ST_HW, (ST_PLINTH - ST_ARC) * 0.5), 0.0);
+        float plinth = sdBox(p - vec2(0.0, YB - 0.08 * R), vec2(ST_HW * 1.18, 0.08 * R), 0.03 * R);
+        return min(min(arch, slab), plinth);
+      }
+
       // shapeSD returns the signed distance; also outputs the avatar UV zoom
       // (shapes that poke past R need a slightly wider photo crop).
       float shapeSD(vec2 p, out float ext) {
@@ -219,6 +269,7 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
         if (s == 5) { ext = 1.18; vec2 q = p / vec2(1.18, 0.86); return (length(q) - R) * 0.86; }
         if (s == 6) { ext = 1.04; return sdOctogon(p, R * 0.99); }
         if (s == 7) { ext = 1.06; return sdHeart(p); }
+        if (s == 8) { ext = 1.0; return sdStone(p); }
         return length(p) - R;
       }
 
@@ -401,38 +452,137 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
         return col;
       }
 
+      // ── Gravestone ─────────────────────────────────────────────────────────
+      // A weathered granite headstone planted in a little mound of earth: grain
+      // and speckle, a lit bevel (light from the upper left), a bronze-framed
+      // portrait cameo, two engraved inscription grooves, moss creeping up from
+      // the foot, grass blades in front of the plinth and a long soft shadow cast
+      // across the ground. Tinted by a whisper of the person's colour.
+      vec4 stoneNode(float sd, float aa) {
+        vec2 p = vCorner;
+        float seed = vSeed * 53.0;
+
+        // ground: cast shadow, then the earth mound around the base
+        vec2 sp = (p - vec2(0.46 * R, YB + 0.04 * R)) / vec2(1.05 * R, 0.13 * R);
+        float castSh = (1.0 - smoothstep(0.25, 1.0, length(sp))) * uShadowStrength * 1.5;
+        vec4 col = vec4(uShadowColor, castSh);
+        vec2 mp = (p - vec2(0.0, YB + 0.03 * R)) / vec2(1.02 * R, 0.17 * R);
+        float mound = 1.0 - smoothstep(0.82, 1.0, length(mp));
+        vec3 soil = uSoilColor * (0.78 + 0.44 * iFbm(p * 16.0 + seed));
+        col = over(vec4(soil, mound * 0.96), col);
+
+        // stone body (edges chipped a touch by noise)
+        float sdw = sd + (iNoise(p * 34.0 + seed) - 0.5) * 0.014 * R;
+        float inside = 1.0 - smoothstep(-aa, aa, sdw);
+        vec3 base = mix(uStoneColor, vFill, 0.16);
+        float gran = iFbm(p * 19.0 + seed);
+        float speck = step(0.86, iHash(floor(p * 95.0) + seed));
+        vec3 stone = base * (0.84 + 0.26 * gran) + speck * 0.06;
+        stone *= mix(1.12, 0.84, smoothstep(ST_TOP, YB, p.y)); // brighter crown
+        // bevel from the SDF gradient: lit upper-left rim, shaded lower-right
+        vec2 e = vec2(0.004, 0.0);
+        vec2 n = normalize(vec2(sdStone(p + e.xy) - sdStone(p - e.xy),
+                                sdStone(p + e.yx) - sdStone(p - e.yx)) + 1e-6);
+        float bevel = 1.0 - smoothstep(0.0, 0.11 * R, -sd);
+        stone *= 1.0 + bevel * dot(n, normalize(vec2(-0.6, -0.8))) * 0.34;
+
+        // moss creeping up from the foot (amount varies per stone)
+        float mossAmt = 0.2 + 0.8 * fract(vSeed * 7.31);
+        float moss = smoothstep(0.52, 0.78, iFbm(p * 7.5 + seed * 1.7))
+                   * smoothstep(YB - 1.0 * R, YB - 0.05 * R, p.y) * mossAmt;
+        stone = mix(stone, uMossColor * (0.8 + 0.4 * gran), moss * 0.75);
+
+        // portrait cameo in a bronze oval frame
+        vec2 cc = vec2(0.0, ST_TOP + 0.66 * R);
+        vec2 cr = vec2(0.40 * R, 0.48 * R);
+        float co = (length((p - cc) / cr) - 1.0) * min(cr.x, cr.y);
+        float frameW = 0.05 * R;
+        float inCameo = 1.0 - smoothstep(-frameW - aa, -frameW + aa, co);
+        float frame = (1.0 - smoothstep(frameW - aa, frameW + aa, abs(co + frameW * 0.2))) * (1.0 - inCameo);
+        vec3 cameo = vFill;
+        if (uHasAtlas == 1 && vAvatar >= 0.0) {
+          vec2 uv = (p - cc) / (2.0 * cr.y) + 0.5;
+          vec4 tex = texture(uAtlas, vec3(clamp(uv, 0.0, 1.0), vAvatar));
+          if (vAvatar >= 0.5) {
+            float L = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
+            cameo = mix(tex.rgb, vec3(L) * vec3(1.08, 0.98, 0.84), 0.28); // aged print
+          } else {
+            cameo = mix(vFill, uSilhouetteColor, tex.a);
+          }
+        }
+        stone = mix(stone, cameo, inCameo);
+        vec3 bronze = uFrameColor * (0.85 + 0.3 * smoothstep(-0.5, 0.5, dot(n, vec2(-0.6, -0.8))));
+        stone = mix(stone, bronze * (0.9 + 0.2 * iNoise(p * 60.0)), frame * 0.95);
+
+        // two engraved inscription grooves (dark cut + light lower lip)
+        float y1 = cc.y + cr.y + 0.30 * R;
+        float y2 = y1 + 0.24 * R;
+        float g1 = (1.0 - smoothstep(0.018 * R, 0.03 * R, abs(p.y - y1))) * step(abs(p.x), 0.46 * R);
+        float g2 = (1.0 - smoothstep(0.018 * R, 0.03 * R, abs(p.y - y2))) * step(abs(p.x), 0.30 * R);
+        float l1 = (1.0 - smoothstep(0.012 * R, 0.022 * R, abs(p.y - y1 - 0.04 * R))) * step(abs(p.x), 0.46 * R);
+        float l2 = (1.0 - smoothstep(0.012 * R, 0.022 * R, abs(p.y - y2 - 0.04 * R))) * step(abs(p.x), 0.30 * R);
+        stone *= 1.0 - 0.42 * max(g1, g2);
+        stone *= 1.0 + 0.16 * max(l1, l2);
+
+        col = over(vec4(stone, inside), col);
+
+        // grass blades in front of the plinth
+        float gx = p.x / R;
+        float cell = floor(gx * 11.0 + seed);
+        float hgt = (0.09 + 0.13 * iHash(vec2(cell, seed))) * R;
+        float root = YB + 0.05 * R;
+        float tt = clamp((root - p.y) / hgt, 0.0, 1.0);
+        float lean = (iHash(vec2(cell, seed + 3.0)) - 0.5) * 0.35 * tt;
+        float bx = abs(fract(gx * 11.0 + seed + lean) - 0.5);
+        float bladeW = 0.32 * (1.0 - tt);
+        float blade = (1.0 - smoothstep(bladeW - 0.08, bladeW, bx))
+                    * step(p.y, root) * step(root - hgt, p.y)
+                    * (1.0 - smoothstep(0.85, 1.05, abs(gx)));
+        vec3 grass = uGrassColor * (0.75 + 0.5 * iHash(vec2(cell, 7.0)) + 0.25 * tt);
+        col = over(vec4(grass, blade * 0.95), col);
+        return col;
+      }
+
       void main() {
         float ext;
         float sd = shapeSD(vCorner, ext);
         float aa = fwidth(sd) * 1.5 + 0.0012;
 
-        if (uInk > 0.5) {
+        // Gravestones keep their carved look in the ink theme too (re-tinted to
+        // ink-and-paper tones by NodeLayer.setInkUniforms) — an ensō hooked round
+        // a tall stone reads as a stray brush mark.
+        if (uInk > 0.5 && int(uShape + 0.5) != 8) {
           vec4 ic = inkNode(sd, ext);
-          ic.a *= vOpacity;
+          ic.a *= vOpacity * (1.0 - uFog * 0.45 * smoothstep(1.0, 2.4, vDepth));
           if (ic.a < 0.002) discard;
           fragColor = ic;
           return;
         }
 
-        // ---- drop shadow (offset soft shape, behind everything) ----
-        float extS;
-        float sds = shapeSD(vCorner - uShadowOffset, extS);
-        float shadowMask = 1.0 - smoothstep(-0.20 * R, 0.16 * R, sds);
-        vec4 col = vec4(uShadowColor, shadowMask * uShadowStrength);
-
-        // ---- fill / avatar (inside the shape) ----
+        vec4 col;
         float inside = 1.0 - smoothstep(-aa, aa, sd);
-        vec3 bodyRGB = vFill;
-        if (uHasAtlas == 1 && vAvatar >= 0.0) {
-          vec2 uv = vCorner * (0.5 / (R * ext)) + 0.5; // shape bbox -> [0,1]
-          vec4 tex = texture(uAtlas, vec3(clamp(uv, 0.0, 1.0), vAvatar));
-          if (vAvatar >= 0.5) {
-            bodyRGB = tex.rgb;                       // photo (layers >= 1)
-          } else {
-            bodyRGB = mix(vFill, uSilhouetteColor, tex.a); // silhouette glyph over fill (layer 0)
+        if (int(uShape + 0.5) == 8) {
+          col = stoneNode(sd, aa);
+        } else {
+          // ---- drop shadow (offset soft shape, behind everything) ----
+          float extS;
+          float sds = shapeSD(vCorner - uShadowOffset, extS);
+          float shadowMask = 1.0 - smoothstep(-0.20 * R, 0.16 * R, sds);
+          col = vec4(uShadowColor, shadowMask * uShadowStrength);
+
+          // ---- fill / avatar (inside the shape) ----
+          vec3 bodyRGB = vFill;
+          if (uHasAtlas == 1 && vAvatar >= 0.0) {
+            vec2 uv = vCorner * (0.5 / (R * ext)) + 0.5; // shape bbox -> [0,1]
+            vec4 tex = texture(uAtlas, vec3(clamp(uv, 0.0, 1.0), vAvatar));
+            if (vAvatar >= 0.5) {
+              bodyRGB = tex.rgb;                       // photo (layers >= 1)
+            } else {
+              bodyRGB = mix(vFill, uSilhouetteColor, tex.a); // silhouette glyph over fill (layer 0)
+            }
           }
+          col = over(vec4(bodyRGB, inside), col);
         }
-        col = over(vec4(bodyRGB, inside), col);
 
         // ---- border ring (centred on the shape edge) ----
         float bw = max(vBorderNorm, aa);
@@ -458,6 +608,9 @@ export function createNodeMaterial({ atlasTexture, pixelRatio = 1 }) {
           col = over(col, vec4(uGlowColor, hazeA)); // haze sits BEHIND the shadow/disc
           col = over(vec4(uGlowColor, hazeA * 0.35), col); // faint veil on top ties it together
         }
+
+        // ---- tilt depth haze: far nodes recede ----
+        col.a *= 1.0 - uFog * 0.45 * smoothstep(1.0, 2.4, vDepth);
 
         col.a *= vOpacity;
         if (col.a < 0.002) discard;

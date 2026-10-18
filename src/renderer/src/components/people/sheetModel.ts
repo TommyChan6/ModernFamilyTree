@@ -146,7 +146,22 @@ export function columnOffsets(cols: SheetColumn[]): {
 
 // ── Cell text ⇄ value ─────────────────────────────────────────────────────────
 
-export type ParseResult = { ok: true; value: unknown } | { ok: false; error: string }
+/** A failed parse carries an English `error` plus a stable `code` (and the
+ *  offending text as `arg`, when relevant) so the view can show it in the UI
+ *  language. */
+export type ParseErrorCode =
+  | 'notNumber'
+  | 'numRangeShape'
+  | 'numRangeNumbers'
+  | 'yesNo'
+  | 'notOption'
+  | 'dateShape'
+  | 'dateRangeShape'
+  | 'dateRangeDates'
+  | 'notEditable'
+
+export type ParseResult =
+  { ok: true; value: unknown } | { ok: false; error: string; code: ParseErrorCode; arg?: string }
 
 const TRUE_WORDS = new Set(['true', 'yes', 'y', '1', 'x', '✓', '✔', 'on', 'checked'])
 const FALSE_WORDS = new Set(['false', 'no', 'n', '0', 'off', 'unchecked'])
@@ -213,7 +228,8 @@ const YEAR_HYPHEN = /^(-?\d{1,6})-(\d{3,6})$/
 export function parseCellText(def: FieldDef, text: string): ParseResult {
   const raw = text ?? ''
   const t = raw.trim()
-  const bad = (error: string): ParseResult => ({ ok: false, error })
+  const bad = (code: ParseErrorCode, error: string, arg?: string): ParseResult =>
+    arg == null ? { ok: false, error, code } : { ok: false, error, code, arg }
   const ok = (v: unknown): ParseResult => ({ ok: true, value: coerceValue(def, v) })
   switch (def.type) {
     case 'text':
@@ -221,15 +237,16 @@ export function parseCellText(def: FieldDef, text: string): ParseResult {
     case 'number':
     case 'slider': {
       const n = parseNumberText(t, def.unit)
-      return n === undefined ? bad('Not a number') : ok(n)
+      return n === undefined ? bad('notNumber', 'Not a number') : ok(n)
     }
     case 'number_range': {
       if (t === '') return ok(null)
       const parts = splitRange(t, NUMBER_HYPHEN)
-      if (parts.length > 2) return bad('Use “low–high”')
+      if (parts.length > 2) return bad('numRangeShape', 'Use “low–high”')
       const a = parseNumberText(parts[0], def.unit)
       const b = parts.length === 2 ? parseNumberText(parts[1], def.unit) : a
-      if (a === undefined || b === undefined) return bad('Use numbers, like “10–20”')
+      if (a === undefined || b === undefined)
+        return bad('numRangeNumbers', 'Use numbers, like “10–20”')
       return ok({ a, b })
     }
     case 'boolean': {
@@ -237,7 +254,7 @@ export function parseCellText(def: FieldDef, text: string): ParseResult {
       if (w === '') return ok(null)
       if (TRUE_WORDS.has(w) || w === def.label.toLowerCase()) return ok(true)
       if (FALSE_WORDS.has(w)) return ok(false)
-      return bad('Use yes / no')
+      return bad('yesNo', 'Use yes / no')
     }
     case 'select': {
       if (t === '') return ok(null)
@@ -245,23 +262,24 @@ export function parseCellText(def: FieldDef, text: string): ParseResult {
       const opt = (def.config.options || []).find(
         (o) => o.label.trim().toLowerCase() === w || o.id === t
       )
-      return opt ? ok(opt.id) : bad(`“${t}” isn't an option`)
+      return opt ? ok(opt.id) : bad('notOption', `“${t}” isn't an option`, t)
     }
     case 'date': {
       const d = parseDateText(t)
-      return d === undefined ? bad('Use a year, or YYYY-MM-DD') : ok(d)
+      return d === undefined ? bad('dateShape', 'Use a year, or YYYY-MM-DD') : ok(d)
     }
     case 'date_range': {
       if (t === '') return ok(null)
       const parts = splitRange(t, YEAR_HYPHEN)
-      if (parts.length > 2) return bad('Use “from–to”')
+      if (parts.length > 2) return bad('dateRangeShape', 'Use “from–to”')
       const from = parseDateText(parts[0])
       const to = parts.length === 2 ? parseDateText(parts[1]) : null
-      if (from === undefined || to === undefined) return bad('Use dates, like “1950–1960”')
+      if (from === undefined || to === undefined)
+        return bad('dateRangeDates', 'Use dates, like “1950–1960”')
       return ok({ from, to })
     }
     default:
-      return bad('This trait type can’t be edited here yet')
+      return bad('notEditable', 'This trait type can’t be edited here yet')
   }
 }
 

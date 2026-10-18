@@ -767,6 +767,9 @@ export class FactionsRenderer {
       this.inkNodes.setTime(time)
       this.mist.setTime(time)
     }
+    // Person nodes are NodeMaterial billboards sized in screen px (uViewScale,
+    // scaled by the camera zoom) — keep them in step with the view.
+    this.nodes.setView(this.width || 1, this.height || 1, t.k, 0, 0)
     this.renderer.render(this.scene, this.camera)
 
     if (this._tweening || entranceActive || this._ambient) this.requestRedraw()
@@ -838,6 +841,7 @@ export class FactionsRenderer {
         new THREE.Vector3(transform.k, transform.k, 1)
       )
       this.world.matrixWorldNeedsUpdate = true
+      this.nodes.setView(width, height, transform.k, 0, 0)
       this.renderer.render(this.scene, this.camera)
 
       const out = document.createElement('canvas')

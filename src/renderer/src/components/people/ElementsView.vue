@@ -2,8 +2,8 @@
   <div class="elx">
     <div v-if="!persons.length" class="elx-empty">
       <div class="elx-empty-icon"><UiIcon name="atom" :size="44" :stroke="1.5" /></div>
-      <div class="elx-empty-title">No elements discovered</div>
-      <div class="elx-empty-text">No people match — clear the search or add someone.</div>
+      <div class="elx-empty-title">{{ t('directory.elements.emptyTitle') }}</div>
+      <div class="elx-empty-text">{{ t('directory.elements.emptyText') }}</div>
     </div>
 
     <template v-else>
@@ -23,10 +23,10 @@
               class="elx-big-moon"
               name="moon"
               :size="14"
-              label="Deceased"
+              :label="t('directory.elements.deceased')"
             />
             <div class="elx-big-sym" :data-len="symLen(featured.sym)">{{ featured.sym }}</div>
-            <div class="elx-big-name">{{ featured.p.name || 'Unnamed' }}</div>
+            <div class="elx-big-name">{{ featured.p.name || t('directory.elements.unnamed') }}</div>
             <div class="elx-big-mass">{{ featured.mass }}</div>
           </div>
           <div class="elx-portrait">
@@ -34,45 +34,45 @@
           </div>
           <div class="elx-facts">
             <div class="elx-facts-title">
-              {{ featured.p.name || 'Unnamed' }}
+              {{ featured.p.name || t('directory.elements.unnamed') }}
               <span class="elx-facts-cat">{{ featured.catLabel }}</span>
             </div>
             <div v-if="featured.sub" class="elx-facts-sub">{{ featured.sub }}</div>
             <dl class="elx-stats">
               <div>
-                <dt>Born</dt>
+                <dt>{{ t('directory.elements.stats.born') }}</dt>
                 <dd>{{ featured.born }}</dd>
               </div>
               <div>
-                <dt>Died</dt>
+                <dt>{{ t('directory.elements.stats.died') }}</dt>
                 <dd>{{ featured.died }}</dd>
               </div>
               <div>
-                <dt>Age</dt>
+                <dt>{{ t('directory.elements.stats.age') }}</dt>
                 <dd>{{ featured.age }}</dd>
               </div>
               <div>
-                <dt>Kin</dt>
+                <dt>{{ t('directory.elements.stats.kin') }}</dt>
                 <dd>{{ featured.kin }}</dd>
               </div>
               <div>
-                <dt>Children</dt>
+                <dt>{{ t('directory.elements.stats.children') }}</dt>
                 <dd>{{ featured.children }}</dd>
               </div>
               <div>
-                <dt>Group</dt>
+                <dt>{{ t('directory.elements.stats.group') }}</dt>
                 <dd>{{ featured.group }}</dd>
               </div>
             </dl>
             <div v-if="featured.tags.length" class="elx-tags">
               <span
-                v-for="t in featured.tags"
-                :key="t.id"
+                v-for="tg in featured.tags"
+                :key="tg.id"
                 class="elx-tag"
-                :style="{ '--tc': t.color || 'var(--accent)' }"
+                :style="{ '--tc': tg.color || 'var(--accent)' }"
               >
-                <UiIcon v-if="t.icon" :name="t.icon" :size="12" />
-                {{ t.label }}
+                <UiIcon v-if="tg.icon" :name="tg.icon" :size="12" />
+                {{ defaultNameLabel(tg.label) }}
               </span>
             </div>
           </div>
@@ -80,8 +80,8 @@
 
         <div class="elx-side">
           <div class="elx-controls">
-            <div class="elx-seg" role="group" aria-label="Group columns by">
-              <span class="elx-seg-label">Groups</span>
+            <div class="elx-seg" role="group" :aria-label="t('directory.elements.groupByAria')">
+              <span class="elx-seg-label">{{ t('directory.elements.groupsLabel') }}</span>
               <button
                 v-for="g in GROUPINGS"
                 :key="g.id"
@@ -89,11 +89,11 @@
                 :class="{ on: grouping === g.id }"
                 @click="setGrouping(g.id)"
               >
-                {{ g.label }}
+                {{ t('directory.elements.groupings.' + g.id) }}
               </button>
             </div>
-            <div class="elx-seg" role="group" aria-label="Colour tiles by">
-              <span class="elx-seg-label">Colour</span>
+            <div class="elx-seg" role="group" :aria-label="t('directory.elements.colourByAria')">
+              <span class="elx-seg-label">{{ t('directory.elements.colourLabel') }}</span>
               <button
                 v-for="c in COLORINGS"
                 :key="c.id"
@@ -101,7 +101,7 @@
                 :class="{ on: coloring === c.id }"
                 @click="setColoring(c.id)"
               >
-                {{ c.label }}
+                {{ t('directory.elements.colorings.' + c.id) }}
               </button>
             </div>
           </div>
@@ -122,8 +122,13 @@
             </button>
           </div>
           <div class="elx-hint">
-            {{ persons.length }} elements · {{ layout.columns.length }} groups ·
-            {{ layout.maxRows }} periods — hover to inspect, click to open
+            {{
+              t('directory.elements.hint', {
+                elements: persons.length,
+                groups: layout.columns.length,
+                periods: layout.maxRows
+              })
+            }}
           </div>
         </div>
       </header>
@@ -160,28 +165,34 @@
           </div>
 
           <div
-            v-for="t in tiles"
-            :key="t.p.id"
+            v-for="tl in tiles"
+            :key="tl.p.id"
             class="el"
             :class="{
-              enter: t.enter,
-              pop: t.pop,
-              dead: t.dead,
-              selected: store.selectedPersonId === t.p.id,
-              lit: activeCat && t.cat === activeCat,
-              dim: activeCat && t.cat !== activeCat
+              enter: tl.enter,
+              pop: tl.pop,
+              dead: tl.dead,
+              selected: store.selectedPersonId === tl.p.id,
+              lit: activeCat && tl.cat === activeCat,
+              dim: activeCat && tl.cat !== activeCat
             }"
-            :style="t.style"
-            @pointerenter="onTileEnter(t.p.id)"
+            :style="tl.style"
+            @pointerenter="onTileEnter(tl.p.id)"
             @pointerleave="onTileLeave"
-            @click="select(t.p.id)"
+            @click="select(tl.p.id)"
           >
             <div class="el-in">
-              <span class="el-num">{{ t.no }}</span>
-              <UiIcon v-if="t.dead" class="el-moon" name="moon" :size="12" label="Deceased" />
-              <div class="el-sym" :data-len="symLen(t.sym)">{{ t.sym }}</div>
-              <div class="el-name">{{ t.p.name || 'Unnamed' }}</div>
-              <div class="el-mass">{{ t.mass }}</div>
+              <span class="el-num">{{ tl.no }}</span>
+              <UiIcon
+                v-if="tl.dead"
+                class="el-moon"
+                name="moon"
+                :size="12"
+                :label="t('directory.elements.deceased')"
+              />
+              <div class="el-sym" :data-len="symLen(tl.sym)">{{ tl.sym }}</div>
+              <div class="el-name">{{ tl.p.name || t('directory.elements.unnamed') }}</div>
+              <div class="el-mass">{{ tl.mass }}</div>
             </div>
           </div>
         </div>
@@ -193,6 +204,8 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, h } from 'vue'
 import { useMainStore } from '../../store/index.js'
+import { useI18n } from '../../i18n'
+import { defaultNameLabel } from '../../lib/dataLabels'
 import { isDeceased, ageOf } from './peopleLayout.js'
 import { useThumbnail } from './useThumbnail.js'
 import UiIcon from '../ui/UiIcon.js'
@@ -224,6 +237,7 @@ const props = defineProps({
 })
 
 const store = useMainStore()
+const { t } = useI18n()
 const scrollEl = ref(null)
 
 const reduceMotion =
@@ -232,16 +246,10 @@ const reduceMotion =
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // ── Remembered controls ─────────────────────────────────────────────────────
-const GROUPINGS = [
-  { id: 'decade', label: 'Birth decade' },
-  { id: 'generation', label: 'Generation' },
-  { id: 'tag', label: 'Group tag' }
-]
-const COLORINGS = [
-  { id: 'gender', label: 'Gender' },
-  { id: 'life', label: 'Life status' },
-  { id: 'group', label: 'Group' }
-]
+// Labels are translated at render time by id (directory.elements.groupings.* /
+// directory.elements.colorings.*).
+const GROUPINGS = [{ id: 'decade' }, { id: 'generation' }, { id: 'tag' }]
+const COLORINGS = [{ id: 'gender' }, { id: 'life' }, { id: 'group' }]
 function loadPref(key, allowed, fallback) {
   try {
     const v = localStorage.getItem('elements.' + key)
@@ -316,29 +324,29 @@ function catOf(p) {
     if (isDeceased(p, props.refYear)) return 'dead'
     return ageOf(p, props.refYear) != null ? 'living' : 'unknown'
   }
-  const t = store.tagsOf.get(p.id)?.[0]
-  return t ? 't' + t.id : 'none'
+  const tg = store.tagsOf.get(p.id)?.[0]
+  return tg ? 't' + tg.id : 'none'
 }
 const catMeta = computed(() => {
   const m = new Map()
   if (coloring.value === 'gender') {
-    m.set('male', { label: 'Male', color: genderColor('male') })
-    m.set('female', { label: 'Female', color: genderColor('female') })
-    m.set('other', { label: 'Other / unknown', color: genderColor('') })
+    m.set('male', { label: t('data.gender.male'), color: genderColor('male') })
+    m.set('female', { label: t('data.gender.female'), color: genderColor('female') })
+    m.set('other', { label: t('directory.elements.cats.other'), color: genderColor('') })
   } else if (coloring.value === 'life') {
-    m.set('living', { label: 'Living', color: 'var(--green)' })
-    m.set('dead', { label: 'Deceased', color: 'var(--t3)' })
-    m.set('unknown', { label: 'Undated', color: 'var(--amber)' })
+    m.set('living', { label: t('directory.elements.cats.living'), color: 'var(--green)' })
+    m.set('dead', { label: t('directory.elements.cats.deceased'), color: 'var(--t3)' })
+    m.set('unknown', { label: t('directory.elements.cats.undated'), color: 'var(--amber)' })
   } else {
     const seen = new Map()
     for (const p of props.persons) {
-      const t = store.tagsOf.get(p.id)?.[0]
-      if (t && !seen.has(t.id)) seen.set(t.id, t)
+      const tg = store.tagsOf.get(p.id)?.[0]
+      if (tg && !seen.has(tg.id)) seen.set(tg.id, tg)
     }
     const list = [...seen.values()].sort((a, b) => (a.label || '').localeCompare(b.label || ''))
-    for (const t of list)
-      m.set('t' + t.id, { label: t.label || 'Tag', color: t.color || 'var(--accent)' })
-    m.set('none', { label: 'Untagged', color: 'var(--t3)' })
+    for (const tg of list)
+      m.set('t' + tg.id, { label: tagName(tg), color: tg.color || 'var(--accent)' })
+    m.set('none', { label: t('directory.elements.cats.untagged'), color: 'var(--t3)' })
   }
   return m
 })
@@ -551,7 +559,8 @@ function massOf(p, dead) {
   const age = ageOf(p, props.refYear)
   if (age == null) return dead ? '[?]' : '—'
   // Decayed elements get the bracketed "most stable isotope" mass.
-  return dead ? `[${age} yr]` : `${age} yr`
+  const yr = t('directory.elements.massYears', { age })
+  return dead ? `[${yr}]` : yr
 }
 
 const tiles = computed(() => {
@@ -619,8 +628,27 @@ const tiles = computed(() => {
 })
 
 const unknownLabel = computed(() =>
-  grouping.value === 'tag' ? 'Untagged' : grouping.value === 'decade' ? 'Undated' : '?'
+  grouping.value === 'tag'
+    ? t('directory.elements.cats.untagged')
+    : grouping.value === 'decade'
+      ? t('directory.elements.cats.undated')
+      : '?'
 )
+// A column descriptor's display label. The pure layout emits English labels
+// ('Gen 3', '1950s', tag names); translate from the numeric order / tag here.
+function tagName(tg) {
+  return defaultNameLabel(tg?.label) || t('directory.elements.tagFallback')
+}
+function colLabel(g) {
+  if (!g || g.unknown) return unknownLabel.value
+  if (typeof g.order === 'number' && g.key.startsWith('g'))
+    return t('directory.elements.gen', { n: g.order })
+  if (typeof g.order === 'number' && g.key.startsWith('d')) {
+    const d = g.order
+    return t('directory.elements.decade', { d: d < 0 ? '−' + -d : d })
+  }
+  return g.label ? defaultNameLabel(g.label) : t('directory.elements.tagFallback')
+}
 const ghostStyle = computed(() => {
   const M = morph.value
   if (M && M.phase === 'from')
@@ -647,7 +675,7 @@ const headers = computed(() => {
     const col = L.columns[c]
     out.push({
       key: grouping.value + '|' + col.key,
-      label: col.unknown ? unknownLabel.value : col.label,
+      label: colLabel(col),
       unknown: col.unknown,
       color: col.color,
       count: col.ids.length,
@@ -690,10 +718,13 @@ function onTileLeave() {
 
 function fmtDate(dv) {
   if (!dv || dv.year == null) return ''
-  const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const M = t('directory.elements.monthsShort')
   const m = dv.month
-  if (dv.precision === 'day' && m && dv.day) return `${dv.day} ${M[m - 1]} ${dv.year}`
-  if (dv.precision === 'month' && m) return `${M[m - 1]} ${dv.year}`
+  const mon = Array.isArray(M) ? M[m - 1] : m
+  if (dv.precision === 'day' && m && dv.day)
+    return t('directory.elements.dateDay', { d: dv.day, m: mon, y: dv.year })
+  if (dv.precision === 'month' && m)
+    return t('directory.elements.dateMonth', { m: mon, y: dv.year })
   return String(dv.year)
 }
 
@@ -720,11 +751,16 @@ const featured = computed(() => {
     catLabel: catMeta.value.get(cat)?.label || '',
     sub: [p.occupation, p.location].filter(Boolean).join(' · '),
     born: fmtDate(p.birth) || '—',
-    died: dead ? fmtDate(p.death) || '—' : p.death?.year ? fmtDate(p.death) : 'Living',
-    age: age == null ? '—' : dead ? `${age} (at death)` : String(age),
+    died: dead
+      ? fmtDate(p.death) || '—'
+      : p.death?.year
+        ? fmtDate(p.death)
+        : t('directory.elements.cats.living'),
+    age: age == null ? '—' : dead ? t('directory.elements.ageAtDeath', { age }) : String(age),
     kin: stats.kin ?? 0,
     children: stats.children ?? 0,
-    group: (g ? g.label : unknownLabel.value) + (cell ? ` · P${cell.row + 1}` : ''),
+    group:
+      colLabel(g) + (cell ? ' · ' + t('directory.elements.periodShort', { n: cell.row + 1 }) : ''),
     tags: (store.tagsOf.get(p.id) || []).slice(0, 5)
   }
 })

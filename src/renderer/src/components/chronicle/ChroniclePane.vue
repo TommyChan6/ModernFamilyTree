@@ -5,13 +5,13 @@
   <div class="chp canvas-pane" @pointerdown.stop @wheel.stop @click.stop>
     <div class="chp-head">
       <span class="chp-title">
-        <UiIcon class="chp-title-ic" name="scroll-text" :size="14" />Chronicle
+        <UiIcon class="chp-title-ic" name="scroll-text" :size="14" />{{ t('chronicle.pane.title') }}
       </span>
-      <button class="chp-new" title="New era" @click="newEra">
-        <UiIcon name="plus" :size="14" />Era
+      <button class="chp-new" :title="t('chronicle.editor.newEra')" @click="newEra">
+        <UiIcon name="plus" :size="14" />{{ t('chronicle.pane.era') }}
       </button>
-      <button class="chp-new chp-new-ev" title="New event" @click="newEvent">
-        <UiIcon name="plus" :size="14" />Event
+      <button class="chp-new chp-new-ev" :title="t('chronicle.editor.newEvent')" @click="newEvent">
+        <UiIcon name="plus" :size="14" />{{ t('chronicle.pane.event') }}
       </button>
     </div>
 
@@ -21,34 +21,33 @@
         :style="{ transform: `translateX(${tab === 'events' ? 100 : 0}%)` }"
       ></span>
       <button class="chp-tab" :class="{ on: tab === 'eras' }" @click="tab = 'eras'">
-        Eras <b>{{ store.eras.length }}</b>
+        {{ t('chronicle.pane.eras') }} <b>{{ store.eras.length }}</b>
       </button>
       <button class="chp-tab" :class="{ on: tab === 'events' }" @click="tab = 'events'">
-        Events <b>{{ store.events.length }}</b>
+        {{ t('chronicle.pane.events') }} <b>{{ store.events.length }}</b>
       </button>
     </div>
 
     <!-- ── Eras ── -->
     <div v-if="tab === 'eras'" class="chp-body">
       <div class="chp-presets">
-        <span class="chp-sub">Quick start</span>
+        <span class="chp-sub">{{ t('chronicle.pane.quickStart') }}</span>
         <div class="chp-pack-row">
           <button
             v-for="(p, i) in ERA_PACKS"
             :key="p.id"
             class="chp-pack"
             :style="{ '--i': i }"
-            :title="p.hint"
+            :title="packHint(p)"
             @click="applyPack(p)"
           >
-            <UiIcon class="chp-pack-ic" :name="p.icon" :size="14" />{{ p.label }}
+            <UiIcon class="chp-pack-ic" :name="p.icon" :size="14" />{{ packLabel(p) }}
           </button>
         </div>
       </div>
       <div v-if="!eraRows.length" class="chp-empty">
         <UiIcon class="chp-empty-ic" name="hourglass" :size="24" :stroke="1.7" />
-        Name the stretches of your story — a war, a reign, a golden age — and they'll band the
-        Timeline and the Birth graph.
+        {{ t('chronicle.pane.erasEmpty') }}
       </div>
       <div class="chp-list">
         <div
@@ -60,7 +59,7 @@
         >
           <UiIcon class="chp-era-ic" :name="hasIcon(e.icon) ? e.icon : 'diamond'" :size="16" />
           <span class="chp-era-text">
-            <span class="chp-era-name">{{ e.name }}</span>
+            <span class="chp-era-name">{{ defaultNameLabel(e.name) }}</span>
             <span class="chp-era-span">{{ e.span }}</span>
             <span class="chp-era-bar">
               <span :style="{ left: e.l + '%', width: e.w + '%' }"></span>
@@ -68,8 +67,8 @@
           </span>
           <button
             class="chp-edit"
-            title="Edit era"
-            aria-label="Edit era"
+            :title="t('chronicle.editor.editEra')"
+            :aria-label="t('chronicle.editor.editEra')"
             @click.stop="store.openEraEditor({ id: e.id })"
           >
             <UiIcon name="pencil" :size="14" />
@@ -84,15 +83,11 @@
         v-if="store.events.length > 5"
         v-model="q"
         size="sm"
-        placeholder="Search events…"
+        :placeholder="t('chronicle.pane.searchPh')"
       />
       <div v-if="!eventRows.length" class="chp-empty">
         <UiIcon class="chp-empty-ic" name="swords" :size="24" :stroke="1.7" />
-        {{
-          store.events.length
-            ? 'Nothing matches.'
-            : 'Battles, coronations, migrations, first meetings — add the moments that shaped your people.'
-        }}
+        {{ store.events.length ? t('chronicle.pane.noMatch') : t('chronicle.pane.eventsEmpty') }}
       </div>
       <div class="chp-list">
         <div
@@ -106,15 +101,17 @@
         >
           <span class="chp-ev-disc"><UiIcon :name="ev.icon" :size="14" /></span>
           <span class="chp-ev-text">
-            <span class="chp-ev-title" :class="'imp-' + ev.importance">{{ ev.title }}</span>
+            <span class="chp-ev-title" :class="'imp-' + ev.importance">{{
+              defaultNameLabel(ev.title)
+            }}</span>
             <span class="chp-ev-meta">
               {{ ev.when }}<template v-if="ev.cast"> · {{ ev.cast }}</template>
             </span>
           </span>
           <button
             class="chp-edit"
-            title="Edit event"
-            aria-label="Edit event"
+            :title="t('chronicle.editor.editEvent')"
+            :aria-label="t('chronicle.editor.editEvent')"
             @click.stop="store.openEventEditor({ id: ev.id })"
           >
             <UiIcon name="pencil" :size="14" />
@@ -137,9 +134,13 @@ import { useKinship } from '../kinship/useKinship'
 import UiIcon from '../ui/UiIcon.js'
 import SearchField from '../ui/SearchField.vue'
 import { hasIcon } from '../ui/icons.js'
+import { useI18n } from '../../i18n'
+import { defaultNameLabel } from '../../lib/dataLabels'
+import { packLabel, packHint, localizeSeed } from './chronicleText.js'
 
 defineEmits(['jump', 'hover'])
 const store = useMainStore()
+const { t } = useI18n()
 const kin = useKinship()
 const tab = ref('eras')
 const q = ref('')
@@ -159,7 +160,7 @@ const eraRows = computed(() => {
       return {
         ...e,
         sort: a ?? -Infinity,
-        span: `${format(e.start) || '…'} – ${format(e.end) || 'now'}`,
+        span: `${format(e.start) || '…'} – ${format(e.end) || t('chronicle.now')}`,
         l,
         w: Math.max(2, r - l),
         jumpYear: a ?? min
@@ -191,7 +192,7 @@ const eventRows = computed(() => {
           ? format(ev.end)
             ? `${format(ev.date)}–${format(ev.end)}`
             : format(ev.date)
-          : 'undated',
+          : t('chronicle.undated'),
         cast:
           names.length > 3
             ? `${names.slice(0, 2).join(', ')} +${names.length - 2}`
@@ -221,15 +222,25 @@ function newEvent() {
 async function applyPack(p) {
   const { min, max } = range.value
   const have = new Set(store.eras.map((e) => e.name.toLowerCase()))
-  const seeds = presetEras(p.id, min, max).filter((s) => !have.has(s.name.toLowerCase()))
+  // Seeds are saved in the UI language; skip any already present under
+  // either their English or their translated name.
+  const seeds = presetEras(p.id, min, max)
+    .map((s) => ({ en: s.name, seed: localizeSeed(p.id, s) }))
+    .filter((x) => !have.has(x.en.toLowerCase()) && !have.has(x.seed.name.toLowerCase()))
+    .map((x) => x.seed)
   if (!seeds.length) {
-    toast(`Nothing new from “${p.label}” for ${min}–${max}`)
+    toast(t('chronicle.pane.nothingNew', { pack: packLabel(p), min, max }))
     return
   }
   const res = await store.saveEras(seeds)
   if (res.success)
-    undoToast(`Added ${seeds.length} era${seeds.length > 1 ? 's' : ''}`, 'eras:saveMany')
-  else toast(res.error || 'Could not add the eras', { tone: 'danger' })
+    undoToast(
+      t(seeds.length > 1 ? 'chronicle.pane.addedMany' : 'chronicle.pane.addedOne', {
+        n: seeds.length
+      }),
+      'eras:saveMany'
+    )
+  else toast(res.error || t('chronicle.pane.addFailed'), { tone: 'danger' })
 }
 </script>
 

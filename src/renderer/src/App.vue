@@ -1,7 +1,12 @@
 <template>
   <div class="app-shell">
     <header class="topbar">
-      <button class="home-btn" title="Homepage" aria-label="Homepage" @click="homeOpen = true">
+      <button
+        class="home-btn"
+        :title="t('app.homepage')"
+        :aria-label="t('app.homepage')"
+        @click="homeOpen = true"
+      >
         <UiIcon class="home-btn-mark" name="tree-deciduous" :size="18" />
       </button>
       <div class="project-btn-area">
@@ -24,7 +29,9 @@
           <span class="projects-btn-count">{{ store.projects.length }}</span>
           <span class="projects-btn-divider"></span>
           <span class="projects-btn-live-dot"></span>
-          <span class="projects-btn-current">{{ store.activeProject?.name }}</span>
+          <span class="projects-btn-current">{{
+            defaultNameLabel(store.activeProject?.name)
+          }}</span>
           <UiIcon class="projects-btn-chevron" name="chevron-right" :size="14" />
         </button>
         <button class="browse-btn" :title="t('browse.buttonHint')" @click="openBrowsePage">
@@ -254,6 +261,8 @@
         </Transition>
         <!-- Time Travel slider (graph + timeline views; decides its own visibility) -->
         <TimeSlider />
+        <!-- Style Studio: the whole-app layer + the current view's own style -->
+        <StyleStudio />
       </div>
       <div
         v-if="!dockCollapsed"
@@ -268,7 +277,6 @@
     </div>
     <PersonModal />
     <PersonForm />
-    <GraphSettings />
     <CommandPalette ref="paletteRef" />
     <ExportModal :open="exportOpen" :capture="captureViewImage" @close="exportOpen = false" />
     <SettingsModal />
@@ -332,6 +340,7 @@
 </template>
 
 <script setup>
+import { defaultNameLabel } from './lib/dataLabels'
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useMainStore } from './store/index.js'
 import { useI18n } from './i18n'
@@ -351,7 +360,7 @@ import { CharacterView } from './paid'
 import RightDock from './components/RightDock.vue'
 import PersonModal from './components/PersonModal.vue'
 import PersonForm from './components/PersonForm.vue'
-import GraphSettings from './components/GraphSettings.vue'
+import StyleStudio from './components/style/StyleStudio.vue'
 import AuthGate from './components/AuthGate.vue'
 import SupabaseAuthGate from './components/SupabaseAuthGate.vue'
 import HomePage from './components/home/HomePage.vue'
@@ -699,7 +708,7 @@ async function handleExport() {
       duration: 5000
     })
   } else {
-    toast(res.error || 'Export failed', { tone: 'error' })
+    toast(res.error || t('app.exportFailed'), { tone: 'error' })
   }
 }
 

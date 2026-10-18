@@ -10,8 +10,8 @@
   >
     <div v-if="!persons.length" class="hs-empty">
       <img class="hs-empty-enso" :src="emptyEnso" alt="" />
-      <div class="hs-empty-title">The scroll is blank</div>
-      <div class="hs-empty-text">No people match — clear the search or add someone.</div>
+      <div class="hs-empty-title">{{ t('directory.handscroll.emptyTitle') }}</div>
+      <div class="hs-empty-text">{{ t('directory.handscroll.emptyText') }}</div>
     </div>
 
     <template v-else>
@@ -55,7 +55,7 @@
                 @click="openPerson(it.p.id)"
               >
                 <div class="hs-colo-text">
-                  <b class="hs-colo-name">{{ it.p.name || 'Unnamed' }}</b>
+                  <b class="hs-colo-name">{{ it.p.name || t('directory.card.unnamed') }}</b>
                   <span class="hs-colo-body">{{ it.text }}</span>
                 </div>
                 <img
@@ -73,7 +73,9 @@
                 :style="{ left: it.x + 'px', top: Math.round(bandH * 0.035) + 'px' }"
               >
                 <span class="hs-mark-cjk">{{ it.label }}</span>
-                <span v-if="it.year != null" class="hs-mark-lat">{{ it.year }}s</span>
+                <span v-if="it.year != null" class="hs-mark-lat">{{
+                  t('directory.handscroll.decade', { year: it.year })
+                }}</span>
               </div>
 
               <div
@@ -114,10 +116,7 @@
                     >右圖凡<span class="tcy">{{ it.count }}</span
                     >人</span
                   >
-                  <span class="hs-end-sub"
-                    >{{ it.count }} {{ it.count === 1 ? 'person' : 'people' }} · {{ layout.scenes }}
-                    {{ layout.scenes === 1 ? 'scene' : 'scenes' }}</span
-                  >
+                  <span class="hs-end-sub">{{ countsText(it.count) }}</span>
                 </div>
                 <img v-if="endSeal" class="hs-end-seal s1" :src="endSeal" alt="" />
                 <img v-if="titleSeal" class="hs-end-seal s2" :src="titleSeal" alt="" />
@@ -136,7 +135,7 @@
       <div class="hs-hud">
         <div class="hs-hud-name">
           <span class="hs-hud-brush">長卷</span>
-          <span class="hs-hud-sub">{{ persons.length }} people · {{ layout.scenes }} scenes</span>
+          <span class="hs-hud-sub">{{ countsText(persons.length) }}</span>
         </div>
         <div ref="stripEl" class="hs-strip" @pointerdown.stop="onStripDown">
           <i class="hs-strip-line"></i>
@@ -153,7 +152,7 @@
           <span class="hs-era-cjk">{{ era.cjk }}</span>
           <span class="hs-era-lat">{{ era.lat }}</span>
         </div>
-        <span class="hs-hud-hint">drag · wheel · arrow keys</span>
+        <span class="hs-hud-hint">{{ t('directory.handscroll.hint') }}</span>
       </div>
     </template>
   </div>
@@ -162,6 +161,8 @@
 <script setup>
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useMainStore } from '../../store/index.js'
+import { useI18n } from '../../i18n'
+import { defaultNameLabel } from '../../lib/dataLabels'
 import { isDeceased } from './peopleLayout.js'
 import HandscrollFigure from './HandscrollFigure.vue'
 import { paintTile } from './handscrollPainter'
@@ -198,6 +199,17 @@ const props = defineProps({
 })
 
 const store = useMainStore()
+const { t } = useI18n()
+
+/** `key.one` / `key.other` by count, with `{n}` filled in. */
+const plural = (key, n) => t(`${key}.${n === 1 ? 'one' : 'other'}`, { n })
+/** "12 people · 5 scenes" — the HUD and the end panel share it. */
+function countsText(people) {
+  return `${plural('directory.handscroll.people', people)} · ${plural(
+    'directory.handscroll.scenes',
+    layout.value.scenes
+  )}`
+}
 
 const reduceMotion =
   typeof window !== 'undefined' &&
@@ -275,9 +287,9 @@ const itemKey = (it) =>
 const eraYear = ref(null)
 const era = computed(() => {
   const y = eraYear.value
-  if (y == null) return { cjk: '年代不詳', lat: 'undated' }
+  if (y == null) return { cjk: '年代不詳', lat: t('directory.handscroll.undated') }
   const d = decadeOf(y)
-  return { cjk: cjkYear(d), lat: d + 's' }
+  return { cjk: cjkYear(d), lat: t('directory.handscroll.decade', { year: d }) }
 })
 
 function apply() {
@@ -541,7 +553,7 @@ function sealOf(p) {
   return personSealUrl(p.name || '', p.id || '', 64)
 }
 const emptyEnso = ensoUrl(2)
-const projectName = computed(() => store.activeProject?.name || '')
+const projectName = computed(() => defaultNameLabel(store.activeProject?.name || ''))
 const isDead = (p) => isDeceased(p, props.refYear)
 
 const stripMarks = computed(() => {

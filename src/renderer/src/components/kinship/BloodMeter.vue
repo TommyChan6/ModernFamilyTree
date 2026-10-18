@@ -18,8 +18,8 @@
         :stroke="`url(#${gid})`"
         :style="{ strokeDashoffset: shown ? 151 * (1 - frac) : 151 }"
       />
-      <g v-for="t in ticks" :key="t.label" class="bm-tick">
-        <line :x1="t.x1" :y1="t.y1" :x2="t.x2" :y2="t.y2" />
+      <g v-for="tk in ticks" :key="tk.label" class="bm-tick">
+        <line :x1="tk.x1" :y1="tk.y1" :x2="tk.x2" :y2="tk.y2" />
       </g>
       <g class="bm-needle" :style="{ transform: `rotate(${shown ? angle : -90}deg)` }">
         <line x1="60" y1="62" x2="60" y2="22" />
@@ -37,6 +37,9 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { bloodBand } from './kinshipGraph'
+import { useI18n } from '../../i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   /** kinship coefficient of the pair (their child's F) */
@@ -56,26 +59,9 @@ const pct = computed(() => {
   if (!v) return '0%'
   return (v < 1 ? v.toFixed(2) : v < 10 ? v.toFixed(1) : v.toFixed(0)) + '%'
 })
-const LABELS = {
-  none: 'No shared blood',
-  echo: 'Distant echoes',
-  distant: 'Distant cousins',
-  cousins: 'Cousin marriage',
-  close: 'Close kin',
-  royal: 'Royal-house territory',
-  habsburg: 'Habsburg jaw'
-}
-const NOTES = {
-  none: 'Their child would carry no inbreeding.',
-  echo: 'Around third cousins — common in any old village.',
-  distant: 'About second cousins (1.56%).',
-  cousins: 'First cousins sit at 6.25%.',
-  close: 'Uncle–niece or double-cousin territory (12.5%).',
-  royal: 'Only generations of in-marriage get this high.',
-  habsburg: 'Charles II of Spain: 25.4%.'
-}
-const bandLabel = computed(() => LABELS[band.value])
-const note = computed(() => NOTES[band.value])
+// Band names + notes: kinship.blood.<band>.label / .note
+const bandLabel = computed(() => t(`kinship.blood.${band.value}.label`))
+const note = computed(() => t(`kinship.blood.${band.value}.note`))
 
 // Reference ticks at second cousins, first cousins, uncle–niece, siblings.
 const ticks = computed(() =>

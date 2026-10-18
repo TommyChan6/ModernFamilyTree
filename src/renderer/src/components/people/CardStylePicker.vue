@@ -1,24 +1,25 @@
 <template>
-  <div ref="rootEl" class="csp">
-    <!-- Toolbar trigger -->
+  <div ref="rootEl" class="csp" :class="{ 'csp-inline': inline }">
+    <!-- Toolbar trigger (the Style Studio shows the gallery inline instead) -->
     <button
+      v-if="!inline"
       class="csp-btn"
       :class="{ open }"
-      :title="'Card style: ' + current.label"
+      :title="t('directory.cardStyle.current', { style: styleLabel(current.id) })"
       :aria-expanded="open"
       @click="toggle"
     >
       <UiIcon name="palette" :size="16" />
-      {{ current.label }}
+      {{ styleLabel(current.id) }}
       <UiIcon class="csp-caret" :class="{ open }" name="chevron-down" :size="14" />
     </button>
 
     <!-- Floating gallery -->
     <Transition name="csp-pop">
-      <div v-if="open" class="csp-panel">
-        <div class="csp-head">
-          <span class="csp-title">Card style</span>
-          <span class="csp-sub">how the directory deals its deck</span>
+      <div v-if="open || inline" class="csp-panel">
+        <div v-if="!inline" class="csp-head">
+          <span class="csp-title">{{ t('directory.cardStyle.title') }}</span>
+          <span class="csp-sub">{{ t('directory.cardStyle.sub') }}</span>
         </div>
         <div class="csp-row">
           <button
@@ -27,7 +28,7 @@
             class="csp-item"
             :class="{ active: s.id === store.cardStyle }"
             :style="{ '--i': i }"
-            :title="s.blurb"
+            :title="styleBlurb(s.id)"
             @click="pick(s.id)"
           >
             <!-- Miniature card face (pure CSS caricature of each style) -->
@@ -87,7 +88,7 @@
                 <UiIcon name="check" :size="10" :stroke="3" />
               </span>
             </span>
-            <span class="csp-label">{{ s.label }}</span>
+            <span class="csp-label">{{ styleLabel(s.id) }}</span>
           </button>
         </div>
       </div>
@@ -98,6 +99,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMainStore } from '../../store/index.js'
+import { useI18n } from '../../i18n'
 import UiIcon from '../ui/UiIcon.js'
 
 // The Directory's card-style selector: a toolbar chip that opens a small
@@ -105,26 +107,26 @@ import UiIcon from '../ui/UiIcon.js'
 // view re-deals the cards with that style's entrance animation) and persists
 // per project via the store.
 
+const props = defineProps({
+  /** Render the gallery in place (no trigger, no popover) — the Style Studio. */
+  inline: { type: Boolean, default: false }
+})
 const store = useMainStore()
+const { t } = useI18n()
+// Style names + blurbs live in the locale files, keyed by style id.
+const styleLabel = (id) => t(`directory.cardStyle.styles.${id}.label`)
+const styleBlurb = (id) => t(`directory.cardStyle.styles.${id}.blurb`)
 const open = ref(false)
 const rootEl = ref(null)
 
 const STYLES = [
-  { id: 'classic', label: 'Classic', blurb: 'The original — banner, avatar, and stats.' },
-  { id: 'poster', label: 'Full Art', blurb: 'The photo fills the card; info floats in front.' },
-  { id: 'holo', label: 'Holo', blurb: 'Gold-foil trading card with HP, attacks, and rarity.' },
-  { id: 'neon', label: 'Neon', blurb: 'Cyberpunk dossier — scanlines, glitches, barcodes.' },
-  { id: 'arcana', label: 'Arcana', blurb: 'Tarot of the family — gilded frames and starlight.' },
-  {
-    id: 'scroll',
-    label: 'Scroll',
-    blurb: '立轴 — hanging ink scrolls with calligraphy and seals.'
-  },
-  {
-    id: 'moonfan',
-    label: 'Moon Fan',
-    blurb: '团扇 — round silk fans painted with plum, bamboo and moon.'
-  }
+  { id: 'classic' },
+  { id: 'poster' },
+  { id: 'holo' },
+  { id: 'neon' },
+  { id: 'arcana' },
+  { id: 'scroll' },
+  { id: 'moonfan' }
 ]
 
 const current = computed(() => STYLES.find((s) => s.id === store.cardStyle) || STYLES[0])
@@ -134,7 +136,7 @@ function toggle() {
 }
 function pick(id) {
   store.setCardStyle(id)
-  open.value = false
+  if (!props.inline) open.value = false
 }
 
 // Close on outside click / Escape — no @blur (unreliable in headless runs).
@@ -199,6 +201,20 @@ onUnmounted(() => {
 }
 .csp-caret.open {
   transform: rotate(180deg);
+}
+
+/* Inline (Style Studio): the gallery sits in the flow and wraps. */
+.csp-inline .csp-panel {
+  position: static;
+  padding: 0;
+  border: none;
+  background: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.csp-inline .csp-row {
+  flex-wrap: wrap;
+  gap: 12px 10px;
 }
 
 /* ── Panel ── */

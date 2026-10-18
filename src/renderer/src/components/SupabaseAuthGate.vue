@@ -13,16 +13,16 @@
     <div class="auth-card">
       <button class="back-btn" type="button" @click="emit('back')">
         <UiIcon name="arrow-left" :size="14" />
-        Back
+        {{ t('auth.back') }}
       </button>
       <div class="brand">
         <UiIcon class="brand-mark" name="tree-deciduous" :size="22" />
         <span class="brand-name">Family Tree</span>
       </div>
 
-      <h1 class="title">{{ isSignUp ? 'Create your account' : 'Welcome back' }}</h1>
+      <h1 class="title">{{ isSignUp ? t('auth.sb.createTitle') : t('auth.sb.welcomeTitle') }}</h1>
       <p class="subtitle">
-        {{ isSignUp ? 'Sign up to start building your trees.' : 'Sign in to your trees.' }}
+        {{ isSignUp ? t('auth.sb.createSub') : t('auth.sb.welcomeSub') }}
       </p>
 
       <!-- Sign-up confirmation notice (email confirmation is on) -->
@@ -33,19 +33,19 @@
 
       <form v-else class="form" @submit.prevent="submit">
         <label class="field">
-          <span class="field-label">Email</span>
+          <span class="field-label">{{ t('auth.email') }}</span>
           <input
             v-model.trim="email"
             type="email"
             autocomplete="email"
-            placeholder="you@example.com"
+            :placeholder="t('auth.emailPh')"
             required
             :disabled="busy"
           />
         </label>
 
         <label class="field">
-          <span class="field-label">Password</span>
+          <span class="field-label">{{ t('auth.password') }}</span>
           <input
             v-model="password"
             type="password"
@@ -60,14 +60,14 @@
         <p v-if="error" class="error">{{ error }}</p>
 
         <button class="btn-primary" type="submit" :disabled="busy">
-          {{ busy ? 'Please wait…' : isSignUp ? 'Sign up' : 'Sign in' }}
+          {{ busy ? t('auth.sb.wait') : isSignUp ? t('auth.sb.signUp') : t('auth.signIn') }}
         </button>
       </form>
 
       <p class="toggle">
-        {{ isSignUp ? 'Already have an account?' : 'No account yet?' }}
+        {{ isSignUp ? t('auth.sb.haveAccount') : t('auth.sb.noAccount') }}
         <button class="toggle-btn" type="button" :disabled="busy" @click="toggleMode">
-          {{ isSignUp ? 'Sign in' : 'Sign up' }}
+          {{ isSignUp ? t('auth.signIn') : t('auth.sb.signUp') }}
         </button>
       </p>
     </div>
@@ -78,6 +78,7 @@
 import { ref } from 'vue'
 import { useMainStore } from '../store/index.js'
 import UiIcon from './ui/UiIcon.js'
+import { useI18n } from '../i18n'
 
 // Same contract as the native AuthGate: the homepage's CTAs pick the starting
 // mode, and Back returns to the homepage.
@@ -85,6 +86,7 @@ const props = defineProps({ initialMode: { type: String, default: 'login' } })
 const emit = defineEmits(['back'])
 
 const store = useMainStore()
+const { t } = useI18n()
 
 const isSignUp = ref(props.initialMode === 'register')
 const email = ref('')
@@ -109,12 +111,12 @@ async function submit() {
       : await store.signIn({ email: email.value, password: password.value })
 
     if (!res.success) {
-      error.value = res.error || 'Something went wrong. Please try again.'
+      error.value = res.error || t('auth.sb.genericError')
       return
     }
     // Sign-up may require email confirmation before a session exists.
     if (res.needsConfirmation) {
-      notice.value = `We sent a confirmation link to ${email.value}. Confirm it, then sign in.`
+      notice.value = t('auth.sb.confirmSent', { email: email.value })
     }
     // Otherwise the store's auth listener takes over (loads data, hides this gate).
   } catch (e) {

@@ -1,6 +1,37 @@
-import { worldToScreen } from './coords.js'
+import { worldToScreen, tiltParams, clipSegment } from './coords.js'
+import { shapeLabelDrop, shapeTopLift, shapeAnchor } from './nodeShapes.js'
+import { bodyBox, makeOccluder } from './occlusion.js'
 import { drawIcon, iconPath } from '../../../lib/canvasIcon.js'
 import { INK_FONTS, inkFontsReady } from '../../../lib/inkArt'
+import { translate } from '../../../i18n'
+import { defaultNameLabel } from '../../../lib/dataLabels'
+import { RING_LABELS, OUTSIDERS_LABEL } from '../spotlightLayout'
+import { popRing } from './popAnim.js'
+
+// The pure layout modules (familyTreeLayout, guideLines, layout3D, spotlight)
+// emit stable English guide labels ('Gen 3', 'New Gen', 'Now · 1990', ring
+// names) so they stay i18n-free and testable; the canvas translates them as it
+// draws. The owning views redraw on a locale change.
+const RING_KEYS = ['main', 'inner', 'close', 'extended', 'distant', 'far', 'edge']
+
+/** A guide label as display text in the active language. */
+export function guideLabelText(label) {
+  if (label == null) return label
+  const s = String(label)
+  let m = /^Gen (\d+)$/.exec(s)
+  if (m) return translate('graph.canvas.gen', { n: m[1] })
+  if (s === 'New Gen') return translate('graph.canvas.newGen')
+  m = /^Now · (.+)$/.exec(s)
+  if (m) return translate('graph.canvas.now', { year: m[1] })
+  return s
+}
+
+/** A Spotlight ring's name in the active language. */
+export function ringLabelText(label) {
+  if (label === OUTSIDERS_LABEL) return translate('graph.rings.outside')
+  const i = RING_LABELS.indexOf(label)
+  return i >= 0 ? translate(`graph.rings.${RING_KEYS[i]}`) : label
+}
 
 // A transparent 2D canvas layered over the WebGL canvas. It draws everything textual or
 // low-count: node name/age labels (viewport-culled, LOD by zoom) and the guide lines,
@@ -17,6 +48,8 @@ export class TextGuideOverlay {
     // 水墨: null | 'paper' | 'moon' | 'light' — calligraphy labels + ink guides.
     this.ink = null
     this.inkFontOk = false
+    // Ink label sprites (see _inkSprite): key -> { canvas, w, h, ax, ay, B, textW }
+    this._sprites = new Map()
     this.onFontsReady = null
     // Descriptors set by GraphCanvas/guideLines (all in WORLD coords).
     this.guides = [] // [{ y, label, kind:'year'|'gen', opacity }]
@@ -35,6 +68,7 @@ export class TextGuideOverlay {
     if (this.ink && !this.inkFontOk)
       inkFontsReady().then(() => {
         this.inkFontOk = true
+        this._clearSprites() // drop sprites painted in the fallback face
         this.onFontsReady?.()
       })
   }
@@ -134,12 +168,18 @@ export class TextGuideOverlay {
       ctx.save()
       ctx.strokeStyle = stroke
       ctx.lineWidth = lineW
-      ctx.setLineDash(dash)
-      ctx.beginPath()
-      ctx.moveTo(s1.x, s1.y)
-      ctx.lineTo(s2.x, s2.y)
-      ctx.stroke()
-      ctx.setLineDash([])
+      // Stroke only the on-screen part (the dashes stay anchored at s1).
+      const seg = clipSegment(s1.x, s1.y, s2.x, s2.y, -8, -8, this.w + 8, this.h + 8)
+      if (seg) {
+        ctx.setLineDash(dash)
+        ctx.lineDashOffset = seg.t0 * Math.hypot(s2.x - s1.x, s2.y - s1.y)
+        ctx.beginPath()
+        ctx.moveTo(seg.x0, seg.y0)
+        ctx.lineTo(seg.x1, seg.y1)
+        ctx.stroke()
+        ctx.setLineDash([])
+        ctx.lineDashOffset = 0
+      }
       if (label != null) {
         ctx.fillStyle = fill
         ctx.font = this.ink ? `13px ${INK_FONTS.kai}` : `${weight} 11px system-ui, sans-serif`
@@ -148,7 +188,7 @@ export class TextGuideOverlay {
         // Clamp into the viewport so the year stays readable when the line's
         // world-space left end has scrolled off-screen (zoomed in). The left
         // clamp sits clear of the Time-travel slider panel (~86px wide).
-        ctx.fillText(label, Math.min(Math.max(s1.x - 14, 128), this.w - 12), s1.y)
+        ctx.fillText(guideLabelText(label), Math.min(Math.max(s1.x - 14, 128), this.w - 12), s1.y)
       }
       ctx.restore()
     }
@@ -182,6 +222,9 @@ export class TextGuideOverlay {
     // ---- Spotlight layout: the stage light, ring guides, the lead's halo ----
     if (opts.spotlight) this._drawSpotlight(opts.spotlight)
 
+    // ---- newcomers: a ripple ring as each one pops in (under the names) ----
+    if (opts.pops?.length) this._drawPops(opts, c)
+
     if (opts.showLabels) this._drawLabels(opts, c)
 
     // ---- kinship lens: the reveal ripple + kin-name pills above nodes ----
@@ -189,6 +232,67 @@ export class TextGuideOverlay {
 
     // ---- bezier edit handles (on top of everything) ----
     if (opts.curveHandles) this._drawCurveHandles(opts.curveHandles, c)
+  }
+
+  // opts.pops: [{ n, k }] — k = ring progress 0..1 (popAnim.popRing). The ring
+  // circles the node's drawn centre (standing shapes rise above their point)
+  // and shrinks with the node under the tilt. Accent colour; cinnabar in ink.
+  _drawPops(opts, c) {
+    const ctx = this.ctx,
+      t = this.transform,
+      gs = opts.gs
+    const lift = shapeAnchor(gs.nodeShape).lift || 0
+    const color = this.ink ? c.sel : opts.popColor || c.sel
+    ctx.save()
+    ctx.strokeStyle = color
+    for (const { n, k } of opts.pops) {
+      const ring = popRing(k)
+      if (!ring) continue
+      const s = worldToScreen(n.x, n.y, t)
+      const ps = s.s ?? 1
+      const R = (opts.radiusOf ? opts.radiusOf(n) : gs.nodeRadius) * t.k * ps
+      const cy = s.y - lift * R
+      if (s.x < -R * 3 || s.x > this.w + R * 3 || cy < -R * 3 || cy > this.h + R * 3) continue
+      ctx.globalAlpha = ring.alpha
+      ctx.lineWidth = ring.width * Math.max(0.5, ps)
+      ctx.beginPath()
+      ctx.arc(s.x, cy, R * ring.r, 0, Math.PI * 2)
+      ctx.stroke()
+      // a fainter inner echo trailing the main ring
+      ctx.globalAlpha = ring.alpha * 0.45
+      ctx.lineWidth = ring.width * 0.6 * Math.max(0.5, ps)
+      ctx.beginPath()
+      ctx.arc(s.x, cy, R * (1 + (ring.r - 1) * 0.55), 0, Math.PI * 2)
+      ctx.stroke()
+    }
+    ctx.restore()
+  }
+
+  // Standing nodes (gravestones / the tilt): an index of every visible body so a
+  // name covered by someone NEARER can step back (null when nothing stands).
+  _occluder(opts) {
+    const t = this.transform,
+      gs = opts.gs
+    if (!tiltParams(t) && !shapeAnchor(gs.nodeShape).lift) return null
+    const bodies = []
+    for (const n of opts.nodes) {
+      const s = worldToScreen(n.x, n.y, t)
+      if (s.x < -80 || s.x > this.w + 80 || s.y < -80 || s.y > this.h + 200) continue
+      const R = (opts.radiusOf ? opts.radiusOf(n) : gs.nodeRadius) * t.k * (s.s ?? 1)
+      const b = bodyBox(gs.nodeShape, s.x, s.y, R)
+      b.depth = s.y
+      bodies.push(b)
+    }
+    return makeOccluder(bodies)
+  }
+
+  // 1 when the label is clear, a faint 0.16 when a nearer body covers it.
+  // Expects ctx.font to be the label font already.
+  _labelVisibility(occ, text, s, baseline, fontPx, ps) {
+    const w = this.ctx.measureText(text).width * ps
+    const px = fontPx * ps
+    const box = { x0: s.x - w / 2, y0: baseline - px, x1: s.x + w / 2, y1: baseline + px * 0.25 }
+    return occ.covered(box, s.y) ? 0.16 : 1
   }
 
   _drawLabels(opts, c) {
@@ -205,18 +309,33 @@ export class TextGuideOverlay {
     const margin = 60
     const nameFont = `500 ${fontPx}px system-ui, sans-serif`
     const ageFont = `600 ${fontPx}px system-ui, sans-serif`
+    const occ = this._occluder(opts)
     for (const n of opts.nodes) {
       const s = worldToScreen(n.x, n.y, t)
       if (s.x < -margin || s.x > this.w + margin || s.y < -margin || s.y > this.h + margin) continue
-      const op = opts.labelOpacityOf ? opts.labelOpacityOf(n) : 1
+      let op =
+        (opts.labelOpacityOf ? opts.labelOpacityOf(n) : 1) * (opts.revealOf ? opts.revealOf(n) : 1)
       if (op <= 0.01) continue
       // Sit below the node's drawn radius (per-node size + emphasis swell),
       // not the global default, so enlarged nodes don't swallow their label.
       const r = opts.radiusOf ? opts.radiusOf(n) : gs.nodeRadius
-      const y = s.y + (r + 14) * t.k
+      // Under the perspective tilt a label shrinks with its node (ps = 1 flat).
+      const ps = s.s ?? 1
+      if (fontPx * ps < 6) continue
+      const y = s.y + shapeLabelDrop(gs.nodeShape, r) * t.k * ps
       // The trait system composes the full node label (name-slot words + any
       // "show in graph" values); pre-trait nodes fall back to the first name.
       const first = n.graph_label ?? (n.name ? n.name.split(' ')[0] : '')
+      if (occ) {
+        ctx.font = nameFont
+        op *= this._labelVisibility(occ, first, s, y, fontPx, ps)
+      }
+      if (ps !== 1) {
+        ctx.save()
+        ctx.translate(s.x, y)
+        ctx.scale(ps, ps)
+        ctx.translate(-s.x, -y)
+      }
       ctx.globalAlpha = op
       ctx.font = nameFont
       ctx.fillStyle = opts.selectedId === n.id ? c.sel : c.name
@@ -238,6 +357,7 @@ export class TextGuideOverlay {
       } else {
         ctx.fillText(first, s.x, y)
       }
+      if (ps !== 1) ctx.restore()
     }
     ctx.globalAlpha = 1
   }
@@ -245,52 +365,185 @@ export class TextGuideOverlay {
   // 水墨 labels: names brushed in 楷书 with a soft paper halo (so a stroke passing
   // behind never cuts the characters); the selected name in cinnabar; age as a
   // small ochre annotation.
+  //
+  // Each label is painted ONCE into a small sprite (see _inkSprite) and blitted
+  // with drawImage. Stroking a thick round-joined halo around calligraphy glyph
+  // outlines is far too slow to redo per label per frame — under the tilt every
+  // label also sits at its own depth scale, so nothing would ever hit the
+  // browser's glyph cache (the "slow ink tilt" problem).
   _drawInkLabels(opts, c, fontPx) {
     const ctx = this.ctx,
       t = this.transform,
       gs = opts.gs
-    const font = `${fontPx.toFixed(1)}px ${INK_FONTS.kai}`
-    const ageFont = `${(fontPx * 0.78).toFixed(1)}px ${INK_FONTS.kai}`
     const margin = 60
-    ctx.lineJoin = 'round'
-    ctx.lineWidth = Math.max(2, fontPx * 0.32)
-    ctx.strokeStyle = c.halo
+    const dpr = this.dpr || 1
+    const gapRatio = 4 / ((gs.labelSize || 12) * 1.3) // the 4·k gap, relative to fontPx
+    const occ = this._occluder(opts)
     for (const n of opts.nodes) {
       const s = worldToScreen(n.x, n.y, t)
       if (s.x < -margin || s.x > this.w + margin || s.y < -margin || s.y > this.h + margin) continue
-      const op =
+      let op =
         (opts.labelOpacityOf ? opts.labelOpacityOf(n) : 1) * (opts.revealOf ? opts.revealOf(n) : 1)
       if (op <= 0.01) continue
       const r = opts.radiusOf ? opts.radiusOf(n) : gs.nodeRadius
-      const y = s.y + (r + 12) * t.k + fontPx * 0.7
+      const ps = s.s ?? 1
+      if (fontPx * ps < 6) continue
+      const y = s.y + ((shapeLabelDrop(gs.nodeShape, r) - 2) * t.k + fontPx * 0.7) * ps
       const first = n.graph_label ?? (n.name ? n.name.split(' ')[0] : '')
-      ctx.globalAlpha = op
-      ctx.font = font
       const age = opts.showAge && opts.ageOf ? opts.ageOf(n) : null
-      // Center the name (+ age annotation) as one unit under the node.
-      const nameW = ctx.measureText(first).width
-      let ageW = 0
-      const gap = 4 * t.k
-      if (age != null) {
-        ctx.font = ageFont
-        ageW = ctx.measureText(String(age)).width + gap
-        ctx.font = font
+      const devPx = fontPx * ps * dpr
+      const sp = this._inkSprite(first, age, devPx, opts.selectedId === n.id, c, gapRatio)
+      if (!sp) {
+        // Very large text (deep zoom, a handful of labels): draw it directly.
+        if (occ) op *= this._coveredFactor(occ, null, first, s, y, fontPx, ps)
+        this._drawInkLabelDirect(first, age, s.x, y, fontPx, ps, op, opts.selectedId === n.id, c)
+        continue
       }
-      const x0 = s.x - (nameW + ageW) / 2
-      ctx.textAlign = 'left'
-      ctx.strokeText(first, x0, y)
-      ctx.fillStyle = opts.selectedId === n.id ? c.sel : c.name
-      ctx.fillText(first, x0, y)
-      if (age != null) {
-        ctx.font = ageFont
-        const ax = x0 + nameW + gap
-        ctx.strokeText(String(age), ax, y)
-        ctx.fillStyle = c.age
-        ctx.fillText(String(age), ax, y)
+      const k = devPx / sp.B / dpr // sprite device px -> CSS px at this label's size
+      if (occ) op *= this._coveredFactor(occ, sp.nameW * k, first, s, y, fontPx, ps)
+      ctx.globalAlpha = op
+      ctx.drawImage(sp.canvas, s.x - sp.ax * k, y - sp.ay * k, sp.w * k, sp.h * k)
+    }
+    ctx.globalAlpha = 1
+  }
+
+  // 1 when the label is clear, 0.16 when a nearer body covers it. `w` is the
+  // name's on-screen width (null = measure it with the label font).
+  _coveredFactor(occ, w, text, s, baseline, fontPx, ps) {
+    if (w == null) {
+      this.ctx.font = `${fontPx.toFixed(1)}px ${INK_FONTS.kai}`
+      w = this.ctx.measureText(text).width * ps
+    }
+    const px = fontPx * ps
+    const box = { x0: s.x - w / 2, y0: baseline - px, x1: s.x + w / 2, y1: baseline + px * 0.25 }
+    return occ.covered(box, s.y) ? 0.16 : 1
+  }
+
+  /** One ink label (name + optional age) rendered at a quantized device-px
+   *  size, cached. Returns null for text too big to be worth caching. Sizes
+   *  snap to 1/8-octave steps, so a label drawn within ±4.5% of a cached size
+   *  reuses it — continuous zoom/tilt mostly hits the cache. */
+  _inkSprite(text, age, devPx, selected, c, gapRatio) {
+    const B = Math.pow(2, Math.round(Math.log2(Math.max(devPx, 1)) * 8) / 8)
+    if (B > 140) return null
+    const key = `${this.ink}|${this.inkFontOk ? 1 : 0}|${B.toFixed(2)}|${selected ? 1 : 0}|${gapRatio.toFixed(3)}|${text}|${age ?? ''}`
+    const hit = this._sprites.get(key)
+    if (hit) {
+      // refresh recency (Map keeps insertion order — the oldest go first)
+      this._sprites.delete(key)
+      this._sprites.set(key, hit)
+      return hit
+    }
+    const canvas = document.createElement('canvas')
+    const g = canvas.getContext('2d')
+    const font = `${B.toFixed(2)}px ${INK_FONTS.kai}`
+    const ageFont = `${(B * 0.78).toFixed(2)}px ${INK_FONTS.kai}`
+    g.font = font
+    const m = g.measureText(text)
+    const nameW = m.width
+    let ageW = 0,
+      ageM = null
+    const ageStr = age != null ? String(age) : ''
+    const gap = B * gapRatio
+    if (ageStr) {
+      g.font = ageFont
+      ageM = g.measureText(ageStr)
+      ageW = ageM.width + gap
+    }
+    const lw = Math.max(2 * (this.dpr || 1), B * 0.32)
+    const asc = Math.max(m.actualBoundingBoxAscent || B * 0.9, ageM?.actualBoundingBoxAscent || 0)
+    const desc = Math.max(
+      m.actualBoundingBoxDescent || B * 0.2,
+      ageM?.actualBoundingBoxDescent || 0
+    )
+    const pad = Math.ceil(lw / 2 + B * 0.18) + 1
+    const w = Math.ceil(nameW + ageW + pad * 2)
+    const h = Math.ceil(asc + desc + pad * 2)
+    canvas.width = w
+    canvas.height = h
+    const ay = pad + asc
+    g.lineJoin = 'round'
+    g.lineWidth = lw
+    g.strokeStyle = c.halo
+    g.textAlign = 'left'
+    g.textBaseline = 'alphabetic'
+    g.font = font
+    g.strokeText(text, pad, ay)
+    g.fillStyle = selected ? c.sel : c.name
+    g.fillText(text, pad, ay)
+    if (ageStr) {
+      const ax = pad + nameW + gap
+      g.font = ageFont
+      g.strokeText(ageStr, ax, ay)
+      g.fillStyle = c.age
+      g.fillText(ageStr, ax, ay)
+    }
+    // An ImageBitmap is immutable, so the GPU keeps it cached across frames; a
+    // live canvas source gets re-uploaded on every drawImage.
+    let img = canvas
+    if (typeof OffscreenCanvas !== 'undefined') {
+      try {
+        const oc = new OffscreenCanvas(w, h)
+        oc.getContext('2d').drawImage(canvas, 0, 0)
+        img = oc.transferToImageBitmap()
+      } catch {
+        img = canvas
       }
     }
-    ctx.textAlign = 'center'
-    ctx.globalAlpha = 1
+    const sp = { canvas: img, w, h, ax: pad + (nameW + ageW) / 2, ay, B, nameW }
+    this._sprites.set(key, sp)
+    if (this._sprites.size > 700) {
+      let drop = 200
+      for (const [k, v] of this._sprites) {
+        v.canvas.close?.() // free the bitmap's GPU/CPU memory now, not at GC
+        this._sprites.delete(k)
+        if (--drop <= 0) break
+      }
+    }
+    return sp
+  }
+
+  _clearSprites() {
+    for (const v of this._sprites.values()) v.canvas.close?.()
+    this._sprites.clear()
+  }
+
+  _drawInkLabelDirect(first, age, cx, y, fontPx, ps, op, selected, c) {
+    const ctx = this.ctx
+    const font = `${fontPx.toFixed(1)}px ${INK_FONTS.kai}`
+    const ageFont = `${(fontPx * 0.78).toFixed(1)}px ${INK_FONTS.kai}`
+    ctx.save()
+    if (ps !== 1) {
+      ctx.translate(cx, y)
+      ctx.scale(ps, ps)
+      ctx.translate(-cx, -y)
+    }
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = Math.max(2, fontPx * 0.32)
+    ctx.strokeStyle = c.halo
+    ctx.globalAlpha = op
+    ctx.font = font
+    const nameW = ctx.measureText(first).width
+    let ageW = 0
+    const gap = 4 * this.transform.k
+    if (age != null) {
+      ctx.font = ageFont
+      ageW = ctx.measureText(String(age)).width + gap
+      ctx.font = font
+    }
+    const x0 = cx - (nameW + ageW) / 2
+    ctx.textAlign = 'left'
+    ctx.strokeText(first, x0, y)
+    ctx.fillStyle = selected ? c.sel : c.name
+    ctx.fillText(first, x0, y)
+    if (age != null) {
+      ctx.font = ageFont
+      const ax = x0 + nameW + gap
+      ctx.strokeText(String(age), ax, y)
+      ctx.fillStyle = c.age
+      ctx.fillText(String(age), ax, y)
+    }
+    ctx.restore()
   }
 
   // sp: { x, y (main character, world), rings: [{ r, label, count, ring }],
@@ -342,7 +595,7 @@ export class TextGuideOverlay {
       // Era icon: an icon name (or legacy glyph) drawn as an SVG icon; an
       // unrecognised value is simply omitted (never drawn as emoji text).
       const icon = e.icon && iconPath(e.icon) ? e.icon : ''
-      const label = e.name
+      const label = defaultNameLabel(e.name)
       ctx.font = `800 11px ${font}`
       const iconW = icon ? 16 : 0
       const w = ctx.measureText(label).width + 22 + iconW
@@ -381,7 +634,8 @@ export class TextGuideOverlay {
       ctx.stroke()
       ctx.setLineDash([])
       const big = ev.importance === 3
-      const title = ev.title.length > 26 ? ev.title.slice(0, 25) + '…' : ev.title
+      const evTitle = defaultNameLabel(ev.title)
+      const title = evTitle.length > 26 ? evTitle.slice(0, 25) + '…' : evTitle
       ctx.font = `${big ? 800 : 700} 11px ${font}`
       const h = 19
       const w = ctx.measureText(title).width + h + 12
@@ -427,12 +681,27 @@ export class TextGuideOverlay {
     ctx.restore()
   }
 
+  // A circle lying on the (tilted) ground, traced as a projected polyline —
+  // the homography turns it into the right perspective ellipse.
+  _groundRing(wx, wy, wr) {
+    const ctx = this.ctx,
+      t = this.transform
+    const N = 72
+    for (let i = 0; i <= N; i++) {
+      const a = (i / N) * Math.PI * 2
+      const p = worldToScreen(wx + Math.cos(a) * wr, wy + Math.sin(a) * wr, t)
+      if (i === 0) ctx.moveTo(p.x, p.y)
+      else ctx.lineTo(p.x, p.y)
+    }
+  }
+
   _drawSpotlight(sp) {
     const ctx = this.ctx,
       t = this.transform
     const now = performance.now() / 1000
     const s = worldToScreen(sp.x, sp.y, t)
     const k = t.k
+    const tilted = !!tiltParams(t)
     const col = sp.color || '#f5c542'
     const rgb = hexRgb(col)
     const rgba = (a) => `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a})`
@@ -468,16 +737,20 @@ export class TextGuideOverlay {
       ctx.setLineDash(outsider ? [2, 7] : [7, 6])
       ctx.lineDashOffset = (i % 2 ? 1 : -1) * now * (14 - i)
       ctx.beginPath()
-      ctx.arc(s.x, s.y, r, 0, Math.PI * 2)
+      if (tilted) this._groundRing(sp.x, sp.y, ring.r)
+      else ctx.arc(s.x, s.y, r, 0, Math.PI * 2)
       ctx.stroke()
       ctx.restore()
       // Label pill at the top of the ring.
-      const label = `${ring.label} · ${ring.count}`
+      const label = `${ringLabelText(ring.label)} · ${ring.count}`
       // In the ring's widest empty arc (from the layout), so it never sits
       // on anyone; lower-left (the usual quiet bearing) as a fallback.
       const la = ring.labelAngle ?? Math.PI * 0.75
-      const lx = s.x + Math.cos(la) * r,
-        ly = s.y + Math.sin(la) * r
+      const lp = tilted
+        ? worldToScreen(sp.x + Math.cos(la) * ring.r, sp.y + Math.sin(la) * ring.r, t)
+        : { x: s.x + Math.cos(la) * r, y: s.y + Math.sin(la) * r }
+      const lx = lp.x,
+        ly = lp.y
       if (ly < -20 || ly > this.h + 20 || lx < -120 || lx > this.w + 120) return
       const w = ctx.measureText(label).width + 16
       ctx.save()
@@ -593,7 +866,7 @@ export class TextGuideOverlay {
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     const placed = []
-    const lift = (gs.nodeRadius + 13) * t.k + 6
+    const liftOf = (cand) => shapeTopLift(gs.nodeShape, gs.nodeRadius) * t.k * (cand.s.s ?? 1) + 6
     const bg =
       this.ink === 'paper'
         ? 'rgba(245,239,224,0.94)'
@@ -607,7 +880,7 @@ export class TextGuideOverlay {
       const w = tw + 14
       const h = 17
       const x = c.s.x - w / 2
-      const y = c.s.y - lift - h + (1 - c.p) * 10
+      const y = c.s.y - liftOf(c) - h + (1 - c.p) * 10
       let clash = false
       for (const r of placed) {
         if (x < r.x + r.w + 3 && x + w + 3 > r.x && y < r.y + r.h + 2 && y + h + 2 > r.y) {

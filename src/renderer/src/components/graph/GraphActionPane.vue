@@ -21,13 +21,18 @@
               </div>
               <div v-if="relDates" class="ap-dates">{{ relDates }}</div>
             </div>
-            <button class="ap-close" title="Dismiss (Esc)" aria-label="Dismiss" @click="close">
+            <button
+              class="ap-close"
+              :title="t('graphActions.dismissHint')"
+              :aria-label="t('dialog.dismiss')"
+              @click="close"
+            >
               <UiIcon name="x" :size="14" />
             </button>
           </div>
 
           <div v-if="relStatuses.length > 1" class="ap-row ap-stagger" style="--i: 0">
-            <span class="ap-sec-label">Status</span>
+            <span class="ap-sec-label">{{ t('graphActions.status') }}</span>
             <div class="ap-seg">
               <button
                 v-for="s in relStatuses"
@@ -45,31 +50,31 @@
             <button
               v-if="relDef?.directed"
               class="ap-btn"
-              title="Reverse who is who in this bond"
+              :title="t('graphActions.swapHint')"
               @click="swapRel"
             >
-              <UiIcon name="arrow-right-left" :size="14" />Swap
+              <UiIcon name="arrow-right-left" :size="14" />{{ t('graphActions.swap') }}
             </button>
             <button
               class="ap-btn"
               :class="{ on: soloType === rel.type }"
-              title="Isolate this relationship type on the canvas"
+              :title="t('graphActions.isolateHint')"
               @click="$emit('solo', rel.type)"
             >
-              <UiIcon name="filter" :size="14" />Isolate
+              <UiIcon name="filter" :size="14" />{{ t('graphActions.isolate') }}
             </button>
             <button
               class="ap-btn"
-              title="Open the Relationships view"
+              :title="t('graphActions.allBondsHint')"
               @click="store.activeView = 'relationships'"
             >
-              <UiIcon name="relationships" :size="14" />All bonds
+              <UiIcon name="relationships" :size="14" />{{ t('graphActions.allBonds') }}
             </button>
           </div>
 
           <div class="ap-danger-row ap-stagger" style="--i: 2">
             <button class="ap-btn ap-btn-danger" @click="deleteRel">
-              <UiIcon name="trash-2" :size="14" />Delete bond
+              <UiIcon name="trash-2" :size="14" />{{ t('graphActions.deleteBond') }}
             </button>
           </div>
         </div>
@@ -86,8 +91,8 @@
             </div>
             <button
               class="ap-close"
-              title="Clear selection (Esc)"
-              aria-label="Clear selection"
+              :title="t('graphActions.clearSelHint')"
+              :aria-label="t('graphActions.clearSel')"
               @click="close"
             >
               <UiIcon name="x" :size="14" />
@@ -95,17 +100,17 @@
           </div>
 
           <div class="ap-row ap-stagger" style="--i: 0">
-            <span class="ap-sec-label">Pick</span>
+            <span class="ap-sec-label">{{ t('graphActions.pick') }}</span>
             <div class="ap-seg">
               <button
                 v-for="f in FILTERS"
                 :key="f.v"
                 class="ap-seg-opt"
                 :class="{ on: selFilter === f.v }"
-                :title="f.title"
+                :title="t('graphActions.filters.' + f.v + '.title')"
                 @click="setFilter(f.v)"
               >
-                {{ f.label }}
+                {{ t('graphActions.filters.' + f.v + '.label') }}
               </button>
             </div>
           </div>
@@ -116,14 +121,19 @@
             class="ap-row ap-stagger"
             style="--i: 1"
           >
-            <span class="ap-sec-label">Status</span>
+            <span class="ap-sec-label">{{ t('graphActions.status') }}</span>
             <div class="ap-seg">
               <button
                 v-for="s in uniformStatuses"
                 :key="s"
                 class="ap-seg-opt"
                 :class="{ on: uniformStatus === s }"
-                :title="`Set all ${relCount} bonds to ${statusLabel(s, uniformRelDef?.key).toLowerCase()}`"
+                :title="
+                  t('graphActions.setAllStatus', {
+                    count: relCount,
+                    status: statusLabel(s, uniformRelDef?.key).toLowerCase()
+                  })
+                "
                 @click="setStatusAll(s)"
               >
                 {{ statusLabel(s, uniformRelDef?.key) }}
@@ -134,27 +144,27 @@
           <!-- Node styling — applies to every selected person -->
           <div v-if="n && !mode3d && nodeStyle" class="ap-section ap-stagger" style="--i: 2">
             <div class="ap-row">
-              <span class="ap-sec-label">Size</span>
+              <span class="ap-sec-label">{{ t('graphActions.size') }}</span>
               <div class="ap-seg">
                 <button
                   v-for="s in SIZES"
-                  :key="s.label"
+                  :key="s.id"
                   class="ap-seg-opt"
                   :class="{ on: styleSize === s.v }"
-                  :title="s.title"
+                  :title="t('graphActions.sizes.' + s.id + '.title')"
                   @click="$emit('set-size', s.v)"
                 >
-                  {{ s.label }}
+                  {{ t('graphActions.sizes.' + s.id + '.label') }}
                 </button>
               </div>
             </div>
             <div class="ap-row">
-              <span class="ap-sec-label">Color</span>
+              <span class="ap-sec-label">{{ t('graphActions.color') }}</span>
               <div class="ap-swatches">
                 <button
                   class="ap-swatch ap-swatch-auto"
                   :class="{ on: !styleColor }"
-                  title="Auto — the gender gradient"
+                  :title="t('graphActions.autoColor')"
                   @click="$emit('set-color', null)"
                 ></button>
                 <button
@@ -171,10 +181,12 @@
 
           <div class="ap-danger-row ap-stagger" style="--i: 3">
             <button class="ap-btn ap-btn-danger" :disabled="!total" @click="deleteMarquee">
-              <UiIcon name="trash-2" :size="14" />Delete{{ total ? ` ${total}` : '' }}
+              <UiIcon name="trash-2" :size="14" />{{
+                total ? t('graphActions.deleteN', { n: total }) : t('graphActions.delete')
+              }}
             </button>
-            <button class="ap-btn" title="Keep everything, drop the selection" @click="close">
-              Clear
+            <button class="ap-btn" :title="t('graphActions.clearKeepAll')" @click="close">
+              {{ t('graphActions.clear') }}
             </button>
           </div>
         </div>
@@ -197,8 +209,8 @@
             </div>
             <button
               class="ap-close"
-              title="Clear selection (Esc)"
-              aria-label="Clear selection"
+              :title="t('graphActions.clearSelHint')"
+              :aria-label="t('graphActions.clearSel')"
               @click="close"
             >
               <UiIcon name="x" :size="14" />
@@ -207,56 +219,58 @@
 
           <!-- Single person: the verb row -->
           <div v-if="n === 1" class="ap-actions ap-stagger" style="--i: 0">
-            <button class="ap-btn" title="Open the profile card" @click="openDetails">
-              <UiIcon name="eye" :size="14" />Details
+            <button class="ap-btn" :title="t('graphActions.detailsHint')" @click="openDetails">
+              <UiIcon name="eye" :size="14" />{{ t('graphActions.details') }}
             </button>
             <button
               class="ap-btn"
-              :title="`Edit this ${store.noun.toLowerCase()}`"
+              :title="t('graphActions.editHint', { noun: nounLabel(store.noun).toLowerCase() })"
               @click="openEdit"
             >
-              <UiIcon name="pencil" :size="14" />Edit
+              <UiIcon name="pencil" :size="14" />{{ t('graphActions.edit') }}
             </button>
             <button
               v-if="!mode3d"
               class="ap-btn"
-              title="Glide the camera to this node"
+              :title="t('graphActions.focusHint')"
               @click="$emit('focus-person', ids[0])"
             >
-              <UiIcon name="locate-fixed" :size="14" />Focus
+              <UiIcon name="locate-fixed" :size="14" />{{ t('graphActions.focus') }}
             </button>
             <button
               v-if="!mode3d"
               class="ap-btn"
-              title="Trace a connection — then click another person"
+              :title="t('graphActions.traceHint')"
               @click="$emit('trace', ids[0])"
             >
-              <UiIcon name="route" :size="14" />Trace
+              <UiIcon name="route" :size="14" />{{ t('graphActions.trace') }}
             </button>
             <button
               v-if="!mode3d"
               class="ap-btn"
-              title="Kinship lens — label everyone by what they are to this person"
+              :title="t('graphActions.kinHint')"
               @click="$emit('kin-lens', ids[0])"
             >
-              <UiIcon name="dna" :size="14" />Kin
+              <UiIcon name="dna" :size="14" />{{ t('graphActions.kin') }}
             </button>
             <button
               v-if="!mode3d && spotlight"
               class="ap-btn"
-              title="Spotlight — make this the main character, everyone else in rings around them"
+              :title="t('graphActions.spotlightHint')"
               @click="$emit('spotlight', ids[0])"
             >
-              <UiIcon name="star" :size="14" />Spotlight
+              <UiIcon name="star" :size="14" />{{ t('graphActions.spotlight') }}
             </button>
             <button
               v-if="canPin"
               class="ap-btn"
               :class="{ on: pinned }"
-              :title="pinned ? 'Release the node back to the simulation' : 'Pin the node in place'"
+              :title="pinned ? t('graphActions.unpinHint') : t('graphActions.pinHint')"
               @click="$emit('toggle-pin')"
             >
-              <UiIcon :name="pinned ? 'pin-off' : 'pin'" :size="14" />{{ pinned ? 'Unpin' : 'Pin' }}
+              <UiIcon :name="pinned ? 'pin-off' : 'pin'" :size="14" />{{
+                pinned ? t('graphActions.unpin') : t('graphActions.pin')
+              }}
             </button>
           </div>
 
@@ -267,7 +281,7 @@
               v-if="pairKin"
               class="ap-kin"
               :style="{ '--kc': pairKin.color }"
-              title="Show how they're related"
+              :title="t('graphActions.pairKinHint')"
               @click="$emit('trace-pair', [pairA, pairB])"
             >
               <UiIcon class="ap-kin-ic" name="dna" :size="14" />
@@ -279,10 +293,10 @@
               <span class="ap-kin-rel">{{ pairKin.text }}</span>
             </button>
             <div class="ap-sec-head">
-              <span class="ap-sec-label">Link</span>
+              <span class="ap-sec-label">{{ t('graphActions.link') }}</span>
               <button
                 class="ap-swap"
-                title="Swap direction (matters for parent → child, admirer → crush…)"
+                :title="t('graphActions.swapDirHint')"
                 @click="flipped = !flipped"
               >
                 <b :style="{ color: colorOf(pairA) }">{{ shortName(pairA) }}</b>
@@ -303,7 +317,7 @@
                 @click="link(d)"
               >
                 <UiIcon class="ap-chip-glyph" :name="iconOr(d.glyph, 'link')" :size="12" />
-                {{ d.label }}
+                {{ relTypeLabel(d) }}
                 <UiIcon
                   v-if="existingTypes.has(d.key)"
                   class="ap-chip-check"
@@ -314,43 +328,45 @@
             </div>
             <Transition name="apflash">
               <div v-if="justLinked" class="ap-flash">
-                <UiIcon name="check" :size="14" />Linked — {{ justLinked }}
+                <UiIcon name="check" :size="14" />{{
+                  t('graphActions.linked', { label: justLinked })
+                }}
               </div>
             </Transition>
             <button
               v-if="!mode3d"
               class="ap-btn ap-btn-full"
-              title="Light up the shortest chain between them"
+              :title="t('graphActions.traceConnectionHint')"
               @click="$emit('trace-pair', [pairA, pairB])"
             >
-              <UiIcon name="route" :size="14" />Trace connection
+              <UiIcon name="route" :size="14" />{{ t('graphActions.traceConnection') }}
             </button>
           </div>
 
           <!-- Node styling (2D canvas only) — applies to the whole selection -->
           <div v-if="!mode3d && nodeStyle" class="ap-section ap-stagger" style="--i: 1">
             <div class="ap-row">
-              <span class="ap-sec-label">Size</span>
+              <span class="ap-sec-label">{{ t('graphActions.size') }}</span>
               <div class="ap-seg">
                 <button
                   v-for="s in SIZES"
-                  :key="s.label"
+                  :key="s.id"
                   class="ap-seg-opt"
                   :class="{ on: styleSize === s.v }"
-                  :title="s.title"
+                  :title="t('graphActions.sizes.' + s.id + '.title')"
                   @click="$emit('set-size', s.v)"
                 >
-                  {{ s.label }}
+                  {{ t('graphActions.sizes.' + s.id + '.label') }}
                 </button>
               </div>
             </div>
             <div class="ap-row">
-              <span class="ap-sec-label">Color</span>
+              <span class="ap-sec-label">{{ t('graphActions.color') }}</span>
               <div class="ap-swatches">
                 <button
                   class="ap-swatch ap-swatch-auto"
                   :class="{ on: !styleColor }"
-                  title="Auto — the gender gradient"
+                  :title="t('graphActions.autoColor')"
                   @click="$emit('set-color', null)"
                 ></button>
                 <button
@@ -367,15 +383,17 @@
 
           <div class="ap-danger-row ap-stagger" :style="{ '--i': 2 }">
             <button class="ap-btn ap-btn-danger" @click="deleteSelected">
-              <UiIcon name="trash-2" :size="14" />Delete{{ n > 1 ? ` ${n}` : '' }}
+              <UiIcon name="trash-2" :size="14" />{{
+                n > 1 ? t('graphActions.deleteN', { n }) : t('graphActions.delete')
+              }}
             </button>
             <button
               v-if="n > 1"
               class="ap-btn"
-              title="Keep everyone, drop the selection"
+              :title="t('graphActions.clearKeepPeople')"
               @click="close"
             >
-              Clear
+              {{ t('graphActions.clear') }}
             </button>
           </div>
         </div>
@@ -391,7 +409,8 @@ import UiIcon, { hasIcon } from '../ui/UiIcon.js'
 import { nodeColor } from './linkHelpers.js'
 import { confirmDialog } from '../../lib/dialogs.js'
 import { undoToast } from '../../lib/undoToast.js'
-import { translate as tr } from '../../i18n'
+import { translate as tr, useI18n } from '../../i18n'
+import { relTypeLabel, relRoleLabel, relStatusLabel, nounLabel } from '../../lib/dataLabels'
 import { useKinship, kinClass, kinPalette } from '../kinship/useKinship'
 
 defineProps({
@@ -418,12 +437,14 @@ defineEmits([
 ])
 
 const store = useMainStore()
+const { t } = useI18n()
 
+// Labels/titles: graphActions.sizes.<id>.*
 const SIZES = [
-  { label: 'S', v: 0.7, title: 'Small' },
-  { label: 'M', v: 1, title: 'Default' },
-  { label: 'L', v: 1.4, title: 'Large' },
-  { label: 'XL', v: 1.9, title: 'Huge' }
+  { id: 's', v: 0.7 },
+  { id: 'm', v: 1 },
+  { id: 'l', v: 1.4 },
+  { id: 'xl', v: 1.9 }
 ]
 // Same presets the Groups view offers, so accents feel like one family.
 const COLORS = [
@@ -453,21 +474,29 @@ const mode = computed(() => {
 })
 
 // ── Marquee mode (mixed node + bond selection) ──────────────────────────────
-const FILTERS = [
-  { v: 'both', label: 'Both', title: 'Select nodes and bonds' },
-  { v: 'nodes', label: 'Nodes', title: 'Select only people' },
-  { v: 'bonds', label: 'Bonds', title: 'Select only relationships' }
-]
+// Labels/titles: graphActions.filters.<v>.*
+const FILTERS = [{ v: 'both' }, { v: 'nodes' }, { v: 'bonds' }]
 const relCount = computed(() => store.selectedRelationshipIds.length)
 const total = computed(() => n.value + relCount.value)
 const selFilter = computed(() => store.selectionFilter)
-const nodeNoun = computed(() => store.noun.toLowerCase())
-const marqueeTitle = computed(() => `${total.value} selected`)
+const nodeNoun = computed(() => nounLabel(store.noun).toLowerCase())
+const marqueeTitle = computed(() => t('graphActions.selected', { n: total.value }))
 const marqueeSub = computed(() => {
   const parts = []
-  if (n.value) parts.push(`${n.value} ${n.value === 1 ? nodeNoun.value : nodeNoun.value + 's'}`)
-  if (relCount.value) parts.push(`${relCount.value} bond${relCount.value === 1 ? '' : 's'}`)
-  return parts.length ? parts.join(' · ') : 'Nothing in range'
+  if (n.value)
+    parts.push(
+      t(n.value === 1 ? 'graphActions.nounCountOne' : 'graphActions.nounCountOther', {
+        n: n.value,
+        noun: nodeNoun.value
+      })
+    )
+  if (relCount.value)
+    parts.push(
+      t(relCount.value === 1 ? 'graphActions.bondCountOne' : 'graphActions.bondCountOther', {
+        n: relCount.value
+      })
+    )
+  return parts.length ? parts.join(' · ') : t('graphActions.nothingInRange')
 })
 function setFilter(f) {
   store.applySelectionFilter(f)
@@ -481,8 +510,8 @@ const selRelObjs = computed(() => {
 const uniformRelDef = computed(() => {
   const rels = selRelObjs.value
   if (!rels.length) return null
-  const t = rels[0].type
-  return rels.every((r) => r.type === t) ? store.relTypeByKey.get(t) : null
+  const type = rels[0].type
+  return rels.every((r) => r.type === type) ? store.relTypeByKey.get(type) : null
 })
 const uniformStatuses = computed(() => uniformRelDef.value?.statuses || [])
 const uniformStatus = computed(() => {
@@ -522,7 +551,7 @@ function personOf(id) {
   return store.persons.find((p) => p.id === id) || null
 }
 function nameOf(id) {
-  return personOf(id)?.name || 'Unnamed'
+  return personOf(id)?.name || t('graphActions.unnamed')
 }
 function shortName(id) {
   return nameOf(id).split(/\s+/)[0]
@@ -546,8 +575,9 @@ const headIds = computed(() => ids.value.slice(0, 4))
 const extraCount = computed(() => Math.max(0, n.value - 4))
 const peopleTitle = computed(() => {
   if (n.value === 1) return nameOf(ids.value[0])
-  if (n.value === 2) return `${shortName(ids.value[0])} & ${shortName(ids.value[1])}`
-  return `${n.value} selected`
+  if (n.value === 2)
+    return t('graphActions.pairTitle', { a: shortName(ids.value[0]), b: shortName(ids.value[1]) })
+  return t('graphActions.selected', { n: n.value })
 })
 const peopleSub = computed(() => {
   if (n.value === 1) {
@@ -555,12 +585,12 @@ const peopleSub = computed(() => {
     const b = p?.birth?.year,
       d = p?.death?.year
     if (b && d) return `${b} – ${d}`
-    if (b) return `b. ${b}`
-    if (d) return `d. ${d}`
-    return store.noun
+    if (b) return t('graphActions.born', { year: b })
+    if (d) return t('graphActions.died', { year: d })
+    return nounLabel(store.noun)
   }
-  if (n.value === 2) return 'Forge a bond, or style them together'
-  return 'Styling applies to everyone selected'
+  if (n.value === 2) return t('graphActions.pairSub')
+  return t('graphActions.multiSub')
 })
 
 function openDetails() {
@@ -643,10 +673,12 @@ function chipColor(def) {
   return def.color || gs.parentChildColor
 }
 function chipTitle(def) {
-  if (existingTypes.value.has(def.key)) return 'Already linked'
+  if (existingTypes.value.has(def.key)) return t('graphActions.alreadyLinked')
+  const a = shortName(pairA.value)
+  const b = shortName(pairB.value)
   if (def.directed && def.role_a)
-    return `${shortName(pairA.value)} becomes ${def.role_a.toLowerCase()} of ${shortName(pairB.value)}`
-  return `Link ${shortName(pairA.value)} and ${shortName(pairB.value)} as ${def.label.toLowerCase()}`
+    return t('graphActions.becomes', { a, b, role: relRoleLabel(def, 'a').toLowerCase() })
+  return t('graphActions.linkAs', { a, b, type: relTypeLabel(def).toLowerCase() })
 }
 
 const justLinked = ref('')
@@ -659,7 +691,7 @@ async function link(def) {
     type: def.key
   })
   if (res?.success) {
-    justLinked.value = def.label
+    justLinked.value = relTypeLabel(def)
     if (linkedTimer) clearTimeout(linkedTimer)
     linkedTimer = setTimeout(() => (justLinked.value = ''), 1800)
   }
@@ -672,23 +704,28 @@ const relTitle = computed(() => {
   const r = rel.value
   if (!r) return ''
   if (r.label) return r.label // per-edge custom label wins
-  if (r.type === 'spouse') return r.status === 'divorced' ? 'Divorced' : 'Married'
-  return relDef.value?.label || r.type
+  if (r.type === 'spouse')
+    return r.status === 'divorced' ? relStatusLabel('divorced') : t('graphActions.married')
+  return relTypeLabel(relDef.value) || r.type
 })
 const relDates = computed(() => {
   const r = rel.value
   if (!r) return ''
   if (r.formed?.year) {
-    const from = r.type === 'spouse' ? `Married ${r.formed.year}` : `Since ${r.formed.year}`
-    return r.ended?.year ? `${from} — ${r.ended.year}` : from
+    const year = r.formed.year
+    const from =
+      r.type === 'spouse'
+        ? t('graphActions.marriedYear', { year })
+        : t('graphActions.sinceYear', { year })
+    return r.ended?.year ? t('graphActions.range', { from, to: r.ended.year }) : from
   }
-  if (r.ended?.year) return `Ended ${r.ended.year}`
+  if (r.ended?.year) return t('graphActions.endedYear', { year: r.ended.year })
   return ''
 })
 const relStatuses = computed(() => relDef.value?.statuses || [])
 function statusLabel(s, type = rel.value?.type) {
-  if (type === 'spouse' && s === 'active') return 'Married'
-  return s.charAt(0).toUpperCase() + s.slice(1)
+  if (type === 'spouse' && s === 'active') return t('graphActions.married')
+  return relStatusLabel(s)
 }
 
 async function setRelStatus(status) {

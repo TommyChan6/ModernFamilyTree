@@ -4,7 +4,7 @@
     class="mini-map"
     :class="{ dragging, ink: store.isInk }"
     :style="{ width: width + 'px', height: height + 'px' }"
-    title="Overview — drag to move the view"
+    :title="t('minimap.title')"
     @pointerdown.stop.prevent="onDown"
     @pointermove="onMove"
     @pointerup="onUp"
@@ -33,6 +33,7 @@
 //   onDragEnd?()                 → notified when a minimap drag gesture ends
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useMainStore } from '../store/index.js'
+import { useI18n } from '../i18n'
 import { createCssColorCache, roundRect, withAlpha } from './webgl/overlayUtils.js'
 import {
   rectToBounds,
@@ -52,6 +53,7 @@ const props = defineProps({
 })
 
 const store = useMainStore()
+const { t } = useI18n()
 const rootEl = ref(null)
 const canvasEl = ref(null)
 const dragging = ref(false)

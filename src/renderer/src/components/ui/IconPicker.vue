@@ -1,6 +1,6 @@
 <template>
   <div class="icon-picker">
-    <div class="ip-grid" role="listbox" :aria-label="ariaLabel">
+    <div class="ip-grid" role="listbox" :aria-label="ariaLabel || t('ui.icon')">
       <button
         v-if="allowNone"
         type="button"
@@ -8,7 +8,7 @@
         :class="{ on: !current }"
         role="option"
         :aria-selected="!current"
-        title="No icon"
+        :title="t('ui.noIcon')"
         @click="pick('')"
       >
         <UiIcon name="ban" :size="15" />
@@ -32,9 +32,9 @@
       v-model="query"
       class="ip-search"
       size="sm"
-      placeholder="Search all icons…"
+      :placeholder="t('ui.searchIcons')"
     />
-    <div v-if="query && !shown.length" class="ip-empty">No icon matches “{{ query }}”.</div>
+    <div v-if="query && !shown.length" class="ip-empty">{{ t('ui.noIconMatch', { query }) }}</div>
   </div>
 </template>
 
@@ -43,6 +43,7 @@ import { computed, ref } from 'vue'
 import UiIcon from './UiIcon.js'
 import SearchField from './SearchField.vue'
 import { ICON_NAMES, resolveIcon } from './icons.js'
+import { useI18n } from '../../i18n'
 
 // Pick one icon NAME (components/ui/icons.js). Shows a curated grid; typing in
 // the search widens it to the whole bundled set. A legacy stored glyph (an
@@ -53,10 +54,11 @@ const props = defineProps({
   options: { type: Array, default: () => DEFAULT_OPTIONS },
   allowNone: { type: Boolean, default: false },
   searchable: { type: Boolean, default: true },
-  ariaLabel: { type: String, default: 'Icon' }
+  ariaLabel: { type: String, default: '' }
 })
 const emit = defineEmits(['update:modelValue'])
 
+const { t } = useI18n()
 const query = ref('')
 const current = computed(() => resolveIcon(props.modelValue) || '')
 

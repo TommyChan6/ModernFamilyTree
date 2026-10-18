@@ -33,11 +33,14 @@
           </div>
           <div v-else key="idle" class="wheel-hub-inner wheel-hub-idle">
             <UiIcon class="wheel-hub-ic" name="move" :size="20" />
-            <span class="wheel-hub-label">Edit</span>
+            <span class="wheel-hub-label">{{ t('graphWheel.hubIdle') }}</span>
           </div>
         </Transition>
       </div>
-      <div class="wheel-tip">Release to select · <b>C</b> customize · <b>Esc</b> cancel</div>
+      <div class="wheel-tip">
+        {{ t('graphWheel.tipRelease') }} · <b>C</b> {{ t('graphWheel.tipCustomize') }} · <b>Esc</b>
+        {{ t('graphWheel.tipCancel') }}
+      </div>
     </div>
   </div>
 </template>
@@ -45,6 +48,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import UiIcon from '../ui/UiIcon.js'
+import { useI18n } from '../../i18n'
 import { sectorPath, sectorCentroid, sectorUnit, sectorFromPoint } from './wheelModes.js'
 
 const props = defineProps({
@@ -54,6 +58,7 @@ const props = defineProps({
   activeId: { type: String, default: null } // currently active mode (rendered lit)
 })
 const emit = defineEmits(['update:highlight', 'pick', 'cancel'])
+const { t } = useI18n()
 
 const layerEl = ref(null)
 const highlight = ref(null)

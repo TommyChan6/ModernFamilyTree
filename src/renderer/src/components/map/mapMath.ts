@@ -525,7 +525,7 @@ export function hitFeature(
   tol: number,
   year: number | null,
   geometryOf: GeometryOf,
-  opts: { skipBase?: boolean } = {}
+  opts: { skipBase?: boolean; hidden?: Set<string> | null } = {}
 ): string | null {
   let bestPoint: string | null = null
   let bestPointD = Infinity
@@ -537,6 +537,7 @@ export function hitFeature(
   let baseAreaA = Infinity
   for (let i = features.length - 1; i >= 0; i--) {
     const f = features[i]
+    if (opts.hidden?.has(f.kind)) continue
     if (windowAlpha(f, year) < 0.3) continue
     const geo = geometryOf(f.kind)
     if (geo === 'point') {
@@ -579,6 +580,144 @@ export function hitVertex(pts: number[], wx: number, wy: number, tol: number): n
     }
   }
   return best
+}
+
+// ── vertex editing ────────────────────────────────────────────────────────────
+/** Fewest raw vertices a shape can keep: a polygon needs 3, a line 2. */
+export const minVertices = (closed: boolean) => (closed ? 3 : 2)
+
+/** A new point list with (x, y) inserted after vertex `i` (i.e. on segment i). */
+export function insertVertex(pts: number[], i: number, x: number, y: number): number[] {
+  const out = pts.slice()
+  out.splice((i + 1) * 2, 0, Math.round(x * 10) / 10, Math.round(y * 10) / 10)
+  return out
+}
+
+/** A new point list without vertex `i` — or null when that would leave fewer
+ *  vertices than the shape needs (the caller deletes the whole feature instead). */
+export function removeVertex(pts: number[], i: number, closed: boolean): number[] | null {
+  const n = pts.length / 2
+  if (i < 0 || i >= n || n - 1 < minVertices(closed)) return null
+  const out = pts.slice()
+  out.splice(i * 2, 2)
+  return out
+}
+
+/** Midpoint of segment i (vertex i → i+1; a closed shape's last segment wraps). */
+export function segmentMidpoint(pts: number[], i: number): [number, number] {
+  const n = pts.length
+  const a = i * 2
+  const b = (a + 2) % n
+  return [(pts[a] + pts[b]) / 2, (pts[a + 1] + pts[b + 1]) / 2]
+}
+
+/** The segment whose midpoint handle is within `tol` of a world point, or -1.
+ *  Segments shorter than `minLen` show no handle, so they can't be hit either. */
+export function hitMidpoint(
+  pts: number[],
+  closed: boolean,
+  wx: number,
+  wy: number,
+  tol: number,
+  minLen = 0
+): number {
+  const n = pts.length
+  const segs = closed ? n / 2 : n / 2 - 1
+  let best = -1
+  let bestD = tol
+  for (let i = 0; i < segs; i++) {
+    const a = i * 2
+    const b = (a + 2) % n
+    if (Math.hypot(pts[b] - pts[a], pts[b + 1] - pts[a + 1]) < minLen) continue
+    const [mx, my] = segmentMidpoint(pts, i)
+    const d = Math.hypot(wx - mx, wy - my)
+    if (d <= bestD) {
+      bestD = d
+      best = i
+    }
+  }
+  return best
+}
+
+// ── snapping ──────────────────────────────────────────────────────────────────
+const boxCache = new WeakMap<number[], Box>()
+function cachedBox(pts: number[]): Box {
+  let b = boxCache.get(pts)
+  if (!b) {
+    b = bboxOf(pts)
+    boxCache.set(pts, b)
+  }
+  return b
+}
+
+export interface SnapHit {
+  x: number
+  y: number
+  /** The feature snapped to. */
+  id: string
+  /** 'point' = a place / event marker, 'vertex' = a corner of a line or area. */
+  type: 'point' | 'vertex'
+}
+
+/** Magnetic snap: the nearest place marker or line/area vertex within `tol`
+ *  of a world point. Places pull harder (a road should end IN the town): any
+ *  place in reach wins over every vertex. Hidden kinds, features faded out
+ *  at `year`, and `excludeId` (the shape being edited) never attract. */
+export function snapPoint(
+  features: MapFeature[],
+  wx: number,
+  wy: number,
+  tol: number,
+  year: number | null,
+  geometryOf: GeometryOf,
+  opts: { excludeId?: string | null; hidden?: Set<string> | null } = {}
+): SnapHit | null {
+  let best: SnapHit | null = null
+  let bestScore = Infinity
+  for (const f of features) {
+    if (f.id === opts.excludeId || opts.hidden?.has(f.kind)) continue
+    if (f.kind === 'label') continue
+    if (windowAlpha(f, year) < 0.3) continue
+    const geo = geometryOf(f.kind)
+    if (geo === 'point') {
+      const d = Math.hypot(wx - f.pts[0], wy - f.pts[1])
+      // any place in reach beats every vertex (scores below −tol), nearest first
+      if (d <= tol * 1.5 && d - tol * 4 < bestScore) {
+        bestScore = d - tol * 4
+        best = { x: f.pts[0], y: f.pts[1], id: f.id, type: 'point' }
+      }
+      continue
+    }
+    const b = cachedBox(f.pts)
+    if (wx < b.x0 - tol || wx > b.x1 + tol || wy < b.y0 - tol || wy > b.y1 + tol) continue
+    const p = f.pts
+    for (let i = 0; i < p.length; i += 2) {
+      const d = Math.hypot(wx - p[i], wy - p[i + 1])
+      if (d <= tol && d < bestScore) {
+        bestScore = d
+        best = { x: p[i], y: p[i + 1], id: f.id, type: 'vertex' }
+      }
+    }
+  }
+  return best
+}
+
+// ── search ────────────────────────────────────────────────────────────────────
+/** Lower-case, accent-free text for forgiving matches ("Ålesund" ~ "alesund"). */
+export function foldText(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+}
+
+/** How well `name` answers the query: 0 exact, 1 prefix, 2 a word starts with
+ *  it, 3 contains it, -1 no match. Lower is better; an empty query matches all. */
+export function matchScore(name: string, query: string): number {
+  const q = foldText(query)
+  if (!q) return 3
+  const n = foldText(name)
+  if (n === q) return 0
+  if (n.startsWith(q)) return 1
+  if (n.split(/[\s\-–—_'’.,/()]+/).some((w) => w.startsWith(q))) return 2
+  return n.includes(q) ? 3 : -1
 }
 
 /** A "nice" scale-bar length (1/2/5 × 10ⁿ) close to `target`. */

@@ -12,8 +12,8 @@
       type="text"
       role="searchbox"
       :value="modelValue"
-      :placeholder="placeholder"
-      :aria-label="ariaLabel || placeholder"
+      :placeholder="shownPlaceholder"
+      :aria-label="ariaLabel || shownPlaceholder"
       spellcheck="false"
       autocomplete="off"
       @input="onInput"
@@ -23,8 +23,8 @@
       v-if="clearable && modelValue"
       type="button"
       class="sf-clear"
-      title="Clear search"
-      aria-label="Clear search"
+      :title="t('ui.clearSearch')"
+      :aria-label="t('ui.clearSearch')"
       @mousedown.prevent
       @click="clear"
     >
@@ -36,6 +36,7 @@
 <script setup>
 import { computed, ref, useAttrs } from 'vue'
 import UiIcon from './UiIcon.js'
+import { useI18n } from '../../i18n'
 
 // The app's one search input: magnifier icon inside the field, an optional
 // clear button, Esc-to-clear. Extra attributes (@keydown, @focus, autofocus,
@@ -44,13 +45,17 @@ defineOptions({ inheritAttrs: false })
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
-  placeholder: { type: String, default: 'Search…' },
+  placeholder: { type: String, default: '' },
   ariaLabel: { type: String, default: '' },
   /** 'sm' (28px) · 'md' (34px) · 'lg' (42px) */
   size: { type: String, default: 'md' },
   clearable: { type: Boolean, default: true }
 })
 const emit = defineEmits(['update:modelValue', 'clear'])
+
+const { t } = useI18n()
+// Default placeholder resolves at render time so it follows the UI language.
+const shownPlaceholder = computed(() => props.placeholder || t('ui.search'))
 
 const attrs = useAttrs()
 // Vue puts class/style into $attrs too once inheritAttrs is off — route them

@@ -64,7 +64,7 @@
                         <div class="pv-card-rim"></div>
                         <div v-if="deceased" class="pv-memoriam">
                           <UiIcon name="bird" :size="13" />
-                          In memoriam
+                          {{ t('personModal.inMemoriam') }}
                         </div>
                       </div>
                     </div>
@@ -88,17 +88,19 @@
                         <span class="pv-life-dot" :class="{ 'pv-alive': !deceased }"></span>
                       </span>
                       <span class="pv-year">{{
-                        deceased ? fmtDate(person.death) || '?' : 'Present'
+                        deceased ? fmtDate(person.death) || '?' : t('personModal.present')
                       }}</span>
-                      <span v-if="age !== null" class="pv-age">{{ age }} yrs</span>
+                      <span v-if="age !== null" class="pv-age">{{
+                        t('personModal.ageYrs', { n: age })
+                      }}</span>
                     </template>
-                    <span v-else class="pv-dim">No dates recorded</span>
+                    <span v-else class="pv-dim">{{ t('personModal.noDates') }}</span>
                   </div>
 
                   <div class="pv-chips">
                     <span v-if="person.gender && person.gender !== 'unknown'" class="pv-chip">
                       <UiIcon :name="genderIcon" :size="14" />
-                      {{ person.gender }}
+                      {{ genderLabel(person.gender) }}
                     </span>
                     <span v-if="person.occupation" class="pv-chip">
                       <UiIcon name="briefcase" :size="14" />
@@ -119,26 +121,26 @@
                     >
                       <span class="pv-tag-dot"></span>
                       <UiIcon v-if="tag.icon" :name="tag.icon" :size="13" />
-                      {{ tag.label }}
+                      {{ defaultNameLabel(tag.label) }}
                     </span>
                   </div>
 
                   <div class="pv-stats">
                     <div class="pv-stat" style="--i: 0">
                       <span class="pv-stat-val">{{ statsShown.bonds }}</span>
-                      <span class="pv-stat-key">Bonds</span>
+                      <span class="pv-stat-key">{{ t('personModal.stats.bonds') }}</span>
                     </div>
                     <div class="pv-stat" style="--i: 1">
                       <span class="pv-stat-val">{{ statsShown.circle }}</span>
-                      <span class="pv-stat-key">Circle</span>
+                      <span class="pv-stat-key">{{ t('personModal.stats.circle') }}</span>
                     </div>
                     <div class="pv-stat" style="--i: 2">
                       <span class="pv-stat-val">{{ statsShown.traits }}</span>
-                      <span class="pv-stat-key">Traits</span>
+                      <span class="pv-stat-key">{{ t('personModal.stats.traits') }}</span>
                     </div>
                     <div class="pv-stat" style="--i: 3">
                       <span class="pv-stat-val">{{ statsShown.photos }}</span>
-                      <span class="pv-stat-key">Photos</span>
+                      <span class="pv-stat-key">{{ t('personModal.stats.photos') }}</span>
                     </div>
                   </div>
                 </aside>
@@ -148,8 +150,10 @@
                   <!-- Constellation -->
                   <section v-if="ring1.length" class="pv-section" style="--i: 0">
                     <h2 class="pv-h">
-                      Constellation
-                      <span class="pv-h-sub">{{ circleCount }} within two bonds</span>
+                      {{ t('personModal.constellation') }}
+                      <span class="pv-h-sub">{{
+                        t('personModal.withinTwo', { n: circleCount })
+                      }}</span>
                     </h2>
                     <div class="pv-orbit" :class="{ 'pv-orbit-lg': ring2.length }">
                       <div v-if="ring2.length" class="pv-ring pv-ring-2"></div>
@@ -210,7 +214,10 @@
                               />
                               <span v-else>{{ initialsOf(sat.name) }}</span>
                             </span>
-                            <span class="pv-sat-label"><b>2 hops</b>{{ sat.name }}</span>
+                            <span class="pv-sat-label"
+                              ><b>{{ t('personModal.twoHops') }}</b
+                              >{{ sat.name }}</span
+                            >
                           </span>
                         </button>
                       </div>
@@ -220,8 +227,8 @@
                   <!-- Kinship: the whole family, named, beside the ancestor fan -->
                   <section v-if="relationshipChips.length" class="pv-section" style="--i: 1">
                     <h2 class="pv-h pv-h-kin">
-                      Kinship
-                      <span class="pv-h-sub">family, named</span>
+                      {{ t('personModal.kinship') }}
+                      <span class="pv-h-sub">{{ t('personModal.kinshipSub') }}</span>
                       <KinLangPicker class="pv-kin-lang" />
                     </h2>
                     <KinshipSection :person-id="person.id" @navigate="navigateTo" />
@@ -229,7 +236,7 @@
 
                   <!-- Story -->
                   <section v-if="person.bio" class="pv-section" style="--i: 1">
-                    <h2 class="pv-h">Story</h2>
+                    <h2 class="pv-h">{{ t('personModal.story') }}</h2>
                     <p class="pv-bio" :class="{ 'pv-bio-cap': person.bio.length > 140 }">
                       {{ person.bio }}
                     </p>
@@ -238,48 +245,56 @@
                   <!-- Traits -->
                   <section v-if="traitRows.length" class="pv-section" style="--i: 2">
                     <h2 class="pv-h">
-                      Traits <span class="pv-h-sub">{{ traitRows.length }}</span>
+                      {{ t('personModal.traits') }}
+                      <span class="pv-h-sub">{{ traitRows.length }}</span>
                     </h2>
                     <div class="pv-traits">
                       <div
-                        v-for="(t, i) in traitRows"
-                        :key="t.id"
+                        v-for="(trait, i) in traitRows"
+                        :key="trait.id"
                         class="pv-trait"
-                        :class="{ 'pv-trait-wide': t.kind === 'para' }"
+                        :class="{ 'pv-trait-wide': trait.kind === 'para' }"
                         :style="{ '--i': i }"
                       >
                         <div class="pv-trait-head">
-                          <UiIcon v-if="t.icon" class="pv-trait-icon" :name="t.icon" :size="14" />
-                          {{ t.label }}
+                          <UiIcon
+                            v-if="trait.icon"
+                            class="pv-trait-icon"
+                            :name="trait.icon"
+                            :size="14"
+                          />
+                          {{ trait.label }}
                         </div>
-                        <div v-if="t.kind === 'slider'" class="pv-trait-slider">
+                        <div v-if="trait.kind === 'slider'" class="pv-trait-slider">
                           <div class="pv-bar">
-                            <div class="pv-bar-fill" :style="{ width: t.pct + '%' }"></div>
-                            <div class="pv-bar-spark" :style="{ left: t.pct + '%' }"></div>
+                            <div class="pv-bar-fill" :style="{ width: trait.pct + '%' }"></div>
+                            <div class="pv-bar-spark" :style="{ left: trait.pct + '%' }"></div>
                           </div>
-                          <div v-if="t.left || t.right" class="pv-bar-labels">
-                            <span>{{ t.left }}</span>
-                            <span>{{ t.right }}</span>
+                          <div v-if="trait.left || trait.right" class="pv-bar-labels">
+                            <span>{{ trait.left }}</span>
+                            <span>{{ trait.right }}</span>
                           </div>
                         </div>
-                        <div v-else-if="t.kind === 'select'" class="pv-trait-value">
+                        <div v-else-if="trait.kind === 'select'" class="pv-trait-value">
                           <span
-                            v-if="t.color"
+                            v-if="trait.color"
                             class="pv-select-dot"
-                            :style="{ background: t.color }"
+                            :style="{ background: trait.color }"
                           ></span>
-                          {{ t.text }}
+                          {{ trait.text }}
                         </div>
                         <div
-                          v-else-if="t.kind === 'bool'"
+                          v-else-if="trait.kind === 'bool'"
                           class="pv-trait-value"
-                          :class="t.bool ? 'pv-bool-yes' : 'pv-bool-no'"
+                          :class="trait.bool ? 'pv-bool-yes' : 'pv-bool-no'"
                         >
-                          <UiIcon :name="t.bool ? 'check' : 'x'" :size="16" :stroke="2.4" />
-                          {{ t.bool ? 'Yes' : 'No' }}
+                          <UiIcon :name="trait.bool ? 'check' : 'x'" :size="16" :stroke="2.4" />
+                          {{ trait.bool ? t('personForm.input.yes') : t('personForm.input.no') }}
                         </div>
-                        <div v-else-if="t.kind === 'para'" class="pv-trait-para">{{ t.text }}</div>
-                        <div v-else class="pv-trait-value">{{ t.text }}</div>
+                        <div v-else-if="trait.kind === 'para'" class="pv-trait-para">
+                          {{ trait.text }}
+                        </div>
+                        <div v-else class="pv-trait-value">{{ trait.text }}</div>
                       </div>
                     </div>
                   </section>
@@ -291,29 +306,29 @@
                     style="--i: 3"
                   >
                     <h2 class="pv-h pv-h-chron">
-                      Chronicle
+                      {{ t('personModal.chronicle') }}
                       <button
                         class="pv-chron-add"
                         type="button"
-                        title="Add a story event they took part in"
+                        :title="t('personModal.addEventHint')"
                         @click="addStoryEvent"
                       >
                         <UiIcon name="plus" :size="14" />
-                        Add event
+                        {{ t('personModal.addEvent') }}
                       </button>
                     </h2>
                     <div v-if="livedEras.length" class="pv-eras">
-                      <span class="pv-eras-k">Lived through</span>
+                      <span class="pv-eras-k">{{ t('personModal.livedThrough') }}</span>
                       <button
                         v-for="(e, i) in livedEras"
                         :key="e.id"
                         class="pv-era"
                         :style="{ '--ec': e.color, '--i': i }"
-                        :title="e.description || e.name"
+                        :title="e.description || defaultNameLabel(e.name)"
                         @click="store.openEraEditor({ id: e.id })"
                       >
                         <UiIcon class="pv-era-ic" :name="e.icon || 'diamond'" :size="13" />
-                        {{ e.name }}
+                        {{ defaultNameLabel(e.name) }}
                       </button>
                     </div>
                     <div class="pv-chron">
@@ -341,7 +356,8 @@
                   <!-- Bonds -->
                   <section v-if="bondGroups.length" class="pv-section" style="--i: 4">
                     <h2 class="pv-h">
-                      Bonds <span class="pv-h-sub">{{ relationshipChips.length }}</span>
+                      {{ t('personModal.bonds') }}
+                      <span class="pv-h-sub">{{ relationshipChips.length }}</span>
                     </h2>
                     <div v-for="g in bondGroups" :key="g.key" class="pv-band">
                       <div class="pv-band-name">{{ g.label }}</div>
@@ -365,9 +381,9 @@
                             </span>
                             <span class="pv-bond-name">{{ c.name }}</span>
                           </span>
-                          <span v-if="c.endedYear" class="pv-bond-endtag"
-                            >Ended {{ c.endedYear }}</span
-                          >
+                          <span v-if="c.endedYear" class="pv-bond-endtag">{{
+                            t('personModal.endedYear', { year: c.endedYear })
+                          }}</span>
                         </button>
                       </div>
                     </div>
@@ -376,7 +392,8 @@
                   <!-- Gallery -->
                   <section v-if="images.length" class="pv-section" style="--i: 5">
                     <h2 class="pv-h">
-                      Gallery <span class="pv-h-sub">{{ images.length }}</span>
+                      {{ t('personModal.gallery') }}
+                      <span class="pv-h-sub">{{ images.length }}</span>
                     </h2>
                     <div class="pv-gallery">
                       <button
@@ -392,8 +409,14 @@
                           loading="lazy"
                           decoding="async"
                         />
-                        <span v-if="img.role" class="pv-photo-role">{{ img.role }}</span>
-                        <span v-if="img.is_primary" class="pv-photo-star" title="Primary photo">
+                        <span v-if="img.role" class="pv-photo-role">{{
+                          imageRoleLabel(img.role)
+                        }}</span>
+                        <span
+                          v-if="img.is_primary"
+                          class="pv-photo-star"
+                          :title="t('personModal.primaryPhoto')"
+                        >
                           <UiIcon name="star" :size="13" />
                         </span>
                       </button>
@@ -405,14 +428,15 @@
                     <div class="pv-empty-mark">
                       <UiIcon name="sparkles" :size="34" :stroke="1.6" />
                     </div>
-                    <div class="pv-empty-title">A story waiting to be written</div>
+                    <div class="pv-empty-title">{{ t('personModal.blankTitle') }}</div>
                     <div class="pv-empty-text">
-                      No traits, bonds, or photos yet — open the editor to bring
-                      {{ person.name || 'them' }} to life.
+                      {{
+                        t('personModal.blankText', { name: person.name || t('personModal.them') })
+                      }}
                     </div>
                     <button class="pv-act pv-empty-cta" @click="store.openForm(person)">
                       <UiIcon name="pencil" :size="16" />
-                      Start editing
+                      {{ t('personModal.startEditing') }}
                     </button>
                   </section>
 
@@ -443,7 +467,7 @@
         <div
           class="pv-style"
           role="radiogroup"
-          aria-label="Profile style"
+          :aria-label="t('personModal.profileStyle')"
           :style="{ '--n': PROFILE_STYLE_META.length, '--at': styleIndex }"
         >
           <i class="pv-style-thumb" aria-hidden="true"></i>
@@ -463,24 +487,24 @@
         </div>
         <button
           class="pv-act"
-          :title="`Edit ${store.noun.toLowerCase()}`"
+          :title="t('personModal.editNoun', { noun: nounLabel(store.noun).toLowerCase() })"
           @click="store.openForm(person)"
         >
           <UiIcon name="pencil" :size="16" />
-          <span class="pv-act-label">Edit</span>
+          <span class="pv-act-label">{{ t('personModal.edit') }}</span>
         </button>
         <button
           class="pv-act pv-act-danger"
-          :title="`Delete ${store.noun.toLowerCase()}`"
+          :title="t('personModal.deleteNoun', { noun: nounLabel(store.noun).toLowerCase() })"
           @click="handleDelete"
         >
           <UiIcon name="trash-2" :size="16" />
-          <span class="pv-act-label">Delete</span>
+          <span class="pv-act-label">{{ t('dialog.delete') }}</span>
         </button>
         <button
           class="pv-x"
-          title="Close profile"
-          aria-label="Close profile"
+          :title="t('personModal.closeProfile')"
+          :aria-label="t('personModal.closeProfile')"
           @click="store.closeModal()"
         >
           <UiIcon name="x" :size="18" />
@@ -498,8 +522,8 @@
           <button
             v-if="images.length > 1"
             class="pv-lb-nav pv-lb-prev"
-            title="Previous photo"
-            aria-label="Previous photo"
+            :title="t('personModal.prevPhoto')"
+            :aria-label="t('personModal.prevPhoto')"
             @click="stepLightbox(-1)"
           >
             <UiIcon name="chevron-left" :size="24" />
@@ -509,7 +533,7 @@
             <div class="pv-lb-caption">
               {{ person.name }}
               <span v-if="images[lightbox].role" class="pv-lb-role">{{
-                images[lightbox].role
+                imageRoleLabel(images[lightbox].role)
               }}</span>
               <span class="pv-lb-count">{{ lightbox + 1 }} / {{ images.length }}</span>
             </div>
@@ -517,13 +541,18 @@
           <button
             v-if="images.length > 1"
             class="pv-lb-nav pv-lb-next"
-            title="Next photo"
-            aria-label="Next photo"
+            :title="t('personModal.nextPhoto')"
+            :aria-label="t('personModal.nextPhoto')"
             @click="stepLightbox(1)"
           >
             <UiIcon name="chevron-right" :size="24" />
           </button>
-          <button class="pv-lb-x" title="Close" aria-label="Close" @click="lightbox = null">
+          <button
+            class="pv-lb-x"
+            :title="t('personForm.close')"
+            :aria-label="t('personForm.close')"
+            @click="lightbox = null"
+          >
             <UiIcon name="x" :size="18" />
           </button>
         </div>
@@ -540,7 +569,16 @@ import { derivedSiblings, egoDistances } from './graph/graphInsights.js'
 import { ageOf } from './people/peopleLayout.js'
 import { confirmDialog } from '../lib/dialogs.js'
 import { undoToast } from '../lib/undoToast.js'
-import { translate as tr } from '../i18n'
+import { translate as tr, useI18n } from '../i18n'
+import {
+  defaultNameLabel,
+  fieldLabel,
+  genderLabel,
+  nounLabel,
+  optionLabel,
+  relRoleLabel,
+  relTypeLabel
+} from '../lib/dataLabels'
 import KinshipSection from './kinship/KinshipSection.vue'
 import { eventsOf, eventKind, erasLivedThrough } from '../../../shared/chronicle'
 import KinLangPicker from './kinship/KinLangPicker.vue'
@@ -555,6 +593,7 @@ import UiIcon from './ui/UiIcon.js'
 // the page stays smooth; the graph underneath idles at 0% CPU meanwhile.
 
 const store = useMainStore()
+const { t } = useI18n()
 
 const person = computed(() => store.selectedPerson)
 const images = ref([])
@@ -567,9 +606,20 @@ const reduceMotion =
 
 // ── Presentation style ──────────────────────────────────────────────────────
 // Both styles render the same state below; only the template differs.
+// label/title are getters so the switch re-translates on a language change.
+const profileStyle = (id, icon) => ({
+  id,
+  icon,
+  get label() {
+    return t(`personModal.styles.${id}`)
+  },
+  get title() {
+    return t(`personModal.styleTitles.${id}`)
+  }
+})
 const PROFILE_STYLE_META = [
-  { id: 'cinematic', icon: 'clapperboard', label: 'Cinematic', title: 'Cinematic profile' },
-  { id: 'scroll', icon: 'scroll', label: 'Scroll', title: 'Handscroll — an ink-painting profile' }
+  profileStyle('cinematic', 'clapperboard'),
+  profileStyle('scroll', 'scroll')
 ]
 const isScroll = computed(() => store.profileStyle === 'scroll')
 const styleIndex = computed(() =>
@@ -584,10 +634,17 @@ function imageUrl(filePath) {
   return api.getImageUrl(filePath) || ''
 }
 
-function hexMix(a, b, t) {
+/** A photo's named slot ('portrait' / 'fullbody' / 'background') as display text. */
+function imageRoleLabel(role) {
+  return ['portrait', 'fullbody', 'background'].includes(role)
+    ? t(`personForm.imageSlots.${role}`)
+    : role
+}
+
+function hexMix(a, b, k) {
   const pa = parseInt(a.slice(1), 16)
   const pb = parseInt(b.slice(1), 16)
-  const ch = (sh) => Math.round(((pa >> sh) & 255) + (((pb >> sh) & 255) - ((pa >> sh) & 255)) * t)
+  const ch = (sh) => Math.round(((pa >> sh) & 255) + (((pb >> sh) & 255) - ((pa >> sh) & 255)) * k)
   return `rgb(${ch(16)}, ${ch(8)}, ${ch(0)})`
 }
 
@@ -597,7 +654,7 @@ const deceased = computed(() => person.value?.death?.year != null)
 const age = computed(() => (person.value ? ageOf(person.value, refYear.value) : null))
 // Spaces become NBSP so the per-letter inline-block spans keep word gaps.
 const nameChars = computed(() =>
-  (person.value?.name || 'Unnamed').split('').map((ch) => (ch === ' ' ? ' ' : ch))
+  (person.value?.name || t('personForm.unnamed')).split('').map((ch) => (ch === ' ' ? ' ' : ch))
 )
 const genderIcon = computed(() =>
   person.value?.gender === 'male'
@@ -611,9 +668,9 @@ const genderIcon = computed(() =>
 // graph uses for node tinting, falling back to the unknown color.
 const personAccent = computed(() => {
   const g = store.graphSettings
-  const t = person.value?.gender_t
-  if (t == null) return g.unknownColor || '#5c6bc0'
-  return hexMix(g.maleColor || '#3a7bd5', g.femaleColor || '#c95fa0', t)
+  const gt = person.value?.gender_t
+  if (gt == null) return g.unknownColor || '#5c6bc0'
+  return hexMix(g.maleColor || '#3a7bd5', g.femaleColor || '#c95fa0', gt)
 })
 // In the ink theme the signature colour is ground into ink — a tinted wash,
 // never a neon. The blot is the mask the page dissolves through on a swap.
@@ -683,27 +740,33 @@ const relationshipChips = computed(() => {
 
     const def = store.relTypeByKey.get(r.type)
     let role = ''
+    const kin = (key) => t(`personModal.kin.${key}`)
     if (r.type === 'spouse') {
-      role = other.gender === 'male' ? 'Husband' : other.gender === 'female' ? 'Wife' : 'Spouse'
+      role =
+        other.gender === 'male'
+          ? kin('husband')
+          : other.gender === 'female'
+            ? kin('wife')
+            : kin('spouse')
     } else if (r.type === 'parent_child') {
       role =
         r.person_a_id === pid
           ? other.gender === 'male'
-            ? 'Son'
+            ? kin('son')
             : other.gender === 'female'
-              ? 'Daughter'
-              : 'Child'
+              ? kin('daughter')
+              : kin('child')
           : other.gender === 'male'
-            ? 'Father'
+            ? kin('father')
             : other.gender === 'female'
-              ? 'Mother'
-              : 'Parent'
+              ? kin('mother')
+              : kin('parent')
     } else if (r.type === 'adopted') {
-      role = r.person_a_id === pid ? 'Adopted child' : 'Adoptive parent'
+      role = r.person_a_id === pid ? kin('adoptedChild') : kin('adoptiveParent')
     } else if (def?.directed) {
-      role = (r.person_a_id === pid ? def.role_b : def.role_a) || def.label
+      role = relRoleLabel(def, r.person_a_id === pid ? 'b' : 'a') || relTypeLabel(def)
     } else {
-      role = r.label || def?.label || r.type
+      role = r.label || relTypeLabel(def) || r.type
     }
 
     // Which side of the family sketch this tie sits on (scroll profile).
@@ -726,7 +789,7 @@ const relationshipChips = computed(() => {
       id: r.id,
       otherId,
       side,
-      name: other.name || 'Unnamed',
+      name: other.name || t('personForm.unnamed'),
       img: other.primary_image || null,
       role,
       icon: def?.glyph || '',
@@ -747,19 +810,20 @@ const relationshipChips = computed(() => {
   const sibDef = store.relTypeByKey.get('sibling')
   const sibs = derivedSiblings(
     store.relationships,
-    store.relTypeRoles.size ? (t) => store.relTypeRoles.get(t) || 'none' : undefined
+    store.relTypeRoles.size ? (ty) => store.relTypeRoles.get(ty) || 'none' : undefined
   )
   for (const otherId of sibs.get(pid) || []) {
     const other = personById.value.get(otherId)
     if (!other) continue
-    const role =
-      other.gender === 'male' ? 'Brother' : other.gender === 'female' ? 'Sister' : 'Sibling'
+    const role = t(
+      `personModal.kin.${other.gender === 'male' ? 'brother' : other.gender === 'female' ? 'sister' : 'sibling'}`
+    )
     if (explicit.has(otherId + '~' + role)) continue
     chips.push({
       id: 'sib:' + otherId,
       otherId,
       side: 'sibling',
-      name: other.name || 'Unnamed',
+      name: other.name || t('personForm.unnamed'),
       img: other.primary_image || null,
       role,
       icon: sibDef?.glyph || '',
@@ -775,7 +839,6 @@ const relationshipChips = computed(() => {
   return chips
 })
 
-const BAND_LABELS = { family: 'Family', social: 'Social', power: 'Power', custom: 'Other' }
 const bondGroups = computed(() => {
   const order = ['family', 'social', 'power', 'custom']
   const byBand = new Map()
@@ -786,7 +849,7 @@ const bondGroups = computed(() => {
   }
   return order
     .filter((k) => byBand.has(k))
-    .map((k) => ({ key: k, label: BAND_LABELS[k], chips: byBand.get(k) }))
+    .map((k) => ({ key: k, label: t(`personModal.bands.${k}`), chips: byBand.get(k) }))
 })
 
 // ── Constellation rings ─────────────────────────────────────────────────────
@@ -824,7 +887,7 @@ const ring2 = computed(() => {
     if (d !== 2) continue
     const p = personById.value.get(id)
     if (!p) continue
-    out.push({ otherId: id, name: p.name || 'Unnamed', img: p.primary_image || null })
+    out.push({ otherId: id, name: p.name || t('personForm.unnamed'), img: p.primary_image || null })
     if (out.length >= RING2_CAP) break
   }
   return out
@@ -852,7 +915,7 @@ const traitRows = computed(() => {
     const row = vals.get(def.id)
     if (!row || row.value == null || row.value === '') continue
     const v = row.value
-    const t = { id: def.id, label: def.label, icon: def.icon, kind: 'text', text: '' }
+    const item = { id: def.id, label: fieldLabel(def), icon: def.icon, kind: 'text', text: '' }
     switch (def.type) {
       case 'slider': {
         const cfg = def.config || {}
@@ -860,44 +923,44 @@ const traitRows = computed(() => {
         const max = cfg.max ?? 100
         const num = Number(v)
         if (!Number.isFinite(num)) continue
-        t.kind = 'slider'
-        t.pct = Math.max(0, Math.min(100, ((num - min) / (max - min || 1)) * 100))
-        t.left = cfg.leftLabel || ''
-        t.right = cfg.rightLabel || ''
+        item.kind = 'slider'
+        item.pct = Math.max(0, Math.min(100, ((num - min) / (max - min || 1)) * 100))
+        item.left = cfg.leftLabel || ''
+        item.right = cfg.rightLabel || ''
         break
       }
       case 'select': {
         const opt = (def.config?.options || []).find((o) => o.id === v)
-        t.kind = 'select'
-        t.text = opt?.label ?? String(v)
-        t.color = opt?.color || ''
+        item.kind = 'select'
+        item.text = opt ? optionLabel(opt) : String(v)
+        item.color = opt?.color || ''
         break
       }
       case 'boolean':
-        t.kind = 'bool'
-        t.bool = !!v
+        item.kind = 'bool'
+        item.bool = !!v
         break
       case 'number':
-        t.text = `${v}${def.unit ? ' ' + def.unit : ''}`
+        item.text = `${v}${def.unit ? ' ' + def.unit : ''}`
         break
       case 'number_range':
-        t.text =
+        item.text =
           v && typeof v === 'object'
             ? `${v.a ?? '?'} – ${v.b ?? '?'}${def.unit ? ' ' + def.unit : ''}`
             : String(v)
         break
       case 'date':
-        t.text = fmtDate(v)
+        item.text = fmtDate(v)
         break
       case 'date_range':
-        t.text = `${fmtDate(v?.from) || '?'} – ${fmtDate(v?.to) || '?'}`
+        item.text = `${fmtDate(v?.from) || '?'} – ${fmtDate(v?.to) || '?'}`
         break
       default:
-        t.kind = def.config?.multiline ? 'para' : 'text'
-        t.text = String(v)
+        item.kind = def.config?.multiline ? 'para' : 'text'
+        item.text = String(v)
     }
-    if (t.kind !== 'slider' && t.kind !== 'bool' && !t.text) continue
-    rows.push(t)
+    if (item.kind !== 'slider' && item.kind !== 'bool' && !item.text) continue
+    rows.push(item)
   }
   return rows
 })
@@ -913,12 +976,17 @@ const lifeEvents = computed(() => {
     evs.push({ ord, when: fmtDate(dv), ...ev })
   }
 
-  push(p.birth, { title: 'Born', sub: p.location || '', kind: 'birth', icon: 'sun' })
+  push(p.birth, {
+    title: t('personModal.ev.born'),
+    sub: p.location || '',
+    kind: 'birth',
+    icon: 'sun'
+  })
 
   for (const c of relationshipChips.value) {
     if (c.type === 'spouse') {
       push(c.formed, {
-        title: `Married ${c.name}`,
+        title: t('personModal.ev.married', { name: c.name }),
         sub: '',
         kind: 'union',
         icon: c.icon,
@@ -928,7 +996,7 @@ const lifeEvents = computed(() => {
       // Children arrive on their own birth dates — the richest chronicle rows.
       const child = personById.value.get(c.otherId)
       push(child?.birth, {
-        title: `${c.name} born`,
+        title: t('personModal.ev.childBorn', { name: c.name }),
         sub: c.role,
         kind: 'child',
         icon: 'baby',
@@ -936,7 +1004,7 @@ const lifeEvents = computed(() => {
       })
     } else {
       push(c.formed, {
-        title: `${c.role} — ${c.name}`,
+        title: t('personModal.ev.bond', { role: c.role, name: c.name }),
         sub: '',
         kind: 'bond',
         icon: c.icon,
@@ -947,7 +1015,7 @@ const lifeEvents = computed(() => {
       push(
         { year: c.endedYear, month: null, day: null, precision: 'year' },
         {
-          title: `${c.role} ended — ${c.name}`,
+          title: t('personModal.ev.bondEnded', { role: c.role, name: c.name }),
           sub: '',
           kind: 'ended',
           icon: 'unlink',
@@ -965,10 +1033,15 @@ const lifeEvents = computed(() => {
       .map((id) => personById.value.get(id)?.name?.split(' ')[0])
       .filter(Boolean)
     push(ev.date, {
-      title: ev.title,
+      title: defaultNameLabel(ev.title),
       sub: [
         ev.place,
-        others.length ? `with ${others.slice(0, 3).join(', ')}${others.length > 3 ? '…' : ''}` : ''
+        others.length
+          ? t('personModal.ev.with', {
+              names:
+                others.slice(0, 3).join(t('personModal.listSep')) + (others.length > 3 ? '…' : '')
+            })
+          : ''
       ]
         .filter(Boolean)
         .join(' · '),
@@ -986,8 +1059,8 @@ const lifeEvents = computed(() => {
     if (a == null || born == null || a <= born || a > until) continue
     const at = ageOf(p, Math.floor(a))
     push(e.start, {
-      title: `${e.name} begins`,
-      sub: at != null ? `aged ${at}` : '',
+      title: t('personModal.ev.eraBegins', { name: defaultNameLabel(e.name) }),
+      sub: at != null ? t('personModal.ev.aged', { n: at }) : '',
       kind: 'era',
       icon: e.icon || 'diamond',
       color: e.color,
@@ -998,8 +1071,8 @@ const lifeEvents = computed(() => {
   if (deceased.value) {
     const at = ageOf(p, p.death.year)
     push(p.death, {
-      title: 'Died',
-      sub: at != null ? `at ${at}` : '',
+      title: t('personModal.ev.died'),
+      sub: at != null ? t('personModal.ev.atAge', { n: at }) : '',
       kind: 'death',
       icon: 'moon'
     })
@@ -1171,19 +1244,15 @@ watch(
   }
 )
 
-const VIEW_LABELS = {
-  graph: 'Graph',
-  directory: 'Directory',
-  relationships: 'Relationships',
-  timeline: 'Timeline',
-  groups: 'Groups',
-  character: 'Character'
-}
+const VIEW_KEYS = ['graph', 'directory', 'relationships', 'timeline', 'groups', 'character', 'map']
 const backLabel = computed(() => {
   const prevId = navStack.value[navStack.value.length - 1]
   const prev = prevId ? personById.value.get(prevId) : null
-  if (prev) return prev.name || 'Back'
-  return `Back to ${VIEW_LABELS[store.activeView] || 'view'}`
+  if (prev) return prev.name || t('personModal.back')
+  const view = VIEW_KEYS.includes(store.activeView)
+    ? t(`rail.${store.activeView}`)
+    : t('personModal.view')
+  return t('personModal.backTo', { view })
 })
 
 // ── Keyboard ────────────────────────────────────────────────────────────────

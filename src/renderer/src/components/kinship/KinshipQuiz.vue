@@ -7,17 +7,29 @@
         @click.self="$emit('close')"
         @keydown.esc="$emit('close')"
       >
-        <div class="kq" role="dialog" aria-modal="true" aria-label="Kinship quiz">
+        <div class="kq" role="dialog" aria-modal="true" :aria-label="t('kinship.quiz.title')">
           <header class="kq-head">
-            <span class="kq-title"><UiIcon name="dices" :size="16" />Kinship quiz</span>
+            <span class="kq-title"
+              ><UiIcon name="dices" :size="16" />{{ t('kinship.quiz.title') }}</span
+            >
             <KinLangPicker />
-            <span :key="score" class="kq-score" title="Score">
+            <span :key="score" class="kq-score" :title="t('kinship.quiz.score')">
               <UiIcon name="star" :size="14" />{{ score }}
             </span>
-            <span v-if="streak >= 2" :key="'s' + streak" class="kq-streak" title="Streak">
+            <span
+              v-if="streak >= 2"
+              :key="'s' + streak"
+              class="kq-streak"
+              :title="t('kinship.quiz.streak')"
+            >
               <UiIcon name="flame" :size="14" />{{ streak }}
             </span>
-            <button class="kq-x" title="Close (Esc)" aria-label="Close" @click="$emit('close')">
+            <button
+              class="kq-x"
+              :title="t('kinship.quiz.closeEsc')"
+              :aria-label="t('kinship.quiz.close')"
+              @click="$emit('close')"
+            >
               <UiIcon name="x" :size="16" />
             </button>
           </header>
@@ -34,8 +46,8 @@
           <!-- Not enough family to quiz on -->
           <div v-if="!questions.length" class="kq-empty">
             <UiIcon class="kq-empty-ic" name="sprout" :size="34" :stroke="1.7" />
-            <b>Grow the tree a little first</b>
-            <p>The quiz needs a few parents, children and spouses to ask about.</p>
+            <b>{{ t('kinship.quiz.emptyTitle') }}</b>
+            <p>{{ t('kinship.quiz.emptyText') }}</p>
           </div>
 
           <!-- Result screen -->
@@ -53,36 +65,30 @@
                 :style="{ strokeDashoffset: 314 * (1 - score / questions.length) }"
               />
               <text x="60" y="58" class="kq-ring-n">{{ score }}/{{ questions.length }}</text>
-              <text x="60" y="76" class="kq-ring-k">correct</text>
+              <text x="60" y="76" class="kq-ring-k">{{ t('kinship.quiz.correct') }}</text>
             </svg>
             <div class="kq-grade">{{ grade.title }}</div>
             <div class="kq-grade-sub">{{ grade.sub }}</div>
             <div class="kq-best">
-              Best streak: <UiIcon class="kq-best-ic" name="flame" :size="14" />{{ bestStreak }}
+              {{ t('kinship.quiz.bestStreak') }}
+              <UiIcon class="kq-best-ic" name="flame" :size="14" />{{ bestStreak }}
             </div>
-            <button class="btn btn-primary" @click="start">Play again</button>
+            <button class="btn btn-primary" @click="start">
+              {{ t('kinship.quiz.playAgain') }}
+            </button>
           </div>
 
           <!-- Question -->
           <Transition v-else name="kq-card" mode="out-in">
             <div :key="qi" class="kq-card">
-              <div class="kq-kind">{{ KIND_LABEL[q.kind] }}</div>
+              <div class="kq-kind">{{ t(`kinship.quiz.kinds.${q.kind}`) }}</div>
               <div class="kq-q">
-                <template v-if="q.kind === 'name'">
-                  What is <b :style="{ color: personColor(q.b) }">{{ personName(q.b) }}</b> to
-                  <b :style="{ color: personColor(q.a) }">{{ personName(q.a) }}</b
-                  >?
-                </template>
-                <template v-else-if="q.kind === 'who'">
-                  Who is <b :style="{ color: personColor(q.a) }">{{ personName(q.a) }}</b
-                  >’s <span class="kq-rel">{{ relNameNow }}</span
-                  >?
-                </template>
-                <template v-else>
-                  How many links from
-                  <b :style="{ color: personColor(q.a) }">{{ personName(q.a) }}</b> to
-                  <b :style="{ color: personColor(q.b) }">{{ personName(q.b) }}</b
-                  >?
+                <template v-for="(seg, si) in questionParts" :key="si">
+                  <span v-if="seg.k === 'rel'" class="kq-rel">{{ relNameNow }}</span>
+                  <b v-else-if="seg.k" :style="{ color: personColor(q[seg.k]) }">{{
+                    personName(q[seg.k])
+                  }}</b>
+                  <template v-else>{{ seg.text }}</template>
                 </template>
               </div>
 
@@ -108,15 +114,28 @@
               <Transition name="kq-reveal">
                 <div v-if="picked !== null" class="kq-reveal">
                   <div class="kq-verdict" :class="lastOk ? 'ok' : 'bad'">
-                    {{ lastOk ? pickCheer() : 'Not quite —' }}
+                    {{ lastOk ? pickCheer() : t('kinship.quiz.notQuite') }}
                   </div>
                   <KinshipCard v-if="q.kind !== 'hops'" :a="q.a" :b="q.b" />
                   <div v-else class="kq-hops-note">
-                    It's {{ q.answer }} link{{ q.answer === '1' ? '' : 's' }} — trace them on the
-                    graph to see the chain.
+                    {{
+                      t(
+                        q.answer === '1'
+                          ? 'kinship.quiz.hopsNoteOne'
+                          : 'kinship.quiz.hopsNoteOther',
+                        {
+                          n: q.answer
+                        }
+                      )
+                    }}
                   </div>
                   <button class="btn btn-primary kq-next" @click="next">
-                    {{ qi === questions.length - 1 ? 'See results' : 'Next' }} <kbd>Enter</kbd>
+                    {{
+                      qi === questions.length - 1
+                        ? t('kinship.quiz.seeResults')
+                        : t('kinship.quiz.next')
+                    }}
+                    <kbd>Enter</kbd>
                   </button>
                 </div>
               </Transition>
@@ -135,14 +154,14 @@ import { makeQuiz, makeRng } from './kinshipQuiz'
 import KinshipCard from './KinshipCard.vue'
 import KinLangPicker from './KinLangPicker.vue'
 import UiIcon from '../ui/UiIcon.js'
+import { useI18n } from '../../i18n'
 
 const props = defineProps({ open: { type: Boolean, default: false } })
 defineEmits(['close'])
 
 const K = useKinship()
 const { personName, personColor, kinLang } = K
-
-const KIND_LABEL = { name: 'Name the bond', who: 'Find the relative', hops: 'Six degrees' }
+const { t } = useI18n()
 const questions = ref([])
 const qi = ref(0)
 const picked = ref(null)
@@ -154,6 +173,18 @@ const done = ref(false)
 const lastOk = ref(false)
 
 const q = computed(() => questions.value[qi.value])
+
+// The question sentence comes from the locale with {a} / {b} / {rel} tokens;
+// split it so the names can render as coloured <b>s in any word order.
+const questionParts = computed(() => {
+  const cur = q.value
+  if (!cur) return []
+  const src = String(t(`kinship.quiz.questions.${cur.kind}`))
+  return src
+    .split(/(\{a\}|\{b\}|\{rel\})/)
+    .filter(Boolean)
+    .map((s) => (s === '{a}' || s === '{b}' || s === '{rel}' ? { k: s.slice(1, -1) } : { text: s }))
+})
 
 // Names follow the language picker live, even mid-quiz.
 const relNameNow = computed(() => {
@@ -222,17 +253,27 @@ function optClass(o) {
   return 'faded'
 }
 
-const CHEERS = ['Spot on!', 'Nailed it!', 'Family historian!', 'Exactly right!', 'Yes!']
-const pickCheer = () => CHEERS[(qi.value + score.value) % CHEERS.length]
+const pickCheer = () => {
+  const cheers = t('kinship.quiz.cheers')
+  return Array.isArray(cheers) ? cheers[(qi.value + score.value) % cheers.length] : cheers
+}
 
 const grade = computed(() => {
   const f = questions.value.length ? score.value / questions.value.length : 0
-  if (f >= 0.9)
-    return { title: 'Keeper of the Family Tree', sub: 'Nobody knows this family better.' }
-  if (f >= 0.7) return { title: 'Family Historian', sub: 'You could run the reunion.' }
-  if (f >= 0.45) return { title: 'Cousin Counter', sub: 'Solid — the "removed" ones are tricky.' }
-  if (f >= 0.2) return { title: 'Distant Relative', sub: 'You know the faces, not the bonds.' }
-  return { title: 'Long-lost Stranger', sub: 'Time to study the Kinship lens!' }
+  const tier =
+    f >= 0.9
+      ? 'keeper'
+      : f >= 0.7
+        ? 'historian'
+        : f >= 0.45
+          ? 'cousin'
+          : f >= 0.2
+            ? 'distant'
+            : 'stranger'
+  return {
+    title: t(`kinship.quiz.grades.${tier}.title`),
+    sub: t(`kinship.quiz.grades.${tier}.sub`)
+  }
 })
 
 function initials(id) {

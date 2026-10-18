@@ -15,7 +15,7 @@
           v-model="query"
           size="sm"
           :clearable="false"
-          :placeholder="multi ? 'Find or create a group…' : 'Find or add an option…'"
+          :placeholder="multi ? t('sheet.picker.findGroup') : t('sheet.picker.findOption')"
           @keydown="onKey"
         />
       </div>
@@ -45,19 +45,23 @@
         >
           <UiIcon class="shp-plus" name="plus" :size="14" :stroke="2.4" />
           <span class="shp-label">
-            {{ multi ? 'New group' : 'Add option' }} “<b>{{ query.trim() }}</b
+            {{ multi ? t('sheet.picker.newGroup') : t('sheet.picker.addOption') }} “<b>{{
+              query.trim()
+            }}</b
             >”
           </span>
         </button>
-        <div v-if="!shown.length && !canCreate" class="shp-empty">Nothing to pick yet</div>
+        <div v-if="!shown.length && !canCreate" class="shp-empty">
+          {{ t('sheet.picker.empty') }}
+        </div>
       </div>
       <div class="shp-foot">
         <button v-if="!multi && selected.length" class="shp-clear" @click="$emit('clear')">
-          Clear
+          {{ t('sheet.picker.clear') }}
         </button>
         <span class="shp-hint">
-          <UiIcon name="arrow-up-down" :size="12" /> move · Enter {{ multi ? 'toggle' : 'pick' }} ·
-          Esc close
+          <UiIcon name="arrow-up-down" :size="12" />
+          {{ multi ? t('sheet.picker.hintMulti') : t('sheet.picker.hintSingle') }}
         </span>
       </div>
     </div>
@@ -68,6 +72,7 @@
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import UiIcon from '../ui/UiIcon.js'
 import SearchField from '../ui/SearchField.vue'
+import { useI18n } from '../../i18n'
 
 // Floating option picker for the Sheet's select-trait and Groups cells. It is
 // anchored to the cell's screen rect (flipping above when there's no room
@@ -82,6 +87,7 @@ const props = defineProps({
   initialQuery: { type: String, default: '' }
 })
 const emit = defineEmits(['pick', 'create', 'clear', 'close'])
+const { t } = useI18n()
 
 const rootEl = ref(null)
 const inputEl = ref(null)

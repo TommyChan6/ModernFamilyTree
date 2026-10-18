@@ -5,6 +5,11 @@
 // we rewrite a couple of style properties — the paper drifts at half the pan
 // speed, the far range barely moves, the near range a little more, and zooming
 // breathes their scale very slightly so depth reads without ever distracting.
+// Every per-frame change is a compositor-only `transform`: the layers are
+// oversized by one texture tile and slid by (offset mod tile), which looks
+// exactly like scrolling background-position but never repaints the
+// full-screen paper or the masked mountain strips (that repaint used to cost
+// ~10ms a frame while panning / tilting).
 // The mountain art is painted once per mode with lib/inkArt's mountainRange
 // (expensive bristle strokes → done off the critical path, cached per mode, and
 // tiled seamlessly along x).
@@ -17,6 +22,16 @@ import { mountainRange, rng } from '../../lib/inkArt'
 import { backdropOffset } from './inkStyle.js'
 
 const TILE_W = 2048
+const FAR_H = 420 // painted strip heights (the tile shows at the element's height)
+const NEAR_H = 300
+const PAPER_TILE = 512
+
+/** Wrap an offset into [-w/2, w/2) — a whole-tile shift is invisible. */
+function wrap(o, w) {
+  if (!(w > 0)) return 0
+  const m = ((o % w) + w) % w
+  return m >= w / 2 ? m - w : m
+}
 const art = new Map() // mode → Promise<{ far: url, near: url }>
 
 // farA/nearA are the effective ink strengths. The art is painted `boost`× denser
@@ -136,7 +151,7 @@ export class InkBackdrop {
     host.style.transition = 'opacity 900ms ease'
     this.paper = el(
       host,
-      'inset:0;background-image:var(--ink-paper,none);background-size:512px 512px;background-repeat:repeat;opacity:0.9;'
+      `inset:-${PAPER_TILE}px;background-image:var(--ink-paper,none);background-size:${PAPER_TILE}px ${PAPER_TILE}px;background-repeat:repeat;opacity:0.9;`
     )
     this.moon = el(
       host,
@@ -157,6 +172,32 @@ export class InkBackdrop {
     this.mode = null
     this.t = { x: 0, y: 0, k: 1 }
     this._token = 0
+    // On-screen width of one mountain tile (background-size: auto 100%), per
+    // strip; measured on resize, 0 until laid out.
+    this._tileW = { far: 0, near: 0 }
+    this._last = { paper: '', far: '', near: '' }
+    this._ro =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => this._measure()) : null
+    this._ro?.observe(host)
+  }
+
+  // Widen each strip by one tile on both sides so sliding it by up to half a
+  // tile never uncovers an edge (symmetric, so the scale origin stays centred).
+  _measure() {
+    for (const [name, h0] of [
+      ['far', FAR_H],
+      ['near', NEAR_H]
+    ]) {
+      const el = this[name]
+      const tw = el.clientHeight ? (TILE_W * el.clientHeight) / h0 : 0
+      if (Math.abs(tw - this._tileW[name]) < 0.5) continue
+      this._tileW[name] = tw
+      const ext = `calc(-25% - ${Math.ceil(tw)}px)`
+      el.style.left = ext
+      el.style.right = ext
+    }
+    this._last = { paper: '', far: '', near: '' }
+    this.setCamera(this.t)
   }
 
   setLook(look, theme) {
@@ -189,19 +230,23 @@ export class InkBackdrop {
     if (!this.visible) return
     const k = t.k || 1
     const pp = backdropOffset(t, 0.5)
-    this.paper.style.backgroundPosition = `${pp.x.toFixed(1)}px ${pp.y.toFixed(1)}px`
+    const paper = `translate3d(${wrap(pp.x, PAPER_TILE).toFixed(1)}px,${wrap(pp.y, PAPER_TILE).toFixed(1)}px,0)`
     const f = backdropOffset(t, 0.04)
     const n = backdropOffset(t, 0.1)
-    // background-position scrolls the endless strip; translate/scale add depth.
-    this.far.style.backgroundPositionX = `${f.x.toFixed(1)}px`
-    this.near.style.backgroundPositionX = `${n.x.toFixed(1)}px`
+    // x slides the endless strip (mod one tile); y + scale add depth.
     const fy = Math.max(-40, Math.min(40, f.y * 0.5))
     const ny = Math.max(-60, Math.min(60, n.y * 0.5))
-    this.far.style.transform = `translate3d(0,${fy.toFixed(1)}px,0) scale(${Math.pow(k, 0.05).toFixed(4)})`
-    this.near.style.transform = `translate3d(0,${ny.toFixed(1)}px,0) scale(${Math.pow(k, 0.1).toFixed(4)})`
+    const far = `translate3d(${wrap(f.x, this._tileW.far).toFixed(1)}px,${fy.toFixed(1)}px,0) scale(${Math.pow(k, 0.05).toFixed(4)})`
+    const near = `translate3d(${wrap(n.x, this._tileW.near).toFixed(1)}px,${ny.toFixed(1)}px,0) scale(${Math.pow(k, 0.1).toFixed(4)})`
+    // Only touch the style when the value actually changed (turning the tilted
+    // board doesn't move the backdrop at all).
+    if (paper !== this._last.paper) this.paper.style.transform = this._last.paper = paper
+    if (far !== this._last.far) this.far.style.transform = this._last.far = far
+    if (near !== this._last.near) this.near.style.transform = this._last.near = near
   }
 
   dispose() {
+    this._ro?.disconnect()
     this._token++
     this.host.replaceChildren()
   }

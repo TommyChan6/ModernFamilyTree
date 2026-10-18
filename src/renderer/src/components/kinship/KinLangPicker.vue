@@ -1,7 +1,7 @@
 <template>
   <!-- The kinship naming-language switch: a tiny segmented pill whose thumb
        glides between EN · NO · 简 · 繁. -->
-  <div class="klp" role="radiogroup" aria-label="Kinship naming language">
+  <div class="klp" role="radiogroup" :aria-label="t('kinship.lang.aria')">
     <span class="klp-thumb" :style="{ transform: `translateX(${idx * 100}%)` }"></span>
     <button
       v-for="l in KIN_LANGS"
@@ -10,7 +10,7 @@
       :class="{ on: l.code === kinLang }"
       role="radio"
       :aria-checked="l.code === kinLang"
-      :title="`Name relatives in ${l.label}`"
+      :title="t('kinship.lang.nameIn', { lang: langName(l.code) })"
       @click="setKinLang(l.code)"
     >
       {{ l.short }}
@@ -22,6 +22,12 @@
 import { computed } from 'vue'
 import { KIN_LANGS } from './kinshipNames'
 import { kinLang, setKinLang } from './kinshipLang'
+import { useI18n } from '../../i18n'
+
+const { t } = useI18n()
+
+// The language's name in the UI language (kinship's 'no' is the UI's 'nb').
+const langName = (code) => t('app.langName.' + (code === 'no' ? 'nb' : code))
 
 const idx = computed(() =>
   Math.max(

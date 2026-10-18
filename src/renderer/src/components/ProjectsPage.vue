@@ -175,7 +175,7 @@
                         <UiIcon name="star" :size="16" />
                       </button>
                       <span v-if="renamingId !== p.id" class="pp-name">
-                        {{ p.name }}
+                        {{ defaultNameLabel(p.name) }}
                       </span>
                       <input
                         v-else
@@ -275,7 +275,7 @@
                   <div class="pp-face pp-backface" @click.stop>
                     <UiIcon class="pp-back-warn" name="triangle-alert" :size="26" />
                     <h3 class="pp-back-title">
-                      {{ t('projectsPage.deleteTitle', { name: p.name }) }}
+                      {{ t('projectsPage.deleteTitle', { name: defaultNameLabel(p.name) }) }}
                     </h3>
                     <p class="pp-back-body">
                       {{
@@ -362,7 +362,9 @@
                   </div>
                   <div class="pp-row-main">
                     <div class="pp-row-toprow">
-                      <span v-if="renamingId !== p.id" class="pp-name">{{ p.name }}</span>
+                      <span v-if="renamingId !== p.id" class="pp-name">{{
+                        defaultNameLabel(p.name)
+                      }}</span>
                       <input
                         v-else
                         ref="renameInputRef"
@@ -606,6 +608,7 @@
 import { ref, computed, reactive, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useMainStore } from '../store/index.js'
 import { useI18n } from '../i18n'
+import { defaultNameLabel } from '../lib/dataLabels'
 import { ACCESS_ICONS, ACCESS_MODES } from './browse/browseModel'
 import AdSlot from './billing/AdSlot.vue'
 import InkBackdrop from './ui/InkBackdrop.vue'
@@ -899,7 +902,7 @@ async function confirmRename(p) {
   if (!name || name === p.name) return
   const res = await store.updateProject(p.id, { name })
   if (res.success) patchCard(res.data)
-  else showToast(res.error || 'Could not rename', 'err')
+  else showToast(res.error || t('pagesX.couldNotRename'), 'err')
 }
 
 function cancelRename() {
@@ -938,7 +941,7 @@ async function saveEdit() {
     editDraft.value = null
     showToast(t('projectsPage.saved'), 'ok')
   } else {
-    editError.value = res.error || 'Could not save'
+    editError.value = res.error || t('pagesX.couldNotSave')
   }
 }
 
@@ -953,7 +956,7 @@ async function duplicate(p) {
     setTimeout(() => (freshId.value = null), 1800)
     showToast(t('projectsPage.duplicated'), 'ok')
   } else {
-    showToast(res.error || 'Could not duplicate', 'err')
+    showToast(res.error || t('pagesX.couldNotDuplicate'), 'err')
   }
 }
 

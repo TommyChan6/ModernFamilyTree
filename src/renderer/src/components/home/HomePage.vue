@@ -10,17 +10,17 @@
         <span class="nav-logo-name">Family Tree</span>
       </button>
       <nav class="nav-links">
-        <button type="button" @click="scrollTo('features')">Features</button>
-        <button type="button" @click="scrollTo('views')">Views</button>
-        <button type="button" @click="scrollTo('explore')">Explore</button>
-        <button type="button" @click="scrollTo('about')">About</button>
+        <button type="button" @click="scrollTo('features')">{{ t('home.nav.features') }}</button>
+        <button type="button" @click="scrollTo('views')">{{ t('home.nav.views') }}</button>
+        <button type="button" @click="scrollTo('explore')">{{ t('home.nav.explore') }}</button>
+        <button type="button" @click="scrollTo('about')">{{ t('home.nav.about') }}</button>
       </nav>
       <div class="nav-actions">
         <button
           class="icon-btn home-ink-btn"
           :class="{ on: store.isInk }"
           type="button"
-          :title="store.isInk ? 'Leave the ink painting theme' : 'Ink painting theme (水墨)'"
+          :title="store.isInk ? t('topbar.inkOff') : t('topbar.inkOn')"
           :aria-pressed="store.isInk"
           @click="store.toggleInk()"
         >
@@ -29,8 +29,8 @@
         <button
           class="icon-btn"
           type="button"
-          :title="store.isLightTheme ? 'Dark mode' : 'Light mode'"
-          :aria-label="store.isLightTheme ? 'Dark mode' : 'Light mode'"
+          :title="store.isLightTheme ? t('topbar.darkMode') : t('topbar.lightMode')"
+          :aria-label="store.isLightTheme ? t('topbar.darkMode') : t('topbar.lightMode')"
           @click="store.setTheme(store.isLightTheme ? 'dark' : 'light')"
         >
           <UiIcon :name="store.isLightTheme ? 'moon' : 'sun'" :size="16" />
@@ -40,13 +40,17 @@
         <template v-if="isAuthed">
           <button class="nav-signin" type="button" @click="emit('close')">
             <UiIcon name="square-pen" :size="14" />
-            Open editor
+            {{ t('home.nav.openEditor') }}
           </button>
           <AccountMenu />
         </template>
         <template v-else>
-          <button class="nav-signin" type="button" @click="emit('signin')">Sign in</button>
-          <button class="nav-start" type="button" @click="emit('register')">Get started</button>
+          <button class="nav-signin" type="button" @click="emit('signin')">
+            {{ t('home.nav.signIn') }}
+          </button>
+          <button class="nav-start" type="button" @click="emit('register')">
+            {{ t('home.nav.getStarted') }}
+          </button>
         </template>
       </div>
     </header>
@@ -67,12 +71,12 @@
       <div class="hero-content" :style="heroParallax">
         <p class="hero-eyebrow">
           <UiIcon name="sparkle" :size="12" />
-          Every family is a universe
+          {{ t('home.hero.eyebrow') }}
           <UiIcon name="sparkle" :size="12" />
         </p>
-        <h1 class="hero-title" aria-label="Turn your family into a living constellation.">
+        <h1 class="hero-title" :class="{ cjk: isCjk }" :aria-label="t('home.hero.titleLabel')">
           <span
-            v-for="(word, i) in TITLE_WORDS"
+            v-for="(word, i) in titleWords"
             :key="i"
             class="word"
             :class="{ grad: word.grad }"
@@ -80,15 +84,11 @@
             >{{ word.text }}</span
           >
         </h1>
-        <p class="hero-sub">
-          Map real ancestors or invented dynasties. Watch lifetimes unfold on a cinematic timeline,
-          gather kin into glowing houses, and drift through your tree in 3D — silky smooth at
-          thousands of people.
-        </p>
+        <p class="hero-sub">{{ t('home.hero.sub') }}</p>
         <div class="hero-ctas">
           <button class="cta-primary magnetic" type="button" @click="primaryAction">
             <UiIcon name="tree-deciduous" :size="18" />
-            {{ isAuthed ? 'Open your tree' : 'Start your tree — free' }}
+            {{ isAuthed ? t('home.hero.ctaOpen') : t('home.hero.ctaStart') }}
           </button>
           <button
             v-if="!isAuthed"
@@ -99,7 +99,7 @@
           >
             <template v-if="!guestBusy">
               <UiIcon name="play" :size="16" />
-              Try the live demo
+              {{ t('home.hero.ctaDemo') }}
             </template>
             <span v-else class="demo-spinner"></span>
           </button>
@@ -107,17 +107,22 @@
         <Transition name="hero-error">
           <p v-if="demoError" class="hero-error">{{ demoError }}</p>
         </Transition>
-        <p class="hero-trust">Free forever · Private by default · Desktop &amp; web</p>
+        <p class="hero-trust">{{ t('home.hero.trust') }}</p>
       </div>
 
-      <button class="hero-scroll-cue" type="button" title="Scroll" @click="scrollTo('features')">
+      <button
+        class="hero-scroll-cue"
+        type="button"
+        :title="t('home.hero.scroll')"
+        @click="scrollTo('features')"
+      >
         <span class="cue-mouse"><span class="cue-wheel"></span></span>
       </button>
 
       <Transition name="hint">
         <span v-if="!skyClicked" class="hero-hint">
           <UiIcon name="sparkles" :size="14" />
-          Psst — click the sky
+          {{ t('home.hero.hint') }}
         </span>
       </Transition>
     </section>
@@ -125,25 +130,25 @@
     <!-- ── Features ────────────────────────────────────────────────────── -->
     <section id="features" class="section">
       <div class="section-head" data-reveal>
-        <p class="kicker">Why it feels different</p>
-        <h2>Ancestry, but <em>alive</em>.</h2>
-        <p class="section-sub">
-          Most family tree tools feel like tax software. This one feels like a night sky you get to
-          arrange.
-        </p>
+        <p class="kicker">{{ t('home.features.kicker') }}</p>
+        <h2>
+          {{ t('home.features.titleLead') }}<em>{{ t('home.features.titleEm') }}</em
+          >{{ t('home.features.titleTail') }}
+        </h2>
+        <p class="section-sub">{{ t('home.features.sub') }}</p>
       </div>
       <div class="feature-grid">
         <article
           v-for="(f, i) in FEATURES"
-          :key="f.title"
+          :key="f.id"
           class="feature"
           data-reveal
           :style="{ '--reveal-delay': (i % 3) * 90 + 'ms' }"
           @mousemove="featureGlow"
         >
           <div class="feature-icon"><UiIcon :name="f.icon" :size="22" /></div>
-          <h3>{{ f.title }}</h3>
-          <p>{{ f.text }}</p>
+          <h3>{{ t('home.features.items.' + f.id + '.title') }}</h3>
+          <p>{{ t('home.features.items.' + f.id + '.text') }}</p>
         </article>
       </div>
     </section>
@@ -151,11 +156,11 @@
     <!-- ── View showcase ───────────────────────────────────────────────── -->
     <section id="views" class="section">
       <div class="section-head" data-reveal>
-        <p class="kicker">Five lenses</p>
-        <h2>One family. <em>Five ways to see it.</em></h2>
-        <p class="section-sub">
-          Watch the same twelve people rearrange themselves — this is live, go ahead and click.
-        </p>
+        <p class="kicker">{{ t('home.views.kicker') }}</p>
+        <h2>
+          {{ t('home.views.titleLead') }}<em>{{ t('home.views.titleEm') }}</em>
+        </h2>
+        <p class="section-sub">{{ t('home.views.sub') }}</p>
       </div>
       <div data-reveal>
         <ViewShowcase />
@@ -164,18 +169,18 @@
 
     <!-- ── Stats ───────────────────────────────────────────────────────── -->
     <section ref="statsRef" class="stats" data-reveal>
-      <div v-for="s in STATS" :key="s.label" class="stat-block">
+      <div v-for="s in STATS" :key="s.id" class="stat-block">
         <div class="stat-num">
           <span class="stat-value" :data-target="s.value">0</span
           ><span class="stat-suffix">{{ s.suffix }}</span>
         </div>
-        <div class="stat-label">{{ s.label }}</div>
+        <div class="stat-label">{{ t('home.stats.' + s.id) }}</div>
       </div>
     </section>
 
     <!-- ── Marquee ─────────────────────────────────────────────────────── -->
     <section class="marquee-zone">
-      <p class="marquee-title" data-reveal>Room for every kind of family</p>
+      <p class="marquee-title" data-reveal>{{ t('home.marquee.title') }}</p>
       <div class="marquee">
         <div class="marquee-track">
           <span v-for="(name, i) in marqueeRow1" :key="'a' + i" class="marquee-item">{{
@@ -195,12 +200,12 @@
     <!-- ── Community ───────────────────────────────────────────────────── -->
     <section id="explore" class="section">
       <div class="section-head" data-reveal>
-        <p class="kicker">Community · coming soon</p>
-        <h2>Explore family <em>universes</em>.</h2>
-        <p class="section-sub">
-          A peek at the kinds of trees people are growing. Browsing, likes, comments and follows
-          launch with our hosted home — every cover below is generated art, not a screenshot.
-        </p>
+        <p class="kicker">{{ t('home.explore.kicker') }}</p>
+        <h2>
+          {{ t('home.explore.titleLead') }}<em>{{ t('home.explore.titleEm') }}</em
+          >{{ t('home.explore.titleTail') }}
+        </h2>
+        <p class="section-sub">{{ t('home.explore.sub') }}</p>
       </div>
       <div data-reveal>
         <CommunityGallery @start="primaryAction" />
@@ -220,23 +225,17 @@
           <UiIcon class="emblem-twinkle tw-3" name="sparkle" :size="10" />
         </div>
         <div class="about-text">
-          <p class="kicker">About the maker</p>
-          <h2>Handmade by one person who thinks family history deserves better software.</h2>
-          <p>
-            Hi — I'm Tommy. I built Family Tree because my own family refused to fit in a
-            spreadsheet, and every tool I tried felt like filling out forms. No company behind this,
-            no tracking, no venture capital — just a long labour of love, shipped from Norway. If it
-            makes you map somebody you love (or a dynasty you invented at 2 a.m.), it's doing its
-            job.
-          </p>
+          <p class="kicker">{{ t('home.about.kicker') }}</p>
+          <h2>{{ t('home.about.title') }}</h2>
+          <p>{{ t('home.about.body', { app: APP_NAME }) }}</p>
           <div class="about-actions">
             <a class="about-btn primary" :href="mailtoHello">
               <UiIcon name="mail" :size="16" />
-              Say hello
+              {{ t('home.about.hello') }}
             </a>
             <a class="about-btn" :href="mailtoIdea">
               <UiIcon name="lightbulb" :size="16" />
-              Suggest a feature
+              {{ t('home.about.idea') }}
             </a>
           </div>
         </div>
@@ -252,19 +251,13 @@
       </div>
       <div class="final-border" aria-hidden="true"></div>
       <div class="final-inner">
-        <h2>{{ isAuthed ? 'Your family is waiting.' : "Begin your family's story." }}</h2>
-        <p>
-          {{
-            isAuthed
-              ? 'Jump back into the editor and keep the constellation growing.'
-              : 'Two minutes from now, your first three generations could be on the canvas.'
-          }}
-        </p>
+        <h2>{{ isAuthed ? t('home.final.titleAuthed') : t('home.final.titleGuest') }}</h2>
+        <p>{{ isAuthed ? t('home.final.subAuthed') : t('home.final.subGuest') }}</p>
         <button class="cta-primary big magnetic" type="button" @click="primaryAction">
-          {{ isAuthed ? 'Back to your tree' : "Start your tree — it's free" }}
+          {{ isAuthed ? t('home.final.ctaAuthed') : t('home.final.ctaGuest') }}
           <UiIcon name="arrow-right" :size="18" />
         </button>
-        <p class="final-note">No downloads required · No credit card · Just your people</p>
+        <p class="final-note">{{ t('home.final.note') }}</p>
       </div>
     </section>
 
@@ -275,31 +268,36 @@
           <span class="nav-logo-mark"><UiIcon name="tree-deciduous" :size="18" /></span>
           <div>
             <div class="footer-name">Family Tree</div>
-            <div class="footer-tag">Every family is a constellation.</div>
+            <div class="footer-tag">{{ t('home.footer.tag') }}</div>
           </div>
         </div>
         <div class="footer-cols">
           <div class="footer-col">
-            <h4>Product</h4>
-            <button type="button" @click="scrollTo('features')">Features</button>
-            <button type="button" @click="scrollTo('views')">Views</button>
-            <button type="button" @click="scrollTo('explore')">Explore</button>
+            <h4>{{ t('home.footer.product') }}</h4>
+            <button type="button" @click="scrollTo('features')">
+              {{ t('home.nav.features') }}
+            </button>
+            <button type="button" @click="scrollTo('views')">{{ t('home.nav.views') }}</button>
+            <button type="button" @click="scrollTo('explore')">{{ t('home.nav.explore') }}</button>
           </div>
           <div class="footer-col">
-            <h4>Maker</h4>
-            <button type="button" @click="scrollTo('about')">About</button>
-            <a :href="mailtoHello">Contact</a>
+            <h4>{{ t('home.footer.maker') }}</h4>
+            <button type="button" @click="scrollTo('about')">{{ t('home.nav.about') }}</button>
+            <a :href="mailtoHello">{{ t('home.footer.contact') }}</a>
           </div>
           <div class="footer-col">
-            <h4>Legal</h4>
-            <button type="button" @click="openLegal('terms')">Terms of Use</button>
-            <button type="button" @click="openLegal('privacy')">Privacy Policy</button>
+            <h4>{{ t('home.footer.legal') }}</h4>
+            <button type="button" @click="openLegal('terms')">{{ t('home.footer.terms') }}</button>
+            <button type="button" @click="openLegal('privacy')">
+              {{ t('home.footer.privacy') }}
+            </button>
           </div>
         </div>
       </div>
       <div class="footer-bottom">
-        © {{ new Date().getFullYear() }} Family Tree · Made with
-        <UiIcon class="heartbeat" name="heart" :size="13" label="love" /> and zero venture capital
+        {{ COPYRIGHT_HOLDER }} · {{ APP_NAME }} · {{ t('home.footer.madeWith') }}
+        <UiIcon class="heartbeat" name="heart" :size="13" :label="t('home.footer.love')" />
+        {{ t('home.footer.madeAfter') }}
       </div>
     </footer>
 
@@ -317,9 +315,12 @@ import LegalModal from '../LegalModal.vue'
 import AccountMenu from '../AccountMenu.vue'
 import InkBackdrop from '../ui/InkBackdrop.vue'
 import UiIcon from '../ui/UiIcon.js'
+import { APP_NAME, COPYRIGHT_HOLDER, contactMailto } from '../../lib/appInfo'
+import { SUPPORTED_LOCALES, useI18n } from '../../i18n'
 
 const emit = defineEmits(['signin', 'register', 'close'])
 const store = useMainStore()
+const { t, locale } = useI18n()
 
 // The homepage doubles as the signed-in "About / Explore" page: with a session
 // the auth CTAs become "back to the editor" actions and the nav shows the
@@ -331,58 +332,33 @@ function primaryAction() {
   else emit('register')
 }
 
-const CONTACT_EMAIL = 'timmy.chan@helthjem.no'
-const mailtoHello = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Hello from a Family Tree visitor')}`
-const mailtoIdea = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Family Tree feature idea')}`
+const mailtoHello = contactMailto(`Hello from a ${APP_NAME} visitor`)
+const mailtoIdea = contactMailto(`${APP_NAME} feature idea`)
 
-const TITLE_WORDS = [
-  { text: 'Turn' },
-  { text: 'your' },
-  { text: 'family' },
-  { text: 'into' },
-  { text: 'a' },
-  { text: 'living', grad: true },
-  { text: 'constellation.', grad: true }
-]
+// The hero title animates in word by word. Each locale supplies its own word
+// (or short CJK chunk) list; a leading '*' marks the gradient-highlighted ones.
+const isCjk = computed(() => locale.value.startsWith('zh'))
+const titleWords = computed(() => {
+  const words = t('home.hero.titleWords')
+  return (Array.isArray(words) ? words : []).map((w) =>
+    w.startsWith('*') ? { text: w.slice(1), grad: true } : { text: w }
+  )
+})
 
 const FEATURES = [
-  {
-    icon: 'network',
-    title: 'A tree that breathes',
-    text: 'Physics-driven graphs: drag a grandparent and the whole family sways. Five layouts, from strict generations to free-floating space.'
-  },
-  {
-    icon: 'hourglass',
-    title: 'Time travel',
-    text: 'Scrub the time slider and watch people appear, marry and grow old. Lifelines, marriage ribbons and birth sparks — all animated.'
-  },
-  {
-    icon: 'groups',
-    title: 'Houses & clans',
-    text: 'Tag anyone into groups — farms, dynasties, ship crews — and watch them gather into glowing clusters you can rearrange.'
-  },
-  {
-    icon: 'image',
-    title: 'Faces & stories',
-    text: 'Portraits, photos, dates and notes on every person. Build the full cast of your family, not just a chart of names.'
-  },
-  {
-    icon: 'zap',
-    title: 'Absurdly smooth',
-    text: 'Everything is WebGL. Ten thousand relatives glide at 60fps, ambient animations idle at 0% CPU, and views switch like scenes in a film.'
-  },
-  {
-    icon: 'lock',
-    title: 'Yours, full stop',
-    text: 'Private by default and works offline. Your data lives with you and exports to a plain file. No ads, no mining, no credit card.'
-  }
+  { id: 'breathes', icon: 'network' },
+  { id: 'time', icon: 'hourglass' },
+  { id: 'houses', icon: 'groups' },
+  { id: 'faces', icon: 'image' },
+  { id: 'smooth', icon: 'zap' },
+  { id: 'yours', icon: 'lock' }
 ]
 
 const STATS = [
-  { value: 10000, suffix: '+', label: 'people in one tree — still silky' },
-  { value: 5, suffix: '', label: 'lenses on every family' },
-  { value: 3, suffix: '', label: 'languages, two themes' },
-  { value: 60, suffix: 'fps', label: 'with ambient animation at 0% idle CPU' }
+  { id: 'people', value: 10000, suffix: '+' },
+  { id: 'lenses', value: 5, suffix: '' },
+  { id: 'languages', value: SUPPORTED_LOCALES.length, suffix: '' },
+  { id: 'fps', value: 60, suffix: 'fps' }
 ]
 
 const DYNASTIES = [
@@ -431,7 +407,7 @@ async function tryDemo() {
   guestBusy.value = true
   try {
     const res = await store.guestLogin()
-    if (!res.success) demoError.value = res.error || 'Could not start the demo — try again'
+    if (!res.success) demoError.value = res.error || t('home.hero.demoError')
   } finally {
     guestBusy.value = false
   }
@@ -549,7 +525,9 @@ function setupMagnetic() {
 }
 
 onMounted(() => {
-  if (heroCanvas.value) hero = createHeroConstellation(heroCanvas.value)
+  if (heroCanvas.value) {
+    hero = createHeroConstellation(heroCanvas.value, (year) => t('home.born', { year }))
+  }
 
   revealObserver = new IntersectionObserver(
     (entries) => {
@@ -599,6 +577,11 @@ onUnmounted(() => {
   background: var(--bg);
   color: var(--t1);
   scroll-behavior: smooth;
+}
+
+/* CJK title chunks sit flush — no inter-word gap */
+.hero-title.cjk .word {
+  margin-right: 0;
 }
 
 /* ══ Cursor aura ══════════════════════════════════════════════════════════ */

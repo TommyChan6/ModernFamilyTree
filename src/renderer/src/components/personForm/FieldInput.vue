@@ -26,7 +26,7 @@
     class="fi-toggle"
     :class="{ on: modelValue === true, unset: modelValue == null }"
     type="button"
-    :title="modelValue == null ? 'Not set — click to set' : ''"
+    :title="modelValue == null ? t('personForm.input.notSetHint') : ''"
     @click="cycleBool"
   >
     <span class="fi-toggle-track"><span class="fi-toggle-thumb"></span></span>
@@ -34,7 +34,7 @@
     <span
       v-if="modelValue != null"
       class="fi-clear"
-      title="Clear"
+      :title="t('personForm.input.clear')"
       @click.stop="emit('update:modelValue', null)"
       ><UiIcon name="x" :size="12"
     /></span>
@@ -61,7 +61,7 @@
       class="fi fi-num"
       type="number"
       :value="rangeA"
-      placeholder="From"
+      :placeholder="t('personForm.input.from')"
       @input="emitRange('a', $event.target.value)"
     />
     <span class="fi-range-dash">–</span>
@@ -69,7 +69,7 @@
       class="fi fi-num"
       type="number"
       :value="rangeB"
-      placeholder="To"
+      :placeholder="t('personForm.input.to')"
       @input="emitRange('b', $event.target.value)"
     />
     <span v-if="def.unit" class="fi-unit">{{ def.unit }}</span>
@@ -86,7 +86,7 @@
       :style="opt.color ? { '--chip-c': opt.color } : {}"
       @click="emit('update:modelValue', modelValue === opt.id ? null : opt.id)"
     >
-      <span v-if="opt.color" class="fi-chip-dot"></span>{{ opt.label }}
+      <span v-if="opt.color" class="fi-chip-dot"></span>{{ optionLabel(opt) }}
     </button>
   </div>
   <select
@@ -96,7 +96,7 @@
     @change="emit('update:modelValue', $event.target.value || null)"
   >
     <option value="">—</option>
-    <option v-for="opt in options" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
+    <option v-for="opt in options" :key="opt.id" :value="opt.id">{{ optionLabel(opt) }}</option>
   </select>
 
   <!-- slider -->
@@ -122,8 +122,8 @@
       v-if="modelValue != null"
       class="fi-clear"
       type="button"
-      title="Clear"
-      aria-label="Clear"
+      :title="t('personForm.input.clear')"
+      :aria-label="t('personForm.input.clear')"
       @click="emit('update:modelValue', null)"
     >
       <UiIcon name="x" :size="12" />
@@ -136,7 +136,7 @@
       class="fi fi-num"
       type="number"
       :value="modelValue?.year ?? ''"
-      placeholder="Year"
+      :placeholder="t('personForm.input.year')"
       @input="emit('update:modelValue', yearDate($event.target.value))"
     />
   </div>
@@ -147,7 +147,7 @@
       class="fi fi-num"
       type="number"
       :value="modelValue?.from?.year ?? ''"
-      placeholder="From"
+      :placeholder="t('personForm.input.from')"
       @input="emitDateRange('from', $event.target.value)"
     />
     <span class="fi-range-dash">–</span>
@@ -155,19 +155,21 @@
       class="fi fi-num"
       type="number"
       :value="modelValue?.to?.year ?? ''"
-      placeholder="To"
+      :placeholder="t('personForm.input.to')"
       @input="emitDateRange('to', $event.target.value)"
     />
   </div>
 
   <!-- reserved types -->
-  <div v-else class="fi-reserved">Coming with custom calendars</div>
+  <div v-else class="fi-reserved">{{ t('personForm.input.reserved') }}</div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
 import { yearDate } from '../../../../shared/calendarMath'
 import UiIcon from '../ui/UiIcon.js'
+import { useI18n } from '../../i18n'
+import { optionLabel } from '../../lib/dataLabels'
 
 const props = defineProps({
   def: { type: Object, required: true },
@@ -177,6 +179,7 @@ const props = defineProps({
   trackGradient: { type: String, default: '' }
 })
 const emit = defineEmits(['update:modelValue'])
+const { t } = useI18n()
 
 const options = computed(() => props.def.config.options || [])
 const middle = computed(() => {
@@ -186,9 +189,11 @@ const middle = computed(() => {
 })
 
 const boolLabel = computed(() => {
-  if (props.modelValue == null) return 'Not set'
+  if (props.modelValue == null) return t('personForm.input.notSet')
   const { leftLabel, rightLabel } = props.def.config
-  return props.modelValue === true ? rightLabel || 'Yes' : leftLabel || 'No'
+  return props.modelValue === true
+    ? rightLabel || t('personForm.input.yes')
+    : leftLabel || t('personForm.input.no')
 })
 
 const rangeA = computed(() => props.modelValue?.a ?? '')
@@ -198,8 +203,8 @@ const bubbleLeft = computed(() => {
   const min = props.def.config.min ?? 0
   const max = props.def.config.max ?? 100
   const v = props.modelValue ?? middle.value
-  const t = max > min ? (v - min) / (max - min) : 0.5
-  return `${t * 100}%`
+  const frac = max > min ? (v - min) / (max - min) : 0.5
+  return `${frac * 100}%`
 })
 
 const trackStyle = computed(() =>

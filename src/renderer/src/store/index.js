@@ -5,7 +5,8 @@ import { planHasFeature } from '../../../shared/auth'
 import { isPaidPlan, planHasPerk } from '../../../shared/billing'
 import { setSessionToken, clearSessionToken, getSessionToken } from '../api/session'
 import { latestDataYear } from './currentYear.js'
-import { locale, setLocale, isSupportedLocale } from '../i18n'
+import { locale, setLocale, isSupportedLocale, translate } from '../i18n'
+import { defaultNameLabel } from '../lib/dataLabels'
 import { accentVars, normalizeHex, DEFAULT_ACCENT } from '../lib/accent.js'
 import { revealTransition } from '../lib/themeReveal.js'
 import { installInkAssets } from '../lib/inkArt'
@@ -102,7 +103,10 @@ export const useMainStore = defineStore('main', () => {
   // The theme to return to when the ink toggle is switched off (session only).
   const inkReturnTheme = ref('light')
   const accent = ref(DEFAULT_ACCENT) // user accent color (hex) — see lib/accent.js
-  const settingsOpen = ref(false) // graph "Style" side panel
+  const settingsOpen = ref(false) // the Style Studio (components/style/StyleStudio.vue)
+  // Which studio layer is in front: 'view' (this view's own style) or 'app'
+  // (the foundation every view paints on). Session only.
+  const styleLayer = ref('view')
   const appSettingsOpen = ref(false) // the app-wide Settings modal (language, help, feedback)
   const appSettingsTab = ref('general') // which Settings tab opens (see openAppSettings)
   const userPageOpen = ref(false) // the full-screen profile / account page
@@ -127,6 +131,9 @@ export const useMainStore = defineStore('main', () => {
   const lockLines = ref(false)
   const relPopup = ref(null)
   const cleanView = ref(false)
+  // Time drag (graph Birth layout + timeline toggle): dragging people up/down
+  // retimes their lives instead of only moving them on screen.
+  const timeDrag = ref(false)
   // Current year. `userCurrentYear` is the explicit user override (null = follow
   // the data). While it's null the current year tracks the latest year present
   // in the data; once the user sets a value it stays pinned there regardless of
@@ -218,7 +225,7 @@ export const useMainStore = defineStore('main', () => {
     nodeOpacity: 1.0,
     linkOpacity: 0.6,
     // ── Aesthetics system (see components/graph/graphThemes.js) ─────────────
-    nodeShape: 'circle', // circle|square|diamond|hexagon|shield|oval|octagon|heart
+    nodeShape: 'circle', // circle|square|diamond|hexagon|shield|oval|octagon|heart|gravestone
     nodeDecor: 'none', // none|aura|runes|orbit|burst|pulse|enso
     decorColor: '#d4af37',
     linkRoute: 'organic', // organic|straight|arc|elbow|trident|circuit|wave|bezier|brush
@@ -233,7 +240,11 @@ export const useMainStore = defineStore('main', () => {
     lineFxScope: 'lineage', // lineage (parent→child) | family (+ couples) | all
     lineFxSpeed: 1, // animation speed ×
     lineFxGlow: 1, // glow strength ×
-    lineFxKeep: false // true = keep each relationship's own colour
+    lineFxKeep: false, // true = keep each relationship's own colour
+    // ── Perspective tilt: the 2D layouts seen as a board in 3D ─────────────
+    viewTilt: false,
+    tiltAngle: 48, // degrees (8–64)
+    tiltYaw: 0 // degrees the board is turned (-180–180), tilted view only
   }
   const graphSettings = ref({ ...GRAPH_SETTING_DEFAULTS })
 
@@ -510,7 +521,11 @@ export const useMainStore = defineStore('main', () => {
     }
     const name = authUser.value?.display_name || authUser.value?.username
     const welcome =
-      authUser.value?.plan === 'guest' ? 'Welcome, guest' : `Welcome${name ? ', ' + name : ''}`
+      authUser.value?.plan === 'guest'
+        ? translate('storeMsg.welcomeGuest')
+        : name
+          ? translate('storeMsg.welcomeName', { name })
+          : translate('storeMsg.welcome')
     await runWithCurtain(
       'login',
       welcome,
@@ -518,7 +533,7 @@ export const useMainStore = defineStore('main', () => {
         await loadProjects()
         await loadAll()
       },
-      { min: 1200, sub: 'Growing your family tree…' }
+      { min: 1200, sub: translate('storeMsg.growingTree') }
     )
     refreshUsage()
     return res
@@ -576,7 +591,7 @@ export const useMainStore = defineStore('main', () => {
     billingStatus.value = null
     await runWithCurtain(
       'logout',
-      'Signing out…',
+      translate('storeMsg.signingOut'),
       async () => {
         await api.invoke('auth:logout')
         clearSessionToken()
@@ -584,7 +599,7 @@ export const useMainStore = defineStore('main', () => {
         authUsage.value = null
         clearWorkspace()
       },
-      { min: 950, sub: 'See you soon' }
+      { min: 950, sub: translate('storeMsg.seeYouSoon') }
     )
   }
 
@@ -636,9 +651,12 @@ export const useMainStore = defineStore('main', () => {
       if (initial) await load()
       else {
         const name = newSession.user.email
-        await runWithCurtain('login', `Welcome${name ? ', ' + name : ''}`, load, {
+        const welcome = name
+          ? translate('storeMsg.welcomeName', { name })
+          : translate('storeMsg.welcome')
+        await runWithCurtain('login', welcome, load, {
           min: 1200,
-          sub: 'Growing your family tree…'
+          sub: translate('storeMsg.growingTree')
         })
       }
     } else {
@@ -691,12 +709,12 @@ export const useMainStore = defineStore('main', () => {
     const supabase = await sbClient()
     await runWithCurtain(
       'logout',
-      'Signing out…',
+      translate('storeMsg.signingOut'),
       // The listener fires SIGNED_OUT → applySupabaseSession(null) clears state.
       async () => {
         await supabase.auth.signOut()
       },
-      { min: 950, sub: 'See you soon' }
+      { min: 950, sub: translate('storeMsg.seeYouSoon') }
     )
   }
 
@@ -799,7 +817,7 @@ export const useMainStore = defineStore('main', () => {
     try {
       file = JSON.parse(text)
     } catch {
-      return { success: false, error: 'Not a project file' }
+      return { success: false, error: translate('storeMsg.notProjectFile') }
     }
     const res = await api.invoke('projects:import', { file })
     if (res.success) {
@@ -824,7 +842,9 @@ export const useMainStore = defineStore('main', () => {
     const target = projects.value.find((p) => p.id === id)
     await runWithCurtain(
       'switch',
-      target?.name ? `Opening ${target.name}` : 'Switching project…',
+      target?.name
+        ? translate('storeMsg.opening', { name: defaultNameLabel(target.name) })
+        : translate('storeMsg.switchingProject'),
       async () => {
         const res = await api.invoke('projects:setActive', { id })
         if (res.success) {
@@ -843,7 +863,7 @@ export const useMainStore = defineStore('main', () => {
           await loadAll()
         }
       },
-      { min: 850, sub: 'Loading people & relationships…' }
+      { min: 850, sub: translate('storeMsg.loadingData') }
     )
   }
 
@@ -1032,13 +1052,14 @@ export const useMainStore = defineStore('main', () => {
     journalTick.value++
   }
 
-  // Arrangement history: the graph registers the function that restores a
-  // memento (and returns the inverse one); views record steps as they happen.
-  let layoutHistoryHandler = null
-  function registerLayoutHistory(fn) {
-    layoutHistoryHandler = fn
+  // Arrangement history: each view registers the function that restores its
+  // mementos (and returns the inverse one) — keyed by the memento's `view`
+  // ('graph' when absent); views record steps as they happen.
+  const layoutHistoryHandlers = new Map()
+  function registerLayoutHistory(fn, view = 'graph') {
+    layoutHistoryHandlers.set(view, fn)
     return () => {
-      if (layoutHistoryHandler === fn) layoutHistoryHandler = null
+      if (layoutHistoryHandlers.get(view) === fn) layoutHistoryHandlers.delete(view)
     }
   }
   /** Record one undoable arrangement step. `state` is the memento from
@@ -1152,7 +1173,8 @@ export const useMainStore = defineStore('main', () => {
     const to = dir === 'undo' ? j.redo : j.undo
     const top = from[from.length - 1]
     if (top?.kind === 'layout') {
-      const restore = top.state?.view === 'groups' ? restoreGroupMoves : layoutHistoryHandler
+      const view = top.state?.view || 'graph'
+      const restore = view === 'groups' ? restoreGroupMoves : layoutHistoryHandlers.get(view)
       if (!restore) return null
       from.pop()
       const inverse = await restore(top.state)
@@ -1879,8 +1901,11 @@ export const useMainStore = defineStore('main', () => {
     if (persist) api.invoke('globalSettings:set', { key: 'accent', value: clean })
   }
 
-  function toggleSettings() {
-    settingsOpen.value = !settingsOpen.value
+  /** Open/close the Style Studio. `open` forces a state; `layer` brings
+   *  that layer ('app' | 'view') to the front as it opens. */
+  function toggleSettings(open, { layer } = {}) {
+    settingsOpen.value = typeof open === 'boolean' ? open : !settingsOpen.value
+    if (settingsOpen.value && (layer === 'app' || layer === 'view')) styleLayer.value = layer
   }
 
   function toggleAppSettings(open) {
@@ -1975,13 +2000,13 @@ export const useMainStore = defineStore('main', () => {
   function openUserPage() {
     return runWithCurtain(
       'profile',
-      'Your profile',
+      translate('storeMsg.yourProfile'),
       async () => {
         userPageOpen.value = true
         // Give the page a beat to mount and kick off its overview fetch.
         await new Promise((r) => setTimeout(r, 80))
       },
-      { min: 700, sub: 'Gathering your account…' }
+      { min: 700, sub: translate('storeMsg.gatheringAccount') }
     )
   }
 
@@ -2058,6 +2083,13 @@ export const useMainStore = defineStore('main', () => {
   function updateTimelineSetting(key, value) {
     timelineSettings.value = { ...timelineSettings.value, [key]: value }
     api.invoke('settings:set', { key: `timeline_${key}`, value: JSON.stringify(value) })
+  }
+  /** Apply several timeline settings at once (looks, chapter resets) — one
+   *  reactive update, then persist each key. */
+  function applyTimelineSettings(patch) {
+    timelineSettings.value = { ...timelineSettings.value, ...patch }
+    for (const [key, value] of Object.entries(patch))
+      api.invoke('settings:set', { key: `timeline_${key}`, value: JSON.stringify(value) })
   }
   function resetTimelineSettings() {
     for (const [key, value] of Object.entries(TIMELINE_SETTING_DEFAULTS))
@@ -2169,6 +2201,7 @@ export const useMainStore = defineStore('main', () => {
     accent,
     setAccent,
     settingsOpen,
+    styleLayer,
     appSettingsOpen,
     userPageOpen,
     projectsPageOpen,
@@ -2199,6 +2232,7 @@ export const useMainStore = defineStore('main', () => {
     resetTimelineSettings,
     lockNodes,
     cleanView,
+    timeDrag,
     currentDate,
     userCurrentYear,
     autoCurrentYear,
@@ -2303,6 +2337,9 @@ export const useMainStore = defineStore('main', () => {
     updateGraphSetting,
     applyGraphSettings,
     resetGraphSettings,
+    applyTimelineSettings,
+    GRAPH_SETTING_DEFAULTS,
+    TIMELINE_SETTING_DEFAULTS,
     hasUnsavedChanges,
     saveCheckpoint,
     revertToCheckpoint,

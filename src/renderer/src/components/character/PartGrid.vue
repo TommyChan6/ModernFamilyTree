@@ -57,9 +57,16 @@ const slotDef = computed(() => slotOf(props.pack, props.slotId))
 const options = computed(() => partsFor(props.pack, props.slotId))
 const currentPartId = computed(() => slotState(props.doc, props.pack, props.slotId).partId)
 
-/** 'hair-twintails' → 'Twintails', 'acc-headphones' → 'Headphones'. */
+/** 'hair-twintails' → 'Twintails', 'acc-headphones' → 'Headphones'
+ *  (localized via `characterX.partIds.<id>` / `characterX.parts.<suffix>`). */
 function nameOf(id) {
   const rest = id.includes('-') ? id.slice(id.indexOf('-') + 1) : id
+  const byId = 'characterX.partIds.' + id
+  const exact = t(byId)
+  if (exact !== byId) return exact
+  const bySuffix = 'characterX.parts.' + rest
+  const named = t(bySuffix)
+  if (named !== bySuffix) return named
   const s = rest.replace(/-/g, ' ')
   return s.charAt(0).toUpperCase() + s.slice(1)
 }

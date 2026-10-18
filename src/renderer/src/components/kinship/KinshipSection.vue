@@ -6,7 +6,9 @@
     <div class="ks-groups">
       <div v-for="(g, gi) in groups" :key="g.key" class="ks-group" :style="{ '--gi': gi }">
         <div class="ks-g-head">
-          <UiIcon class="ks-g-ic" :name="g.icon" :size="14" />{{ g.label }}
+          <UiIcon class="ks-g-ic" :name="g.icon" :size="14" />{{
+            t(`kinship.section.groups.${g.key}`)
+          }}
           <span class="ks-g-n">{{ g.items.length }}</span>
         </div>
         <div class="ks-chips">
@@ -29,11 +31,11 @@
             class="ks-more"
             @click="expanded[g.key] = !expanded[g.key]"
           >
-            {{ expanded[g.key] ? 'Less' : `+${g.items.length - CAP}` }}
+            {{ expanded[g.key] ? t('kinship.section.less') : `+${g.items.length - CAP}` }}
           </button>
         </div>
       </div>
-      <div v-if="!groups.length" class="ks-empty">No family on record yet.</div>
+      <div v-if="!groups.length" class="ks-empty">{{ t('kinship.section.empty') }}</div>
     </div>
 
     <aside class="ks-side">
@@ -47,25 +49,22 @@
       <div class="ks-stats">
         <div class="ks-stat">
           <span class="ks-stat-v">{{ completeness }}%</span>
-          <span class="ks-stat-k">Pedigree known</span>
+          <span class="ks-stat-k">{{ t('kinship.section.pedigreeKnown') }}</span>
           <span class="ks-bar"><span :style="{ width: completeness + '%' }"></span></span>
         </div>
         <div class="ks-stat">
           <span class="ks-stat-v">{{ ped.deepest || 0 }}</span>
-          <span class="ks-stat-k">Generations back</span>
+          <span class="ks-stat-k">{{ t('kinship.section.generationsBack') }}</span>
         </div>
         <div class="ks-stat" :class="{ 'ks-warn': ped.collapse > 0 }">
           <span class="ks-stat-v">{{ Math.round(ped.collapse * 100) }}%</span>
-          <span
-            class="ks-stat-k"
-            title="Share of ancestor slots filled by someone who already appears elsewhere"
-          >
-            Pedigree collapse
+          <span class="ks-stat-k" :title="t('kinship.section.collapseTitle')">
+            {{ t('kinship.section.collapse') }}
           </span>
         </div>
       </div>
       <div v-if="F > 0" class="ks-inbred">
-        <div class="ks-stat-k">Own inbreeding (F)</div>
+        <div class="ks-stat-k">{{ t('kinship.section.inbreeding') }}</div>
         <BloodMeter :phi="F" />
       </div>
     </aside>
@@ -79,23 +78,26 @@ import { ancestorFan, pedigreeStats } from './kinshipGraph'
 import FanChart from './FanChart.vue'
 import BloodMeter from './BloodMeter.vue'
 import UiIcon from '../ui/UiIcon.js'
+import { useI18n } from '../../i18n'
 
 const props = defineProps({ personId: { type: String, required: true } })
 defineEmits(['navigate'])
 
 const K = useKinship()
 const { personName, personColor, kinLang } = K
+const { t } = useI18n()
 const CAP = 10
 const expanded = reactive({})
 
 const GROUPS = [
-  { key: 'ancestors', label: 'Ancestors', icon: 'tree-deciduous' },
-  { key: 'siblings', label: 'Siblings', icon: 'users' },
-  { key: 'descendants', label: 'Descendants', icon: 'sprout' },
-  { key: 'collateral', label: 'Aunts, uncles, nieces & nephews', icon: 'leaf' },
-  { key: 'cousins', label: 'Cousins', icon: 'git-branch' },
-  { key: 'marriage', label: 'Spouse & in-laws', icon: 'heart-handshake' },
-  { key: 'step', label: 'Step-family', icon: 'link-2' }
+  // labels: kinship.section.groups.<key>
+  { key: 'ancestors', icon: 'tree-deciduous' },
+  { key: 'siblings', icon: 'users' },
+  { key: 'descendants', icon: 'sprout' },
+  { key: 'collateral', icon: 'leaf' },
+  { key: 'cousins', icon: 'git-branch' },
+  { key: 'marriage', icon: 'heart-handshake' },
+  { key: 'step', icon: 'link-2' }
 ]
 
 function groupOf(k) {

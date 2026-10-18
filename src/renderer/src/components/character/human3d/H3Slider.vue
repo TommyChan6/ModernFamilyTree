@@ -6,8 +6,8 @@
       <button
         v-if="isChanged"
         class="h3s-reset"
-        :title="resetTitle"
-        :aria-label="resetTitle"
+        :title="resetText"
+        :aria-label="resetText"
         @click="reset"
       >
         <UiIcon name="rotate-ccw" :size="12" />
@@ -39,6 +39,7 @@
 <script setup>
 import { computed } from 'vue'
 import UiIcon from '../../ui/UiIcon.js'
+import { useI18n } from '../../../i18n'
 
 // One editor slider: bipolar sliders fill from the centre notch, unipolar
 // from the left. `live` fires during a drag, `done` once it's released (the
@@ -56,9 +57,11 @@ const props = defineProps({
   /** Value formatter (default: signed percent for bipolar, percent otherwise). */
   format: { type: Function, default: null },
   compact: { type: Boolean, default: false },
-  resetTitle: { type: String, default: 'Reset' }
+  resetTitle: { type: String, default: '' }
 })
 const emit = defineEmits(['live', 'done'])
+const { t } = useI18n()
+const resetText = computed(() => props.resetTitle || t('human3dX.reset'))
 
 const bipolar = computed(() => props.min < props.neutral && props.max > props.neutral)
 const isChanged = computed(() => Math.abs(props.modelValue - props.neutral) > props.step / 2)

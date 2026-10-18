@@ -6,7 +6,7 @@
           class="sm-box ink-mount ink-unroll ink-rollers"
           role="dialog"
           aria-modal="true"
-          aria-label="Settings"
+          :aria-label="t('settings.title')"
         >
           <!-- Sidebar tabs -->
           <nav class="sm-nav">
@@ -52,7 +52,7 @@
                     @click="store.setLanguage(loc.code)"
                   >
                     <span class="sm-lang-native">{{ loc.native }}</span>
-                    <span class="sm-lang-label">{{ loc.label }}</span>
+                    <span class="sm-lang-label">{{ t('app.langName.' + loc.code) }}</span>
                     <UiIcon
                       v-if="store.language === loc.code"
                       class="sm-lang-check"
@@ -161,7 +161,7 @@
                   class="sm-noun-input"
                   type="text"
                   maxlength="24"
-                  :value="store.noun"
+                  :value="nounLabel(store.noun)"
                   :placeholder="t('settings.noun.placeholder')"
                   @change="store.setNoun($event.target.value)"
                 />
@@ -270,12 +270,15 @@
                 <div class="sm-meta-row">
                   <dt>{{ t('about.contactLabel') }}</dt>
                   <dd>
-                    <a :href="'mailto:' + CREATOR_EMAIL">{{ CREATOR_EMAIL }}</a>
+                    <a :href="'mailto:' + CONTACT_EMAIL">{{ CONTACT_EMAIL }}</a>
                   </dd>
                 </div>
               </dl>
               <p class="sm-note">{{ t('about.tech') }}</p>
               <p class="sm-note">{{ t('about.privacy') }}</p>
+              <p class="sm-note sm-copyright">
+                {{ t('about.copyright', { holder: COPYRIGHT_HOLDER }) }}
+              </p>
             </section>
           </div>
         </div>
@@ -290,14 +293,18 @@ import { useMainStore } from '../store/index.js'
 import { useI18n } from '../i18n'
 import { ACCENT_PRESETS, DEFAULT_ACCENT } from '../lib/accent.js'
 import UiIcon from './ui/UiIcon.js'
+import { nounLabel } from '../lib/dataLabels'
+import {
+  APP_NAME,
+  APP_VERSION,
+  CREATOR_NAME,
+  CONTACT_EMAIL,
+  COPYRIGHT_HOLDER,
+  contactMailto
+} from '../lib/appInfo'
 
 const store = useMainStore()
 const { t, SUPPORTED_LOCALES } = useI18n()
-
-// Program metadata (single source in the About panel + feedback subject line).
-const APP_VERSION = '1.0.0'
-const CREATOR_NAME = 'Tommy Chan'
-const CREATOR_EMAIL = 'timmy.chan@helthjem.no'
 
 const tabs = [
   { id: 'general', icon: 'settings', labelKey: 'settings.tabs.general' },
@@ -321,9 +328,8 @@ function sendFeedback() {
   const msg = fbMessage.value.trim()
   if (!msg) return
   const typeLabel = t('feedback.type.' + fbType.value)
-  const subject = `[Family Tree ${APP_VERSION}] ${typeLabel}`
-  const href = `mailto:${CREATOR_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg)}`
-  window.open(href, '_blank')
+  const subject = `[${APP_NAME} ${APP_VERSION}] ${typeLabel}`
+  window.open(contactMailto(subject, msg), '_blank')
 }
 
 // Open on the requested tab (General unless a caller such as the `?` hotkey
@@ -715,6 +721,11 @@ kbd {
 }
 
 /* About */
+.sm-copyright {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
 .sm-about {
   align-items: center;
   text-align: center;

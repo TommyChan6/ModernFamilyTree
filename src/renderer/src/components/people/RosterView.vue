@@ -4,8 +4,8 @@
       <div class="roster-empty-icon">
         <UiIcon name="gamepad-2" :size="44" :stroke="1.5" />
       </div>
-      <div class="roster-empty-title">No challengers</div>
-      <div class="roster-empty-text">No people match — clear the search or add someone.</div>
+      <div class="roster-empty-title">{{ t('directory.roster.emptyTitle') }}</div>
+      <div class="roster-empty-text">{{ t('directory.roster.emptyText') }}</div>
     </div>
 
     <template v-else>
@@ -50,15 +50,15 @@
               <div class="sp-top">
                 <span class="sp-p1">P1</span>
                 <span class="sp-no">
-                  No.{{ String(focusIdx + 1).padStart(3, '0') }}
+                  {{ t('directory.roster.no', { n: String(focusIdx + 1).padStart(3, '0') }) }}
                   <small>/ {{ persons.length }}</small>
                 </span>
                 <span v-if="focusDead" class="sp-fallen">
                   <UiIcon name="moon" :size="12" :stroke="2.4" />
-                  Departed
+                  {{ t('directory.roster.departed') }}
                 </span>
               </div>
-              <h2 class="sp-name">{{ focused.name || 'Unnamed' }}</h2>
+              <h2 class="sp-name">{{ focused.name || t('directory.roster.unnamed') }}</h2>
               <div class="sp-epithet">{{ focusEpithet }}</div>
               <div v-if="focusLife" class="sp-life">{{ focusLife }}</div>
 
@@ -77,14 +77,14 @@
 
               <div v-if="focusTags.list.length || focusPartner" class="sp-tags">
                 <span
-                  v-for="(t, k) in focusTags.list"
-                  :key="t.id"
+                  v-for="(tag, k) in focusTags.list"
+                  :key="tag.id"
                   class="sp-tag"
-                  :style="{ '--tc': t.color || 'var(--accent)', '--k': k }"
+                  :style="{ '--tc': tag.color || 'var(--accent)', '--k': k }"
                 >
                   <span>
-                    <UiIcon v-if="t.icon" class="sp-tag-icon" :name="t.icon" :size="12" />
-                    {{ t.label }}
+                    <UiIcon v-if="tag.icon" class="sp-tag-icon" :name="tag.icon" :size="12" />
+                    {{ defaultNameLabel(tag.label) }}
                   </span>
                 </span>
                 <span v-if="focusTags.more" class="sp-tag sp-tag-more" :style="{ '--k': 5 }">
@@ -98,7 +98,7 @@
             </div>
 
             <div v-if="lockedId === focused.id" class="sp-stamp">
-              <span>Selected!</span>
+              <span>{{ t('directory.roster.selected') }}</span>
             </div>
           </div>
         </Transition>
@@ -106,20 +106,53 @@
         <div v-if="wipeKey" :key="'w' + wipeKey" class="sp-wipe" aria-hidden="true"></div>
         <div v-if="lockKey" :key="'f' + lockKey" class="sp-flash" aria-hidden="true"></div>
 
-        <button class="sp-lock" type="button" @click="lockFocused">Lock in <kbd>Enter</kbd></button>
+        <button class="sp-lock" type="button" @click="lockFocused">
+          {{ t('directory.roster.lockIn') }} <kbd>Enter</kbd>
+        </button>
       </section>
 
       <!-- ── Divider rail ── -->
       <div class="rail">
-        <span class="rail-title">Select your character</span>
+        <span class="rail-title">{{ t('directory.roster.selectTitle') }}</span>
         <span class="rail-hint">
-          <kbd><UiIcon name="arrow-left" :size="11" :stroke="2.6" label="Left" /></kbd>
-          <kbd><UiIcon name="arrow-up" :size="11" :stroke="2.6" label="Up" /></kbd>
-          <kbd><UiIcon name="arrow-down" :size="11" :stroke="2.6" label="Down" /></kbd>
-          <kbd><UiIcon name="arrow-right" :size="11" :stroke="2.6" label="Right" /></kbd>
-          move <kbd>Enter</kbd> lock in
+          <kbd
+            ><UiIcon
+              name="arrow-left"
+              :size="11"
+              :stroke="2.6"
+              :label="t('directory.roster.keys.left')"
+          /></kbd>
+          <kbd
+            ><UiIcon
+              name="arrow-up"
+              :size="11"
+              :stroke="2.6"
+              :label="t('directory.roster.keys.up')"
+          /></kbd>
+          <kbd
+            ><UiIcon
+              name="arrow-down"
+              :size="11"
+              :stroke="2.6"
+              :label="t('directory.roster.keys.down')"
+          /></kbd>
+          <kbd
+            ><UiIcon
+              name="arrow-right"
+              :size="11"
+              :stroke="2.6"
+              :label="t('directory.roster.keys.right')"
+          /></kbd>
+          {{ t('directory.roster.hintMove') }} <kbd>Enter</kbd> {{ t('directory.roster.hintLock') }}
         </span>
-        <span class="rail-count">{{ persons.length }} fighters</span>
+        <span class="rail-count">{{
+          t(
+            persons.length === 1
+              ? 'directory.roster.fighters.one'
+              : 'directory.roster.fighters.other',
+            { n: persons.length }
+          )
+        }}</span>
       </div>
 
       <!-- ── Select grid (row-windowed) ── -->
@@ -134,25 +167,25 @@
         <div class="grid-fade" aria-hidden="true"></div>
         <div class="sizer" :style="{ height: metrics.totalH + 'px' }">
           <div
-            v-for="t in tiles"
-            :key="t.p.id"
+            v-for="tile in tiles"
+            :key="tile.p.id"
             class="tile"
             :class="{
-              on: t.i === focusIdx,
-              dead: t.dead,
-              selected: store.selectedPersonId === t.p.id,
-              locked: lockedId === t.p.id
+              on: tile.i === focusIdx,
+              dead: tile.dead,
+              selected: store.selectedPersonId === tile.p.id,
+              locked: lockedId === tile.p.id
             }"
-            :data-i="t.i"
-            :style="t.style"
-            :aria-label="t.p.name || 'Unnamed'"
+            :data-i="tile.i"
+            :style="tile.style"
+            :aria-label="tile.p.name || unnamed"
           >
-            <div class="tile-in" :style="{ '--tc': t.color }">
+            <div class="tile-in" :style="{ '--tc': tile.color }">
               <div class="tile-body">
-                <TileArt :person="t.p" />
+                <TileArt :person="tile.p" />
                 <div class="tile-scrim"></div>
-                <div class="tile-name">{{ t.p.name || 'Unnamed' }}</div>
-                <UiIcon v-if="t.dead" class="tile-moon" name="moon" :size="12" :stroke="2.4" />
+                <div class="tile-name">{{ tile.p.name || unnamed }}</div>
+                <UiIcon v-if="tile.dead" class="tile-moon" name="moon" :size="12" :stroke="2.4" />
               </div>
             </div>
           </div>
@@ -189,9 +222,11 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, h } from 'vue'
 import { useMainStore } from '../../store/index.js'
-import { isDeceased, ageOf, genderLabel } from './peopleLayout.js'
+import { isDeceased, ageOf } from './peopleLayout.js'
 import UiIcon from '../ui/UiIcon.js'
 import { useThumbnail } from './useThumbnail.js'
+import { useI18n } from '../../i18n'
+import { genderLabel, defaultNameLabel } from '../../lib/dataLabels'
 import {
   TILE_W,
   TILE_H,
@@ -204,7 +239,6 @@ import {
   revealScroll,
   rosterMaxima,
   statFraction,
-  lifeLine,
   epithet,
   initialsOf
 } from './rosterLayout.js'
@@ -222,7 +256,9 @@ const props = defineProps({
 })
 
 const store = useMainStore()
+const { t } = useI18n()
 const gridEl = ref(null)
+const unnamed = computed(() => t('directory.roster.unnamed'))
 
 const reduceMotion =
   typeof window !== 'undefined' &&
@@ -333,14 +369,32 @@ const focusInitials = computed(() => initialsOf(focused.value?.name))
 const focusEpithet = computed(() => {
   const p = focused.value
   if (!p) return ''
-  return epithet(p) || genderLabel(p.gender)
+  return epithet(p) || genderText(p.gender)
 })
+// peopleLayout's genderLabel() stays English; translate at the call site.
+function genderText(g) {
+  return g === 'male' || g === 'female' ? genderLabel(g) : t('data.noun.person')
+}
+// "1901 – 1975" / "b. 1901" / "d. 1975" — rosterLayout's lifeLine(), localized.
+function lifeText(p) {
+  const b = p?.birth?.year
+  const d = p?.death?.year
+  if (b != null && d != null) return t('directory.roster.life.span', { b, d })
+  if (b != null) return t('directory.roster.life.born', { y: b })
+  if (d != null) return t('directory.roster.life.died', { y: d })
+  return ''
+}
 const focusLife = computed(() => {
   const p = focused.value
   if (!p) return ''
-  const life = lifeLine(p)
+  const life = lifeText(p)
   const age = ageOf(p, props.refYear)
-  const agePart = age == null ? '' : focusDead.value ? `died aged ${age}` : `age ${age}`
+  const agePart =
+    age == null
+      ? ''
+      : focusDead.value
+        ? t('directory.roster.diedAged', { n: age })
+        : t('directory.roster.ageN', { n: age })
   return [life, agePart].filter(Boolean).join('  ·  ')
 })
 // Long names shrink so the display type never overflows the splash.
@@ -359,11 +413,23 @@ const focusStats = computed(() => {
   const age = ageOf(p, props.refYear)
   const m = maxima.value
   return [
-    { key: 'age', label: 'Age', text: age == null ? '—' : age, f: statFraction(age, m.age), d: 0 },
-    { key: 'kin', label: 'Kin', text: s.kin, f: statFraction(s.kin, m.kin), d: 1 },
+    {
+      key: 'age',
+      label: t('directory.roster.stats.age'),
+      text: age == null ? '—' : age,
+      f: statFraction(age, m.age),
+      d: 0
+    },
+    {
+      key: 'kin',
+      label: t('directory.roster.stats.kin'),
+      text: s.kin,
+      f: statFraction(s.kin, m.kin),
+      d: 1
+    },
     {
       key: 'children',
-      label: 'Children',
+      label: t('directory.roster.stats.children'),
       text: s.children,
       f: statFraction(s.children, m.children),
       d: 2
@@ -386,7 +452,7 @@ const focusPartner = computed(() => {
     const other = r.person_a_id === id ? r.person_b_id : r.person_b_id === id ? r.person_a_id : null
     if (!other) continue
     const o = personById.value.get(other)
-    if (o && !names.includes(o.name)) names.push(o.name || 'Unnamed')
+    if (o && !names.includes(o.name)) names.push(o.name || unnamed.value)
     if (names.length >= 2) break
   }
   return names.join(' & ')

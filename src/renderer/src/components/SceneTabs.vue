@@ -1,6 +1,6 @@
 <template>
   <div class="scene-tabs" @wheel.stop>
-    <span class="st-label">{{ label }}</span>
+    <span class="st-label">{{ label || t('scenes.label') }}</span>
     <div class="st-chips">
       <TransitionGroup name="stpill">
         <button
@@ -8,7 +8,7 @@
           :key="s.id"
           class="st-chip"
           :class="{ active: s.id === activeId }"
-          :title="tooltip ? tooltip(s) : s.name"
+          :title="tooltip ? tooltip(s) : defaultNameLabel(s.name)"
           @click="onChipClick(s)"
           @dblclick="startRename(s)"
         >
@@ -22,28 +22,28 @@
             @blur="confirmRename"
             @click.stop
           />
-          <span v-else class="st-name">{{ s.name }}</span>
+          <span v-else class="st-name">{{ defaultNameLabel(s.name) }}</span>
           <span v-if="$slots.badge" class="st-badge"><slot name="badge" :scene="s"></slot></span>
           <span
             v-if="scenes.length > 1 && renamingId !== s.id"
             class="st-x"
             role="button"
-            :title="deleteTitle"
-            :aria-label="deleteTitle"
+            :title="deleteLabel"
+            :aria-label="deleteLabel"
             @click.stop="$emit('remove', s)"
           >
             <UiIcon name="x" :size="12" :stroke="2.4" />
           </span>
         </button>
       </TransitionGroup>
-      <button class="st-add" :title="addTitle" :aria-label="addTitle" @click="$emit('create')">
+      <button class="st-add" :title="addLabel" :aria-label="addLabel" @click="$emit('create')">
         <UiIcon name="plus" :size="14" />
       </button>
       <button
         v-if="activeId"
         class="st-add"
-        :title="duplicateTitle"
-        :aria-label="duplicateTitle"
+        :title="duplicateLabel"
+        :aria-label="duplicateLabel"
         @click="$emit('duplicate')"
       >
         <UiIcon name="copy" :size="14" />
@@ -54,23 +54,30 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, computed } from 'vue'
 import UiIcon from './ui/UiIcon.js'
+import { useI18n } from '../i18n'
+import { defaultNameLabel } from '../lib/dataLabels'
 
 // The shared Scene tab strip: lists ONE view's scenes, marks the active one,
 // and offers switch / new / rename (dblclick) / duplicate / delete. Purely
 // presentational — the owning view supplies the scenes and reacts to events,
 // so each view keeps its own switch/transition behaviour.
-defineProps({
+const props = defineProps({
   scenes: { type: Array, required: true },
   activeId: { type: String, default: null },
-  label: { type: String, default: 'Scenes' },
+  label: { type: String, default: '' },
   hint: { type: String, default: '' },
   tooltip: { type: Function, default: null },
-  addTitle: { type: String, default: 'New scene' },
-  duplicateTitle: { type: String, default: 'Duplicate current scene' },
-  deleteTitle: { type: String, default: 'Delete scene' }
+  addTitle: { type: String, default: '' },
+  duplicateTitle: { type: String, default: '' },
+  deleteTitle: { type: String, default: '' }
 })
+const { t } = useI18n()
+// Defaults resolve at render time so they follow the UI language.
+const addLabel = computed(() => props.addTitle || t('scenes.add'))
+const duplicateLabel = computed(() => props.duplicateTitle || t('scenes.duplicate'))
+const deleteLabel = computed(() => props.deleteTitle || t('scenes.remove'))
 
 const emit = defineEmits(['switch', 'create', 'duplicate', 'rename', 'remove'])
 

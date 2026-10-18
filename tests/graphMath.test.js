@@ -30,7 +30,8 @@ describe('webgl coords', () => {
 
   it('worldToScreen applies translate then scale like the old SVG group', () => {
     const t = { x: 10, y: 20, k: 2 }
-    expect(worldToScreen(5, 5, t)).toEqual({ x: 20, y: 30 })
+    // `s` is the perspective scale — always 1 without a tilt (graphTilt.test.js).
+    expect(worldToScreen(5, 5, t)).toEqual({ x: 20, y: 30, s: 1 })
   })
 
   it('fitExtent centres the bounding box within the viewport', () => {

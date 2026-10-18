@@ -19,7 +19,7 @@
         </div>
         <div class="fn-cols">
           <span class="fn-name" :class="{ cjk: cjkName, unnamed: !person.name }">{{
-            person.name || 'Unnamed'
+            person.name || t('directory.card.unnamed')
           }}</span>
           <span v-if="lifeText || person.occupation" class="fn-meta"
             >{{ lifeText }}<template v-if="lifeText && person.occupation"> · </template
@@ -41,6 +41,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from '../../i18n'
 import { hashStr } from '../../lib/inkArt'
 import {
   paintingPaperUrl,
@@ -57,6 +58,8 @@ const props = defineProps({
   deceased: { type: Boolean, default: false },
   lifeText: { type: String, default: '' }
 })
+
+const { t } = useI18n()
 
 const seed = computed(() => hashStr(props.person.id || props.person.name || ''))
 const motif = computed(() => fanMotifUrl(seed.value))

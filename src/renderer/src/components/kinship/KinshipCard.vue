@@ -5,13 +5,15 @@
        couple who share blood — the Bloodline meter. -->
   <div class="kc" :style="{ '--kc': relColor }">
     <div class="kc-top">
-      <span class="kc-eyebrow"><UiIcon class="kc-helix" name="dna" :size="14" />Kinship</span>
+      <span class="kc-eyebrow"
+        ><UiIcon class="kc-helix" name="dna" :size="14" />{{ t('kinship.title') }}</span
+      >
       <KinLangPicker />
       <button
         class="kc-swap"
         :class="{ spun: flipped }"
-        title="Flip the question"
-        aria-label="Flip the question"
+        :title="t('kinship.card.flip')"
+        :aria-label="t('kinship.card.flip')"
         @click="flipped = !flipped"
       >
         <UiIcon name="arrow-right-left" :size="14" />
@@ -42,14 +44,12 @@
           </div>
         </template>
         <div v-else class="kc-sentence kc-none">
-          <b :style="{ color: personColor(B) }">{{ personName(B) }}</b>
-          <span> and </span>
-          <b :style="{ color: personColor(A) }">{{ personName(A) }}</b>
-          <span>
-            {{
-              kin ? ` aren't family — ${kin.hops} links apart` : ' share no connection at all'
-            }}</span
-          >
+          <template v-for="(part, i) in noneParts" :key="i">
+            <b v-if="part.who" :style="{ color: personColor(part.who) }">{{
+              personName(part.who)
+            }}</b>
+            <span v-else>{{ part.text }}</span>
+          </template>
         </div>
       </div>
     </Transition>
@@ -69,11 +69,13 @@
           <span class="kc-fact-v">{{ ancestorsText }}</span>
         </div>
         <div v-if="degree" class="kc-fact" style="--i: 1">
-          <span class="kc-fact-k">Degree</span>
-          <span class="kc-fact-v">{{ ordinalNum(degree) }}-degree relative</span>
+          <span class="kc-fact-k">{{ t('kinship.card.degree') }}</span>
+          <span class="kc-fact-v">{{
+            t('kinship.card.degreeValue', { n: degree, ord: ordinalNum(degree) })
+          }}</span>
         </div>
         <div v-if="r > 0" class="kc-fact kc-dna" style="--i: 2">
-          <span class="kc-fact-k">Shared DNA</span>
+          <span class="kc-fact-k">{{ t('kinship.card.sharedDna') }}</span>
           <span class="kc-fact-v">
             ≈ {{ rPct }} · ~{{ cm.toLocaleString() }} cM
             <span class="kc-dna-bar"
@@ -86,17 +88,17 @@
           class="kc-fact"
           style="--i: 2"
         >
-          <span class="kc-fact-k">Shared DNA</span>
-          <span class="kc-fact-v kc-dim">none — family by {{ bondWord }}</span>
+          <span class="kc-fact-k">{{ t('kinship.card.sharedDna') }}</span>
+          <span class="kc-fact-v kc-dim">{{ bondWord }}</span>
         </div>
         <div v-if="alsoNames.length" class="kc-fact kc-also" style="--i: 3">
-          <span class="kc-fact-k">Also</span>
+          <span class="kc-fact-k">{{ t('kinship.card.also') }}</span>
           <span class="kc-fact-v">
             <span v-for="n in alsoNames" :key="n" class="kc-also-chip">{{ n }}</span>
           </span>
         </div>
         <div v-if="showMeter" class="kc-fact kc-meter" style="--i: 4">
-          <span class="kc-fact-k">Bloodline</span>
+          <span class="kc-fact-k">{{ t('kinship.card.bloodline') }}</span>
           <BloodMeter :phi="phi" />
         </div>
       </div>
@@ -113,6 +115,7 @@ import KinArch from './KinArch.vue'
 import BloodMeter from './BloodMeter.vue'
 import KinLangPicker from './KinLangPicker.vue'
 import UiIcon from '../ui/UiIcon.js'
+import { useI18n } from '../../i18n'
 
 const props = defineProps({
   a: { type: String, required: true },
@@ -122,6 +125,7 @@ defineEmits(['pick'])
 
 const K = useKinship()
 const { kinLang, personName, personColor } = K
+const { t } = useI18n()
 const flipped = ref(false)
 const A = computed(() => (flipped.value ? props.b : props.a))
 const B = computed(() => (flipped.value ? props.a : props.b))
@@ -161,6 +165,18 @@ function sentence(who, owner, rel) {
   ]
 }
 
+/** "{b} and {a} aren't family" — UI chrome, so it follows the app language. */
+const noneParts = computed(() => {
+  const k = kin.value
+  const src = String(
+    k ? t('kinship.card.notFamily', { n: k.hops }) : t('kinship.card.noConnection')
+  )
+  return src
+    .split(/(\{a\}|\{b\})/)
+    .filter(Boolean)
+    .map((s) => (s === '{a}' ? { who: A.value } : s === '{b}' ? { who: B.value } : { text: s }))
+})
+
 // ── Arch ─────────────────────────────────────────────────────────────────
 const archPoints = computed(() => {
   const k = kin.value
@@ -188,15 +204,17 @@ const archPartner = computed(() => {
 const viaLabel = computed(() => {
   const k = kin.value
   if (!k) return ''
-  if (k.kind === 'blood') return k.cas.length > 1 ? 'Common ancestors' : 'Common ancestor'
-  return 'Through'
+  if (k.kind === 'blood') {
+    return k.cas.length > 1 ? t('kinship.card.commonAncestors') : t('kinship.card.commonAncestor')
+  }
+  return t('kinship.card.through')
 })
 const ancestorsText = computed(() => {
   const k = kin.value
   if (!k) return ''
   if (k.kind === 'blood') {
-    if (!k.cas.length) return 'an explicit sibling bond'
-    if (k.up === 0 || k.down === 0) return 'a direct line'
+    if (!k.cas.length) return t('kinship.card.explicitSibling')
+    if (k.up === 0 || k.down === 0) return t('kinship.card.directLine')
     return k.cas.map(personName).join(' & ')
   }
   if (k.via) return personName(k.via)
@@ -215,7 +233,7 @@ const cm = computed(() => {
 })
 const bondWord = computed(() => {
   const c = kinClass(kin.value)
-  return c === 'step' ? 'a stepfamily' : c === 'spouse' ? 'marriage' : 'marriage'
+  return c === 'step' ? t('kinship.card.dnaNoneStep') : t('kinship.card.dnaNoneMarriage')
 })
 const phi = computed(() => K.coef.value.phi(A.value, B.value))
 const showMeter = computed(() => kin.value?.kind === 'spouse' && phi.value > 0)

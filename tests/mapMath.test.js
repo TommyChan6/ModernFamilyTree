@@ -24,10 +24,28 @@ import {
   hitFeature,
   hitVertex,
   niceLength,
+  insertVertex,
+  removeVertex,
+  segmentMidpoint,
+  hitMidpoint,
+  snapPoint,
+  foldText,
+  matchScore,
   MAX_ZOOM
 } from '../src/renderer/src/components/map/mapMath'
 import { generateWorld } from '../src/renderer/src/components/map/mapGen'
-import { MAP_KIND_GEOMETRY } from '../src/renderer/src/components/map/mapKinds'
+import {
+  MAP_KIND_GEOMETRY,
+  MAP_LAYERS,
+  layerOf,
+  hiddenKindsOf,
+  toolKind,
+  ALL_TOOLS
+} from '../src/renderer/src/components/map/mapKinds'
+import {
+  MAP_STYLE_LIST as STYLE_LIST,
+  MAP_UNITS
+} from '../src/renderer/src/components/map/mapStyles'
 import { sanitizeFeature, MAP_FEATURE_KINDS } from '../src/shared/maps'
 
 const square = [0, 0, 100, 0, 100, 100, 0, 100]
@@ -374,5 +392,98 @@ describe('ink painting maths', async () => {
     }
     expect(MAP_STYLES.ink.eastern).toBe(true)
     expect(MAP_STYLES.parchment.painting).toBeUndefined()
+  })
+})
+
+describe('map editing', () => {
+  const geo = (k) => MAP_KIND_GEOMETRY[k]
+  const square = [0, 0, 10, 0, 10, 10, 0, 10]
+
+  it('inserts a vertex on a segment without mutating the input', () => {
+    const out = insertVertex(square, 0, 5, 0.04)
+    expect(out).toEqual([0, 0, 5, 0, 10, 0, 10, 10, 0, 10])
+    expect(square).toHaveLength(8)
+    // the closing segment of a polygon (last vertex → first) inserts at the end
+    expect(insertVertex(square, 3, 0, 5)).toEqual([0, 0, 10, 0, 10, 10, 0, 10, 0, 5])
+  })
+
+  it('removes a vertex but never below the shape minimum', () => {
+    expect(removeVertex(square, 1, true)).toEqual([0, 0, 10, 10, 0, 10])
+    expect(removeVertex([0, 0, 10, 0, 10, 10], 0, true)).toBeNull() // a triangle stays
+    expect(removeVertex([0, 0, 5, 5, 10, 0], 1, false)).toEqual([0, 0, 10, 0])
+    expect(removeVertex([0, 0, 10, 0], 0, false)).toBeNull() // a line keeps 2
+    expect(removeVertex(square, 9, true)).toBeNull()
+  })
+
+  it('finds midpoint handles, including a polygon’s closing edge', () => {
+    expect(segmentMidpoint(square, 0)).toEqual([5, 0])
+    expect(segmentMidpoint(square, 3)).toEqual([0, 5])
+    expect(hitMidpoint(square, true, 0.5, 5, 1)).toBe(3)
+    expect(hitMidpoint(square, false, 0.5, 5, 1)).toBe(-1) // open: no closing edge
+    expect(hitMidpoint(square, true, 5, 5, 1)).toBe(-1)
+    // segments too short to show a handle can't be hit
+    expect(hitMidpoint(square, true, 5, 0, 1, 20)).toBe(-1)
+  })
+
+  it('snaps to places first, then the nearest vertex, skipping the edited shape', () => {
+    const feats = [
+      { id: 'road', kind: 'road', pts: [0, 0, 100, 0] },
+      { id: 'town', kind: 'place', pts: [104, 3] },
+      { id: 'self', kind: 'river', pts: [99, 1, 50, 50] },
+      { id: 'later', kind: 'place', pts: [100, 1], from: 2000 },
+      { id: 'lbl', kind: 'label', pts: [100, 0] }
+    ]
+    // the town is a little further than the road end but a place pulls harder
+    expect(snapPoint(feats, 101, 0, 8, 1900, geo, { excludeId: 'self' })).toMatchObject({
+      id: 'town',
+      type: 'point',
+      x: 104,
+      y: 3
+    })
+    // hide places → the road's end vertex
+    expect(
+      snapPoint(feats, 101, 0, 8, 1900, geo, { excludeId: 'self', hidden: new Set(['place']) })
+    ).toMatchObject({ id: 'road', type: 'vertex', x: 100, y: 0 })
+    // without the exclusion the river's own vertex is nearest
+    expect(snapPoint(feats, 99, 1, 8, 1900, geo, { hidden: new Set(['place']) })?.id).toBe('self')
+    expect(snapPoint(feats, 300, 300, 8, 1900, geo)).toBeNull()
+  })
+
+  it('skips hidden kinds when picking', () => {
+    const feats = [{ id: 'town', kind: 'place', pts: [5, 5] }]
+    expect(hitFeature(feats, 5, 5, 4, null, geo)).toBe('town')
+    expect(hitFeature(feats, 5, 5, 4, null, geo, { hidden: new Set(['place']) })).toBeNull()
+  })
+})
+
+describe('map search + layers', () => {
+  it('ranks exact, prefix, word-prefix and substring matches, ignoring accents', () => {
+    expect(foldText('  Ålesund ')).toBe('alesund')
+    expect(matchScore('Winterfell', 'winterfell')).toBe(0)
+    expect(matchScore('Winterfell', 'wint')).toBe(1)
+    expect(matchScore('The Wall', 'wall')).toBe(2)
+    expect(matchScore('Kings-Landing', 'land')).toBe(2)
+    expect(matchScore('Dragonstone', 'stone')).toBe(3)
+    expect(matchScore('Ålesund', 'ale')).toBe(1)
+    expect(matchScore('Braavos', 'xyz')).toBe(-1)
+    expect(matchScore('anything', '')).toBe(3)
+  })
+
+  it('puts every drawable kind except land and water in exactly one layer', () => {
+    for (const kind of Object.keys(MAP_KIND_GEOMETRY)) {
+      const owners = MAP_LAYERS.filter((l) => l.kinds.includes(kind))
+      expect(owners.length, kind).toBe(kind === 'land' || kind === 'water' ? 0 : 1)
+    }
+    expect(layerOf('road')?.id).toBe('routes')
+    expect(layerOf('land')).toBeNull()
+    expect([...hiddenKindsOf(['realms', 'text'])].sort()).toEqual(['label', 'territory'])
+  })
+
+  it('keeps the measure tool from drawing and gives every style a unit', () => {
+    expect(toolKind('measure').kind).toBeNull()
+    expect(ALL_TOOLS.find((tl) => tl.id === 'measure')?.hotkey).toBe('u')
+    const keys = ALL_TOOLS.filter((tl) => tl.hotkey).map((tl) => tl.hotkey)
+    expect(new Set(keys).size).toBe(keys.length) // no hotkey clash
+    for (const st of STYLE_LIST) expect(MAP_UNITS[st.unit], st.id).toBeGreaterThan(0)
   })
 })

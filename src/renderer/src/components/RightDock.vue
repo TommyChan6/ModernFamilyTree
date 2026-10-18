@@ -3,8 +3,8 @@
   <aside v-if="collapsed" class="right-dock collapsed">
     <button
       class="dock-collapse"
-      title="Expand panel"
-      aria-label="Expand panel"
+      :title="t('dock.expand')"
+      :aria-label="t('dock.expand')"
       @click="$emit('toggle-collapse')"
     >
       <UiIcon name="chevron-left" :size="16" />
@@ -18,19 +18,19 @@
         :class="{ active: store.inspectorTab === 'inspector' }"
         @click="store.inspectorTab = 'inspector'"
       >
-        Inspector
+        {{ t('dock.inspector') }}
       </button>
       <button
         class="dock-tab"
         :class="{ active: store.inspectorTab === 'directory' }"
         @click="store.inspectorTab = 'directory'"
       >
-        Directory
+        {{ t('rail.directory') }}
       </button>
       <button
         class="dock-collapse"
-        title="Collapse panel"
-        aria-label="Collapse panel"
+        :title="t('dock.collapse')"
+        :aria-label="t('dock.collapse')"
         @click="$emit('toggle-collapse')"
       >
         <UiIcon name="chevron-right" :size="16" />
@@ -50,40 +50,43 @@
             />
             <span v-else class="insp-initials">{{ initials(person.name) }}</span>
           </div>
-          <div class="insp-name">{{ person.name || 'Unnamed' }}</div>
+          <div class="insp-name">{{ person.name || t('directory.common.unnamed') }}</div>
           <div class="insp-dates">
             <template v-if="person.birth?.year || person.death?.year">
               {{ person.birth?.year || '?' }}
               <template v-if="person.death?.year"> – {{ person.death.year }}</template>
             </template>
-            <template v-else>No dates recorded</template>
+            <template v-else>{{ t('dock.noDates') }}</template>
           </div>
         </div>
 
         <div class="insp-fields">
           <div v-if="person.occupation" class="insp-field">
-            <span class="insp-label">Occupation</span>{{ person.occupation }}
+            <span class="insp-label">{{ t('data.fields.occupation') }}</span
+            >{{ person.occupation }}
           </div>
           <div v-if="person.location" class="insp-field">
-            <span class="insp-label">Location</span>{{ person.location }}
+            <span class="insp-label">{{ t('data.fields.location') }}</span
+            >{{ person.location }}
           </div>
           <div v-if="person.bio" class="insp-field insp-bio">
-            <span class="insp-label">Bio</span>{{ person.bio }}
+            <span class="insp-label">{{ t('data.fields.bio') }}</span
+            >{{ person.bio }}
           </div>
         </div>
 
         <div v-if="store.caps.tags" class="insp-section">
-          <div class="insp-label">Tags</div>
+          <div class="insp-label">{{ t('dock.tags') }}</div>
           <TagChipsEditor :entity-id="person.id" />
         </div>
 
         <div class="insp-actions">
           <button class="btn btn-ghost btn-sm" @click="store.selectPerson(person.id)">
-            Open profile
+            {{ t('dock.openProfile') }}
           </button>
           <button class="btn btn-primary btn-sm" @click="store.openForm(person)">
             <UiIcon name="pencil" :size="14" />
-            Edit
+            {{ t('dock.edit') }}
           </button>
         </div>
       </template>
@@ -93,8 +96,7 @@
           <UiIcon name="mouse-pointer-click" :size="28" :stroke="1.6" />
         </div>
         <div class="insp-empty-text">
-          Select a person on the canvas — or pick one from the Directory tab — to inspect and edit
-          them here.
+          {{ t('dock.emptyHint') }}
         </div>
       </div>
     </div>
@@ -107,6 +109,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useMainStore } from '../store/index.js'
+import { useI18n } from '../i18n'
 import { api } from '../api'
 import RightSidebar from './RightSidebar.vue'
 import TagChipsEditor from './TagChipsEditor.vue'
@@ -117,6 +120,7 @@ import UiIcon from './ui/UiIcon.js'
 // edit) and Directory (the draggable member roster, dragged onto a canvas to
 // place/assign).
 const store = useMainStore()
+const { t } = useI18n()
 
 defineProps({ collapsed: { type: Boolean, default: false } })
 defineEmits(['toggle-collapse'])

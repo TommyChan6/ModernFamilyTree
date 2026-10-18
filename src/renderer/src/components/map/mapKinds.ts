@@ -62,7 +62,7 @@ export const KIND_Z: Record<string, number> = Object.fromEntries(
 export const LIVE_KINDS = new Set<MapFeatureKind>(['zone', 'arrow', 'event'])
 
 export interface ToolDef {
-  /** Tool id: a feature kind, or 'select' / 'pan' / 'erase'. */
+  /** Tool id: a feature kind, or one of the NON_DRAW_TOOLS. */
   id: string
   /** UiIcon / drawIcon name (lucideIcons.js registry). */
   icon: string
@@ -86,6 +86,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
     tools: [
       { id: 'select', icon: 'mouse-pointer-2', hotkey: 'v' },
       { id: 'pan', icon: 'hand', hotkey: 'h' },
+      { id: 'measure', icon: 'ruler', hotkey: 'u' },
       { id: 'erase', icon: 'eraser', hotkey: 'e' }
     ]
   },
@@ -163,12 +164,15 @@ export const TOOL_GROUPS: ToolGroup[] = [
   }
 ]
 
+/** Tools that draw nothing onto the map. */
+export const NON_DRAW_TOOLS = new Set(['select', 'pan', 'measure', 'erase'])
+
 export const ALL_TOOLS: ToolDef[] = TOOL_GROUPS.flatMap((g) => g.tools)
 export const TOOL_BY_ID = new Map(ALL_TOOLS.map((t) => [t.id, t]))
 
 /** Split a tool id into the feature kind it draws + its glyph. */
 export function toolKind(toolId: string): { kind: MapFeatureKind | null; glyph?: string } {
-  if (toolId === 'select' || toolId === 'pan' || toolId === 'erase') return { kind: null }
+  if (NON_DRAW_TOOLS.has(toolId)) return { kind: null }
   const [kind, glyph] = toolId.split(':')
   return { kind: kind as MapFeatureKind, glyph }
 }
@@ -196,4 +200,39 @@ export const PLACE_RANK: Record<string, number> = {
   cave: 1.5,
   camp: 1,
   village: 1
+}
+
+export interface MapLayer {
+  id: string
+  /** UiIcon name. */
+  icon: string
+  kinds: MapFeatureKind[]
+}
+
+/** The Layers menu: what can be hidden while you work. Land and water are the
+ *  sheet itself and always show. Every other kind sits in exactly one layer. */
+export const MAP_LAYERS: MapLayer[] = [
+  {
+    id: 'terrain',
+    icon: 'mountain',
+    kinds: ['forest', 'mountains', 'hills', 'desert', 'grass', 'swamp', 'snow']
+  },
+  { id: 'realms', icon: 'crown', kinds: ['territory'] },
+  { id: 'routes', icon: 'route', kinds: ['river', 'road', 'rail', 'wall', 'border', 'searoute'] },
+  { id: 'places', icon: 'castle', kinds: ['place'] },
+  { id: 'events', icon: 'swords', kinds: ['event', 'arrow', 'zone'] },
+  { id: 'text', icon: 'type', kinds: ['label'] }
+]
+
+/** The layer a feature kind belongs to (null = land / water, never hidden). */
+export function layerOf(kind: string): MapLayer | null {
+  return MAP_LAYERS.find((l) => (l.kinds as string[]).includes(kind)) || null
+}
+
+/** Every feature kind hidden by the given set of hidden layer ids. */
+export function hiddenKindsOf(hiddenLayers: Iterable<string>): Set<string> {
+  const ids = new Set(hiddenLayers)
+  const out = new Set<string>()
+  for (const l of MAP_LAYERS) if (ids.has(l.id)) for (const k of l.kinds) out.add(k)
+  return out
 }

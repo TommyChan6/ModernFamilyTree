@@ -7,7 +7,7 @@
     class="fan"
     :viewBox="`${-R - 4} ${-R - 6} ${2 * R + 8} ${R + 22}`"
     role="img"
-    aria-label="Ancestor fan chart"
+    :aria-label="t('kinship.fan.aria')"
   >
     <g v-for="(ring, g) in wedges" :key="g" class="fan-ring" :style="{ '--g': g }">
       <path
@@ -32,6 +32,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { useI18n } from '../../i18n'
 
 const props = defineProps({
   /** ancestorFan() rings: rings[g][i] = { id, dup } */
@@ -41,6 +42,7 @@ const props = defineProps({
   hubName: { type: String, default: '' }
 })
 defineEmits(['pick'])
+const { t } = useI18n()
 
 const HUB = 16
 const BAND = 17
@@ -84,7 +86,11 @@ const wedges = computed(() => {
           dup: s.dup,
           d: arc(r0, r1, a0, a1),
           color: s.id ? props.colorOf(s.id) : 'transparent',
-          title: s.id ? props.nameOf(s.id) + (s.dup ? ' — appears more than once' : '') : 'Unknown'
+          title: s.id
+            ? s.dup
+              ? t('kinship.fan.dup', { name: props.nameOf(s.id) })
+              : props.nameOf(s.id)
+            : t('kinship.fan.unknown')
         }
       })
     )

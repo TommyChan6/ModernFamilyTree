@@ -21,10 +21,10 @@
                 :style="{ '--tc': tag.color }"
               >
                 <UiIcon v-if="tag.icon" :name="tag.icon" :size="12" />
-                {{ tag.label }}
+                {{ defaultNameLabel(tag.label) }}
               </span>
             </div>
-            <div class="pf-rail-note">Live preview</div>
+            <div class="pf-rail-note">{{ t('personForm.livePreview') }}</div>
           </div>
         </aside>
 
@@ -46,8 +46,8 @@
             <button
               class="pf-close icon-btn"
               type="button"
-              title="Close"
-              aria-label="Close"
+              :title="t('personForm.close')"
+              :aria-label="t('personForm.close')"
               @click="cancel"
             >
               <UiIcon name="x" :size="18" />
@@ -57,7 +57,7 @@
           <div ref="bodyEl" class="pf-body">
             <!-- ═ Identity: the slot dock ═ -->
             <section :ref="(el) => (sectionEls.identity = el)" class="pf-section">
-              <div class="pf-section-label">Identity slots</div>
+              <div class="pf-section-label">{{ t('personForm.identitySlots') }}</div>
               <SlotDock
                 ref="dockRef"
                 :defs="store.fieldDefs"
@@ -70,10 +70,8 @@
             <!-- ═ Traits ═ -->
             <section :ref="(el) => (sectionEls.traits = el)" class="pf-section">
               <div class="pf-section-label">
-                Traits
-                <span class="pf-section-hint"
-                  >Drag a row's handle to reorder · drop it on a slot to assign</span
-                >
+                {{ t('personForm.traits') }}
+                <span class="pf-section-hint">{{ t('personForm.traitsHint') }}</span>
               </div>
               <TransitionGroup name="fl" tag="div" class="pf-field-list">
                 <FieldRow
@@ -96,12 +94,12 @@
 
             <!-- ═ Relationships ═ -->
             <section :ref="(el) => (sectionEls.relations = el)" class="pf-section">
-              <div class="pf-section-label">Relationships</div>
+              <div class="pf-section-label">{{ t('rail.relationships') }}</div>
 
               <div v-if="store.editingPerson && existingRels.length > 0" class="pf-rels">
                 <div v-for="rel in existingRels" :key="rel.id" class="pf-rel-card">
                   <div class="pf-rel-top">
-                    <span class="pf-rel-type">{{ rel.roleLabel }}</span>
+                    <span class="pf-rel-type">{{ existingRoleLabel(rel) }}</span>
                     <span class="pf-rel-name">{{ rel.otherName }}</span>
                     <span v-if="rel.status && rel.status !== 'active'" class="pf-rel-divorced">
                       {{ statusLabel(rel.relType, rel.status) }}
@@ -109,8 +107,8 @@
                     <button
                       class="pf-rel-x"
                       type="button"
-                      title="Remove relationship"
-                      aria-label="Remove relationship"
+                      :title="t('personForm.removeRel')"
+                      :aria-label="t('personForm.removeRel')"
                       @click="removeExistingRel(rel.id)"
                     >
                       <UiIcon name="x" :size="14" />
@@ -118,7 +116,7 @@
                   </div>
                   <div class="pf-rel-fields">
                     <label v-if="statusesOf(rel.relType).length > 1" class="pf-rel-field">
-                      <span>Status</span>
+                      <span>{{ t('personForm.status') }}</span>
                       <select
                         :value="rel.status"
                         @change="updateExistingRelStatus(rel.id, $event.target.value)"
@@ -129,16 +127,18 @@
                       </select>
                     </label>
                     <label class="pf-rel-field">
-                      <span>{{ rel.relType === 'spouse' ? 'Married' : 'Since' }}</span>
+                      <span>{{
+                        rel.relType === 'spouse' ? t('personForm.married') : t('personForm.since')
+                      }}</span>
                       <input
                         type="number"
                         :value="rel.formedDate"
-                        placeholder="Year"
+                        :placeholder="t('personForm.input.year')"
                         @change="updateExistingRelDate(rel.id, $event.target.value)"
                       />
                     </label>
                     <label v-if="statusesOf(rel.relType).length > 1" class="pf-rel-field">
-                      <span>Ended</span>
+                      <span>{{ t('personForm.ended') }}</span>
                       <input
                         type="number"
                         :value="rel.endedDate"
@@ -152,18 +152,18 @@
 
               <!-- Derived siblings: computed from shared parents, no rows stored -->
               <div v-if="store.editingPerson && derivedSibNames.length" class="pf-sibs">
-                <span class="pf-sibs-label">Siblings</span>
+                <span class="pf-sibs-label">{{ t('personForm.siblings') }}</span>
                 <span
                   v-for="(s, i) in derivedSibNames"
                   :key="s.id"
                   class="pf-sib-chip"
                   :style="{ '--i': i }"
-                  title="Derived from a shared parent — no separate relationship needed"
+                  :title="t('personForm.siblingHint')"
                 >
                   <UiIcon name="arrow-left-right" :size="12" />
                   {{ s.name }}
                 </span>
-                <span class="pf-sibs-hint">via shared parents</span>
+                <span class="pf-sibs-hint">{{ t('personForm.viaSharedParents') }}</span>
               </div>
 
               <TransitionGroup v-if="pendingLinks.length" name="fl" tag="div" class="pf-rels">
@@ -173,14 +173,14 @@
                   class="pf-rel-card pf-rel-new"
                 >
                   <div class="pf-rel-top">
-                    <span class="pf-rel-type">{{ link.roleLabel }}</span>
+                    <span class="pf-rel-type">{{ intentLabel(link.defKey, link.dir) }}</span>
                     <span class="pf-rel-name">{{ personName(link.personId) }}</span>
-                    <span class="pf-rel-pending">New</span>
+                    <span class="pf-rel-pending">{{ t('personForm.new') }}</span>
                     <button
                       class="pf-rel-x"
                       type="button"
-                      title="Discard this link"
-                      aria-label="Discard this link"
+                      :title="t('personForm.discardLink')"
+                      :aria-label="t('personForm.discardLink')"
                       @click="pendingLinks.splice(idx, 1)"
                     >
                       <UiIcon name="x" :size="14" />
@@ -188,7 +188,7 @@
                   </div>
                   <div class="pf-rel-fields">
                     <label v-if="statusesOf(link.defKey).length > 1" class="pf-rel-field">
-                      <span>Status</span>
+                      <span>{{ t('personForm.status') }}</span>
                       <select v-model="link.status">
                         <option v-for="s in statusesOf(link.defKey)" :key="s" :value="s">
                           {{ statusLabel(link.defKey, s) }}
@@ -196,8 +196,14 @@
                       </select>
                     </label>
                     <label class="pf-rel-field">
-                      <span>{{ link.defKey === 'spouse' ? 'Married' : 'Since' }}</span>
-                      <input v-model.number="link.formedDate" type="number" placeholder="Year" />
+                      <span>{{
+                        link.defKey === 'spouse' ? t('personForm.married') : t('personForm.since')
+                      }}</span>
+                      <input
+                        v-model.number="link.formedDate"
+                        type="number"
+                        :placeholder="t('personForm.input.year')"
+                      />
                     </label>
                   </div>
                 </div>
@@ -239,9 +245,9 @@
 
             <!-- ═ Images ═ -->
             <section :ref="(el) => (sectionEls.images = el)" class="pf-section">
-              <div class="pf-section-label">Images</div>
+              <div class="pf-section-label">{{ t('personForm.images') }}</div>
               <div v-if="!store.editingPerson" class="pf-hint">
-                Images can be added after creating — save first.
+                {{ t('personForm.imagesLater') }}
               </div>
               <template v-else>
                 <div class="pf-img-slots">
@@ -258,8 +264,8 @@
                       <button
                         class="pf-img-x"
                         type="button"
-                        title="Remove image"
-                        aria-label="Remove image"
+                        :title="t('personForm.removeImage')"
+                        :aria-label="t('personForm.removeImage')"
                         @click.stop="deletePhoto(imageForRole(slot.role))"
                       >
                         <UiIcon name="x" :size="14" />
@@ -280,8 +286,8 @@
                         :key="slot.role"
                         class="pf-extra-btn"
                         type="button"
-                        :title="`Use as ${slot.label.toLowerCase()}`"
-                        :aria-label="`Use as ${slot.label.toLowerCase()}`"
+                        :title="t('personForm.useAs', { slot: slot.label.toLowerCase() })"
+                        :aria-label="t('personForm.useAs', { slot: slot.label.toLowerCase() })"
                         @click="setRole(photo, slot.role)"
                       >
                         <UiIcon :name="slot.icon" :size="12" />
@@ -289,8 +295,8 @@
                       <button
                         class="pf-extra-btn pf-extra-del"
                         type="button"
-                        title="Delete image"
-                        aria-label="Delete image"
+                        :title="t('personForm.deleteImage')"
+                        :aria-label="t('personForm.deleteImage')"
                         @click="deletePhoto(photo)"
                       >
                         <UiIcon name="trash-2" :size="12" />
@@ -300,11 +306,11 @@
                   <button
                     class="pf-extra-add"
                     type="button"
-                    title="Add an extra image"
+                    :title="t('personForm.addExtraImage')"
                     @click="addPhotoWithRole('')"
                   >
                     <UiIcon name="image-plus" :size="18" />
-                    <span>Extra</span>
+                    <span>{{ t('personForm.extra') }}</span>
                   </button>
                 </div>
               </template>
@@ -316,9 +322,9 @@
               :ref="(el) => (sectionEls.tags = el)"
               class="pf-section"
             >
-              <div class="pf-section-label">Tags</div>
+              <div class="pf-section-label">{{ t('personForm.tags') }}</div>
               <div v-if="!store.editingPerson" class="pf-hint">
-                Tags can be added after creating — save first.
+                {{ t('personForm.tagsLater') }}
               </div>
               <TagChipsEditor v-else :entity-id="store.editingPerson.id" />
             </section>
@@ -326,9 +332,17 @@
 
           <footer class="pf-footer">
             <span v-if="formError" class="pf-error">{{ formError }}</span>
-            <button class="btn btn-ghost" type="button" @click="cancel">Cancel</button>
+            <button class="btn btn-ghost" type="button" @click="cancel">
+              {{ t('dialog.cancel') }}
+            </button>
             <button class="btn btn-primary" type="button" :disabled="submitting" @click="save">
-              {{ submitting ? 'Saving…' : store.editingPerson ? 'Save changes' : 'Create' }}
+              {{
+                submitting
+                  ? t('personForm.saving')
+                  : store.editingPerson
+                    ? t('personForm.saveChanges')
+                    : t('personForm.create')
+              }}
             </button>
           </footer>
         </div>
@@ -373,14 +387,25 @@ import PersonPicker from './personForm/PersonPicker.vue'
 import TagChipsEditor from './TagChipsEditor.vue'
 import UiIcon from './ui/UiIcon.js'
 import { derivedSiblings } from './graph/graphInsights.js'
+import { useI18n } from '../i18n'
+import {
+  defaultNameLabel,
+  fieldLabel,
+  nounLabel,
+  relRoleLabel,
+  relStatusLabel,
+  relTypeLabel
+} from '../lib/dataLabels'
 
 const store = useMainStore()
+const { t } = useI18n()
+const nounLower = () => nounLabel(store.noun).toLowerCase()
 
 // Intent chips are generated from the relationship-type registry. A directed
 // def yields one chip per side — the chip names the person you PICK ("Parent"
 // = pick their parent, "Crush" = pick their crush); a symmetric def yields
 // one. Simple mode only offers the family band.
-const BAND_LABELS = { family: 'Family', social: 'Social', power: 'Power', custom: 'Custom' }
+const BAND_IDS = ['family', 'social', 'power', 'custom']
 const intentBands = computed(() => {
   const defs = store.caps.relTypePicker
     ? store.relTypes
@@ -395,23 +420,26 @@ const intentBands = computed(() => {
         defKey: def.key,
         dir, // which side the PICKED person takes: role_a or role_b
         glyph: def.glyph,
-        label: pickedRole || def.label,
-        hint: `Who is this ${store.noun.toLowerCase()}'s ${(pickedRole || def.label).toLowerCase()}?`
+        label: pickedRole || relTypeLabel(def),
+        hint: t('personForm.intentHintDirected', {
+          noun: nounLower(),
+          role: (pickedRole || relTypeLabel(def)).toLowerCase()
+        })
       })
-      intents.push(mk('a', def.role_a), mk('b', def.role_b))
+      intents.push(mk('a', relRoleLabel(def, 'a')), mk('b', relRoleLabel(def, 'b')))
     } else {
       intents.push({
         id: `${def.key}:sym`,
         defKey: def.key,
         dir: 'sym',
         glyph: def.glyph,
-        label: def.label,
-        hint: `${def.label}: pick the other ${store.noun.toLowerCase()}`
+        label: relTypeLabel(def),
+        hint: t('personForm.intentHintSym', { type: relTypeLabel(def), noun: nounLower() })
       })
     }
-    const band = BAND_LABELS[def.band] ? def.band : 'custom'
+    const band = BAND_IDS.includes(def.band) ? def.band : 'custom'
     if (!bandOf.has(band)) {
-      const entry = { id: band, label: BAND_LABELS[band], intents: [] }
+      const entry = { id: band, label: t(`personForm.bands.${band}`), intents: [] }
       bandOf.set(band, entry)
       bands.push(entry)
     }
@@ -421,33 +449,59 @@ const intentBands = computed(() => {
 })
 const allIntents = computed(() => intentBands.value.flatMap((b) => b.intents))
 
+/** The chip label of a (pending) link's intent — resolved at render time. */
+function intentLabel(defKey, dir) {
+  const def = store.relTypeByKey.get(defKey)
+  if (!def) return defKey
+  if (dir === 'a' || dir === 'b') return relRoleLabel(def, dir) || relTypeLabel(def)
+  return relTypeLabel(def)
+}
+
+/** This person's role in an existing bond ("Parent of", "Friend of"…). */
+function existingRoleLabel(rel) {
+  if (rel.customLabel) return rel.customLabel // per-edge custom label wins
+  const def = store.relTypeByKey.get(rel.relType)
+  if (!def) return rel.relType
+  if (def.directed) {
+    const mine = relRoleLabel(def, rel.isA ? 'a' : 'b')
+    return mine ? t('personForm.roleOf', { role: mine }) : relTypeLabel(def)
+  }
+  return t('personForm.roleOf', { role: relTypeLabel(def) })
+}
+
 /** Selectable statuses of a type (single-status types render no dropdown). */
 function statusesOf(defKey) {
   return store.relTypeByKey.get(defKey)?.statuses || ['active']
 }
 function statusLabel(defKey, s) {
-  if (defKey === 'spouse' && s === 'active') return 'Married'
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
+  if (defKey === 'spouse' && s === 'active') return t('personForm.married')
+  return s ? relStatusLabel(s) : s
 }
 
-const IMAGE_SLOTS = [
-  {
-    role: 'portrait',
-    icon: 'user-round',
-    label: 'Portrait',
-    hint: 'Head & shoulders — the avatar'
+// label/hint are getters so the template re-translates on a language switch.
+const imageSlot = (role, icon) => ({
+  role,
+  icon,
+  get label() {
+    return t(`personForm.imageSlots.${role}`)
   },
-  { role: 'fullbody', icon: 'person-standing', label: 'Full body', hint: 'Standing figure' },
-  { role: 'background', icon: 'mountain', label: 'Background', hint: 'A scene or backdrop' }
+  get hint() {
+    return t(`personForm.imageSlotHints.${role}`)
+  }
+})
+const IMAGE_SLOTS = [
+  imageSlot('portrait', 'user-round'),
+  imageSlot('fullbody', 'person-standing'),
+  imageSlot('background', 'mountain')
 ]
 
-const sections = [
-  { id: 'identity', label: 'Identity' },
-  { id: 'traits', label: 'Traits' },
-  { id: 'relations', label: 'Relations' },
-  { id: 'images', label: 'Images' },
-  { id: 'tags', label: 'Tags' }
-]
+const section = (id) => ({
+  id,
+  get label() {
+    return t(`personForm.sections.${id}`)
+  }
+})
+const sections = ['identity', 'traits', 'relations', 'images', 'tags'].map(section)
 
 // ── form state ────────────────────────────────────────────────────────────────
 const draft = reactive({}) // fieldId → { value, display_in_graph, timeframe }
@@ -470,8 +524,8 @@ const sectionEls = reactive({})
 const advanced = computed(() => store.programMode === 'advanced')
 const formTitle = computed(() =>
   store.editingPerson
-    ? `Edit: ${store.editingPerson.name || 'Unnamed'}`
-    : `Add ${store.noun.toLowerCase()}`
+    ? t('personForm.editTitle', { name: store.editingPerson.name || t('personForm.unnamed') })
+    : t('personForm.addTitle', { noun: nounLower() })
 )
 
 const clone = (v) => (v == null ? null : JSON.parse(JSON.stringify(v)))
@@ -571,9 +625,9 @@ const labelLive = computed(() =>
 )
 const colorLive = computed(() => {
   const def = store.fieldDefs.find((d) => d.slot === 'gender')
-  const t = def ? genderInfo(def, coerceValue(def, valueOfLive(def.id))).t : null
+  const gt = def ? genderInfo(def, coerceValue(def, valueOfLive(def.id))).t : null
   const gs = store.graphSettings
-  return t == null ? gs.unknownColor : lerpColorHex(gs.maleColor, gs.femaleColor, t)
+  return gt == null ? gs.unknownColor : lerpColorHex(gs.maleColor, gs.femaleColor, gt)
 })
 const ringLive = computed(() => {
   const def = store.fieldDefs.find((d) => d.slot === 'highlight')
@@ -595,7 +649,7 @@ const lifeLive = computed(() => {
   }
   const b = of('birth')
   const d = of('death')
-  return b || d ? `${b || '·'} — ${d || 'present'}` : ''
+  return b || d ? `${b || '·'} — ${d || t('personForm.present')}` : ''
 })
 const portraitUrl = computed(() => {
   const img = imageForRole('portrait')
@@ -630,7 +684,7 @@ function startDrag(def, e) {
   drag.active = true
   drag.defId = def.id
   drag.defType = def.type
-  drag.label = def.label
+  drag.label = fieldLabel(def)
   drag.x = e.clientX + 12
   drag.y = e.clientY - 8
   drag.overSlot = null
@@ -687,8 +741,10 @@ async function onDragEnd() {
     } else {
       flashError(
         overSlot === 'name'
-          ? 'Only text traits can appear in the graph name'
-          : `That trait type can't go in the ${overSlot} slot`
+          ? t('personForm.onlyTextInName')
+          : t('personForm.slotRejectsType', {
+              slot: t(`personForm.slots.${overSlot}`).toLowerCase()
+            })
       )
     }
     syncLocalOrder()
@@ -731,7 +787,7 @@ function removeFromPerson(fieldId) {
 // ── relationships ─────────────────────────────────────────────────────────────
 const pickerPlaceholder = computed(() => {
   const intent = allIntents.value.find((i) => i.id === pickerFor.value)
-  return intent ? intent.hint : 'Type a name…'
+  return intent ? intent.hint : t('personForm.picker.placeholder')
 })
 
 // Hide only people already linked with the SAME bond type as the open picker's
@@ -770,7 +826,7 @@ function addLink(person) {
 }
 
 function personName(pid) {
-  return store.persons.find((x) => x.id === pid)?.name || 'Unnamed'
+  return store.persons.find((x) => x.id === pid)?.name || t('personForm.unnamed')
 }
 
 function buildExistingRels(personId) {
@@ -780,21 +836,13 @@ function buildExistingRels(personId) {
     const otherId = r.person_a_id === personId ? r.person_b_id : r.person_a_id
     const other = store.persons.find((p) => p.id === otherId)
     if (!other) return
-    // This person's role in the pair ("Parent of", "Crush of", "Friend of").
-    const def = store.relTypeByKey.get(r.type)
-    let roleLabel
-    if (r.label)
-      roleLabel = r.label // per-edge custom label wins
-    else if (!def) roleLabel = r.type
-    else if (def.directed) {
-      const mine = r.person_a_id === personId ? def.role_a : def.role_b
-      roleLabel = mine ? `${mine} of` : def.label
-    } else roleLabel = `${def.label} of`
+    // This person's role in the pair is resolved at render (existingRoleLabel).
     rels.push({
       id: r.id,
       otherId,
-      otherName: other.name || 'Unnamed',
-      roleLabel,
+      otherName: other.name || t('personForm.unnamed'),
+      customLabel: r.label || '',
+      isA: r.person_a_id === personId,
       relType: r.type,
       status: r.status || 'active',
       formedDate: r.formed?.year || null,
@@ -811,10 +859,13 @@ const derivedSibNames = computed(() => {
   if (!pid) return []
   const sibs = derivedSiblings(
     store.relationships,
-    store.relTypeRoles.size ? (t) => store.relTypeRoles.get(t) || 'none' : undefined
+    store.relTypeRoles.size ? (ty) => store.relTypeRoles.get(ty) || 'none' : undefined
   )
   return [...(sibs.get(pid) || [])]
-    .map((id) => ({ id, name: store.persons.find((p) => p.id === id)?.name || 'Unnamed' }))
+    .map((id) => ({
+      id,
+      name: store.persons.find((p) => p.id === id)?.name || t('personForm.unnamed')
+    }))
     .sort((a, b) => a.name.localeCompare(b.name))
 })
 
@@ -974,11 +1025,11 @@ async function save() {
     const { values, removals } = collectChanges()
     if (store.editingPerson) {
       const res = await store.setFieldValues(store.editingPerson.id, values, removals)
-      if (!res.success) return flashError(res.error || 'Could not save')
+      if (!res.success) return flashError(res.error || t('personForm.couldNotSave'))
       await createPendingLinks(store.editingPerson.id)
     } else {
       const res = await store.createPerson({ values })
-      if (!res.success) return flashError(res.error || 'Could not create')
+      if (!res.success) return flashError(res.error || t('personForm.couldNotCreate'))
       await createPendingLinks(res.data.id)
       store.refreshFields()
     }

@@ -1,7 +1,7 @@
 <template>
   <header class="vh">
     <div class="vh-heading">
-      <UiIcon v-if="icon" class="vh-icon" :name="icon" :size="20" />
+      <UiIcon v-if="icon" class="vh-icon" :name="icon" :size="18" />
       <span class="vh-title">{{ title }}</span>
       <Transition name="vh-count" mode="out-in">
         <span v-if="count !== null" :key="count" class="vh-count">{{ count }}</span>
@@ -43,7 +43,9 @@ defineProps({
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px 22px;
+  /* Compact title bar: 6px + one toggle rail (--ctl-md buttons + 3px rail
+     padding, see the :deep rule below) + 6px ≈ 51px. */
+  padding: 6px 20px;
   background: var(--glass-soft);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -54,7 +56,7 @@ defineProps({
 .vh-heading {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   min-width: 0;
 }
 .vh-icon {
@@ -73,7 +75,7 @@ defineProps({
   }
 }
 .vh-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.2px;
   color: var(--t1);
@@ -130,6 +132,13 @@ defineProps({
   gap: 10px;
   flex-shrink: 0;
 }
+/* Toggle rails sit tighter in the title bar than when they float over a
+   canvas (Timeline/Groups), keeping the bar compact: 32px buttons + 2px
+   padding + 1px border = 38px. */
+.vh-actions :deep(.ct-rail) {
+  padding: 2px;
+  border-radius: 11px;
+}
 
 /* A slow flowing gradient hairline that reads as "alive" without distracting */
 .vh-rule {
@@ -178,7 +187,7 @@ defineProps({
 :root[data-theme='ink'] .vh-title {
   position: relative;
   font-family: var(--font-brush);
-  font-size: 24px;
+  font-size: 21px;
   font-weight: 400;
   letter-spacing: 0.01em;
 }

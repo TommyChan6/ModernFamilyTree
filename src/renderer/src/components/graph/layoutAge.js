@@ -18,3 +18,11 @@ export function computeAgeYPositions(nodesData, height) {
   })
   return { yMap, minYear, maxYear, padding, usableHeight }
 }
+
+/** The whole year at world y on a Birth axis (inverse of the yMap mapping);
+ *  `info` = { minYear, maxYear, padding, usableHeight } (ctx.yearGuideCtx). */
+export function yearAtAgeY(info, y) {
+  if (!info || !(info.usableHeight > 0)) return null
+  const span = info.maxYear - info.minYear || 1
+  return Math.round(info.minYear + ((y - info.padding) / info.usableHeight) * span)
+}

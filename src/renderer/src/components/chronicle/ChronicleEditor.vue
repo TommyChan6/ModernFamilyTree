@@ -17,7 +17,7 @@
             <span class="ce-prev-band"></span>
             <span class="ce-prev-era-label">
               <UiIcon class="ce-prev-icon" :name="eraIcon" :size="16" />
-              <b>{{ draft.name || 'Untitled era' }}</b>
+              <b>{{ draft.name || t('data.defaults.untitledEra') }}</b>
               <span class="ce-prev-span">{{ spanText(draft.start, draft.end) }}</span>
             </span>
           </div>
@@ -25,7 +25,7 @@
             <span class="ce-prev-line"></span>
             <span class="ce-prev-pill" :class="'imp-' + (draft.importance || 2)">
               <span class="ce-prev-disc"><UiIcon :name="evIcon" :size="14" /></span>
-              <b>{{ draft.title || 'Untitled event' }}</b>
+              <b>{{ draft.title || t('data.defaults.untitledEvent') }}</b>
               <span class="ce-prev-span">{{ spanText(draft.date, draft.end, true) }}</span>
             </span>
             <span
@@ -37,10 +37,13 @@
           </div>
 
           <div class="ce-head">
-            <span class="ce-kicker"
-              >{{ isNew ? 'New' : 'Edit' }} {{ isEra ? 'era' : 'event' }}</span
+            <span class="ce-kicker">{{ kicker }}</span>
+            <button
+              class="ce-x"
+              :title="t('chronicle.editor.close')"
+              :aria-label="t('chronicle.editor.closeAria')"
+              @click="close"
             >
-            <button class="ce-x" title="Close (Esc)" aria-label="Close" @click="close">
               <UiIcon name="x" :size="16" />
             </button>
           </div>
@@ -51,23 +54,29 @@
               ref="firstEl"
               v-model="draft.name"
               class="ce-title"
-              placeholder="Name this era — “The Regency”, “Age of Dragons”…"
+              :placeholder="t('chronicle.editor.eraNamePh')"
               maxlength="80"
             />
             <div class="ce-row">
-              <label class="ce-label">From</label>
-              <DateInput v-if="!openStart" v-model="draft.start" placeholder="Year" />
-              <span v-else class="ce-open">the beginning of time</span>
-              <label class="ce-check"><input v-model="openStart" type="checkbox" /> open</label>
+              <label class="ce-label">{{ t('chronicle.editor.from') }}</label>
+              <DateInput v-if="!openStart" v-model="draft.start" />
+              <span v-else class="ce-open">{{ t('chronicle.editor.beginning') }}</span>
+              <label class="ce-check"
+                ><input v-model="openStart" type="checkbox" />
+                {{ t('chronicle.editor.open') }}</label
+              >
             </div>
             <div class="ce-row">
-              <label class="ce-label">Until</label>
-              <DateInput v-if="!openEnd" v-model="draft.end" placeholder="Year" />
-              <span v-else class="ce-open">ongoing</span>
-              <label class="ce-check"><input v-model="openEnd" type="checkbox" /> ongoing</label>
+              <label class="ce-label">{{ t('chronicle.editor.until') }}</label>
+              <DateInput v-if="!openEnd" v-model="draft.end" />
+              <span v-else class="ce-open">{{ t('chronicle.editor.ongoing') }}</span>
+              <label class="ce-check"
+                ><input v-model="openEnd" type="checkbox" />
+                {{ t('chronicle.editor.ongoing') }}</label
+              >
             </div>
             <div class="ce-row">
-              <label class="ce-label">Colour</label>
+              <label class="ce-label">{{ t('chronicle.editor.colour') }}</label>
               <div class="ce-swatches">
                 <button
                   v-for="(c, i) in ERA_COLORS"
@@ -77,17 +86,22 @@
                   :style="{ background: c, '--i': i }"
                   @click="draft.color = c"
                 ></button>
-                <input v-model="draft.color" type="color" class="ce-color" title="Any colour" />
+                <input
+                  v-model="draft.color"
+                  type="color"
+                  class="ce-color"
+                  :title="t('chronicle.editor.anyColour')"
+                />
               </div>
             </div>
             <div class="ce-row">
-              <label class="ce-label">Icon</label>
+              <label class="ce-label">{{ t('chronicle.editor.icon') }}</label>
               <IconPicker
                 v-model="draft.icon"
                 class="ce-icons"
                 :options="ERA_ICONS"
                 allow-none
-                aria-label="Era icon"
+                :aria-label="t('chronicle.editor.eraIcon')"
               />
             </div>
           </template>
@@ -98,7 +112,7 @@
               ref="firstEl"
               v-model="draft.title"
               class="ce-title"
-              placeholder="What happened? — “The Long Winter”, “Grandma arrives in New York”…"
+              :placeholder="t('chronicle.editor.eventTitlePh')"
               maxlength="120"
             />
             <div class="ce-kinds">
@@ -108,45 +122,45 @@
                 class="ce-kind"
                 :class="{ on: draft.kind === k.id }"
                 :style="{ '--kc': k.color, '--i': i }"
-                :title="k.label"
+                :title="kindLabel(k)"
                 @click="pickKind(k)"
               >
                 <UiIcon class="ce-kind-ic" :name="k.icon" :size="14" />
-                <span class="ce-kind-l">{{ k.label }}</span>
+                <span class="ce-kind-l">{{ kindLabel(k) }}</span>
               </button>
             </div>
             <div class="ce-row">
-              <label class="ce-label">When</label>
-              <DateInput v-model="draft.date" placeholder="Year" />
+              <label class="ce-label">{{ t('chronicle.editor.when') }}</label>
+              <DateInput v-model="draft.date" />
               <label class="ce-check"
-                ><input v-model="lasts" type="checkbox" /> lasts a while</label
+                ><input v-model="lasts" type="checkbox" /> {{ t('chronicle.editor.lasts') }}</label
               >
             </div>
             <Transition name="ce-slide">
               <div v-if="lasts" class="ce-row">
-                <label class="ce-label">Until</label>
-                <DateInput v-model="draft.end" placeholder="Year" />
+                <label class="ce-label">{{ t('chronicle.editor.until') }}</label>
+                <DateInput v-model="draft.end" />
               </div>
             </Transition>
             <div class="ce-row">
-              <label class="ce-label">Weight</label>
+              <label class="ce-label">{{ t('chronicle.editor.weight') }}</label>
               <div class="ce-seg">
                 <button
                   v-for="o in IMPORTANCE"
                   :key="o.v"
                   :class="{ on: (draft.importance || 2) === o.v }"
-                  :title="o.hint"
+                  :title="t(`chronicle.editor.importance.${o.id}Hint`)"
                   @click="draft.importance = o.v"
                 >
                   <span v-if="o.stars" class="ce-stars">
                     <UiIcon v-for="n in o.stars" :key="n" name="star" :size="12" />
                   </span>
-                  {{ o.label }}
+                  {{ t(`chronicle.editor.importance.${o.id}`) }}
                 </button>
               </div>
             </div>
             <div class="ce-row ce-row-top">
-              <label class="ce-label">Who</label>
+              <label class="ce-label">{{ t('chronicle.editor.who') }}</label>
               <div class="ce-cast">
                 <TransitionGroup name="ce-chip">
                   <span
@@ -158,8 +172,8 @@
                     <span class="ce-person-dot"></span>{{ p.name }}
                     <button
                       class="ce-person-x"
-                      title="Remove"
-                      :aria-label="'Remove ' + p.name"
+                      :title="t('chronicle.editor.remove')"
+                      :aria-label="t('chronicle.editor.removeName', { name: p.name })"
                       @click="removePerson(p.id)"
                     >
                       <UiIcon name="x" :size="12" />
@@ -167,13 +181,15 @@
                   </span>
                 </TransitionGroup>
                 <button v-if="!picking" class="ce-add" @click="picking = true">
-                  <UiIcon name="plus" :size="14" />Add {{ store.noun.toLowerCase() }}
+                  <UiIcon name="plus" :size="14" />{{
+                    t('chronicle.editor.addNoun', { noun: nounLabel(store.noun).toLowerCase() })
+                  }}
                 </button>
                 <div v-else class="ce-picker">
                   <PersonPicker
                     :exclude="draft.person_ids || []"
                     :allow-create="false"
-                    placeholder="Who took part?"
+                    :placeholder="t('chronicle.editor.whoPh')"
                     @pick="addPerson"
                     @cancel="picking = false"
                   />
@@ -181,11 +197,11 @@
               </div>
             </div>
             <div class="ce-row">
-              <label class="ce-label">Where</label>
+              <label class="ce-label">{{ t('chronicle.editor.where') }}</label>
               <input
                 v-model="draft.place"
                 class="ce-input"
-                placeholder="Optional place"
+                :placeholder="t('chronicle.editor.placePh')"
                 maxlength="120"
               />
             </div>
@@ -195,16 +211,20 @@
             v-model="draft.description"
             class="ce-desc"
             rows="3"
-            :placeholder="isEra ? 'What defined this era?' : 'The story of what happened…'"
+            :placeholder="
+              isEra ? t('chronicle.editor.eraDescPh') : t('chronicle.editor.eventDescPh')
+            "
           ></textarea>
 
           <div class="ce-foot">
-            <button v-if="!isNew" class="btn btn-sm btn-danger" @click="remove">Delete</button>
+            <button v-if="!isNew" class="btn btn-sm btn-danger" @click="remove">
+              {{ t('dialog.delete') }}
+            </button>
             <span class="ce-spacer"></span>
             <span class="ce-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span>
-            <button class="btn btn-sm btn-ghost" @click="close">Cancel</button>
+            <button class="btn btn-sm btn-ghost" @click="close">{{ t('dialog.cancel') }}</button>
             <button class="btn btn-sm btn-primary" :class="{ 'is-loading': saving }" @click="save">
-              {{ isNew ? 'Add to the chronicle' : 'Save' }}
+              {{ isNew ? t('chronicle.editor.add') : t('chronicle.editor.save') }}
             </button>
           </div>
         </div>
@@ -226,12 +246,19 @@ import PersonPicker from '../personForm/PersonPicker.vue'
 import { confirmDialog, toast } from '../../lib/dialogs.js'
 import { undoToast } from '../../lib/undoToast.js'
 import { useKinship } from '../kinship/useKinship'
+import { useI18n } from '../../i18n'
+import { defaultNameLabel, nounLabel } from '../../lib/dataLabels'
+import { kindLabel } from './chronicleText.js'
 
 const store = useMainStore()
+const { t } = useI18n()
 const kin = useKinship()
 const ed = computed(() => store.chronicleEditor)
 const isEra = computed(() => ed.value?.kind === 'era')
 const isNew = computed(() => !ed.value?.data?.id)
+const kicker = computed(() =>
+  t(`chronicle.editor.${isNew.value ? 'new' : 'edit'}${isEra.value ? 'Era' : 'Event'}`)
+)
 
 // Curated era icons (icon names); the picker's search reaches the full set.
 const ERA_ICONS = [
@@ -252,10 +279,11 @@ const ERA_ICONS = [
   'scroll',
   'wand-sparkles'
 ]
+// Labels: chronicle.editor.importance.<id> (+ <id>Hint).
 const IMPORTANCE = [
-  { v: 1, label: 'Minor', stars: 0, hint: 'Shown when zoomed in' },
-  { v: 2, label: 'Notable', stars: 1, hint: 'Shown at most zoom levels' },
-  { v: 3, label: 'Major', stars: 3, hint: 'Always shown, bold' }
+  { v: 1, id: 'minor', stars: 0 },
+  { v: 2, id: 'notable', stars: 1 },
+  { v: 3, id: 'major', stars: 3 }
 ]
 
 const draft = reactive({})
@@ -321,8 +349,8 @@ const castPreview = computed(() =>
 function spanText(a, b, isEvent = false) {
   const fa = format(a)
   const fb = format(b)
-  if (isEvent) return fa ? (fb ? `${fa} – ${fb}` : fa) : 'undated'
-  return `${fa || '…'} – ${fb || 'now'}`
+  if (isEvent) return fa ? (fb ? `${fa} – ${fb}` : fa) : t('chronicle.undated')
+  return `${fa || '…'} – ${fb || t('chronicle.now')}`
 }
 
 function pickKind(k) {
@@ -365,12 +393,20 @@ async function save() {
         start: openStart.value ? null : draft.start,
         end: openEnd.value ? null : draft.end
       })
-      if (!res.success) return toast(res.error || 'Could not save the era', { tone: 'danger' })
-      toast(`${res.data.name} ${isNew.value ? 'added' : 'saved'}`, { tone: 'success' })
+      if (!res.success)
+        return toast(res.error || t('chronicle.editor.saveEraFailed'), { tone: 'danger' })
+      const name = defaultNameLabel(res.data.name)
+      toast(t(isNew.value ? 'chronicle.editor.added' : 'chronicle.editor.saved', { name }), {
+        tone: 'success'
+      })
     } else {
       const res = await store.saveEvent({ ...draft, end: lasts.value ? draft.end : null })
-      if (!res.success) return toast(res.error || 'Could not save the event', { tone: 'danger' })
-      toast(`${res.data.title} ${isNew.value ? 'added' : 'saved'}`, { tone: 'success' })
+      if (!res.success)
+        return toast(res.error || t('chronicle.editor.saveEventFailed'), { tone: 'danger' })
+      const name = defaultNameLabel(res.data.title)
+      toast(t(isNew.value ? 'chronicle.editor.added' : 'chronicle.editor.saved', { name }), {
+        tone: 'success'
+      })
     }
     close()
   } finally {
@@ -380,19 +416,19 @@ async function save() {
 
 async function remove() {
   const era = isEra.value
-  const name = era ? draft.name : draft.title
+  const name =
+    defaultNameLabel(era ? draft.name : draft.title) ||
+    t(era ? 'data.defaults.untitledEra' : 'data.defaults.untitledEvent')
   const ok = await confirmDialog({
-    title: `Delete ${era ? 'era' : 'event'} “${name || 'Untitled'}”?`,
-    message: era
-      ? 'The band leaves every view. People are not affected.'
-      : 'It leaves the timeline and every profile.',
+    title: t(era ? 'chronicle.editor.deleteEra' : 'chronicle.editor.deleteEvent', { name }),
+    message: t(era ? 'chronicle.editor.deleteEraBody' : 'chronicle.editor.deleteEventBody'),
     tone: 'danger'
   })
   if (!ok) return
   const res = era ? await store.deleteEra(draft.id) : await store.deleteEvent(draft.id)
   if (res.success) {
     close()
-    undoToast(`Deleted “${name || 'Untitled'}”`, era ? 'eras:delete' : 'events:delete')
+    undoToast(t('chronicle.deleted', { name }), era ? 'eras:delete' : 'events:delete')
   }
 }
 </script>

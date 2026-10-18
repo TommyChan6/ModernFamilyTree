@@ -8,14 +8,24 @@ export interface DateValueLike {
   precision?: string | null
 }
 
+import { translate } from '../../i18n'
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** Short month name in the active UI language (profile.months). */
+function monthName(m: number): string {
+  const names = translate('profile.months') as unknown
+  return Array.isArray(names) && names[m - 1] ? String(names[m - 1]) : MONTHS[m - 1]
+}
 
 export function fmtDate(dv: DateValueLike | null | undefined): string {
   if (!dv || dv.year == null) return ''
   const m = dv.month
-  if (dv.precision === 'day' && m && dv.day) return `${dv.day} ${MONTHS[m - 1]} ${dv.year}`
+  if (dv.precision === 'day' && m && dv.day) {
+    return translate('profile.dateDay', { d: dv.day, m: monthName(m), mn: m, y: dv.year }) as string
+  }
   if ((dv.precision === 'day' || dv.precision === 'month') && m)
-    return `${MONTHS[m - 1]} ${dv.year}`
+    return translate('profile.dateMonth', { m: monthName(m), mn: m, y: dv.year }) as string
   return String(dv.year)
 }
 

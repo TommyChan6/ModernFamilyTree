@@ -15,8 +15,8 @@
         <i></i>
         <i></i>
       </div>
-      <div class="bb-empty-title">No bubbles to blow</div>
-      <div class="bb-empty-text">No people match — clear the search or add someone.</div>
+      <div class="bb-empty-title">{{ t('directory.bubbles.emptyTitle') }}</div>
+      <div class="bb-empty-text">{{ t('directory.bubbles.emptyText') }}</div>
     </div>
 
     <template v-else>
@@ -61,7 +61,7 @@
                 <div class="bb-body">
                   <BubbleArt :person="b.p" :size="b.tier === 'lg' ? 192 : 96" />
                   <div v-if="b.tier !== 'sm'" class="bb-label">
-                    <span class="bb-name">{{ b.p.name || 'Unnamed' }}</span>
+                    <span class="bb-name">{{ b.p.name || t('directory.bubbles.unnamed') }}</span>
                     <span v-if="b.tier === 'lg'" class="bb-sub">{{ lifeText(b.p) }}</span>
                   </div>
                 </div>
@@ -77,7 +77,7 @@
           <path :id="uid + '-' + i" fill="none" />
           <text :style="{ '--gc': g.color }" :class="{ focus: focusKey === g.key }">
             <textPath :href="'#' + uid + '-' + i" startOffset="50%" text-anchor="middle">
-              {{ g.label }}
+              {{ labelOf(g) }}
               <tspan class="bb-lab-n">{{ g.count }}</tspan>
             </textPath>
           </text>
@@ -87,7 +87,7 @@
       <!-- Controls -->
       <div class="bb-bar" @pointerdown.stop @wheel.stop>
         <div class="bb-seg">
-          <span class="bb-seg-k">Size</span>
+          <span class="bb-seg-k">{{ t('directory.bubbles.size') }}</span>
           <button
             v-for="m in SIZE_MODES"
             :key="m.id"
@@ -95,11 +95,11 @@
             :class="{ on: sizeMode === m.id }"
             @click="setSize(m.id)"
           >
-            {{ m.label }}
+            {{ t(`directory.bubbles.sizeModes.${m.id}`) }}
           </button>
         </div>
         <div class="bb-seg">
-          <span class="bb-seg-k">Group</span>
+          <span class="bb-seg-k">{{ t('directory.bubbles.group') }}</span>
           <button
             v-for="m in GROUP_MODES"
             :key="m.id"
@@ -107,32 +107,44 @@
             :class="{ on: groupMode === m.id }"
             @click="setGroup(m.id)"
           >
-            {{ m.label }}
+            {{ t(`directory.bubbles.groupModes.${m.id}`) }}
           </button>
         </div>
       </div>
 
       <Transition name="bb-fade">
         <button v-if="focusGroup" class="bb-crumb" @pointerdown.stop @click="fitAll()">
-          <span class="bb-crumb-back"><UiIcon name="chevron-left" :size="14" />Everyone</span>
+          <span class="bb-crumb-back"
+            ><UiIcon name="chevron-left" :size="14" />{{ t('directory.bubbles.everyone') }}</span
+          >
           <span class="bb-crumb-sep">/</span>
           <span class="bb-crumb-dot" :style="{ '--gc': focusGroup.color }"></span>
-          {{ focusGroup.label }}
+          {{ labelOf(focusGroup) }}
           <span class="bb-crumb-n">{{ focusGroup.count }}</span>
         </button>
       </Transition>
 
       <div class="bb-zoom" @pointerdown.stop @wheel.stop>
-        <button class="bb-zoom-b" title="Zoom in" aria-label="Zoom in" @click="zoomBy(1 / 1.6)">
+        <button
+          class="bb-zoom-b"
+          :title="t('directory.bubbles.zoomIn')"
+          :aria-label="t('directory.bubbles.zoomIn')"
+          @click="zoomBy(1 / 1.6)"
+        >
           <UiIcon name="plus" :size="14" />
         </button>
-        <button class="bb-zoom-b" title="Zoom out" aria-label="Zoom out" @click="zoomBy(1.6)">
+        <button
+          class="bb-zoom-b"
+          :title="t('directory.bubbles.zoomOut')"
+          :aria-label="t('directory.bubbles.zoomOut')"
+          @click="zoomBy(1.6)"
+        >
           <UiIcon name="minus" :size="14" />
         </button>
         <button
           class="bb-zoom-b bb-zoom-fit"
-          title="Fit everyone (Esc)"
-          aria-label="Fit everyone"
+          :title="t('directory.bubbles.fitTitle')"
+          :aria-label="t('directory.bubbles.fitAria')"
           @click="fitAll()"
         >
           <UiIcon name="maximize" :size="14" />
@@ -140,11 +152,13 @@
       </div>
 
       <div class="bb-foot">
-        <span class="bb-foot-n">{{ persons.length }}</span> people
+        <span class="bb-foot-n">{{ persons.length }}</span>
+        {{ countWord('people', persons.length) }}
         <template v-if="layout.groups.length">
-          · <span class="bb-foot-n">{{ layout.groups.length }}</span> groups
+          · <span class="bb-foot-n">{{ layout.groups.length }}</span>
+          {{ countWord('groups', layout.groups.length) }}
         </template>
-        <span class="bb-foot-hint">Scroll to zoom · drag to pan · click a circle to dive in</span>
+        <span class="bb-foot-hint">{{ t('directory.bubbles.footHint') }}</span>
       </div>
 
       <!-- Hover card -->
@@ -161,7 +175,7 @@
             {{ tip.years
             }}<template v-if="tip.dead">
               ·
-              <UiIcon name="moon" :size="11" label="Deceased" />
+              <UiIcon name="moon" :size="11" :label="t('directory.bubbles.deceased')" />
             </template>
           </div>
           <div v-if="tip.metric || tip.group" class="bb-tip-row">
@@ -193,6 +207,8 @@ import { useMainStore } from '../../store/index.js'
 import { isDeceased, ageOf } from './peopleLayout.js'
 import { useThumbnail } from './useThumbnail.js'
 import UiIcon from '../ui/UiIcon.js'
+import { useI18n } from '../../i18n'
+import { genderLabel, defaultNameLabel } from '../../lib/dataLabels'
 import {
   SIZE_MODES,
   GROUP_MODES,
@@ -221,6 +237,7 @@ const props = defineProps({
 })
 
 const store = useMainStore()
+const { t, locale } = useI18n()
 const rootEl = ref(null)
 const worldEl = ref(null)
 const layerEl = ref(null)
@@ -305,21 +322,59 @@ function lifeText(p) {
   const b = p.birth?.year
   const d = p.death?.year
   if (b != null && d != null) return `${b} – ${d}`
-  if (b != null) return `b. ${b}`
-  if (d != null) return `d. ${d}`
-  return 'Dates unknown'
+  if (b != null) return t('directory.bubbles.born', { year: b })
+  if (d != null) return t('directory.bubbles.died', { year: d })
+  return t('directory.bubbles.datesUnknown')
 }
+
+// English singular/plural picked here; other locales may share one form.
+const plural = (key, n, params) => t(`${key}.${n === 1 ? 'one' : 'other'}`, params)
+const countWord = (key, n) => plural(`directory.bubbles.foot.${key}`, n)
 
 function metricText(p) {
   const m = sizeMode.value
   if (m === 'equal') return ''
   if (m === 'age') {
     const a = ageOf(p, props.refYear)
-    return a == null ? 'Age unknown' : `Age ${a}`
+    return a == null
+      ? t('directory.bubbles.metric.ageUnknown')
+      : t('directory.bubbles.metric.age', { n: a })
   }
   const s = props.statsOf(p.id) || { kin: 0, children: 0 }
-  if (m === 'children') return s.children === 1 ? '1 child' : `${s.children} children`
-  return s.kin === 1 ? '1 connection' : `${s.kin} connections`
+  if (m === 'children') {
+    return plural('directory.bubbles.metric.children', s.children, { n: s.children })
+  }
+  return plural('directory.bubbles.metric.connections', s.kin, { n: s.kin })
+}
+
+// Group display names. bubblesLayout stays language-neutral (its English
+// labels are asserted by tests), so the view translates by group key here.
+function groupLabel(g, mode) {
+  const k = g.key || ''
+  const G = 'directory.bubbles.groups.'
+  if (mode === 'gender') {
+    if (k === 'female') return genderLabel('Female')
+    if (k === 'male') return genderLabel('Male')
+    if (k === 'other') return t(G + 'other')
+  } else if (mode === 'life') {
+    if (k === 'dead') return t(G + 'deceased')
+    if (k === 'alive') return t(G + 'living')
+  } else if (mode === 'decade') {
+    if (k === 'none') return t(G + 'unknownBirth')
+    if (k.startsWith('d')) return t(G + 'decade', { n: k.slice(1) })
+  } else if (mode === 'tag') {
+    if (k === 'none') return t(G + 'ungrouped')
+    const tag = store.tags.find((x) => 't' + x.id === k)
+    if (tag && !tag.label) return t('directory.bubbles.groupModes.tag')
+    return defaultNameLabel(g.label)
+  } else if (mode === 'family') {
+    if (k === 'solo') return t(G + 'unconnected')
+    const named = /^(.+) family$/.exec(g.label || '')
+    if (named) return t(G + 'surnameFamily', { name: named[1] })
+    const numbered = /^Family (\d+)$/.exec(g.label || '')
+    if (numbered) return t(G + 'familyN', { n: numbered[1] })
+  }
+  return g.label
 }
 
 // Stable 0..1 phase per id so each bubble bobs out of step with its neighbours.
@@ -341,6 +396,7 @@ const layout = shallowRef({
   bounds: { x0: -1, y0: -1, x1: 1, y1: 1 },
   maxR: 30
 })
+const layoutMode = ref(groupMode.value) // the group mode `layout` was built with
 const meta = new Map() // id → { color, dead, phase }
 let version = 0
 let trans = null // { version, start, total, from: Map, delays: Map }
@@ -420,6 +476,7 @@ function relayout(reason) {
       requestFrame()
     }, trans.total)
   }
+  layoutMode.value = groupMode.value
   layout.value = next
   lastSig = null
   hideTip()
@@ -440,6 +497,16 @@ function relayout(reason) {
   laidOut = true
   requestFrame()
 }
+
+// Translated group labels (key → text). Reads the active locale through t(),
+// so a language switch recomputes it; the layout's mode is captured per layout.
+const groupLabels = computed(() => {
+  const m = new Map()
+  const mode = layoutMode.value
+  for (const g of layout.value.groups) m.set(g.key, groupLabel(g, mode))
+  return m
+})
+const labelOf = (g) => (g ? (groupLabels.value.get(g.key) ?? g.label) : '')
 
 const focusKey = ref(null)
 const focusGroup = computed(() =>
@@ -667,7 +734,7 @@ function updateLabels(t) {
       'd',
       `M ${(sx - R).toFixed(1)} ${sy.toFixed(1)} A ${R.toFixed(1)} ${R.toFixed(1)} 0 0 1 ${(sx + R).toFixed(1)} ${sy.toFixed(1)}`
     )
-    const need = (g.label.length + String(g.count).length + 3) * 7.4
+    const need = (textUnits(labelOf(g)) + String(g.count).length + 3) * 7.4
     const top = sy - R
     const ok =
       R > 30 && Math.PI * R * 0.8 > need && top < H + 20 && top > -40 && sx > -R && sx < W + R
@@ -692,6 +759,13 @@ function updateLabels(t) {
     c.gEl.classList.toggle('hid', hit)
     if (!hit) placed.push(c)
   }
+}
+
+// Rough label width in Latin-character units: CJK glyphs are ~1.7× wider.
+function textUnits(s) {
+  let n = 0
+  for (const ch of s) n += ch.charCodeAt(0) >= 0x2e80 ? 1.7 : 1
+  return n
 }
 
 // ── Imperative transforms (after Vue has patched the bubble layer) ──────────
@@ -874,24 +948,24 @@ function setHover(id) {
   const n = lay.nodes.get(id)
   if (!n) return
   hoverId = id
-  const t = viewToTransform(view, W, H)
-  const sx = n.x * t.k + t.tx
-  const sr = n.r * t.k * 1.18
-  const top = n.y * t.k + t.ty - sr
+  const vt = viewToTransform(view, W, H)
+  const sx = n.x * vt.k + vt.tx
+  const sr = n.r * vt.k * 1.18
+  const top = n.y * vt.k + vt.ty - sr
   const below = top < 110
   const g = lay.groups[n.gi]
   const m = meta.get(id)
   tip.value = {
     id,
-    name: n.p.name || 'Unnamed',
+    name: n.p.name || t('directory.bubbles.unnamed'),
     years: lifeText(n.p),
     dead: !!m?.dead,
     metric: metricText(n.p),
-    group: g ? g.label : '',
+    group: g ? labelOf(g) : '',
     groupColor: g ? g.color : '',
     color: m?.color || 'var(--accent)',
     x: Math.max(110, Math.min(W - 110, sx)),
-    y: below ? n.y * t.k + t.ty + sr + 10 : top - 10,
+    y: below ? n.y * vt.k + vt.ty + sr + 10 : top - 10,
     below
   }
 
@@ -995,6 +1069,14 @@ watch(
 )
 watch([sizeMode, groupMode], () => {
   if (W) relayout('mode')
+})
+// Language switch: drop the (English-built) hover card and refit the arced
+// group labels, whose widths change with the translation.
+watch(locale, () => {
+  hideTip()
+  nextTick(() => {
+    if (W) updateLabels(viewToTransform(view, W, H))
+  })
 })
 // The world/labels elements come and go with the empty state.
 watch(

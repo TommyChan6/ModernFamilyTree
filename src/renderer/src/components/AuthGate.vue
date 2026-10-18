@@ -10,7 +10,7 @@
 
     <button class="auth-back" type="button" @click="emit('back')">
       <UiIcon class="auth-back-arrow" name="arrow-left" :size="16" />
-      Home
+      {{ t('auth.home') }}
     </button>
 
     <div class="auth-card" :class="{ shake: shaking }">
@@ -20,11 +20,7 @@
         </div>
         <h1 class="auth-title">Family Tree</h1>
         <p class="auth-subtitle">
-          {{
-            mode === 'login'
-              ? 'Welcome back — sign in to continue'
-              : 'Create an account to start your tree'
-          }}
+          {{ mode === 'login' ? t('auth.loginSubtitle') : t('auth.registerSubtitle') }}
         </p>
       </div>
 
@@ -37,7 +33,7 @@
           type="button"
           @click="switchMode('login')"
         >
-          Sign in
+          {{ t('auth.signIn') }}
         </button>
         <button
           class="auth-toggle-btn"
@@ -45,7 +41,7 @@
           type="button"
           @click="switchMode('register')"
         >
-          Create account
+          {{ t('auth.createAccount') }}
         </button>
       </div>
 
@@ -61,7 +57,7 @@
             spellcheck="false"
             maxlength="20"
           />
-          <span class="auth-label">Username</span>
+          <span class="auth-label">{{ t('auth.username') }}</span>
         </label>
 
         <label class="auth-field">
@@ -72,12 +68,12 @@
             placeholder=" "
             :autocomplete="mode === 'login' ? 'current-password' : 'new-password'"
           />
-          <span class="auth-label">Password</span>
+          <span class="auth-label">{{ t('auth.password') }}</span>
           <button
             type="button"
             class="auth-eye"
-            :title="showPassword ? 'Hide password' : 'Show password'"
-            :aria-label="showPassword ? 'Hide password' : 'Show password'"
+            :title="showPassword ? t('auth.hidePassword') : t('auth.showPassword')"
+            :aria-label="showPassword ? t('auth.hidePassword') : t('auth.showPassword')"
             tabindex="-1"
             @click="showPassword = !showPassword"
           >
@@ -108,18 +104,21 @@
                 placeholder=" "
                 autocomplete="new-password"
               />
-              <span class="auth-label">Confirm password</span>
+              <span class="auth-label">{{ t('auth.confirmPassword') }}</span>
             </label>
 
             <label class="auth-terms">
               <input v-model="acceptedTerms" type="checkbox" class="auth-check" />
               <span>
-                I agree to the
-                <button type="button" class="auth-link" @click="openLegal('terms')">Terms</button>
-                and
-                <button type="button" class="auth-link" @click="openLegal('privacy')">
-                  Privacy Policy
+                {{ t('auth.agreePre') }}
+                <button type="button" class="auth-link" @click="openLegal('terms')">
+                  {{ t('auth.terms') }}
                 </button>
+                {{ t('auth.agreeAnd') }}
+                <button type="button" class="auth-link" @click="openLegal('privacy')">
+                  {{ t('auth.privacyPolicy') }}
+                </button>
+                {{ t('auth.agreePost') }}
               </span>
             </label>
           </div>
@@ -130,12 +129,16 @@
         </Transition>
 
         <button class="auth-submit" type="submit" :disabled="busy || guestBusy">
-          <span v-if="!busy">{{ mode === 'login' ? 'Sign in' : 'Create account' }}</span>
+          <span v-if="!busy">{{
+            mode === 'login' ? t('auth.signIn') : t('auth.createAccount')
+          }}</span>
           <span v-else class="auth-spinner"></span>
         </button>
       </form>
 
-      <div class="auth-divider"><span>or</span></div>
+      <div class="auth-divider">
+        <span>{{ t('auth.or') }}</span>
+      </div>
 
       <button
         class="auth-guest"
@@ -145,17 +148,18 @@
       >
         <span v-if="!guestBusy" class="auth-guest-inner">
           <UiIcon class="auth-guest-icon" name="hand" :size="16" />
-          Continue as guest
+          {{ t('auth.guest') }}
         </span>
         <span v-else class="auth-spinner dark"></span>
       </button>
-      <p class="auth-guest-note">Explore with sample data — Advanced mode stays locked.</p>
+      <p class="auth-guest-note">{{ t('auth.guestNote') }}</p>
 
       <p class="auth-foot">
-        Your data stays on this device — see the
+        {{ t('auth.footPre') }}
         <button type="button" class="auth-link" @click="openLegal('privacy')">
-          Privacy Policy
+          {{ t('auth.privacyPolicy') }}
         </button>
+        {{ t('auth.footPost') }}
       </p>
     </div>
 
@@ -166,9 +170,16 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useMainStore } from '../store/index.js'
-import { validateUsername, validatePassword } from '../../../shared/auth'
+import {
+  validateUsername,
+  validatePassword,
+  USERNAME_MIN,
+  USERNAME_MAX,
+  PASSWORD_MIN
+} from '../../../shared/auth'
 import LegalModal from './LegalModal.vue'
 import UiIcon from './ui/UiIcon.js'
+import { useI18n } from '../i18n'
 
 const props = defineProps({
   // Which panel to open on: the landing page's "Sign in" vs "Get started"
@@ -177,6 +188,7 @@ const props = defineProps({
 const emit = defineEmits(['back'])
 
 const store = useMainStore()
+const { t } = useI18n()
 
 const mode = ref(props.initialMode === 'register' ? 'register' : 'login')
 const username = ref('')
@@ -216,11 +228,31 @@ const strength = computed(() => {
   return Math.min(s, 3)
 })
 const strengthLabel = computed(() =>
-  password.value.length === 0 ? '' : ['Too short', 'Okay', 'Good', 'Strong'][strength.value]
+  password.value.length === 0
+    ? ''
+    : t('auth.strength.' + ['tooShort', 'okay', 'good', 'strong'][strength.value])
 )
 
+// The shared validators and the auth channels speak English (they run on the
+// "server" too); map their known messages onto the UI language here. Anything
+// unrecognised is shown verbatim.
+const AUTH_ERRORS = {
+  [`Username must be at least ${USERNAME_MIN} characters`]: ['usernameMin', { n: USERNAME_MIN }],
+  [`Username must be at most ${USERNAME_MAX} characters`]: ['usernameMax', { n: USERNAME_MAX }],
+  'Username may only contain letters, numbers, dots, dashes and underscores': ['usernameChars'],
+  [`Password must be at least ${PASSWORD_MIN} characters`]: ['passwordMin', { n: PASSWORD_MIN }],
+  'Password must be at most 128 characters': ['passwordMax', { n: 128 }],
+  'Please accept the Terms & Privacy Policy': ['acceptTerms'],
+  'That username is already taken': ['taken'],
+  'Invalid username or password': ['invalid'],
+  'Too many failed attempts — try again in a few minutes': ['locked']
+}
+function localizeAuthError(message) {
+  const hit = AUTH_ERRORS[message]
+  return hit ? t('auth.err.' + hit[0], hit[1]) : message
+}
 function fail(message) {
-  error.value = message
+  error.value = localizeAuthError(message)
   shaking.value = true
   setTimeout(() => (shaking.value = false), 450)
 }
@@ -234,8 +266,8 @@ async function submit() {
   const passwordError = validatePassword(password.value)
   if (passwordError) return fail(passwordError)
   if (mode.value === 'register') {
-    if (password.value !== confirmPassword.value) return fail('Passwords do not match')
-    if (!acceptedTerms.value) return fail('Please accept the Terms & Privacy Policy')
+    if (password.value !== confirmPassword.value) return fail(t('auth.err.mismatch'))
+    if (!acceptedTerms.value) return fail(t('auth.err.acceptTerms'))
   }
 
   busy.value = true
@@ -248,7 +280,7 @@ async function submit() {
             password: password.value,
             acceptedTerms: acceptedTerms.value
           })
-    if (!res.success) fail(res.error || 'Something went wrong')
+    if (!res.success) fail(res.error || t('auth.err.generic'))
   } finally {
     busy.value = false
   }
@@ -260,7 +292,7 @@ async function continueAsGuest() {
   guestBusy.value = true
   try {
     const res = await store.guestLogin()
-    if (!res.success) fail(res.error || 'Could not start a guest session')
+    if (!res.success) fail(res.error || t('auth.err.guest'))
   } finally {
     guestBusy.value = false
   }

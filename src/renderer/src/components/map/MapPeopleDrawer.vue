@@ -3,7 +3,7 @@
     <header class="mp-head">
       <div class="mp-title">
         <UiIcon name="users" :size="16" />
-        {{ t('map.people.title', { noun: noun }) }}
+        {{ t('map.people.title', { noun: nounLabel(noun) }) }}
       </div>
       <button
         class="mp-x"
@@ -48,6 +48,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useI18n } from '../../i18n'
+import { nounLabel } from '../../lib/dataLabels'
 import UiIcon from '../ui/UiIcon.js'
 import SearchField from '../ui/SearchField.vue'
 

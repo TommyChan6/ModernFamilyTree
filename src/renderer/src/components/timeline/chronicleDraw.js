@@ -19,6 +19,8 @@
 import { GUTTER } from './timelineLayout.js'
 import { drawIcon } from '../../lib/canvasIcon.js'
 import { hasIcon } from '../ui/icons.js'
+import { defaultNameLabel } from '../../lib/dataLabels'
+import { nowText } from './timelineText.js'
 
 // The event rail sits just clear of the Time-travel slider panel that rides
 // the gutter's right edge, so pills and chapter headers are never under it.
@@ -105,8 +107,8 @@ export function drawChronicleFg(r, ctx, c) {
 
     // Header: sticky at the top of the visible band, pushed off by its end.
     if (y1 - y0 < 26) continue
-    const label = e.name
-    const span = `${yearText(e.a) || '…'} – ${yearText(e.b) || 'now'}`
+    const label = defaultNameLabel(e.name)
+    const span = `${yearText(e.a) || '…'} – ${yearText(e.b) || nowText()}`
     // The era icon is drawn (not typed) before the name; the pair is
     // measured as one unit so the header stays snug around it.
     const icon = hasIcon(e.icon) ? e.icon : ''
@@ -211,7 +213,7 @@ export function drawChronicleFg(r, ctx, c) {
     // The pill: icon disc + title (+ year). Stacks right when crowded.
     ctx.font = `${ev.importance === 3 ? 800 : 700} ${11 * s}px ${font}`
     const showTitle = hot || (markers !== 'dots' && (px >= 1.2 || ev.importance === 3))
-    const title = showTitle ? truncate(ev.title, 28) : ''
+    const title = showTitle ? truncate(defaultNameLabel(ev.title), 28) : ''
     const tw = title ? ctx.measureText(title).width : 0
     ctx.font = `600 ${9 * s}px ${font}`
     const yt = yearText(ev.a)

@@ -13,7 +13,7 @@
         @click="pick(view.id)"
       >
         <UiIcon class="tab-icon" :name="view.icon" :size="16" />
-        <span class="tab-name">{{ view.name }}</span>
+        <span class="tab-name">{{ t(view.nameKey) }}</span>
         <span v-if="autoplay && active === view.id" :key="cycle" class="tab-progress"></span>
       </button>
     </div>
@@ -21,7 +21,7 @@
     <!-- The stage: one family, morphing between five layouts -->
     <div class="stage-frame" @mousemove="stageTilt" @mouseleave="stageLeave">
       <div class="stage-stars" aria-hidden="true"></div>
-      <span class="live-chip"><span class="live-dot"></span> Live</span>
+      <span class="live-chip"><span class="live-dot"></span> {{ t('home.showcase.live') }}</span>
       <div class="stage-hover">
         <div class="stage-tilt" :class="{ tilted: active === 'space' }">
           <div class="stage-spin" :class="{ spinning: active === 'space' }">
@@ -33,7 +33,9 @@
               :class="'disc-' + gi"
               :style="discStyle(g)"
             >
-              <span class="disc-label"><UiIcon :name="g.icon" :size="12" />{{ g.label }}</span>
+              <span class="disc-label"
+                ><UiIcon :name="g.icon" :size="12" />{{ t('home.showcase.groups.' + g.id) }}</span
+              >
             </div>
 
             <!-- Timeline year grid (timeline view only) -->
@@ -64,7 +66,7 @@
             >
               <span class="dot-label">
                 <span class="dot-name">{{ p.name }}</span>
-                <span class="dot-sub">b. {{ p.birth }}</span>
+                <span class="dot-sub">{{ t('home.born', { year: p.birth }) }}</span>
               </span>
             </div>
           </div>
@@ -75,15 +77,19 @@
     <!-- Caption -->
     <Transition name="caption" mode="out-in">
       <p :key="active" class="caption">
-        <strong>{{ activeView.title }}</strong> — {{ activeView.caption }}
+        <strong>{{ t('home.showcase.views.' + active + '.title') }}</strong
+        >{{ t('home.showcase.sep') }}{{ t('home.showcase.views.' + active + '.caption') }}
       </p>
     </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import UiIcon from '../ui/UiIcon.js'
+import { useI18n } from '../../i18n'
+
+const { t } = useI18n()
 
 // ── One tiny family, five layouts ────────────────────────────────────────────
 // Positions live in a 100×60 design space; the stage keeps that aspect ratio,
@@ -134,50 +140,21 @@ const LINKS = [
 ]
 
 const GROUPS = [
-  { icon: 'wheat', label: 'The farm', x: 21, y: 34, r: 13.5 },
-  { icon: 'anchor', label: 'Seafarers', x: 52, y: 32, r: 14.5 },
-  { icon: 'music', label: 'Musicians', x: 81, y: 30, r: 11.5 }
+  { id: 'farm', icon: 'wheat', x: 21, y: 34, r: 13.5 },
+  { id: 'seafarers', icon: 'anchor', x: 52, y: 32, r: 14.5 },
+  { id: 'musicians', icon: 'music', x: 81, y: 30, r: 11.5 }
 ]
 
 const YEARS = [1920, 1940, 1960, 1980, 2000]
 const yearToX = (year) => 8 + ((year - 1915) / (2026 - 1915)) * 84
 
+// Titles + captions live under home.showcase.views.<id> in the locales.
 const VIEWS = [
-  {
-    id: 'tree',
-    icon: 'graph',
-    name: 'Graph',
-    title: 'The living graph',
-    caption: 'a physics-driven web of everyone — drag someone and the whole family sways.'
-  },
-  {
-    id: 'timeline',
-    icon: 'timeline',
-    name: 'Timeline',
-    title: 'Lifelines',
-    caption: 'every person becomes a lifespan — see who overlapped, who never met.'
-  },
-  {
-    id: 'groups',
-    icon: 'groups',
-    name: 'Groups',
-    title: 'Houses & clans',
-    caption: 'tag people into groups and watch them gather into glowing constellations.'
-  },
-  {
-    id: 'grid',
-    icon: 'directory',
-    name: 'Directory',
-    title: 'The directory',
-    caption: 'a searchable card index of your whole cast — built to scroll thousands.'
-  },
-  {
-    id: 'space',
-    icon: 'orbit',
-    name: '3D Space',
-    title: 'Space mode',
-    caption: 'the experimental lens — your dynasty floating in three dimensions.'
-  }
+  { id: 'tree', icon: 'graph', nameKey: 'rail.graph' },
+  { id: 'timeline', icon: 'timeline', nameKey: 'rail.timeline' },
+  { id: 'groups', icon: 'groups', nameKey: 'rail.groups' },
+  { id: 'grid', icon: 'directory', nameKey: 'rail.directory' },
+  { id: 'space', icon: 'orbit', nameKey: 'home.showcase.spaceName' }
 ]
 
 const active = ref('tree')
@@ -202,7 +179,6 @@ function stageLeave(e) {
   e.currentTarget.style.setProperty('--hx', '0deg')
   e.currentTarget.style.setProperty('--hy', '0deg')
 }
-const activeView = computed(() => VIEWS.find((v) => v.id === active.value))
 
 let timer = 0
 function pick(id) {

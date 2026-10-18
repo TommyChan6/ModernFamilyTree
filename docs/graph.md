@@ -115,6 +115,32 @@ vertical, real conflicts are shared out) with an exact order-preserving row
 projection. Siblings sit `NODE_GAP` apart, unrelated neighbours `+FAMILY_GAP`, and
 all gaps scale with the node radius.
 
+## Perspective tilt {#tilt}
+
+Any 2D layout can be viewed as a tilted board (Style → Perspective, the bottom-bar
+rotate-3d button or **T**; **Q / E** turn it; Alt + drag sets angle (up/down) and turn
+(left/right)). The tilt is a yaw about the view centre followed by a plane homography
+on the camera transform — `{ tl, yw, vw, vh }` beside `{ x, y, k, sx, sy }` — applied by
+`coords.worldToScreen` / `screenToWorld` after the flat mapping, so the overlay, picking
+and dragging need no special cases. `tiltProjection()` builds the matching 4×4 for the
+renderer's `viewCamera`; NodeMaterial projects each node's point and grows its quad in
+clip space (billboards that shrink with depth — identical to the old quad when flat);
+`clip.w` doubles as the depth for a soft haze on nodes and links. The ambient weather
+draws in its own flat pass, and `GroundGrid.js` fades a world-space grid in with the tilt.
+Node picking under tilt (or for standing shapes like `gravestone`) is screen-space
+(`pickNodeOnScreen`). Standing nodes are drawn back to front — `depthOrder` sorts by the
+projected foot (pivot) and `NodeLayer.setOrder` maps nodes to draw slots — and names a
+nearer body covers are dimmed (`occlusion.js`). While tilted, d3.zoom's drag/wheel are
+filtered out and replaced by exact pan/zoom (`translateToPin`): the ground point under
+the cursor stays under it. See `tests/graphTilt.test.js`.
+
+**Generations newcomers.** People created outside the canvas (form, Directory, Sheet,
+import) land ON a row: `placeNewcomersOnRows` puts a child one row below its parent, a
+parent above, a partner/sibling on the same row (in the nearest free slot), opening a row
+past either end; a newcomer that arrives before its first link (the form creates, then
+links) is re-anchored when that link lands. `cleanupEmptyGenRows` lands any row glide in
+flight first, so two quick edits can't delete rows that only look empty mid-glide.
+
 ## Scenes
 
 The graph runs off `view:'graph'` **Scenes** — named, saved arrangements the user
@@ -166,15 +192,21 @@ divorced spouses are faded and finely dashed.
 
 ## Aesthetics system (shapes · ornaments · routes · themes · atmosphere)
 
-The Style panel ([`GraphSettings.vue`](../src/renderer/src/components/GraphSettings.vue))
+The Style Studio's Graph layer ([`GraphStyleSheet.vue`](../src/renderer/src/components/style/GraphStyleSheet.vue);
+the shared gender/bond colours sit in its Whole-app palette, [`AppStyleSheet.vue`](../src/renderer/src/components/style/AppStyleSheet.vue))
 drives a coordinated look system, all persisted per project as `graph_*` settings
 (restored on load in the store):
 
 - **Node shapes** — every node is drawn as a signed-distance shape in the
   instanced fragment shader ([`NodeMaterial.js`](../src/renderer/src/components/graph/webgl/NodeMaterial.js)):
-  circle / square / diamond / hexagon / shield / oval / octagon / heart
-  (`gs.nodeShape`, a single `uShape` uniform — still one draw call). Avatar,
-  border ring, drop shadow and focus haze all follow the SDF.
+  circle / square / diamond / hexagon / shield / oval / octagon / heart / gravestone
+  (`gs.nodeShape`, a single `uShape` uniform — still one draw call; ids and anchors in
+  [`nodeShapes.js`](../src/renderer/src/components/graph/webgl/nodeShapes.js)). Avatar,
+  border ring, drop shadow and focus haze all follow the SDF. The **gravestone** is a
+  full material (`stoneNode()`: granite, bevel light, bronze portrait cameo, engraved
+  grooves, moss, grass and an earth mound) and **stands on** its point instead of
+  centring on it (`shapeAnchor().lift`) — in the Birth layout each stone rests on its
+  birth-year line; labels, kin pills and picking follow the anchor.
 - **Ornaments** (`gs.nodeDecor` + `decorColor`) — procedural decor around the rim,
   same shader: `aura` (gilded double ring), `runes` (revolving dashed sigils),
   `orbit` (comet spark on a track), `burst` (turning spike crown), `pulse`

@@ -14,8 +14,8 @@
     <div v-if="!persons.length" class="board-empty">
       <div class="board-empty-card">
         <div class="board-empty-pin"></div>
-        <div class="board-empty-title">No leads yet</div>
-        <div class="board-empty-text">No people match — clear the search or add someone.</div>
+        <div class="board-empty-title">{{ t('directory.board.emptyTitle') }}</div>
+        <div class="board-empty-text">{{ t('directory.board.emptyText') }}</div>
       </div>
     </div>
 
@@ -68,38 +68,48 @@
     <template v-if="persons.length">
       <div class="board-tag" @pointerdown.stop>
         <span class="board-tag-hole"></span>
-        <b>EVIDENCE</b>
-        <span>{{ persons.length }} {{ persons.length === 1 ? 'subject' : 'subjects' }}</span>
+        <b>{{ t('directory.board.evidence') }}</b>
+        <span>{{ countText('subjects', persons.length) }}</span>
         <span class="board-tag-sep">·</span>
-        <span>{{ edges.length }} {{ edges.length === 1 ? 'string' : 'strings' }}</span>
+        <span>{{ countText('strings', edges.length) }}</span>
       </div>
 
       <div class="board-ui" @pointerdown.stop @wheel.stop.prevent>
-        <button class="bu-btn" title="Zoom out" aria-label="Zoom out" @click="zoomOut">
+        <button
+          class="bu-btn"
+          :title="t('directory.board.zoomOut')"
+          :aria-label="t('directory.board.zoomOut')"
+          @click="zoomOut"
+        >
           <UiIcon name="minus" :size="14" />
         </button>
         <span ref="zoomText" class="bu-zoom">100%</span>
-        <button class="bu-btn" title="Zoom in" aria-label="Zoom in" @click="zoomIn">
+        <button
+          class="bu-btn"
+          :title="t('directory.board.zoomIn')"
+          :aria-label="t('directory.board.zoomIn')"
+          @click="zoomIn"
+        >
           <UiIcon name="plus" :size="14" />
         </button>
         <span class="bu-sep"></span>
-        <button class="bu-btn bu-wide" title="Fit everyone on screen" @click="fitAnimated">
+        <button class="bu-btn bu-wide" :title="t('directory.board.fitTitle')" @click="fitAnimated">
           <UiIcon name="maximize" :size="14" />
-          Fit
+          {{ t('directory.board.fit') }}
         </button>
         <button
           class="bu-btn bu-wide"
           :disabled="!hasMoved"
-          title="Put every photo back in its family spot"
+          :title="t('directory.board.tidyTitle')"
           @click="tidyUp"
         >
           <UiIcon name="sparkles" :size="14" />
-          Tidy up
+          {{ t('directory.board.tidy') }}
         </button>
       </div>
 
       <div class="board-hint" :class="{ gone: hintGone }">
-        Drag the board to pan · scroll to zoom · drag photos to rearrange
+        {{ t('directory.board.hint') }}
       </div>
     </template>
   </div>
@@ -111,6 +121,8 @@ import { useMainStore } from '../../store/index.js'
 import { isDeceased, ageOf } from './peopleLayout.js'
 import { useThumbnail } from './useThumbnail.js'
 import UiIcon from '../ui/UiIcon.js'
+import { useI18n } from '../../i18n'
+import { defaultNameLabel } from '../../lib/dataLabels'
 import {
   POL_W,
   POL_H,
@@ -146,6 +158,7 @@ const props = defineProps({
 })
 
 const store = useMainStore()
+const { t } = useI18n()
 const rootEl = ref(null)
 const corkEl = ref(null)
 const worldEl = ref(null)
@@ -167,10 +180,12 @@ function lifeText(p) {
   const b = p.birth?.year
   const d = p.death?.year
   if (b && d) return `${b} – ${d}`
-  if (b) return `b. ${b}`
-  if (d) return `d. ${d}`
+  if (b) return t('directory.board.born', { year: b })
+  if (d) return t('directory.board.died', { year: d })
   return '—'
 }
+// "3 subjects" / "1 string" — English picks one/other; other locales may match.
+const countText = (key, n) => t(`directory.board.${key}.${n === 1 ? 'one' : 'other'}`, { n })
 const PolaroidCard = {
   props: {
     person: { type: Object, required: true },
@@ -194,22 +209,25 @@ const PolaroidCard = {
             ? h('img', { class: 'pc-img', src: src.value, alt: '', draggable: false })
             : h('div', { class: 'pc-mono' }, initials.value),
           h('div', { class: 'pc-gloss' }),
-          pr.dead ? h('div', { class: 'pc-stamp' }, 'DECEASED') : null
+          pr.dead ? h('div', { class: 'pc-stamp' }, t('directory.board.deceasedStamp')) : null
         ]),
         h('div', { class: 'pc-cap' }, [
-          h('div', { class: 'pc-name' }, p.name || 'Unnamed'),
+          h('div', { class: 'pc-name' }, p.name || t('directory.board.unnamed')),
           h('div', { class: 'pc-year' }, lifeText(p))
         ]),
-        ...tags.map((t, i) =>
+        ...tags.map((tag, i) =>
           h(
             'div',
             {
               class: 'pc-note',
-              style: { '--nc': t.color || 'var(--amber)', '--ni': i }
+              style: { '--nc': tag.color || 'var(--amber)', '--ni': i }
             },
-            t.icon
-              ? [h(UiIcon, { name: t.icon, size: 11, class: 'pc-note-icon' }), t.label || '']
-              : t.label || ''
+            tag.icon
+              ? [
+                  h(UiIcon, { name: tag.icon, size: 11, class: 'pc-note-icon' }),
+                  defaultNameLabel(tag.label)
+                ]
+              : defaultNameLabel(tag.label)
           )
         ),
         h('div', { class: 'pc-pin' })
@@ -879,13 +897,16 @@ function caseLines(p) {
   if (p.occupation) out.push({ text: p.occupation })
   if (p.location) out.push({ icon: 'map-pin', text: p.location })
   const age = ageOf(p, props.refYear)
-  if (age != null) out.push({ text: isDeceased(p, props.refYear) ? `† at ${age}` : `Age ${age}` })
+  if (age != null) {
+    const key = isDeceased(p, props.refYear) ? 'diedAt' : 'age'
+    out.push({ text: t(`directory.board.${key}`, { age }) })
+  }
   const s = props.statsOf(p.id)
   if (s && (s.kin || s.children))
     out.push({
       text:
-        `${s.kin || 0} kin` +
-        (s.children ? ` · ${s.children} ${s.children === 1 ? 'child' : 'children'}` : '')
+        t('directory.board.kin', { n: s.kin || 0 }) +
+        (s.children ? ' · ' + countText('children', s.children) : '')
     })
   return out
 }

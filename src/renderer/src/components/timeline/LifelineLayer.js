@@ -14,12 +14,18 @@ import { FX_GLSL, FX_NOISE_GLSL, lineFxSpec } from '../graph/webgl/lineFx.js'
 // them (lit looks only). Every look animates off the uTime uniform — no
 // per-frame buffer writes.
 
+// `labelKey` / `hintKey` are i18n keys (translated where rendered);
+// `label` / `hint` stay as the English fallback.
 export const LIFELINE_STYLES = [
   { id: 'classic', label: 'Classic', hint: 'Flat, clean lines' },
   { id: 'tube', label: 'Tube', hint: 'Lit 3D cylinders with shadows' },
   { id: 'glass', label: 'Glass', hint: 'Glass rods — a sheen flows down each life' },
   { id: 'glow', label: 'Glow', hint: 'White-hot cores in a coloured glow' }
-]
+].map((s) => ({
+  ...s,
+  labelKey: `timeline.style.lifelines.${s.id}.label`,
+  hintKey: `timeline.style.lifelines.${s.id}.hint`
+}))
 const BASE = { classic: 0, tube: 1, glass: 2, glow: 3 }
 
 /** Shader style id + geometry headroom for a lifeline look. */

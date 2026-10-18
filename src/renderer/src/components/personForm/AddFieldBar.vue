@@ -3,7 +3,7 @@
     <!-- collapsed -->
     <button v-if="!open" class="afb-toggle" type="button" @click="open = true">
       <UiIcon name="plus" :size="14" />
-      Add trait
+      {{ t('personForm.addTrait') }}
     </button>
 
     <!-- expanded: type palette → name it → create -->
@@ -24,8 +24,8 @@
         <button
           class="afb-cancel"
           type="button"
-          title="Close"
-          aria-label="Close"
+          :title="t('personForm.close')"
+          :aria-label="t('personForm.close')"
           @click="open = false"
         >
           <UiIcon name="x" :size="14" />
@@ -33,7 +33,12 @@
       </div>
 
       <div v-else class="afb-naming">
-        <button type="button" class="afb-picked" title="Change type" @click="picked = null">
+        <button
+          type="button"
+          class="afb-picked"
+          :title="t('personForm.changeType')"
+          @click="picked = null"
+        >
           <UiIcon class="afb-glyph" :name="picked.icon" :size="14" />
           {{ picked.label }}
           <UiIcon class="afb-picked-x" name="x" :size="12" />
@@ -43,12 +48,12 @@
           v-model="label"
           class="afb-input"
           type="text"
-          :placeholder="`Name this ${picked.label.toLowerCase()} trait…`"
+          :placeholder="t('personForm.nameTraitPh', { type: picked.label.toLowerCase() })"
           @keydown.enter="create"
           @keydown.esc="picked = null"
         />
-        <label class="afb-lock" title="Locked traits appear on every person's form">
-          <input v-model="locked" type="checkbox" /> Lock
+        <label class="afb-lock" :title="t('personForm.lockHint')">
+          <input v-model="locked" type="checkbox" /> {{ t('personForm.lock') }}
         </label>
         <button
           class="btn btn-primary btn-sm"
@@ -56,7 +61,7 @@
           :disabled="!label.trim()"
           @click="create"
         >
-          Create
+          {{ t('personForm.create') }}
         </button>
       </div>
     </div>
@@ -67,8 +72,10 @@
 import { ref, watch, nextTick } from 'vue'
 import { FIELD_TYPE_META } from './fieldUi.js'
 import UiIcon from '../ui/UiIcon.js'
+import { useI18n } from '../../i18n'
 
 const emit = defineEmits(['create'])
+const { t } = useI18n()
 
 const open = ref(false)
 const picked = ref(null)
@@ -90,8 +97,8 @@ function create() {
     picked.value.type === 'select'
       ? {
           options: [
-            { id: 'opt-1', label: 'Option 1' },
-            { id: 'opt-2', label: 'Option 2' }
+            { id: 'opt-1', label: t('personForm.optionN', { n: 1 }) },
+            { id: 'opt-2', label: t('personForm.optionN', { n: 2 }) }
           ]
         }
       : {}

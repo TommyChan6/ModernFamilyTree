@@ -102,13 +102,20 @@ export function decadeOf(year: number): number {
   return Math.floor(year / 10) * 10
 }
 
+/** Formatters for the one-sided spans (the view passes translated ones). */
+export interface LifeSpanFormat {
+  born: (year: number) => string
+  died: (year: number) => string
+}
+const EN_SPAN: LifeSpanFormat = { born: (y) => `b. ${y}`, died: (y) => `d. ${y}` }
+
 /** "1901 – 1975" / "b. 1901" / "d. 1975" / ''. */
-export function lifeSpan(p: HsPerson): string {
+export function lifeSpan(p: HsPerson, fmt: LifeSpanFormat = EN_SPAN): string {
   const b = p.birth?.year
   const d = p.death?.year
   if (b != null && d != null) return `${b} – ${d}`
-  if (b != null) return `b. ${b}`
-  if (d != null) return `d. ${d}`
+  if (b != null) return fmt.born(b)
+  if (d != null) return fmt.died(d)
   return ''
 }
 

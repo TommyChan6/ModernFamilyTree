@@ -303,6 +303,45 @@ export class TimelineFx {
         tri(g, p.x, p.y + r + 7, 1)
         break
       }
+      case 'column': {
+        // A lane being carried: a soft light column + its landing chip.
+        const grad = g.createLinearGradient(p.x - 26, 0, p.x + 26, 0)
+        grad.addColorStop(0, withA(p.color, 0))
+        grad.addColorStop(0.5, withA(p.color, 0.16 + 0.06 * pulse))
+        grad.addColorStop(1, withA(p.color, 0))
+        g.fillStyle = grad
+        g.fillRect(p.x - 26, 0, 52, this.h)
+        g.strokeStyle = p.color
+        g.globalAlpha = 0.55
+        g.lineWidth = 1.2
+        g.setLineDash([4, 6])
+        g.lineDashOffset = this.reduced ? 0 : -t * 24
+        g.beginPath()
+        g.moveTo(p.x - 22, 0)
+        g.lineTo(p.x - 22, this.h)
+        g.moveTo(p.x + 22, 0)
+        g.lineTo(p.x + 22, this.h)
+        g.stroke()
+        g.setLineDash([])
+        g.globalAlpha = 1
+        if (p.label) chip(g, p.x, p.y, p.label, p.color, this.pal, 'center', true)
+        break
+      }
+      case 'slot': {
+        // Where the carried lane will land: a bright notch between lanes.
+        g.strokeStyle = p.color
+        g.lineCap = 'round'
+        g.globalAlpha = 0.9
+        g.lineWidth = 2.5
+        g.beginPath()
+        g.moveTo(p.x, p.y0)
+        g.lineTo(p.x, p.y1)
+        g.stroke()
+        g.fillStyle = p.color
+        tri(g, p.x, p.y0 - 6, 1)
+        tri(g, p.x, p.y1 + 6, -1)
+        break
+      }
       case 'bubble':
         chip(g, p.x, p.y, p.text, p.color, this.pal, 'center', true, p.icon)
         break

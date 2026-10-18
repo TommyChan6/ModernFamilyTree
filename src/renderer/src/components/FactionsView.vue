@@ -3,26 +3,24 @@
     <!-- Toolbar -->
     <div class="fx-toolbar">
       <div class="fx-heading">
-        <span class="fx-title">Groups</span>
+        <span class="fx-title">{{ t('groups.title') }}</span>
         <span class="fx-count">{{ activeFactions.length }}</span>
       </div>
       <div class="fx-actions">
-        <span class="fx-hint"
-          >Drag people into rings · Drag rings to arrange · Click a person to manage</span
-        >
+        <span class="fx-hint">{{ t('groups.hint') }}</span>
         <button class="btn btn-sm" @click="store.openForm()">
-          <UiIcon name="plus" :size="14" />{{ store.noun }}
+          <UiIcon name="plus" :size="14" />{{ nounLabel(store.noun) }}
         </button>
         <button
           v-if="visibleFactions.length > 1"
           class="btn btn-sm"
-          title="Arrange groups in a ring"
+          :title="t('groups.arrangeTitle')"
           @click="autoArrange"
         >
-          <UiIcon name="sparkles" :size="14" />Arrange
+          <UiIcon name="sparkles" :size="14" />{{ t('groups.arrange') }}
         </button>
         <button class="btn btn-primary btn-sm" @click="handleCreateFaction">
-          <UiIcon name="plus" :size="14" />New group
+          <UiIcon name="plus" :size="14" />{{ t('groups.newGroup') }}
         </button>
         <CanvasToggles
           show-focus
@@ -61,15 +59,15 @@
       <div v-if="!activeFactions.length" class="fx-empty">
         <UiIcon class="fx-empty-icon" name="groups" :size="44" :stroke="1.6" />
         <div class="fx-empty-title">
-          {{ store.groupsScenes.length > 1 ? 'No groups in this scene' : 'No groups yet' }}
+          {{ store.groupsScenes.length > 1 ? t('groups.emptySceneTitle') : t('groups.emptyTitle') }}
         </div>
         <div class="fx-empty-text">
-          Group your people into families, companies, schools, guilds — any camps you like. People
-          in several groups settle in the middle ground between them.
+          {{ t('groups.emptyText') }}
         </div>
         <button class="btn btn-primary" @click="handleCreateFaction">
-          <UiIcon name="plus" :size="16" />Create
-          {{ store.groupsScenes.length > 1 ? 'a' : 'your first' }} group
+          <UiIcon name="plus" :size="16" />{{
+            store.groupsScenes.length > 1 ? t('groups.createGroup') : t('groups.createFirstGroup')
+          }}
         </button>
       </div>
 
@@ -89,14 +87,29 @@
         @pointerdown.stop
         @click.stop
       >
-        <button class="fx-ctrl-btn" title="Zoom in" aria-label="Zoom in" @click="zoomBy(1.3333)">
+        <button
+          class="fx-ctrl-btn"
+          :title="t('groups.zoomIn')"
+          :aria-label="t('groups.zoomIn')"
+          @click="zoomBy(1.3333)"
+        >
           <UiIcon name="zoom-in" :size="16" />
         </button>
-        <button class="fx-ctrl-btn" title="Zoom out" aria-label="Zoom out" @click="zoomBy(0.75)">
+        <button
+          class="fx-ctrl-btn"
+          :title="t('groups.zoomOut')"
+          :aria-label="t('groups.zoomOut')"
+          @click="zoomBy(0.75)"
+        >
           <UiIcon name="zoom-out" :size="16" />
         </button>
         <div class="fx-ctrl-sep"></div>
-        <button class="fx-ctrl-btn" title="Fit all" aria-label="Fit all" @click="fitAll(true)">
+        <button
+          class="fx-ctrl-btn"
+          :title="t('groups.fitAll')"
+          :aria-label="t('groups.fitAll')"
+          @click="fitAll(true)"
+        >
           <UiIcon name="maximize" :size="16" />
         </button>
         <div class="fx-ctrl-sep"></div>
@@ -117,26 +130,26 @@
             @wheel.stop
             @click.stop
           >
-            <div class="fx-panel-title">Focus</div>
+            <div class="fx-panel-title">{{ t('groups.focus') }}</div>
             <div class="fx-focus-row">
-              <span class="fx-focus-label">Gender</span>
+              <span class="fx-focus-label">{{ t('groups.gender') }}</span>
               <div class="fx-focus-chips">
                 <button
                   v-for="o in genderFocusOpts"
                   :key="o.id"
                   class="fx-focus-chip"
                   :class="{ on: focusGender === o.id, 'is-icon': !!o.icon }"
-                  :title="o.icon ? o.label : undefined"
-                  :aria-label="o.label"
+                  :title="o.icon ? t(o.labelKey) : undefined"
+                  :aria-label="t(o.labelKey)"
                   @click="focusGender = o.id"
                 >
                   <UiIcon v-if="o.icon" :name="o.icon" :size="14" />
-                  <template v-else>{{ o.label }}</template>
+                  <template v-else>{{ t(o.labelKey) }}</template>
                 </button>
               </div>
             </div>
             <div class="fx-focus-row" :class="{ 'fx-focus-off': !store.currentDate }">
-              <span class="fx-focus-label">Life</span>
+              <span class="fx-focus-label">{{ t('groups.life') }}</span>
               <div class="fx-focus-chips">
                 <button
                   v-for="o in lifeFocusOpts"
@@ -146,7 +159,7 @@
                   :disabled="o.id !== 'all' && !store.currentDate"
                   @click="focusLife = o.id"
                 >
-                  {{ o.label }}
+                  {{ t(o.labelKey) }}
                 </button>
               </div>
             </div>
@@ -161,7 +174,7 @@
             @wheel.stop
             @click.stop
           >
-            <div class="fx-panel-title">Groups</div>
+            <div class="fx-panel-title">{{ t('groups.title') }}</div>
             <div
               v-for="f in activeFactions"
               :key="f.id"
@@ -171,26 +184,30 @@
               @mouseleave="hoverFactionId = null"
             >
               <span class="fx-mdot" :style="{ background: f.color }"></span>
-              <span class="fx-mname" :title="f.name">{{ f.name }}</span>
+              <span class="fx-mname" :title="defaultNameLabel(f.name)">{{
+                defaultNameLabel(f.name)
+              }}</span>
               <span class="fx-mcount">{{ (f.member_ids || []).length }}</span>
               <button
                 class="fx-mbtn"
-                :title="f.visible === false ? 'Show group' : 'Hide group'"
-                :aria-label="f.visible === false ? 'Show group' : 'Hide group'"
+                :title="f.visible === false ? t('groups.showGroup') : t('groups.hideGroup')"
+                :aria-label="f.visible === false ? t('groups.showGroup') : t('groups.hideGroup')"
                 @click="toggleVisible(f)"
               >
                 <UiIcon :name="f.visible === false ? 'eye-off' : 'eye'" :size="14" />
               </button>
               <button
                 class="fx-mbtn"
-                title="Edit group"
-                aria-label="Edit group"
+                :title="t('groups.editGroup')"
+                :aria-label="t('groups.editGroup')"
                 @click="openFactionEdit(f.id, $event)"
               >
                 <UiIcon name="pencil" :size="14" />
               </button>
             </div>
-            <div v-if="sharedCount" class="fx-mfoot">{{ sharedCount }} in multiple groups</div>
+            <div v-if="sharedCount" class="fx-mfoot">
+              {{ t('groups.sharedCount', { n: sharedCount }) }}
+            </div>
           </div>
         </Transition>
       </div>
@@ -203,9 +220,9 @@
         @click.stop
       >
         <div class="fx-tray-title">
-          Unassigned <span class="fx-tray-count">{{ unassigned.length }}</span>
+          {{ t('groups.unassigned') }} <span class="fx-tray-count">{{ unassigned.length }}</span>
         </div>
-        <div class="fx-tray-hint">drag onto a ring</div>
+        <div class="fx-tray-hint">{{ t('groups.trayHint') }}</div>
         <div class="fx-tray-chips">
           <div
             v-for="p in trayChips"
@@ -214,14 +231,10 @@
             @pointerdown.stop="onTrayChipDown(p, $event)"
           >
             <span class="fx-chip-dot" :style="{ background: genderColor(p.gender) }"></span>
-            <span class="fx-chip-name">{{ trunc(p.name || 'Unnamed', 16) }}</span>
+            <span class="fx-chip-name">{{ trunc(p.name, 16) }}</span>
           </div>
-          <div
-            v-if="trayOverflow"
-            class="fx-chip fx-chip-more"
-            title="Filter the member list on the right and drag people in from there"
-          >
-            +{{ trayOverflow }} more
+          <div v-if="trayOverflow" class="fx-chip fx-chip-more" :title="t('groups.trayMoreTitle')">
+            {{ t('groups.trayMore', { n: trayOverflow }) }}
           </div>
         </div>
       </div>
@@ -238,13 +251,13 @@
         >
           <div class="fx-popup-title">
             <span class="fx-mdot" :style="{ background: fEdit.color }"></span>
-            Edit group
+            {{ t('groups.editGroup') }}
           </div>
           <input
             ref="fEditNameRef"
             v-model="fEdit.name"
             class="fx-input"
-            placeholder="Group name"
+            :placeholder="t('groups.groupName')"
             @keydown.enter="saveFactionEdit"
             @keydown.escape="fEdit = null"
           />
@@ -258,12 +271,18 @@
               @click="fEdit.color = c"
             ></button>
           </div>
-          <IconPicker v-model="fEdit.icon" :options="ICON_PRESETS" aria-label="Group icon" />
+          <IconPicker
+            v-model="fEdit.icon"
+            :options="ICON_PRESETS"
+            :aria-label="t('groups.groupIcon')"
+          />
           <div class="fx-popup-actions">
-            <button class="fx-pbtn danger" @click="handleDeleteFaction">Delete</button>
+            <button class="fx-pbtn danger" @click="handleDeleteFaction">
+              {{ t('dialog.delete') }}
+            </button>
             <span class="fx-popup-spacer"></span>
-            <button class="fx-pbtn" @click="fEdit = null">Cancel</button>
-            <button class="fx-pbtn primary" @click="saveFactionEdit">Save</button>
+            <button class="fx-pbtn" @click="fEdit = null">{{ t('dialog.cancel') }}</button>
+            <button class="fx-pbtn primary" @click="saveFactionEdit">{{ t('groups.save') }}</button>
           </div>
         </div>
       </Transition>
@@ -280,7 +299,7 @@
         >
           <div class="fx-popup-title">
             <span class="fx-mdot" :style="{ background: genderColor(pPopPerson.gender) }"></span>
-            {{ pPopPerson.name || 'Unnamed' }}
+            {{ pPopPerson.name || t('groups.unnamed') }}
           </div>
           <div class="fx-chips">
             <span
@@ -290,28 +309,32 @@
               :style="{ borderColor: f.color }"
             >
               <span class="fx-mdot" :style="{ background: f.color }"></span>
-              {{ f.name }}
+              {{ defaultNameLabel(f.name) }}
               <button
                 class="fx-fchip-x"
-                title="Remove from group"
-                aria-label="Remove from group"
+                :title="t('groups.removeFromGroup')"
+                :aria-label="t('groups.removeFromGroup')"
                 @click="store.removePersonFromGroup(pPop.id, f.id)"
               >
                 <UiIcon name="x" :size="12" />
               </button>
             </span>
-            <span v-if="!pPopMemberships.length" class="fx-nochips">No groups yet</span>
+            <span v-if="!pPopMemberships.length" class="fx-nochips">{{
+              t('groups.emptyTitle')
+            }}</span>
           </div>
           <select v-if="pPopAddable.length" class="fx-select" @change="onAddToFaction($event)">
-            <option value="" disabled selected>Add to group…</option>
+            <option value="" disabled selected>{{ t('groups.addToGroup') }}</option>
             <option v-for="f in pPopAddable" :key="f.id" :value="f.id">
-              {{ f.name }}
+              {{ defaultNameLabel(f.name) }}
             </option>
           </select>
           <div class="fx-popup-actions">
-            <button class="fx-pbtn" @click="openPersonProfile">Open profile</button>
+            <button class="fx-pbtn" @click="openPersonProfile">
+              {{ t('groups.openProfile') }}
+            </button>
             <span class="fx-popup-spacer"></span>
-            <button class="fx-pbtn" @click="pPop = null">Close</button>
+            <button class="fx-pbtn" @click="pPop = null">{{ t('groups.close') }}</button>
           </div>
         </div>
       </Transition>
@@ -322,12 +345,12 @@
       ref="sceneTabsRef"
       :scenes="store.groupsScenes"
       :active-id="store.activeSceneId"
-      label="Scenes"
-      hint="Each scene keeps its own group placements — membership is shared"
+      :label="t('groups.scenes')"
+      :hint="t('groups.scenesHint')"
       :tooltip="scenarioTooltip"
-      add-title="New empty scene"
-      duplicate-title="Duplicate current scene"
-      delete-title="Delete scene"
+      :add-title="t('groups.addScene')"
+      :duplicate-title="t('groups.duplicateScene')"
+      :delete-title="t('groups.deleteScene')"
       @switch="switchScenario"
       @create="addScenario(false)"
       @duplicate="addScenario(true)"
@@ -359,9 +382,11 @@ import CanvasToggles from './CanvasToggles.vue'
 import UiIcon from './ui/UiIcon.js'
 import IconPicker from './ui/IconPicker.vue'
 import { confirmDialog } from '../lib/dialogs.js'
-import { translate as tr } from '../i18n'
+import { translate as tr, useI18n } from '../i18n'
+import { nounLabel, defaultNameLabel } from '../lib/dataLabels'
 
 const store = useMainStore()
+const { t, locale } = useI18n()
 
 // This view stays mounted while hidden (App keeps its GL context alive to avoid a
 // white flash on view switches); `active` tells us when it's actually on screen.
@@ -671,7 +696,7 @@ function genderColor(g) {
 }
 
 function trunc(s, n) {
-  s = s || 'Unnamed'
+  s = s || tr('groups.unnamed')
   return s.length > n ? s.slice(0, n - 1) + '…' : s
 }
 
@@ -682,11 +707,18 @@ const factionById = computed(() => {
 })
 
 // Live display list for the zones (persisted position unless gliding/dragging).
+// Approximate rendered width in Latin-letter units (CJK ≈ 1.9 letters).
+function textUnits(s) {
+  let u = 0
+  for (const ch of s) u += /[\u2e80-\u9fff\uac00-\ud7af\uff00-\uffef]/.test(ch) ? 1.9 : 1
+  return u
+}
+
 function zonesData() {
   return visibleFactions.value.map((f) => {
     const p = getZonePos(f)
     const count = (f.member_ids || []).length
-    const label = trunc(f.name, 18)
+    const label = trunc(defaultNameLabel(f.name), 18)
     return {
       id: f.id,
       x: p.x,
@@ -696,7 +728,8 @@ function zonesData() {
       icon: f.icon,
       label,
       count,
-      headerW: label.length * 7.2 + String(count).length * 7 + 44
+      // CJK glyphs are roughly twice as wide as Latin letters at this size.
+      headerW: textUnits(label) * 7.2 + String(count).length * 7 + 44
     }
   })
 }
@@ -785,15 +818,15 @@ const legendOpen = ref(true)
 const focusGender = ref('all') // 'all' | 'male' | 'female' | 'unknown'
 const focusLife = ref('all') // 'all' | 'living' | 'deceased'
 const genderFocusOpts = [
-  { id: 'all', label: 'All' },
-  { id: 'male', label: 'Male', icon: 'mars' },
-  { id: 'female', label: 'Female', icon: 'venus' },
-  { id: 'unknown', label: 'Unknown', icon: 'circle-help' }
+  { id: 'all', labelKey: 'groups.all' },
+  { id: 'male', labelKey: 'data.gender.male', icon: 'mars' },
+  { id: 'female', labelKey: 'data.gender.female', icon: 'venus' },
+  { id: 'unknown', labelKey: 'groups.unknown', icon: 'circle-help' }
 ]
 const lifeFocusOpts = [
-  { id: 'all', label: 'All' },
-  { id: 'living', label: 'Living' },
-  { id: 'deceased', label: 'Remembered' }
+  { id: 'all', labelKey: 'groups.all' },
+  { id: 'living', labelKey: 'groups.living' },
+  { id: 'deceased', labelKey: 'groups.remembered' }
 ]
 const focusActive = computed(() => focusGender.value !== 'all' || focusLife.value !== 'all')
 const focusPersonById = computed(() => {
@@ -1355,7 +1388,7 @@ async function handleCreateFaction() {
   const cy = (stageH.value / 2 - ty.value) / k.value
   const pos = nextFactionPosition(activeFactions.value, cx, cy)
   const res = await store.createGroup({
-    name: `Group ${activeFactions.value.length + 1}`,
+    name: tr('groups.defaultGroupName', { n: activeFactions.value.length + 1 }),
     color: PRESET_COLORS[activeFactions.value.length % PRESET_COLORS.length],
     icon: ICON_PRESETS[activeFactions.value.length % ICON_PRESETS.length],
     x: Math.round(pos.x),
@@ -1389,7 +1422,7 @@ async function saveFactionEdit() {
   fEdit.value = null
   await store.updateGroup({
     id,
-    name: name.trim() || 'Unnamed Group',
+    name: name.trim() || tr('groups.unnamedGroup'),
     color,
     icon
   })
@@ -1400,7 +1433,7 @@ async function handleDeleteFaction() {
   const f = factionById.value.get(fEdit.value.id)
   const count = (f?.member_ids || []).length
   const ok = await confirmDialog({
-    title: tr('confirm.deleteGroup', { name: f?.name || '' }),
+    title: tr('confirm.deleteGroup', { name: defaultNameLabel(f?.name) }),
     message: count ? tr('confirm.deleteGroupBody', { count }) : tr('dialog.undoHint'),
     tone: 'danger'
   })
@@ -1481,7 +1514,10 @@ function peopleInScenario(sid) {
 
 function scenarioTooltip(s) {
   const fCount = store.sceneTags.filter((st) => st.scene_id === s.id).length
-  return `${fCount} group${fCount === 1 ? '' : 's'} · ${peopleInScenario(s.id)} people in scene`
+  const groups = tr(fCount === 1 ? 'groups.sceneGroupsOne' : 'groups.sceneGroupsOther', {
+    n: fCount
+  })
+  return tr('groups.sceneTooltip', { groups, n: peopleInScenario(s.id) })
 }
 
 function switchScenario(id) {
@@ -1489,7 +1525,7 @@ function switchScenario(id) {
 }
 
 async function addScenario(duplicate) {
-  const name = `Scene ${store.groupsScenes.length + 1}`
+  const name = tr('groups.defaultSceneName', { n: store.groupsScenes.length + 1 })
   const res = duplicate
     ? await store.duplicateScene(store.activeSceneId, name)
     : await store.createScene('groups', name)
@@ -1503,7 +1539,7 @@ async function addScenario(duplicate) {
 async function handleDeleteScenario(s) {
   const fCount = store.sceneTags.filter((st) => st.scene_id === s.id).length
   const ok = await confirmDialog({
-    title: tr('confirm.deleteScene', { name: s.name }),
+    title: tr('confirm.deleteScene', { name: defaultNameLabel(s.name) }),
     message: fCount
       ? tr('confirm.deleteSceneGroups', { count: fCount })
       : tr('confirm.deleteSceneBody'),
@@ -1615,6 +1651,11 @@ function syncTheme() {
   renderer?.setInk(store.isInk)
 }
 watch([() => store.theme, () => store.accent], syncTheme)
+// Canvas labels (default group names, the 'Unnamed' fallback) follow the UI language.
+watch(locale, () => {
+  renderer?.markAllDirty()
+  renderer?.requestRedraw()
+})
 
 onBeforeUnmount(() => {
   sim?.stop()

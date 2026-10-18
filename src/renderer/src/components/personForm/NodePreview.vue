@@ -11,13 +11,14 @@
     </div>
     <div :key="label || '·'" class="np-label">
       <span v-if="label">{{ label }}</span>
-      <span v-else class="np-unnamed">Unnamed</span>
+      <span v-else class="np-unnamed">{{ t('personForm.unnamed') }}</span>
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from '../../i18n'
 
 const props = defineProps({
   label: { type: String, default: '' },
@@ -27,6 +28,7 @@ const props = defineProps({
   image: { type: String, default: null }
 })
 
+const { t } = useI18n()
 const ringCss = computed(() => props.ringColor || 'var(--accent)')
 const initial = computed(() => {
   const c = (props.label || '').trim()[0]

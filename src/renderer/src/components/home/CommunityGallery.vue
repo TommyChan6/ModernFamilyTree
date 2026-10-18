@@ -11,7 +11,7 @@
         @click="filter = f.id"
       >
         <UiIcon :name="f.icon" :size="14" />
-        {{ f.label }}
+        {{ t('home.gallery.filters.' + f.id) }}
       </button>
     </div>
 
@@ -30,40 +30,42 @@
             <canvas :ref="(el) => setCover(el, p)" class="cover-canvas"></canvas>
             <span v-if="p.badge" class="badge-pill" :class="'badge-' + p.badge.replace(' ', '')">
               <UiIcon :name="badgeIcon(p.badge)" :size="12" />
-              {{ p.badge }}
+              {{ badgeLabel(p.badge) }}
             </span>
-            <span class="cover-meta">{{ p.people }} people · {{ p.generations }} generations</span>
+            <span class="cover-meta">{{
+              t('home.gallery.coverMeta', { people: p.people, generations: p.generations })
+            }}</span>
             <div class="cover-glare"></div>
             <div class="cover-holo"></div>
           </div>
           <div class="body">
-            <h3 class="title">{{ p.title }}</h3>
-            <p class="blurb">{{ p.blurb }}</p>
+            <h3 class="title">{{ projectText(p, 'title') }}</h3>
+            <p class="blurb">{{ projectText(p, 'blurb') }}</p>
             <div class="meta">
               <span class="avatar" :style="avatarStyle(p)">{{ p.author[0].toUpperCase() }}</span>
               <span class="author">@{{ p.author }}</span>
-              <span class="updated">· {{ p.updated }}</span>
+              <span class="updated">· {{ agoLabel(p.updated) }}</span>
             </div>
             <div class="stats">
               <button
                 class="stat like"
                 :class="{ liked: liked.has(p.id) }"
                 type="button"
-                :title="liked.has(p.id) ? 'Liked! (community sync coming soon)' : 'Like'"
+                :title="liked.has(p.id) ? t('home.gallery.liked') : t('home.gallery.like')"
                 @click.stop="toggleLike(p)"
               >
                 <UiIcon :key="likeBurst[p.id] || 0" class="heart" name="heart" :size="14" />
                 {{ fmt(p.likes + (liked.has(p.id) ? 1 : 0)) }}
               </button>
-              <span class="stat" title="Comments">
+              <span class="stat" :title="t('home.gallery.comments')">
                 <UiIcon name="message-circle" :size="14" />
                 {{ fmt(p.comments) }}
               </span>
-              <span class="stat" title="Favorites">
+              <span class="stat" :title="t('home.gallery.favorites')">
                 <UiIcon name="star" :size="14" />
                 {{ fmt(p.stars) }}
               </span>
-              <span class="stat followers" title="Followers">
+              <span class="stat followers" :title="t('home.gallery.followers')">
                 <UiIcon name="users" :size="14" />
                 {{ fmt(p.followers) }}
               </span>
@@ -80,8 +82,8 @@
           <button
             class="peek-close"
             type="button"
-            title="Close"
-            aria-label="Close"
+            :title="t('home.gallery.close')"
+            :aria-label="t('home.gallery.close')"
             @click="peek = null"
           >
             <UiIcon name="x" :size="16" />
@@ -90,25 +92,27 @@
             <canvas :ref="(el) => paintPeek(el)" class="cover-canvas"></canvas>
             <div class="peek-cover-shade"></div>
             <div class="peek-headline">
-              <h3>{{ peek.title }}</h3>
-              <span>@{{ peek.author }} · {{ peek.people }} people</span>
+              <h3>{{ projectText(peek, 'title') }}</h3>
+              <span
+                >@{{ peek.author }} ·
+                {{ t('home.gallery.peoplePill', { people: peek.people }) }}</span
+              >
             </div>
           </div>
           <div class="peek-body">
             <UiIcon class="peek-lock" name="telescope" :size="30" :stroke="1.75" />
-            <h4>Community browsing is almost here</h4>
-            <p>
-              Soon you'll be able to step inside trees like this one — explore them view by view,
-              follow the makers, leave comments, and favorite the families you love.
-            </p>
+            <h4>{{ t('home.gallery.peekTitle') }}</h4>
+            <p>{{ t('home.gallery.peekBody') }}</p>
             <div class="peek-soon">
-              <span><UiIcon name="user-plus" :size="14" />Follow</span>
-              <span><UiIcon name="message-circle" :size="14" />Comment</span>
-              <span><UiIcon name="heart" :size="14" />Like</span>
-              <span><UiIcon name="star" :size="14" />Favorite</span>
+              <span><UiIcon name="user-plus" :size="14" />{{ t('home.gallery.follow') }}</span>
+              <span
+                ><UiIcon name="message-circle" :size="14" />{{ t('home.gallery.comment') }}</span
+              >
+              <span><UiIcon name="heart" :size="14" />{{ t('home.gallery.like') }}</span>
+              <span><UiIcon name="star" :size="14" />{{ t('home.gallery.favorite') }}</span>
             </div>
             <button class="peek-cta" type="button" @click="startFromPeek">
-              Start your own tree instead
+              {{ t('home.gallery.cta') }}
               <UiIcon name="arrow-right" :size="16" />
             </button>
           </div>
@@ -122,15 +126,17 @@
 import { ref, computed, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { MOCK_PROJECTS, drawProjectCover } from './mockProjects'
 import UiIcon from '../ui/UiIcon.js'
+import { useI18n } from '../../i18n'
 
 const emit = defineEmits(['start'])
+const { t } = useI18n()
 
 const FILTERS = [
-  { id: 'all', icon: 'sparkles', label: 'All' },
-  { id: 'trending', icon: 'flame', label: 'Trending' },
-  { id: 'fictional', icon: 'wand-sparkles', label: 'Fictional' },
-  { id: 'historical', icon: 'landmark', label: 'Historical' },
-  { id: 'personal', icon: 'house', label: 'Personal' }
+  { id: 'all', icon: 'sparkles' },
+  { id: 'trending', icon: 'flame' },
+  { id: 'fictional', icon: 'wand-sparkles' },
+  { id: 'historical', icon: 'landmark' },
+  { id: 'personal', icon: 'house' }
 ]
 
 const filter = ref('all')
@@ -223,6 +229,27 @@ function fmt(n) {
 
 function badgeIcon(badge) {
   return badge === 'Trending' ? 'flame' : badge === 'Staff pick' ? 'award' : 'sprout'
+}
+
+// The mock data keeps its English source strings (they key the filters and
+// badge classes); what's shown is looked up per locale, falling back to them.
+const BADGE_KEYS = { Trending: 'trending', 'Staff pick': 'staffPick', New: 'new' }
+
+function badgeLabel(badge) {
+  const key = BADGE_KEYS[badge]
+  return key ? t('home.gallery.badges.' + key) : badge
+}
+
+function projectText(p, field) {
+  const key = `home.projects.${p.id}.${field}`
+  const text = t(key)
+  return text === key ? p[field] : text
+}
+
+// '2h ago' / '38m ago' / '1d ago' → the locale's relative-time phrasing.
+function agoLabel(updated) {
+  const m = /^(\d+)([mhd]) ago$/.exec(updated)
+  return m ? t('home.gallery.ago.' + m[2], { n: m[1] }) : updated
 }
 
 function avatarStyle(p) {

@@ -15,7 +15,8 @@
 //
 // Effects pause (render as plain lines) while the 水墨 brush look owns the links.
 
-/** The catalog — order is the Style panel's order. */
+/** The catalog — order is the Style panel's order. `label` / `hint` are the English
+ *  fallback; UIs render the i18n keys `labelKey` / `hintKey` (graphStyle.fx.<id>.*). */
 export const LINE_FX = [
   { id: 'none', n: 0, pad: 1, body: 0, label: 'Classic', icon: 'minus', hint: 'Plain lines' },
   {
@@ -99,7 +100,11 @@ export const LINE_FX = [
     icon: 'crown',
     hint: 'A royal gold rope with a shine that travels its length'
   }
-]
+].map((f) => ({
+  ...f,
+  labelKey: `graphStyle.fx.${f.id}.label`,
+  hintKey: `graphStyle.fx.${f.id}.hint`
+}))
 
 const BY_ID = new Map(LINE_FX.map((f) => [f.id, f]))
 /** Effect spec by id (unknown → Classic). */

@@ -3,8 +3,8 @@
     <!-- Empty codex -->
     <div v-if="!persons.length" class="cx-empty">
       <div class="cx-empty-icon"><UiIcon name="book-open" :size="44" :stroke="1.5" /></div>
-      <div class="cx-empty-title">The codex is unwritten</div>
-      <div class="cx-empty-text">No entries match — clear the search or add someone.</div>
+      <div class="cx-empty-title">{{ t('directory.codex.emptyTitle') }}</div>
+      <div class="cx-empty-text">{{ t('directory.codex.emptyText') }}</div>
     </div>
 
     <template v-else>
@@ -13,12 +13,19 @@
         <header class="cx-index-head">
           <div class="cx-index-title">
             <UiIcon class="cx-index-glyph" name="feather" :size="18" />
-            Codex
+            {{ t('directory.codex.title') }}
           </div>
           <div class="cx-index-count">
-            {{ persons.length }} {{ persons.length === 1 ? 'entry' : 'entries' }}
+            {{
+              t(
+                persons.length === 1
+                  ? 'directory.codex.entries.one'
+                  : 'directory.codex.entries.other',
+                { n: persons.length }
+              )
+            }}
             <span class="cx-dot">·</span>
-            {{ chronicled }} chronicled
+            {{ t('directory.codex.chronicledCount', { n: chronicled }) }}
           </div>
           <div class="cx-index-progress">
             <i :style="{ width: (chronicled / persons.length) * 100 + '%' }"></i>
@@ -29,18 +36,18 @@
               :key="l.ch"
               class="cx-jump-l"
               :class="{ on: l.ch === activeLetter }"
-              :title="'Jump to ' + l.ch"
+              :title="t('directory.codex.jumpTo', { ch: l.ch })"
               @click="turnTo(l.index)"
             >
               {{ l.ch }}
             </button>
             <form class="cx-jump-no" @submit.prevent="jumpToNo">
-              <span>No.</span>
+              <span>{{ t('directory.codex.jumpNo') }}</span>
               <input
                 v-model="noInput"
                 inputmode="numeric"
                 :placeholder="String(active + 1).padStart(3, '0')"
-                aria-label="Jump to entry number"
+                :aria-label="t('directory.codex.jumpToNumber')"
                 @keydown.stop
               />
             </form>
@@ -66,9 +73,9 @@
               <span class="cx-row-av" :style="{ '--rc': r.color }">
                 <IndexArt :person="r.p" />
               </span>
-              <span class="cx-row-name">{{ r.p.name || 'Unnamed' }}</span>
-              <span v-if="r.dead" class="cx-row-mark" title="Deceased">
-                <UiIcon name="moon" :size="12" label="Deceased" />
+              <span class="cx-row-name">{{ r.p.name || t('directory.codex.unnamed') }}</span>
+              <span v-if="r.dead" class="cx-row-mark" :title="t('directory.codex.deceased')">
+                <UiIcon name="moon" :size="12" :label="t('directory.codex.deceased')" />
               </span>
             </button>
           </div>
@@ -94,7 +101,7 @@
                 <span class="cx-no">{{ L.e.no }}</span>
                 <span class="cx-head-rule"></span>
                 <span class="cx-head-kind" :class="{ living: !L.e.dead }">
-                  {{ L.e.dead ? 'Deceased' : 'Living' }}
+                  {{ L.e.dead ? t('directory.codex.deceased') : t('directory.codex.living') }}
                 </span>
               </header>
 
@@ -103,7 +110,7 @@
                   <button
                     class="cx-frame"
                     :style="{ '--sc': L.e.genderColor }"
-                    title="Open full profile"
+                    :title="t('directory.codex.openProfile')"
                     :tabindex="L.kind === 'leaf' ? -1 : null"
                     @click="openProfile(L.e.p.id)"
                   >
@@ -164,17 +171,19 @@
 
                   <dl class="cx-vitals">
                     <div>
-                      <dt>Born</dt>
-                      <dd :class="{ faint: !L.e.born }">{{ L.e.born || 'Unrecorded' }}</dd>
-                    </div>
-                    <div>
-                      <dt>Died</dt>
-                      <dd :class="{ faint: !L.e.died }">
-                        {{ L.e.died || (L.e.dead ? 'Unrecorded' : '—') }}
+                      <dt>{{ t('directory.codex.born') }}</dt>
+                      <dd :class="{ faint: !L.e.born }">
+                        {{ L.e.born || t('directory.codex.unrecorded') }}
                       </dd>
                     </div>
                     <div>
-                      <dt>Age</dt>
+                      <dt>{{ t('directory.codex.died') }}</dt>
+                      <dd :class="{ faint: !L.e.died }">
+                        {{ L.e.died || (L.e.dead ? t('directory.codex.unrecorded') : '—') }}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{{ t('directory.codex.age') }}</dt>
                       <dd :class="{ faint: L.e.age == null }">{{ L.e.ageText }}</dd>
                     </div>
                   </dl>
@@ -182,7 +191,7 @@
                   <!-- Lifespan scale rule: this life against the longest in the roster -->
                   <div class="cx-span">
                     <div class="cx-span-label">
-                      <span>Lifespan</span>
+                      <span>{{ t('directory.codex.lifespan') }}</span>
                       <span class="cx-span-cap">{{ L.e.life.caption }}</span>
                     </div>
                     <div class="cx-rule" :style="{ '--minor': L.e.life.minorPct + '%' }">
@@ -194,30 +203,34 @@
                       >
                         <i class="cx-rule-cap"></i>
                       </div>
-                      <div v-else class="cx-rule-unknown">span unrecorded</div>
+                      <div v-else class="cx-rule-unknown">
+                        {{ t('directory.codex.spanUnrecorded') }}
+                      </div>
                       <span
-                        v-for="t in lifeScale.ticks"
-                        :key="t"
+                        v-for="tick in lifeScale.ticks"
+                        :key="tick"
                         class="cx-tick"
-                        :style="{ left: (t / lifeScale.max) * 100 + '%' }"
+                        :style="{ left: (tick / lifeScale.max) * 100 + '%' }"
                       >
-                        <em>{{ t }}</em>
+                        <em>{{ tick }}</em>
                       </span>
                     </div>
                   </div>
 
                   <div v-if="L.e.tags.length" class="cx-sigils">
                     <span
-                      v-for="t in L.e.tags"
-                      :key="t.id"
+                      v-for="tag in L.e.tags"
+                      :key="tag.id"
                       class="cx-sigil"
-                      :style="{ '--tc': t.color || 'var(--accent)' }"
+                      :style="{ '--tc': tag.color || 'var(--accent)' }"
                     >
                       <b class="cx-sigil-mark">
-                        <UiIcon v-if="t.icon" :name="t.icon" :size="12" :stroke="2.4" />
-                        <template v-else>{{ (t.label || '?').charAt(0) }}</template>
+                        <UiIcon v-if="tag.icon" :name="tag.icon" :size="12" :stroke="2.4" />
+                        <template v-else>{{
+                          (defaultNameLabel(tag.label) || '?').charAt(0)
+                        }}</template>
                       </b>
-                      {{ t.label }}
+                      {{ defaultNameLabel(tag.label) }}
                     </span>
                   </div>
                 </div>
@@ -227,7 +240,7 @@
 
               <div class="cx-lower">
                 <section class="cx-kin">
-                  <h3 class="cx-sec">Kinship</h3>
+                  <h3 class="cx-sec">{{ t('directory.codex.kinship') }}</h3>
                   <div class="cx-kin-body">
                     <svg class="cx-rosette" viewBox="-90 -90 180 180" aria-hidden="true">
                       <circle r="86" class="cx-ros-ring" />
@@ -257,7 +270,7 @@
                       <circle r="23" class="cx-ros-core" />
                       <circle r="19" class="cx-ros-ring thin" />
                       <text y="-1" class="cx-ros-n">{{ L.e.kinCount }}</text>
-                      <text y="11" class="cx-ros-cap">KIN</text>
+                      <text y="11" class="cx-ros-cap">{{ t('directory.codex.kinCap') }}</text>
                     </svg>
 
                     <div class="cx-kin-lists">
@@ -270,31 +283,35 @@
                             <button
                               v-if="r.linked"
                               class="cx-rel"
-                              :title="'Turn to ' + r.name"
+                              :title="t('directory.codex.turnTo', { name: r.name })"
                               :tabindex="L.kind === 'leaf' ? -1 : null"
                               @click="turnToId(r.id)"
                             >
                               {{ r.name }}</button
-                            ><span v-else class="cx-rel off" title="Not in the current filter">{{
-                              r.name
-                            }}</span
+                            ><span
+                              v-else
+                              class="cx-rel off"
+                              :title="t('directory.codex.notInFilter')"
+                              >{{ r.name }}</span
                             ><span v-if="ri < g.shown.length - 1" class="cx-comma">, </span>
                           </template>
-                          <span v-if="g.more" class="cx-more"> +{{ g.more }} more</span>
+                          <span v-if="g.more" class="cx-more">
+                            {{ t('directory.codex.more', { n: g.more }) }}</span
+                          >
                         </span>
                       </div>
                       <div v-if="!L.e.groups.length" class="cx-kin-none">
-                        A solitary soul — no bonds recorded.
+                        {{ t('directory.codex.noBonds') }}
                       </div>
                     </div>
                   </div>
                 </section>
 
                 <section class="cx-chron">
-                  <h3 class="cx-sec">Chronicle</h3>
+                  <h3 class="cx-sec">{{ t('directory.codex.chronicle') }}</h3>
                   <p v-if="L.e.bio" class="cx-bio">{{ L.e.bio }}</p>
                   <p v-else class="cx-bio-empty">
-                    No records survive of this one’s deeds. The page waits for a chronicler.
+                    {{ t('directory.codex.noBio') }}
                   </p>
                 </section>
               </div>
@@ -304,19 +321,21 @@
                   class="cx-turn"
                   :disabled="L.e.i <= 0"
                   :tabindex="L.kind === 'leaf' ? -1 : null"
-                  title="Previous entry (Up or Left arrow)"
-                  aria-label="Previous entry"
+                  :title="t('directory.codex.prevTitle')"
+                  :aria-label="t('directory.codex.prev')"
                   @click="turnBy(-1)"
                 >
                   <UiIcon name="chevron-left" :size="16" />
                 </button>
-                <span class="cx-folio">— {{ L.e.i + 1 }} of {{ persons.length }} —</span>
+                <span class="cx-folio">{{
+                  t('directory.codex.folio', { i: L.e.i + 1, n: persons.length })
+                }}</span>
                 <button
                   class="cx-turn"
                   :disabled="L.e.i >= persons.length - 1"
                   :tabindex="L.kind === 'leaf' ? -1 : null"
-                  title="Next entry (Down or Right arrow)"
-                  aria-label="Next entry"
+                  :title="t('directory.codex.nextTitle')"
+                  :aria-label="t('directory.codex.next')"
                   @click="turnBy(1)"
                 >
                   <UiIcon name="chevron-right" :size="16" />
@@ -327,7 +346,8 @@
                   :tabindex="L.kind === 'leaf' ? -1 : null"
                   @click="openProfile(L.e.p.id)"
                 >
-                  Open full profile <UiIcon class="cx-open-arrow" name="arrow-right" :size="14" />
+                  {{ t('directory.codex.openProfile') }}
+                  <UiIcon class="cx-open-arrow" name="arrow-right" :size="14" />
                 </button>
               </footer>
             </div>
@@ -358,6 +378,8 @@ import { useMainStore } from '../../store/index.js'
 import { ageOf, isDeceased } from './peopleLayout.js'
 import UiIcon from '../ui/UiIcon.js'
 import { useThumbnail } from './useThumbnail.js'
+import { useI18n } from '../../i18n'
+import { relTypeLabel, relRoleLabel, defaultNameLabel } from '../../lib/dataLabels'
 import {
   INDEX_ROW_H,
   INDEX_PAD,
@@ -368,7 +390,6 @@ import {
   letterJumps,
   initialKey,
   initialsOf,
-  prettyDate,
   lifespanScale,
   kinshipOf,
   sealPath,
@@ -391,6 +412,7 @@ const props = defineProps({
 })
 
 const store = useMainStore()
+const { t, locale } = useI18n()
 const listEl = ref(null)
 const stageEl = ref(null)
 const uid = 'cx' + Math.random().toString(36).slice(2, 7)
@@ -441,6 +463,40 @@ const genderColor = (p) =>
     : p?.gender === 'female'
       ? store.graphSettings.femaleColor
       : store.graphSettings.unknownColor
+
+// ── Localized display text (the pure codexLayout helpers stay English) ────
+// "No. 007" → the zero-padded number from entryNo(), framed per locale.
+const entryLabel = (i, total) =>
+  t('directory.codex.entryNo', { n: entryNo(i, total).replace(/^No\. /, '') })
+// A DateValue honouring precision, like codexLayout's prettyDate().
+function localDate(d) {
+  if (!d || d.year == null || !Number.isFinite(Number(d.year))) return ''
+  const y = Number(d.year)
+  const year = y < 0 ? t('directory.codex.date.bce', { y: -y }) : String(y)
+  const months = t('directory.codex.date.months')
+  const m =
+    d.precision !== 'year' && d.month >= 1 && d.month <= 12 && Array.isArray(months)
+      ? months[d.month - 1]
+      : ''
+  if (!m) return t('directory.codex.date.year', { y: year })
+  if (d.precision === 'day' && d.day) return t('directory.codex.date.day', { d: d.day, m, y: year })
+  return t('directory.codex.date.month', { m, y: year })
+}
+// Built-in relationship type names / end roles → translated (renames verbatim).
+const kinLabels = computed(() => {
+  const m = new Map()
+  const put = (raw, shown) => {
+    if (raw && shown && shown !== raw && !m.has(raw)) m.set(raw, shown)
+  }
+  for (const def of store.relTypeByKey.values()) {
+    put(def.role_a, relRoleLabel(def, 'a'))
+    put(def.role_b, relRoleLabel(def, 'b'))
+    put(def.label, relTypeLabel(def))
+  }
+  return m
+})
+const kinLabel = (label) =>
+  kinLabels.value.get(label) || (label === 'Bond' ? t('directory.codex.bond') : label)
 
 const chronicled = computed(() => props.persons.reduce((n, p) => n + (p.bio?.trim() ? 1 : 0), 0))
 const lifeScale = computed(() => {
@@ -594,7 +650,9 @@ const entryCache = computed(() => ({
     props.refYear,
     store.graphSettings.maleColor,
     store.graphSettings.femaleColor,
-    store.graphSettings.unknownColor
+    store.graphSettings.unknownColor,
+    kinLabels.value,
+    locale.value
   ],
   map: new Map()
 }))
@@ -638,7 +696,7 @@ function buildEntry(p, i) {
   )
   const rel = (id) => ({
     id,
-    name: personById.value.get(id)?.name || 'Unnamed',
+    name: personById.value.get(id)?.name || t('directory.codex.unnamed'),
     linked: indexById.value.has(id)
   })
   const groups = []
@@ -653,17 +711,17 @@ function buildEntry(p, i) {
       more: Math.max(0, people.length - SHOW_MAX)
     })
   }
-  addGroup('parents', 'Parents', 'var(--accent)', kin.parents)
-  addGroup('partners', 'Partners', 'var(--pink)', kin.partners)
-  addGroup('children', 'Children', 'var(--green)', kin.children)
-  addGroup('siblings', 'Siblings', 'var(--amber)', kin.siblings)
+  addGroup('parents', t('directory.codex.groups.parents'), 'var(--accent)', kin.parents)
+  addGroup('partners', t('directory.codex.groups.partners'), 'var(--pink)', kin.partners)
+  addGroup('children', t('directory.codex.groups.children'), 'var(--green)', kin.children)
+  addGroup('siblings', t('directory.codex.groups.siblings'), 'var(--amber)', kin.siblings)
   const byLabel = new Map()
   for (const o of kin.others) {
     if (!byLabel.has(o.label)) byLabel.set(o.label, { color: o.color, ids: [] })
     byLabel.get(o.label).ids.push(o.id)
   }
   for (const [label, g] of byLabel) {
-    addGroup('o:' + label, label, g.color || 'var(--t2)', [...new Set(g.ids)])
+    addGroup('o:' + label, kinLabel(label), g.color || 'var(--t2)', [...new Set(g.ids)])
   }
   const counts = {
     parents: kin.parents.length,
@@ -708,16 +766,26 @@ function buildEntry(p, i) {
   )
 
   // Vitals + lifespan
-  const born = prettyDate(p.birth)
-  const died = prettyDate(p.death)
+  const born = localDate(p.birth)
+  const died = localDate(p.death)
   const scale = lifeScale.value
   const living = !dead && age != null
-  const ageText = age == null ? 'Unknown' : dead ? `${age} years` : `${age} · living`
-  let caption = 'unrecorded'
+  const ageText =
+    age == null
+      ? t('directory.codex.ageUnknown')
+      : dead
+        ? t('directory.codex.ageYears', { n: age })
+        : t('directory.codex.ageLiving', { n: age })
+  let caption = t('directory.codex.captionUnrecorded')
   if (age != null) {
     const from = p.birth?.year
     const to = dead ? p.death?.year : ry
-    caption = `${from ?? '?'} – ${dead ? (to ?? '?') : 'now'} · ${age} of ${scale.max} yrs`
+    caption = t('directory.codex.caption', {
+      from: from ?? '?',
+      to: dead ? (to ?? '?') : t('directory.codex.now'),
+      age,
+      max: scale.max
+    })
   }
 
   // Seal
@@ -726,8 +794,8 @@ function buildEntry(p, i) {
   return {
     p,
     i,
-    no: entryNo(i, count.value),
-    name: p.name || 'Unnamed',
+    no: entryLabel(i, count.value),
+    name: p.name || t('directory.codex.unnamed'),
     epithet: (p.occupation || '').trim(),
     location: (p.location || '').trim(),
     dead,
@@ -753,7 +821,12 @@ function buildEntry(p, i) {
       tilt: (hash % 25) - 12,
       year,
       long: year.length > 4,
-      arc: by == null ? 'UNDATED' : by < 0 ? 'DISCOVERED · BCE' : 'DISCOVERED'
+      arc:
+        by == null
+          ? t('directory.codex.seal.undated')
+          : by < 0
+            ? t('directory.codex.seal.discoveredBce')
+            : t('directory.codex.seal.discovered')
     }
   }
 }
@@ -812,7 +885,7 @@ const rows = computed(() => {
     out.push({
       p,
       i,
-      no: entryNo(i, count.value),
+      no: entryLabel(i, count.value),
       dead: isDeceased(p, props.refYear),
       color: genderColor(p),
       style: {

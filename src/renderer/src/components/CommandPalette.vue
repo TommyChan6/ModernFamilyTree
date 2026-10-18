@@ -8,7 +8,7 @@
             v-model="query"
             class="cp-search"
             size="lg"
-            placeholder="Jump to a person…"
+            :placeholder="t('commands.searchPh')"
             @keydown.down.prevent="move(1)"
             @keydown.up.prevent="move(-1)"
             @keydown.enter.prevent="pick(results[cursor])"
@@ -26,14 +26,16 @@
             @click="pick(p)"
           >
             <span class="cp-dot" :style="{ background: genderColor(p.gender) }"></span>
-            <span class="cp-name">{{ p.name || 'Unnamed' }}</span>
+            <span class="cp-name">{{ p.name || t('commands.unnamed') }}</span>
             <span class="cp-meta">
-              <template v-if="p.birth?.year">b. {{ p.birth.year }}</template>
+              <template v-if="p.birth?.year">{{
+                t('commands.born', { year: p.birth.year })
+              }}</template>
               <template v-if="p.birth?.year && p.occupation"> · </template>
               {{ p.occupation }}
             </span>
           </button>
-          <div v-if="!results.length" class="cp-empty">No matches</div>
+          <div v-if="!results.length" class="cp-empty">{{ t('commands.noMatches') }}</div>
         </div>
       </div>
     </div>
@@ -44,10 +46,12 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useMainStore } from '../store/index.js'
 import SearchField from './ui/SearchField.vue'
+import { useI18n } from '../i18n'
 
 // ⌘K / Ctrl+K command palette: fuzzy-ish jump to any entity. Picking one
 // selects it (opening the profile) wherever you are.
 const store = useMainStore()
+const { t } = useI18n()
 
 const open = ref(false)
 const query = ref('')

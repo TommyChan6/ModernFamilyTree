@@ -310,7 +310,12 @@ function buildDynasty(): { nodes: PersonNode[]; links: Link[] } {
 
 // ── Engine ───────────────────────────────────────────────────────────────────
 
-export function createHeroConstellation(canvas: HTMLCanvasElement): HeroConstellationHandle {
+export function createHeroConstellation(
+  canvas: HTMLCanvasElement,
+  // Formats a name tag's birth year (the caller localizes it; read every frame,
+  // so a language switch shows up on the next draw).
+  bornLabel: (year: number) => string = (year) => `b. ${year}`
+): HeroConstellationHandle {
   const ctx = canvas.getContext('2d')
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -527,7 +532,7 @@ export function createHeroConstellation(canvas: HTMLCanvasElement): HeroConstell
 
       // Floating name tag (spotlight cycle or pointer proximity).
       if (n.label > 0.02) {
-        const text = `${n.name} · b. ${n.year}`
+        const text = `${n.name} · ${bornLabel(n.year)}`
         ctx.font = `500 11px ${palette.font}`
         const tw = ctx.measureText(text).width
         const bx = x + 10

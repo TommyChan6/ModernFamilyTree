@@ -28,6 +28,7 @@ import { roundRect, trunc } from '../webgl/overlayUtils.js'
 import { GUTTER, Y_PAD, LANE_W, X0 } from './timelineLayout.js'
 import { mountainStrip, brushRule, ensoRing, personSeal, sealTilt, inkSeed } from './inkBackdrop.js'
 import { drawChronicleBg, drawChronicleFg } from './chronicleDraw.js'
+import { lifeName, lifeYears } from './timelineText.js'
 import { drawKinPills } from './kinPills.js'
 
 const SEG = 16
@@ -86,6 +87,10 @@ export function writeInkBuffers(r) {
     const ws = w ? w.start : 0
     const wd = w ? w.dur : 0
     const seed = inkSeed(p.id)
+    // The stroke's ending tells the story: a life still going (at the year
+    // shown) trails off in a dry, fading tail — the brush still moving on —
+    // while a life that has ended stops with a firm, wet full stop.
+    const living = !lifted
     r.inkStrokes.set(
       i,
       x,
@@ -96,9 +101,9 @@ export function writeInkBuffers(r) {
       col,
       op * 0.94,
       seed,
-      lifted ? 0.72 : 0.45,
-      lifted ? 0 : 1,
-      lifted ? 0.3 : 0,
+      living ? 0.72 : 0.45,
+      living ? 0 : 1,
+      living ? 0.3 : 0,
       ws,
       wd
     )
@@ -504,14 +509,15 @@ export function drawInkFg(r) {
       ctx.textBaseline = 'alphabetic'
       ctx.font = `15px ${kai}`
       ctx.fillStyle = v.selected ? INK.cinnabar : INK.ink
-      const name = trunc(p.name, nameLen)
+      const name = trunc(lifeName(p), nameLen)
       ctx.strokeText(name, x + 22, y0 + 1)
       ctx.fillText(name, x + 22, y0 + 1)
       if (ls >= 0.55) {
         ctx.font = `italic 11px ${serif}`
         ctx.fillStyle = c.t2
-        ctx.strokeText(p.yearsLabel, x + 22, y0 + 14)
-        ctx.fillText(p.yearsLabel, x + 22, y0 + 14)
+        const years = lifeYears(p)
+        ctx.strokeText(years, x + 22, y0 + 14)
+        ctx.fillText(years, x + 22, y0 + 14)
       }
     }
     ctx.globalAlpha = 1

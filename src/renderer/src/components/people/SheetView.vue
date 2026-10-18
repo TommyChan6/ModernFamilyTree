@@ -8,7 +8,7 @@
       ref="sinkEl"
       class="sh-sink"
       data-grid-keys
-      aria-label="Spreadsheet"
+      :aria-label="t('sheet.aria')"
       autocomplete="off"
       spellcheck="false"
       @keydown="onSinkKey"
@@ -40,23 +40,23 @@
         />
       </label>
       <div class="sh-actions">
-        <button class="sh-btn primary" title="Add a row (Enter on an empty sheet)" @click="addRow">
-          <UiIcon name="plus" :size="14" :stroke="2.4" />{{ store.noun }}
+        <button class="sh-btn primary" :title="t('sheet.bar.addRowTitle')" @click="addRow">
+          <UiIcon name="plus" :size="14" :stroke="2.4" />{{ nounLabel(store.noun) }}
         </button>
         <button
           data-menu-toggle
           class="sh-btn"
           :class="{ open: menu?.kind === 'addcol' }"
-          title="Add a trait column"
+          :title="t('sheet.bar.addTraitTitle')"
           @click="toggleMenu('addcol', $event)"
         >
-          <UiIcon name="plus" :size="14" :stroke="2.4" />Trait
+          <UiIcon name="plus" :size="14" :stroke="2.4" />{{ t('sheet.bar.trait') }}
         </button>
         <button
           class="sh-btn"
           data-menu-toggle
           :class="{ open: menu?.kind === 'cols' }"
-          title="Show or hide columns"
+          :title="t('sheet.bar.columnsTitle')"
           @click="toggleMenu('cols', $event)"
         >
           <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -64,16 +64,18 @@
             <rect x="6.2" y="2.5" width="3.6" height="11" rx="1" opacity="0.55" />
             <rect x="10.9" y="2.5" width="3.6" height="11" rx="1" />
           </svg>
-          Columns
+          {{ t('sheet.bar.columns') }}
           <Transition name="sh-badge">
-            <span v-if="hiddenCount" class="sh-badge">{{ hiddenCount }} hidden</span>
+            <span v-if="hiddenCount" class="sh-badge">{{
+              t('sheet.bar.hidden', { n: hiddenCount })
+            }}</span>
           </Transition>
         </button>
         <button
           class="sh-btn icon"
           :disabled="!canFill"
-          title="Fill down (Ctrl+D)"
-          aria-label="Fill down"
+          :title="t('sheet.bar.fillDownTitle')"
+          :aria-label="t('sheet.menu.fillDown')"
           @click="fillDown"
         >
           <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -90,8 +92,8 @@
           >
             {{
               armed === 'bar-delete'
-                ? 'Click again to delete'
-                : `Delete ${fullRowIds.length} ${nounFor(fullRowIds.length)}`
+                ? t('sheet.bar.confirmDelete')
+                : t('sheet.deleteRows', { n: fullRowIds.length, nouns: nounFor(fullRowIds.length) })
             }}
           </button>
         </Transition>
@@ -113,7 +115,7 @@
           <button
             class="sh-corner"
             :class="{ all: allSelected }"
-            title="Select all (Ctrl+A)"
+            :title="t('sheet.head.selectAll')"
             @pointerdown.prevent
             @click="selectAll"
           >
@@ -152,7 +154,7 @@
               >
                 <span class="sh-htype"><UiIcon :name="glyphOf(col)" :size="12" /></span>
                 <UiIcon v-if="col.icon" class="sh-hicon" :name="col.icon" :size="14" />
-                <span class="sh-htext">{{ col.label }}</span>
+                <span class="sh-htext">{{ colLabel(col) }}</span>
                 <span
                   class="sh-sort"
                   :class="{ on: sortSpec?.key === col.key, desc: sortSpec?.dir === -1 }"
@@ -164,8 +166,8 @@
               <button
                 class="sh-hmenu"
                 data-menu-toggle
-                title="Column options"
-                aria-label="Column options"
+                :title="t('sheet.head.options')"
+                :aria-label="t('sheet.head.options')"
                 @pointerdown.prevent
                 @click.stop="openHeadMenu(col, $event)"
               >
@@ -174,7 +176,7 @@
             </template>
             <span
               class="sh-resize"
-              title="Drag to resize · double-click to fit"
+              :title="t('sheet.head.resize')"
               @pointerdown.stop.prevent="startResize(col, $event)"
               @dblclick.stop="autoFit(col)"
             ></span>
@@ -182,8 +184,8 @@
           <button
             class="sh-hadd"
             data-menu-toggle
-            title="Add a trait column"
-            aria-label="Add a trait column"
+            :title="t('sheet.bar.addTraitTitle')"
+            :aria-label="t('sheet.bar.addTraitTitle')"
             @pointerdown.prevent
             @click="toggleMenu('addcol', $event)"
           >
@@ -229,8 +231,8 @@
               <SheetAvatar :person="row.p" />
               <button
                 class="sh-open"
-                title="Open profile"
-                aria-label="Open profile"
+                :title="t('sheet.menu.openProfile')"
+                :aria-label="t('sheet.menu.openProfile')"
                 @pointerdown.stop
                 @click.stop="openProfile(row.p.id)"
               >
@@ -359,8 +361,8 @@
           @click="addRow"
         >
           <UiIcon name="plus" :size="14" :stroke="2.4" />
-          Add {{ store.noun.toLowerCase() }}
-          <span class="sh-addrow-hint">or paste rows below the last one</span>
+          {{ t('sheet.addNoun', { noun: nounLower() }) }}
+          <span class="sh-addrow-hint">{{ t('sheet.addRowHint') }}</span>
         </button>
       </div>
 
@@ -371,17 +373,15 @@
             <UiIcon :name="store.persons.length ? 'search' : 'sheet'" :size="42" :stroke="1.5" />
           </div>
           <div class="sh-empty-title">
-            {{ store.persons.length ? 'No matches' : 'An empty sheet' }}
+            {{ store.persons.length ? t('sheet.empty.noMatches') : t('sheet.empty.emptyTitle') }}
           </div>
           <div class="sh-empty-text">
-            {{
-              store.persons.length
-                ? 'Nobody fits the current search or filters.'
-                : 'Add the first row — or paste a list of names from any spreadsheet.'
-            }}
+            {{ store.persons.length ? t('sheet.empty.noMatchesText') : t('sheet.empty.emptyText') }}
           </div>
           <button class="sh-btn primary sh-empty-btn" @click="addRow">
-            <UiIcon name="plus" :size="14" :stroke="2.4" />Add {{ store.noun.toLowerCase() }}
+            <UiIcon name="plus" :size="14" :stroke="2.4" />{{
+              t('sheet.addNoun', { noun: nounLower() })
+            }}
           </button>
         </div>
       </Transition>
@@ -390,27 +390,29 @@
     <!-- ── Status bar ────────────────────────────────────────────────── -->
     <div class="sh-status">
       <span class="sh-st-count">
-        {{ rows.length }} {{ nounFor(rows.length) }} · {{ columns.length }} columns
+        {{ t('sheet.status.rows', { n: rows.length, nouns: nounFor(rows.length) }) }} ·
+        {{
+          t(columns.length === 1 ? 'sheet.status.cols.one' : 'sheet.status.cols.other', {
+            n: columns.length
+          })
+        }}
       </span>
       <Transition name="sh-pop-x">
         <button
           v-if="orderStale && !gliding"
           class="sh-resort"
-          title="Values changed since the rows were ordered"
+          :title="t('sheet.status.resortTitle')"
           @click="reorder"
         >
           <UiIcon class="sh-resort-icon" name="refresh-cw" :size="12" :stroke="2.4" />
-          Re-sort
+          {{ t('sheet.status.resort') }}
         </button>
       </Transition>
       <Transition name="sh-fade" mode="out-in">
         <span v-if="notice" :key="notice.key" class="sh-notice" :class="notice.tone">{{
           notice.text
         }}</span>
-        <span v-else class="sh-hint">
-          Enter edit · Tab next · Ctrl+C / Ctrl+V · Del clear · Ctrl+D fill down · right-click for
-          more
-        </span>
+        <span v-else class="sh-hint">{{ t('sheet.status.hint') }}</span>
       </Transition>
       <span class="sh-st-right">
         <Transition name="sh-fade" mode="out-in">
@@ -420,10 +422,10 @@
           <span class="sh-save-dot"></span>
           {{
             saveState === 'saving'
-              ? 'Saving…'
+              ? t('sheet.status.saving')
               : saveState === 'error'
-                ? 'Not saved'
-                : 'All changes saved'
+                ? t('sheet.status.notSaved')
+                : t('sheet.status.saved')
           }}
         </span>
       </span>
@@ -459,26 +461,26 @@
         >
           <!-- Add a trait column -->
           <template v-if="menu.kind === 'addcol'">
-            <div class="sh-menu-title">New trait column</div>
+            <div class="sh-menu-title">{{ t('sheet.addCol.title') }}</div>
             <input
               ref="addColInput"
               v-model="newCol.label"
               class="sh-menu-input"
-              placeholder="Trait name, e.g. Nickname"
+              :placeholder="t('sheet.addCol.placeholder')"
               spellcheck="false"
               @keydown.stop="onAddColKey"
             />
             <div class="sh-types">
               <button
-                v-for="(t, i) in TYPE_CHOICES"
-                :key="t.id"
+                v-for="(tc, i) in TYPE_CHOICES"
+                :key="tc"
                 class="sh-type"
-                :class="{ on: newCol.type === t.id }"
+                :class="{ on: newCol.type === tc }"
                 :style="{ '--i': i }"
-                @click="newCol.type = t.id"
+                @click="newCol.type = tc"
               >
-                <UiIcon class="sh-type-glyph" :name="TYPE_GLYPH[t.id]" :size="14" />
-                {{ t.label }}
+                <UiIcon class="sh-type-glyph" :name="TYPE_GLYPH[tc]" :size="14" />
+                {{ t('sheet.types.' + tc) }}
               </button>
             </div>
             <button
@@ -486,13 +488,13 @@
               :disabled="!newCol.label.trim()"
               @click="addColumn"
             >
-              Add column
+              {{ t('sheet.addCol.add') }}
             </button>
           </template>
 
           <!-- Column visibility -->
           <template v-else-if="menu.kind === 'cols'">
-            <div class="sh-menu-title">Columns</div>
+            <div class="sh-menu-title">{{ t('sheet.bar.columns') }}</div>
             <div class="sh-colslist">
               <button
                 v-for="(col, i) in allColumns"
@@ -504,12 +506,12 @@
               >
                 <span class="sh-toggle"><span class="sh-toggle-knob"></span></span>
                 <UiIcon v-if="col.icon" class="sh-hicon" :name="col.icon" :size="14" />
-                <span class="sh-colrow-label">{{ col.label }}</span>
+                <span class="sh-colrow-label">{{ colLabel(col) }}</span>
                 <UiIcon class="sh-colrow-type" :name="glyphOf(col)" :size="12" />
               </button>
             </div>
             <button v-if="hiddenCount" class="sh-menu-link" @click="showAllColumns">
-              Show all columns
+              {{ t('sheet.cols.showAll') }}
             </button>
           </template>
 
@@ -527,7 +529,7 @@
               >
                 <UiIcon class="sh-menu-icon" :name="it.icon" :size="14" />
                 <span class="sh-menu-label">{{
-                  armed === it.id ? it.armedLabel || 'Click again to confirm' : it.label
+                  armed === it.id ? it.armedLabel || t('sheet.menu.confirm') : it.label
                 }}</span>
                 <span v-if="it.hint" class="sh-menu-hint">{{ it.hint }}</span>
               </button>
@@ -552,6 +554,8 @@ import {
   h
 } from 'vue'
 import { useMainStore } from '../../store/index.js'
+import { useI18n } from '../../i18n'
+import { fieldLabel, optionLabel, nounLabel, defaultNameLabel } from '../../lib/dataLabels'
 import { useThumbnail } from './useThumbnail.js'
 import { ageOf } from './peopleLayout.js'
 import SheetPicker from './SheetPicker.vue'
@@ -599,23 +603,36 @@ const props = defineProps({
 })
 
 const store = useMainStore()
+const { t } = useI18n()
 
+/** t(), but `fallback` when the key has no translation (unknown type ids…). */
+function tOr(key, fallback, params) {
+  const v = t(key, params)
+  return v === key ? fallback : v
+}
+
+// Trait types offered by the add-column menu (labels: sheet.types.<id>).
 const TYPE_CHOICES = [
-  { id: 'text', label: 'Text' },
-  { id: 'number', label: 'Number' },
-  { id: 'date', label: 'Date' },
-  { id: 'select', label: 'Choice' },
-  { id: 'boolean', label: 'Yes / no' },
-  { id: 'slider', label: 'Slider' },
-  { id: 'number_range', label: 'Num range' },
-  { id: 'date_range', label: 'Date range' }
+  'text',
+  'number',
+  'date',
+  'select',
+  'boolean',
+  'slider',
+  'number_range',
+  'date_range'
 ]
 
+/** The project noun as a count word ("3 people", "1 knight"). The default
+ *  noun has real plural forms per language; a custom noun gets the locale's
+ *  generic pattern. */
 const nounFor = (n) => {
-  const noun = store.noun || 'Person'
-  if (n === 1) return noun.toLowerCase()
-  return noun.toLowerCase() === 'person' ? 'people' : noun.toLowerCase() + 's'
+  const form = n === 1 ? 'one' : 'other'
+  if (!store.noun || store.noun === 'Person') return t(`sheet.people.${form}`)
+  return t(`sheet.customNoun.${form}`, { noun: nounLabel(store.noun).toLowerCase() })
 }
+/** The project noun mid-sentence ("Add person"). */
+const nounLower = () => nounLabel(store.noun).toLowerCase()
 
 // ── Avatar (own component: each visible row owns its thumbnail) ──────────────
 const SheetAvatar = {
@@ -698,12 +715,19 @@ const cellClasses = computed(() =>
 const DERIVED_ICON = { age: 'hourglass', ties: 'link', groups: 'tags' }
 const glyphOf = (col) =>
   col.kind === 'field' ? TYPE_GLYPH[col.def.type] || 'type' : DERIVED_ICON[col.kind] || 'lock'
+/** A column's display name: trait labels via fieldLabel (built-ins
+ *  translated until renamed), derived columns from the locale. */
+const colLabel = (col) =>
+  col.kind === 'field' ? fieldLabel(col.def) : tOr(`sheet.cols.${col.kind}`, col.label)
 function headTitle(col) {
-  if (col.kind === 'age') return `Age in ${props.refYear} (calculated) — click to sort`
-  if (col.kind === 'ties') return 'Number of relationships (calculated) — click to sort'
-  if (col.kind === 'groups') return 'Group memberships — click to sort'
-  const slot = col.def.slot ? ` · ${col.def.slot} slot` : ''
-  return `${col.label} (${col.def.type.replace('_', ' ')}${slot}) — click to sort`
+  if (col.kind === 'age') return t('sheet.head.titleAge', { year: props.refYear })
+  if (col.kind === 'ties') return t('sheet.head.titleTies')
+  if (col.kind === 'groups') return t('sheet.head.titleGroups')
+  const label = colLabel(col)
+  const type = tOr(`sheet.typeNames.${col.def.type}`, col.def.type.replace('_', ' '))
+  if (!col.def.slot) return t('sheet.head.titleField', { label, type })
+  const slot = tOr(`sheet.slots.${col.def.slot}`, col.def.slot)
+  return t('sheet.head.titleFieldSlot', { label, type, slot })
 }
 
 // ── Values ───────────────────────────────────────────────────────────────────
@@ -718,13 +742,37 @@ function valueOf(id, col) {
   return store.fieldValuesOf.get(id)?.get(col.key)?.value ?? null
 }
 
-/** Plain-text form of any cell (copy, auto-fit, the formula bar). */
+/** Plain-text form of any cell (copy, auto-fit, the formula bar). Select
+ *  options show their display label; parseFor() reads it back. */
 function cellText(p, col) {
-  if (col.kind === 'field') return toCellText(col.def, valueOf(p.id, col))
+  if (col.kind === 'field') {
+    const v = valueOf(p.id, col)
+    if (col.def.type === 'select') {
+      const o = v == null ? null : (col.def.config.options || []).find((x) => x.id === v)
+      return o ? optionLabel(o) : ''
+    }
+    return toCellText(col.def, v)
+  }
   if (col.kind === 'age') return String(ageOf(p, props.refYear) ?? '')
   if (col.kind === 'ties') return String(props.statsOf(p.id).kin)
-  return (store.tagsOf.get(p.id) || []).map((t) => t.label).join(', ')
+  return (store.tagsOf.get(p.id) || []).map((tg) => defaultNameLabel(tg.label)).join(', ')
 }
+
+/** parseCellText, plus: a select also accepts its options' DISPLAY labels
+ *  (the translated built-ins, e.g. 男 / Mann), mapped back to the option id. */
+function parseFor(def, text) {
+  if (def.type === 'select') {
+    const w = String(text ?? '')
+      .trim()
+      .toLowerCase()
+    const opt =
+      w && (def.config.options || []).find((o) => optionLabel(o).trim().toLowerCase() === w)
+    if (opt) return parseCellText(def, opt.id)
+  }
+  return parseCellText(def, text)
+}
+/** A failed parse's message in the UI language. */
+const parseErrorText = (res) => tOr(`sheet.parse.${res.code}`, res.error, { text: res.arg ?? '' })
 
 const EMPTY = { t: 'empty' }
 /** What a cell draws — one small object per visible cell. */
@@ -742,11 +790,11 @@ function cellView(p, col) {
     if (!tags.length) return EMPTY
     return {
       t: 'chips',
-      chips: tags.slice(0, 3).map((t) => ({
-        id: t.id,
-        label: t.label,
-        icon: t.icon || '',
-        color: t.color || 'var(--accent)'
+      chips: tags.slice(0, 3).map((tg) => ({
+        id: tg.id,
+        label: defaultNameLabel(tg.label),
+        icon: tg.icon || '',
+        color: tg.color || 'var(--accent)'
       })),
       more: Math.max(0, tags.length - 3)
     }
@@ -757,13 +805,13 @@ function cellView(p, col) {
   if (def.type === 'boolean') return { t: 'bool', on: v === true, pend }
   if (v == null) {
     return col.frozen && col.editable && def.slot === 'name' && !(p.name || '').trim()
-      ? { t: 'ph', text: 'Unnamed', pend }
+      ? { t: 'ph', text: t('sheet.unnamed'), pend }
       : { t: 'empty', pend }
   }
   switch (def.type) {
     case 'select': {
       const o = (def.config.options || []).find((x) => x.id === v)
-      return o ? { t: 'pill', text: o.label, color: o.color, pend } : { t: 'empty', pend }
+      return o ? { t: 'pill', text: optionLabel(o), color: o.color, pend } : { t: 'empty', pend }
     }
     case 'slider': {
       const min = def.config.min ?? 0
@@ -1074,7 +1122,8 @@ const copyRects = computed(() => {
 const summaryText = computed(() => {
   const g = sel.value
   if (!g || selCells.value < 2) return ''
-  if (selCells.value > 50000) return `${selCells.value.toLocaleString()} cells`
+  if (selCells.value > 50000)
+    return t('sheet.summary.cells', { n: selCells.value.toLocaleString() })
   const vals = []
   for (let r = g.r0; r <= g.r1; r++) {
     const p = rows.value[r]
@@ -1091,10 +1140,15 @@ const summaryText = computed(() => {
   }
   const s = summarize(vals)
   const fmt = (n) => (Number.isInteger(n) ? n.toLocaleString() : n.toFixed(2))
-  const parts = [`Count ${s.filled}`]
+  const parts = [t('sheet.summary.count', { n: s.filled })]
   if (s.numeric) {
-    parts.push(`Sum ${fmt(s.sum)}`, `Avg ${fmt(s.avg)}`)
-    if (s.numeric > 1) parts.push(`Min ${fmt(s.min)}`, `Max ${fmt(s.max)}`)
+    parts.push(t('sheet.summary.sum', { n: fmt(s.sum) }), t('sheet.summary.avg', { n: fmt(s.avg) }))
+    if (s.numeric > 1) {
+      parts.push(
+        t('sheet.summary.min', { n: fmt(s.min) }),
+        t('sheet.summary.max', { n: fmt(s.max) })
+      )
+    }
   }
   return parts.join(' · ')
 })
@@ -1112,8 +1166,8 @@ function notify(text, tone = 'info', ms = 3200) {
   noticeTimer = setTimeout(() => (notice.value = null), ms)
 }
 function fail(message) {
-  lastError.value = message || 'Something went wrong'
-  notify(`Couldn't save — ${lastError.value}`, 'err', 5200)
+  lastError.value = message || t('sheet.notice.genericError')
+  notify(t('sheet.notice.saveFailed', { error: lastError.value }), 'err', 5200)
 }
 
 // Cell flashes (saved = soft accent pulse, failed = red shake).
@@ -1212,7 +1266,7 @@ function writeCells(cells) {
   }
   return enqueue(
     async () => {
-      let res = { success: false, error: 'Not saved' }
+      let res = { success: false, error: t('sheet.status.notSaved') }
       try {
         res = await store.setFieldValuesBatch(updates)
       } finally {
@@ -1220,7 +1274,7 @@ function writeCells(cells) {
       }
       return res.success ? changed.length : 0
     },
-    () => settle({ success: false, error: 'The project changed before this edit saved' })
+    () => settle({ success: false, error: t('sheet.notice.projectChanged') })
   )
 }
 
@@ -1276,7 +1330,7 @@ function startEdit({ draft = null, mode = 'edit', where = 'cell' } = {}) {
   closeMenu()
   if (col.kind === 'groups') return openPicker(p, col, draft ?? '')
   if (!col.editable) {
-    notify(`${col.label} is calculated — it can't be typed into`)
+    notify(t('sheet.notice.calculated', { label: colLabel(col) }))
     return
   }
   if (col.def.type === 'select') return openPicker(p, col, draft ?? '')
@@ -1319,9 +1373,9 @@ function commitEdit(move = null) {
     return true
   }
   if (e.draft !== e.original) {
-    const parsed = parseCellText(col.def, e.draft)
+    const parsed = parseFor(col.def, e.draft)
     if (!parsed.ok) {
-      e.error = parsed.error
+      e.error = parseErrorText(parsed)
       shakeTick.value = false
       requestAnimationFrame(() => (shakeTick.value = true))
       nextTick(focusEditor)
@@ -1384,23 +1438,25 @@ const fxValue = computed(() => {
 })
 const fxPlaceholder = computed(() => {
   const ac = activeCell.value
-  if (!ac) return 'Select a cell'
-  if (ac.col.kind === 'groups') return 'Double-click the cell to pick groups'
-  if (!ac.col.editable) return 'Calculated'
-  if (ac.col.kind === 'field' && ac.col.def.type === 'select') return 'Double-click to pick'
-  return 'Empty — type to fill'
+  if (!ac) return t('sheet.fx.selectCell')
+  if (ac.col.kind === 'groups') return t('sheet.fx.pickGroups')
+  if (!ac.col.editable) return t('sheet.fx.calculated')
+  if (ac.col.kind === 'field' && ac.col.def.type === 'select') return t('sheet.fx.pick')
+  return t('sheet.fx.empty')
 })
 const refMain = computed(() => {
   if (selCells.value > 1) {
     const g = sel.value
     return `${g.r1 - g.r0 + 1} × ${g.c1 - g.c0 + 1}`
   }
-  return activeCell.value?.col.label || '—'
+  return activeCell.value ? colLabel(activeCell.value.col) || '—' : '—'
 })
 const refSub = computed(() => {
-  if (selCells.value > 1) return 'cells'
+  if (selCells.value > 1) return t('sheet.ref.cells')
   const ac = activeCell.value
-  return ac ? `${ac.p.name?.trim() || 'Unnamed'} · row ${aPos.value.r + 1}` : ''
+  return ac
+    ? t('sheet.ref.row', { name: ac.p.name?.trim() || t('sheet.unnamed'), n: aPos.value.r + 1 })
+    : ''
 })
 const refTitle = computed(() => [refMain.value, refSub.value].filter(Boolean).join(' — '))
 
@@ -1726,9 +1782,9 @@ function clearSelection() {
   copied.value = null
   if (cells.length) {
     writeCells(cells)
-    if (cells.length > 1) notify(`Cleared ${cells.length} cells`)
+    if (cells.length > 1) notify(t('sheet.notice.cleared', { n: cells.length }))
   } else if (calculated) {
-    notify('Calculated and group cells can’t be cleared here')
+    notify(t('sheet.notice.cantClear'))
   }
 }
 
@@ -1764,7 +1820,7 @@ function fillDown() {
   }
   if (!cells.length) return
   writeCells(cells).then((n) => {
-    if (n) notify(`Filled ${n} cell${n === 1 ? '' : 's'} down`)
+    if (n) notify(t(n === 1 ? 'sheet.notice.filled.one' : 'sheet.notice.filled.other', { n }))
   })
 }
 
@@ -1787,7 +1843,8 @@ function markCopied() {
     ids: [rows.value[g.r0].id, rows.value[g.r1].id],
     keys: [columns.value[g.c0].key, columns.value[g.c1].key]
   }
-  notify(`Copied ${selCells.value} cell${selCells.value === 1 ? '' : 's'}`)
+  const n = selCells.value
+  notify(t(n === 1 ? 'sheet.notice.copied.one' : 'sheet.notice.copied.other', { n }))
 }
 function onCopy(e) {
   if (editing.value || !sel.value) return
@@ -1801,7 +1858,7 @@ async function copyViaMenu() {
     await navigator.clipboard.writeText(selectionTSV())
     markCopied()
   } catch {
-    notify('Press Ctrl+C to copy')
+    notify(t('sheet.notice.pressCopy'))
   }
 }
 function onPaste(e) {
@@ -1815,7 +1872,7 @@ async function pasteViaMenu() {
     const text = await navigator.clipboard.readText()
     if (text) pasteText(text)
   } catch {
-    notify('Press Ctrl+V to paste')
+    notify(t('sheet.notice.pressPaste'))
   }
 }
 
@@ -1833,7 +1890,7 @@ function pasteText(text) {
     clip.length > 1 &&
     isHeaderRow(
       clip[0],
-      cols.slice(g.c0).map((c) => c.label)
+      cols.slice(g.c0).map((c) => colLabel(c))
     )
   ) {
     clip = clip.slice(1)
@@ -1853,7 +1910,7 @@ function pasteText(text) {
         if (raw.trim()) skipped++
         continue
       }
-      const parsed = parseCellText(col.def, raw)
+      const parsed = parseFor(col.def, raw)
       if (!parsed.ok) {
         bad++
         continue
@@ -1873,12 +1930,18 @@ function pasteText(text) {
   Promise.all([wrote, made]).then(([count, ids]) => {
     if (disposed) return
     const parts = []
-    if (count) parts.push(`Pasted ${count} cell${count === 1 ? '' : 's'}`)
-    if (ids?.length) parts.push(`added ${ids.length} ${nounFor(ids.length)}`)
-    if (bad) parts.push(`${bad} didn't fit their trait type`)
-    if (skipped) parts.push(`${skipped} landed on calculated columns`)
+    if (count) {
+      parts.push(
+        t(count === 1 ? 'sheet.notice.pasted.one' : 'sheet.notice.pasted.other', { n: count })
+      )
+    }
+    if (ids?.length) {
+      parts.push(t('sheet.notice.pastedAdded', { n: ids.length, nouns: nounFor(ids.length) }))
+    }
+    if (bad) parts.push(t('sheet.notice.pastedBad', { n: bad }))
+    if (skipped) parts.push(t('sheet.notice.pastedSkipped', { n: skipped }))
     if (parts.length) notify(parts.join(' · '), bad ? 'warn' : 'info', 4200)
-    else if (!count) notify('Nothing to change')
+    else if (!count) notify(t('sheet.notice.nothing'))
   })
 }
 
@@ -1907,7 +1970,7 @@ function deleteRows(ids) {
   enqueue(async () => {
     const res = await store.deletePersons(ids)
     if (!res.success) return fail(res.error)
-    if (!disposed) notify(`Deleted ${n} ${nounFor(n)} — Ctrl+Z to undo`)
+    if (!disposed) notify(t('sheet.notice.deletedRows', { n, nouns: nounFor(n) }))
   })
   focus.value = anchor.value
 }
@@ -1949,10 +2012,15 @@ const pickerOptions = computed(() => {
   if (!col) return []
   if (col.kind === 'groups') {
     return store.tags
-      .filter((t) => t.source !== 'derived')
-      .map((t) => ({ id: t.id, label: t.label, color: t.color, icon: t.icon }))
+      .filter((tg) => tg.source !== 'derived')
+      .map((tg) => ({
+        id: tg.id,
+        label: defaultNameLabel(tg.label),
+        color: tg.color,
+        icon: tg.icon
+      }))
   }
-  return col.def.config.options || []
+  return (col.def.config.options || []).map((o) => ({ ...o, label: optionLabel(o) }))
 })
 const pickerSelected = computed(() => {
   const pk = picker.value
@@ -2076,34 +2144,55 @@ const menuItems = computed(() => {
     const col = m.col
     const s = sortSpec.value
     const out = [
-      { id: 'sa', icon: 'arrow-up', label: 'Sort ascending', run: () => setSort(col.key, 1) },
-      { id: 'sd', icon: 'arrow-down', label: 'Sort descending', run: () => setSort(col.key, -1) }
+      {
+        id: 'sa',
+        icon: 'arrow-up',
+        label: t('sheet.menu.sortAsc'),
+        run: () => setSort(col.key, 1)
+      },
+      {
+        id: 'sd',
+        icon: 'arrow-down',
+        label: t('sheet.menu.sortDesc'),
+        run: () => setSort(col.key, -1)
+      }
     ]
-    if (s?.key === col.key)
-      out.push({ id: 'sx', icon: 'x', label: 'Clear sort', run: () => setSort(col.key, 0) })
+    if (s?.key === col.key) {
+      out.push({
+        id: 'sx',
+        icon: 'x',
+        label: t('sheet.menu.clearSort'),
+        run: () => setSort(col.key, 0)
+      })
+    }
     out.push(
       { sep: true },
       {
         id: 'fit',
         icon: 'move-horizontal',
-        label: 'Fit width to content',
+        label: t('sheet.menu.fit'),
         run: () => autoFit(col)
       },
       {
         id: 'sel',
         icon: 'columns-3',
-        label: 'Select column',
+        label: t('sheet.menu.selectColumn'),
         hint: 'Ctrl+Space',
         run: () => selectColumn(col)
       }
     )
     if (col.kind === 'field') {
-      out.push({ id: 'ren', icon: 'pencil', label: 'Rename trait', run: () => startRename(col) })
+      out.push({
+        id: 'ren',
+        icon: 'pencil',
+        label: t('sheet.menu.rename'),
+        run: () => startRename(col)
+      })
     }
     out.push({
       id: 'hide',
       icon: 'eye-off',
-      label: 'Hide column',
+      label: t('sheet.menu.hide'),
       run: () => toggleHidden(col.key)
     })
     if (col.kind === 'field' && !col.def.slot) {
@@ -2112,8 +2201,8 @@ const menuItems = computed(() => {
         {
           id: 'deldef',
           icon: 'trash-2',
-          label: 'Delete trait for everyone',
-          armedLabel: 'Click again — removes every value',
+          label: t('sheet.menu.deleteTrait'),
+          armedLabel: t('sheet.menu.deleteTraitArmed'),
           danger: true,
           arm: true,
           run: () => deleteTrait(col)
@@ -2126,13 +2215,25 @@ const menuItems = computed(() => {
   const ac = activeCell.value
   const n = touchedRowIds.value.length
   return [
-    { id: 'cp', icon: 'copy', label: 'Copy', hint: 'Ctrl+C', run: copyViaMenu },
-    { id: 'ps', icon: 'clipboard-paste', label: 'Paste', hint: 'Ctrl+V', run: pasteViaMenu },
-    { id: 'cl', icon: 'eraser', label: 'Clear contents', hint: 'Del', run: clearSelection },
+    { id: 'cp', icon: 'copy', label: t('sheet.menu.copy'), hint: 'Ctrl+C', run: copyViaMenu },
+    {
+      id: 'ps',
+      icon: 'clipboard-paste',
+      label: t('sheet.menu.paste'),
+      hint: 'Ctrl+V',
+      run: pasteViaMenu
+    },
+    {
+      id: 'cl',
+      icon: 'eraser',
+      label: t('sheet.menu.clear'),
+      hint: 'Del',
+      run: clearSelection
+    },
     {
       id: 'fd',
       icon: 'chevrons-down',
-      label: 'Fill down',
+      label: t('sheet.menu.fillDown'),
       hint: 'Ctrl+D',
       disabled: !canFill.value,
       run: fillDown
@@ -2141,24 +2242,24 @@ const menuItems = computed(() => {
     {
       id: 'op',
       icon: 'arrow-up-right',
-      label: 'Open profile',
+      label: t('sheet.menu.openProfile'),
       disabled: !ac,
       run: () => openProfile(ac?.p.id)
     },
     {
       id: 'ed',
       icon: 'square-pen',
-      label: 'Edit in full form',
+      label: t('sheet.menu.editForm'),
       disabled: !ac,
       run: () => ac && store.openForm(ac.p)
     },
-    { id: 'add', icon: 'plus', label: `Add ${store.noun.toLowerCase()}`, run: addRow },
+    { id: 'add', icon: 'plus', label: t('sheet.addNoun', { noun: nounLower() }), run: addRow },
     { sep: true },
     {
       id: 'del',
       icon: 'trash-2',
-      label: `Delete ${n} ${nounFor(n)}`,
-      armedLabel: `Click again to delete ${n}`,
+      label: t('sheet.deleteRows', { n, nouns: nounFor(n) }),
+      armedLabel: t('sheet.menu.deleteRowsArmed', { n }),
       danger: true,
       arm: true,
       disabled: !n,
@@ -2208,7 +2309,7 @@ function addColumn() {
     await nextTick()
     const c = colIndex.value.get(key)
     if (c != null && rows.value.length) setActive({ r: aPos.value?.r ?? 0, c })
-    notify(`Added “${label}” — every ${store.noun.toLowerCase()} has it now`)
+    notify(t('sheet.notice.colAdded', { label, noun: nounLower() }))
     focusSink()
   })
 }
@@ -2227,7 +2328,7 @@ function deleteTrait(col) {
   enqueue(async () => {
     const res = await store.deleteFieldDef(col.def.id)
     if (!res.success) return fail(res.error)
-    if (!disposed) notify(`Deleted “${col.label}” — Ctrl+Z to undo`)
+    if (!disposed) notify(t('sheet.notice.traitDeleted', { label: colLabel(col) }))
   })
 }
 
@@ -2235,7 +2336,7 @@ const renaming = ref(null)
 const renameDraft = ref('')
 function startRename(col) {
   renaming.value = col.key
-  renameDraft.value = col.label
+  renameDraft.value = colLabel(col)
   nextTick(() => {
     const el = Array.isArray(renameEl.value) ? renameEl.value[0] : renameEl.value
     el?.focus()
@@ -2247,7 +2348,7 @@ function finishRename(save) {
   const label = renameDraft.value.trim()
   renaming.value = null
   const col = allColByKey.value.get(key)
-  if (save && col?.kind === 'field' && label && label !== col.label) {
+  if (save && col?.kind === 'field' && label && label !== colLabel(col)) {
     enqueue(async () => {
       const res = await store.updateFieldDef({ id: col.def.id, label })
       if (!res.success) fail(res.error)
@@ -2298,7 +2399,7 @@ function autoFit(col) {
   measureCtx = measureCtx || document.createElement('canvas').getContext('2d')
   const family = getComputedStyle(scrollEl.value).fontFamily
   measureCtx.font = `700 12px ${family}`
-  let w = measureCtx.measureText(col.label).width + 76
+  let w = measureCtx.measureText(colLabel(col)).width + 76
   measureCtx.font = `13px ${family}`
   const list = rows.value
   const extra =
@@ -2332,7 +2433,7 @@ function onWindowPointerDown(e) {
   if (editing.value && !t.closest?.('.sh-scroll, .sh-fx')) {
     if (!commitEdit()) {
       editing.value = null
-      notify('That entry didn’t fit its trait type — change discarded', 'warn')
+      notify(t('sheet.notice.discarded'), 'warn')
     }
   }
 }

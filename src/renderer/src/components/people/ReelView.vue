@@ -9,8 +9,8 @@
     <!-- Empty roster -->
     <div v-if="!persons.length" class="reel-empty">
       <div class="reel-empty-icon"><UiIcon name="film" :size="44" :stroke="1.5" /></div>
-      <div class="reel-empty-title">The reel is blank</div>
-      <div class="reel-empty-text">No people match — clear the search or add someone.</div>
+      <div class="reel-empty-title">{{ t('directory.reel.emptyTitle') }}</div>
+      <div class="reel-empty-text">{{ t('directory.stage.emptyText') }}</div>
     </div>
 
     <template v-else>
@@ -35,9 +35,9 @@
             <StripArt :person="s.p" />
           </div>
           <div class="strip-id">
-            <span class="strip-name">{{ s.p.name || 'Unnamed' }}</span>
+            <span class="strip-name">{{ s.p.name || t('directory.common.unnamed') }}</span>
             <span class="strip-sub">
-              {{ s.p.occupation || (s.p.gender ? s.p.gender : '—') }}
+              {{ s.p.occupation || (s.p.gender ? genderLabel(s.p.gender) : '—') }}
               <template v-if="s.p.location"> · {{ s.p.location }}</template>
             </span>
           </div>
@@ -47,10 +47,10 @@
             class="strip-tag"
             :style="{ '--tc': firstTag(s.p.id).color || 'var(--accent)' }"
           >
-            {{ firstTag(s.p.id).label }}
+            {{ defaultNameLabel(firstTag(s.p.id).label) }}
           </span>
           <span class="strip-years">{{ lifeText(s.p) }}</span>
-          <span class="strip-kin" title="Relations">
+          <span class="strip-kin" :title="t('directory.reel.relations')">
             <UiIcon name="link" :size="12" />{{ statsOf(s.p.id).kin }}
           </span>
           <div class="strip-holes strip-holes-r"></div>
@@ -78,8 +78,8 @@
       <div class="reel-count" @pointerdown.stop>
         <button
           class="reel-count-arrow"
-          title="Previous (Up arrow)"
-          aria-label="Previous"
+          :title="t('directory.reel.prevHint')"
+          :aria-label="t('directory.stage.prev')"
           @click="stepBy(-1)"
         >
           <UiIcon name="chevron-up" :size="14" />
@@ -87,8 +87,8 @@
         {{ focusedIndex + 1 }} / {{ persons.length }}
         <button
           class="reel-count-arrow"
-          title="Next (Down arrow)"
-          aria-label="Next"
+          :title="t('directory.reel.nextHint')"
+          :aria-label="t('directory.stage.next')"
           @click="stepBy(1)"
         >
           <UiIcon name="chevron-down" :size="14" />
@@ -101,6 +101,8 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, h } from 'vue'
 import { useMainStore } from '../../store/index.js'
+import { useI18n } from '../../i18n'
+import { genderLabel, defaultNameLabel } from '../../lib/dataLabels'
 import { isDeceased } from './peopleLayout.js'
 import { useThumbnail } from './useThumbnail.js'
 import UiIcon from '../ui/UiIcon.js'
@@ -118,6 +120,7 @@ const props = defineProps({
 })
 
 const store = useMainStore()
+const { t } = useI18n()
 const reelEl = ref(null)
 
 const reduceMotion =
@@ -219,8 +222,9 @@ function onKeydown(e) {
   if (store.modalOpen || store.formOpen || store.curtain.active) return
   if (store.appSettingsOpen || store.userPageOpen || store.projectsPageOpen || store.browsePageOpen)
     return
-  const t = e.target
-  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return
+  const tgt = e.target
+  if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.tagName === 'SELECT'))
+    return
   if (e.key === 'ArrowUp') {
     e.preventDefault()
     stepBy(-1)
@@ -324,8 +328,8 @@ function lifeText(p) {
   const b = p.birth?.year
   const d = p.death?.year
   if (b && d) return `${b} – ${d}`
-  if (b) return `b. ${b}`
-  if (d) return `d. ${d}`
+  if (b) return t('directory.common.born', { year: b })
+  if (d) return t('directory.common.died', { year: d })
   return '—'
 }
 </script>
