@@ -33,6 +33,11 @@
   overflow: hidden;
   transition: --st-tint 0.5s ease;
 }
+/* Opened from inside the person form (a trait's "Special effect…"): float
+   above the form's backdrop (z 200) so it can be used without losing the form. */
+.studio.over-modal {
+  z-index: 210;
+}
 .studio[data-layer='app'] {
   --st-tint: var(--t1);
 }

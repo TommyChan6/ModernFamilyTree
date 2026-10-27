@@ -154,6 +154,12 @@ create table relationships (
   ended        jsonb,                   -- when it ended (divorce, falling-out); null = ongoing
   label        text,                    -- optional per-edge display text
 
+  -- Relationship dynamics (src/shared/sentiment.ts): per-edge feeling
+  -- -1 cold .. +1 warm and how strongly it's felt 0..1; null = inherit the
+  -- type's sentiment / the default intensity.
+  sentiment    real check (sentiment is null or (sentiment >= -1 and sentiment <= 1)),
+  intensity    real check (intensity is null or (intensity >= 0 and intensity <= 1)),
+
   created_at   timestamptz not null default now()
 );
 
@@ -177,6 +183,7 @@ create table factions (
   type        text not null default '',   -- free-form category ('family', 'allegiance', …)
   color       text not null default '',
   icon        text not null default '',
+  aura        jsonb,                      -- special effect every member wears (src/shared/auras.ts)
 
   member_ids  jsonb not null default '[]'::jsonb,  -- person ids in this faction
 

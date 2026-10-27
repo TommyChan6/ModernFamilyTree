@@ -9,9 +9,11 @@
 //
 // Each ribbon faces the camera with a half-pixel width floor (MSAA resolves
 // sub-pixel coverage); only the tips fade through alpha-to-coverage. Shading is
-// Kajiya–Kay with two shifted specular lobes (Scheuermann), wrap diffuse,
-// fake volumetric self-shadowing (roots + inner layers darker), per-strand
-// colour variation for greys / highlights, and alpha-to-coverage under MSAA.
+// Marschner-style lobes on a Kajiya–Kay base (a whitish R highlight, a
+// hair-coloured TRT highlight with glints, TT back-light), wrap diffuse from
+// the key and fill, strong fake volumetric self-shadowing (roots + inner
+// layers much darker), per-strand + per-clump colour variation, and
+// alpha-to-coverage under MSAA.
 // Lashes rotate with blinks about the eye centres.
 
 import * as THREE from 'three'
@@ -27,6 +29,9 @@ uniform vec3 uEyeL, uEyeR;
 uniform float uScalpBlend;
 uniform float uHeadY, uNeckY;
 uniform vec3 uBlendBones;
+// head centre (rig space): the hair MASS normal is radial from it on the
+// head and cylindrical (from a vertical axis through it) below it
+uniform vec3 uHeadC;
 attribute vec2 aK;      // point index, ribbon side (−1 / +1)
 attribute vec4 aStrand; // width (dm), rand, clump rand, kind
 attribute vec2 aLid;    // lid (+1 upper / −1 lower / 0), eye (0 left / 1 right)
@@ -43,8 +48,8 @@ vec3 lidRotate( vec3 p, vec3 c, float ang ) {
   return c + vec3( d.x, d.y * co - d.z * s, d.y * s + d.z * co );
 }
 
-// outputs: pos (bone space→rig space, skinned), tan, t, outer
-void strandSetup( out vec3 pos, out vec3 tan, out float t, out float outer ) {
+// outputs: pos (bone space→rig space, skinned), tan, mass normal, t, outer
+void strandSetup( out vec3 pos, out vec3 tan, out vec3 nrm, out float t, out float outer ) {
   int k = int( aK.x + 0.5 );
   vec4 here = strandPoint( k );
   vec3 prev = strandPoint( max( k - 1, 0 ) ).xyz;
@@ -52,6 +57,7 @@ void strandSetup( out vec3 pos, out vec3 tan, out float t, out float outer ) {
   pos = here.xyz;
   outer = here.w;
   tan = normalize( next - prev + 1e-7 );
+  nrm = normalize( pos - vec3( uHeadC.x, min( pos.y, uHeadC.y ), uHeadC.z ) + vec3( 0.0, 0.0, 1e-5 ) );
   t = float( k ) / float( uP - 1 );
   if ( aLid.x != 0.0 ) {
     float blink = aLid.y < 0.5 ? uBlinkL : uBlinkR;
@@ -79,6 +85,7 @@ void strandSetup( out vec3 pos, out vec3 tan, out float t, out float outer ) {
     mat4 sm = sW.x * boneMatX + sW.y * boneMatY + sW.z * boneMatZ + sW.w * boneMatW;
     sm = bindMatrixInverse * sm * bindMatrix;
     tan = normalize( ( sm * vec4( tan, 0.0 ) ).xyz );
+    nrm = normalize( ( sm * vec4( nrm, 0.0 ) ).xyz );
   #endif
 }
 
@@ -101,12 +108,14 @@ varying float vRand;
 varying float vOuter;
 varying float vClump;
 varying float vCoverage;
+varying vec3 vMass;
 
 void main() {
-  vec3 pos; vec3 tan; float t; float outer;
-  strandSetup( pos, tan, t, outer );
+  vec3 pos; vec3 tan; vec3 nrm; float t; float outer;
+  strandSetup( pos, tan, nrm, t, outer );
   vec4 world = modelMatrix * vec4( pos, 1.0 );
   vec3 wTan = normalize( mat3( modelMatrix ) * tan );
+  vMass = normalize( mat3( modelMatrix ) * nrm );
   vec3 toCam = normalize( cameraPosition - world.xyz );
   vec3 sideDir = normalize( cross( wTan, toCam ) + 1e-5 );
   float scale = length( modelMatrix[ 0 ].xyz );
@@ -140,8 +149,11 @@ const fragmentShader = /* glsl */ `
 #include <shadowmask_pars_fragment>
 uniform vec3 uRoot, uTip, uHighlight, uGreyColor;
 uniform float uHighlightAmt, uGrey, uGloss, uTipFade, uDarkRoots;
-uniform vec3 uKeyDir, uKeyColor, uRimDir, uRimColor, uSky, uGround;
+uniform vec3 uKeyDir, uKeyColor, uRimDir, uRimColor, uFillDir, uFillColor, uSky, uGround;
 uniform float uAmbient;
+// how much the hair-MASS normal drives shading (1 = scalp hair; beards and
+// brows mostly follow their own strand, or they go black under the chin)
+uniform float uMass;
 varying vec3 vTan;
 varying vec3 vWorld;
 varying float vT;
@@ -149,50 +161,79 @@ varying float vRand;
 varying float vOuter;
 varying float vClump;
 varying float vCoverage;
+varying vec3 vMass;
 
 float kk( vec3 T, vec3 H, float e ) {
   float d = dot( T, H );
   return pow( sqrt( max( 1.0 - d * d, 0.0 ) ), e );
+}
+float sh1( float x ) { return fract( sin( x * 91.7 ) * 43758.5453 ); }
+
+// One light on a strand (Marschner-style lobes on a Kajiya–Kay base):
+//  R   — a near-white, tight highlight shifted toward the root;
+//  TRT — a broader, hair-coloured highlight shifted toward the tip, with
+//        glints that sparkle along each strand;
+//  TT  — light passing through the hair when it is behind the head.
+// M is the hair-MASS normal: it gives the whole hairstyle a lit side and a
+// shadow side (the camera-facing ribbon normal alone lights every strand alike)
+vec3 strandLight( vec3 T, vec3 N, vec3 M, vec3 V, vec3 L, vec3 col, float gloss, float occl ) {
+  float TL = dot( T, L );
+  float sinTL = sqrt( max( 1.0 - TL * TL, 0.0 ) );
+  float ml = dot( M, L );
+  float side = smoothstep( -0.45, 0.85, ml );
+  // diffuse: Kajiya term wrapped around the hair volume
+  float diff = sinTL * side * clamp( dot( N, L ) * 0.3 + 0.7, 0.0, 1.0 );
+  vec3 H = normalize( L + V );
+  float shift = ( vRand - 0.5 ) * 0.12;
+  float eR = mix( 80.0, 420.0, gloss );
+  float eT = mix( 14.0, 60.0, gloss );
+  float r = kk( normalize( T + N * ( 0.1 + shift ) ), H, eR );
+  float trt = kk( normalize( T - N * ( 0.14 + shift ) ), H, eT );
+  float glint = 0.8 + 0.4 * sh1( floor( vT * 40.0 ) + vRand * 113.0 );
+  vec3 spec = vec3( 0.9, 0.92, 1.0 ) * r * ( 0.08 + gloss * 0.42 )
+            + col * col * 3.0 * trt * glint * ( 0.25 + gloss * 0.6 );
+  float tt = pow( clamp( dot( -V, L ), 0.0, 1.0 ), 6.0 ) * ( 0.4 + 0.6 * ( 1.0 - vOuter ) );
+  return col * diff * occl + spec * occl * sinTL * smoothstep( -0.2, 0.5, ml ) + col * tt * 1.4;
 }
 
 void main() {
   vec3 col = mix( uRoot, uTip, smoothstep( 0.15, 1.0, vT ) );
   if ( vClump < uHighlightAmt ) col = mix( col, uHighlight, smoothstep( 0.0, 0.4, vT ) * 0.85 );
   if ( vRand < uGrey ) col = mix( col, uGreyColor, 0.9 );
-  col *= 0.86 + vRand * 0.28;
-  col *= mix( 1.0, 0.55, uDarkRoots * ( 1.0 - smoothstep( 0.0, 0.25, vT ) ) );
+  // strand-to-strand + clump-to-clump variation (no two hairs alike)
+  col *= 0.74 + vRand * 0.42;
+  col *= 0.88 + vClump * 0.24;
+  col = mix( col, col * vec3( 1.08, 0.98, 0.9 ), sh1( vRand * 17.0 ) * 0.5 );
+  col *= mix( 1.0, 0.5, uDarkRoots * ( 1.0 - smoothstep( 0.0, 0.3, vT ) ) );
 
   vec3 T = normalize( vTan );
   vec3 V = normalize( cameraPosition - vWorld );
   vec3 N = normalize( V - T * dot( V, T ) + 1e-5 );
-  float occl = mix( 0.42, 1.0, vOuter ) * mix( 0.55, 1.0, smoothstep( 0.0, 0.35, vT ) );
+  // volumetric self-shadowing: strands deep in the mass are much darker than
+  // the outer layer — this is what gives a hairstyle its depth
+  float depth = smoothstep( 0.0, 1.0, vOuter );
+  float occl = mix( mix( 0.55, 0.2, uMass ), 1.0, depth ) * mix( 0.5, 1.0, smoothstep( 0.0, 0.35, vT ) );
 
   vec3 lit = vec3( 0.0 );
   float shadow = 1.0;
   #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
-    shadow = getShadowMask();
+    shadow = mix( 0.15, 1.0, getShadowMask() );
   #endif
+  vec3 M = normalize( mix( N, normalize( vMass ), uMass ) );
+  lit += uKeyColor * strandLight( T, N, M, V, normalize( uKeyDir ), col, uGloss, occl ) * shadow;
+  lit += uFillColor * strandLight( T, N, M, V, normalize( uFillDir ), col, uGloss * 0.6, occl );
   {
-    vec3 L = normalize( uKeyDir );
-    float TL = dot( T, L );
-    float diff = mix( 0.25, 1.0, sqrt( max( 1.0 - TL * TL, 0.0 ) ) ) * clamp( dot( N, L ) * 0.5 + 0.6, 0.0, 1.0 );
-    vec3 H = normalize( L + V );
-    float shift = ( vRand - 0.5 ) * 0.15;
-    float s1 = kk( normalize( T + N * ( 0.08 + shift ) ), H, mix( 60.0, 260.0, uGloss ) );
-    float s2 = kk( normalize( T - N * ( 0.12 + shift ) ), H, mix( 18.0, 70.0, uGloss ) );
-    vec3 spec = mix( vec3( 1.0 ), col * 2.5, 0.35 ) * 0.13 * s1 * uGloss + col * s2 * ( 0.35 + uGloss * 0.6 );
-    lit += uKeyColor * ( col * diff + spec * occl ) * shadow;
-  }
-  {
+    // rims: a bright edge where the hair mass silhouettes against the light
     vec3 L = normalize( uRimDir );
+    float edge = pow( 1.0 - abs( dot( M, V ) ), 2.0 );
     float fwd = pow( clamp( dot( -V, L ) * 0.5 + 0.5, 0.0, 1.0 ), 3.0 );
     float TL = dot( T, L );
-    float diff = sqrt( max( 1.0 - TL * TL, 0.0 ) ) * 0.4;
-    lit += uRimColor * col * ( diff + fwd * 1.6 );
+    float sinTL = sqrt( max( 1.0 - TL * TL, 0.0 ) );
+    float facing = smoothstep( -0.3, 0.6, dot( M, L ) );
+    lit += uRimColor * ( col * ( sinTL * 0.3 * facing + fwd * 1.2 * ( 0.3 + edge ) ) + col * edge * facing * 0.8 ) * mix( 0.4, 1.0, depth );
   }
-  vec3 amb = mix( uGround, uSky, N.y * 0.5 + 0.5 ) * uAmbient;
-  lit += col * amb * 1.6;
-  lit *= occl;
+  vec3 amb = mix( uGround, uSky, M.y * 0.5 + 0.5 ) * uAmbient;
+  lit += col * amb * mix( occl, occl * occl, uMass ) * 1.3;
 
   float alpha = vCoverage * ( 1.0 - smoothstep( 1.0 - uTipFade, 1.0, vT ) );
   if ( alpha < 0.02 ) discard;
@@ -209,8 +250,8 @@ ${STRAND_VERTEX}
 varying vec2 vHighPrecisionZW;
 void main() {
   if ( aLid.x != 0.0 ) { gl_Position = vec4( 2.0, 2.0, 2.0, 1.0 ); return; } // lashes cast no shadow
-  vec3 pos; vec3 tan; float t; float outer;
-  strandSetup( pos, tan, t, outer );
+  vec3 pos; vec3 tan; vec3 nrm; float t; float outer;
+  strandSetup( pos, tan, nrm, t, outer );
   vec4 world = modelMatrix * vec4( pos, 1.0 );
   vec3 wTan = normalize( mat3( modelMatrix ) * tan );
   vec3 toCam = normalize( cameraPosition - world.xyz );
@@ -243,7 +284,8 @@ function strandUniforms() {
     uScalpBlend: { value: 0 },
     uHeadY: { value: 7 },
     uNeckY: { value: 6 },
-    uBlendBones: { value: new THREE.Vector3() }
+    uBlendBones: { value: new THREE.Vector3() },
+    uHeadC: { value: new THREE.Vector3(0, 7.5, 0) }
   }
 }
 
@@ -263,9 +305,12 @@ export function createHairMaterial() {
     uKeyColor: { value: new THREE.Color(3, 3, 3) },
     uRimDir: { value: new THREE.Vector3(-0.5, 0.4, -0.7) },
     uRimColor: { value: new THREE.Color(1, 1, 1) },
+    uFillDir: { value: new THREE.Vector3(0.6, 0.2, 0.7) },
+    uFillColor: { value: new THREE.Color(0.3, 0.3, 0.3) },
     uSky: { value: new THREE.Color('#9aa6bd') },
     uGround: { value: new THREE.Color('#2a2420') },
     uAmbient: { value: 0.35 },
+    uMass: { value: 1 },
     uPxScale: { value: 0.001 }
   }
   const uniforms = Object.assign(

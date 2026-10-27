@@ -89,7 +89,9 @@ seeds a sample family on first run. Data is scoped per project via `project_id`;
 deletes cascade explicitly (person → its relationships + image files +
 `entity_tags` rows; tag/scene → their join/placement rows; project → its maps). On the web build the same data (including the
 same seed) lives in a single IndexedDB record instead, with photos stored inline as
-data URLs — see `src/renderer/src/api/backends/local.ts`.
+data URLs — see `src/renderer/src/api/backends/local.ts`. Like IPC, it hands back
+a `structuredClone` of every result (handlers return live DB rows; without the copy
+an in-place update returned the very object the store held and Vue saw no change).
 
 **Channel conventions** (`src/shared/dbCore.ts` + shells): channels are named
 `domain:action`. Handlers mutate the raw DB and return plain data or throw; the shell
@@ -193,6 +195,17 @@ labels come from `store.noun` (per-project setting; the data layer stays
 "person"). **Payloads crossing `api.invoke` must be plain JSON** — Vue
 reactive proxies make Electron IPC throw "An object could not be cloned".
 Tests: `tests/fields.test.js`.
+**Name generator** (pure `lib/nameGen.ts` + corpora `lib/nameCorpora.ts`; UI
+`personForm/NameDice.vue`, the dice in SlotDock's Name bay): an order-3 character
+Markov chain (never backs off below order 2; syllable mode for pinyin/romaji), seeded
+RNG, rejects training copies/near-copies, degenerate strings and out-of-range lengths.
+`suggestNames` blends a culture corpus (`NAME_CORPORA`: english/norse/roman/slavic/
+celtic/elvish/dwarven/japanese/chinese; labels `nameGen.corpus.*`) with a tag's members
+(tag weight n/(n+`TAG_PRIOR`); `closestCorpus` picks the base culture), honours the
+gender slot (`genderFromT`), and takes the surname from the parents (keeping the
+family's name order) → the tag's commonest surname → generated (Norse patronymics,
+gendered Slavic surnames). Source remembered per project (localStorage
+`familytree.nameGen.source`). Tests: `tests/nameGen.test.js`.
 
 **The relationship-type registry** (`src/shared/relTypes.ts` + the `relTypes:*`
 channels): every `Relationship.type` points at a project-scoped
@@ -215,6 +228,49 @@ intent chips are generated from the registry (grouped by `band`; Simple mode =
 family band only, per `caps.relTypePicker`/`customRelTypes`), and
 `RelTypesPanel.vue` (Relationships view → ⚙ Types) edits defs — the weight
 slider needs `caps.tuneAffinity` (Advanced). Tests: `tests/relTypes.test.js`.
+**Relationship dynamics** (`src/shared/sentiment.ts`; WILD_IDEAS A3): every
+`RelationshipTypeDef` carries a `sentiment` (−1 cold … +1 warm; built-ins from
+`BUILTIN_SENTIMENT`, backfilled by `backfillRelSentiment` in
+`migrateRelationshipTypes` and after `projects:import`); edges may override it with
+`Relationship.sentiment` / `intensity` (null = inherit / `DEFAULT_INTENSITY`; clamped
+in `relationships:create/update` and `relTypes:*`; hosted columns in
+`supabase/add_rel_sentiment.sql`). Pure math: effective values, `nodeTemperatures`
+(intensity-weighted mean) and a diverging OKLab ramp (`sentimentColor`, per-theme
+`DYNAMICS_PALETTES` under the user's `graphSettings.dynamicsWarm/Cold`, '' = theme
+default → `store.dynamicsPalette`). UI: Feeling sliders in `RelTypesPanel` and the
+Relationships view editor (`components/sentiment/`). The graph's **Dynamics lens**
+(Relationships pane switch + `graph/DynamicsLegend.vue`) recolours links on the ramp,
+sizes them by intensity, dashes cold bonds and rings people by temperature (colours
+precomputed in the `dynamicsLinks` / `dynamicsNodes` computeds). The `relTypes` deep
+watcher only restarts the simulation on weight/role/direction changes. Tests:
+`tests/sentiment.test.js` + dynamics blocks in `relTypes` / `projectFile`.
+**Auras** (`src/shared/auras.ts`; UI in `components/auras/`, Style Studio →
+Whole app → Special effects, plus "Special effect…" in a trait's menu and on tag
+chips → `store.openAuras(focus)`): special effects attached to a **tag**
+(`Tag.aura`) or a **trait** (`FieldDef.auras` — rules with a condition: select
+"is one of", text "contains", numeric/date "range" by value/year, boolean = true;
+numeric rules may `scale` strength with the value). Written through
+`tags:update` / `fields:updateDef` (so one undo step each; sanitized by
+`sanitizeAura` / `sanitizeTraitAuras`, rules re-checked when a select loses an
+option). `resolveAuras` → `store.auraOf` (personId → ResolvedAura) merges slots
+by priority: specific trait rules > tags > "has any value" rules. Drawn as: an
+**ornament** in the node shader (`NodeMaterial.js` `auraLayers` — halo, flame,
+frost, sparkle, crown, shadow, storm, bloom + the five decor ornaments in the
+aura's colour; per-instance `iAura` = (id, strength, ignite start, colour packed
+as 0xRRGGBB by `packRGB`) on `NodeLayer`, so graph nodes AND timeline avatar pins
+wear it; it replaces the global decor on bearers; `avatar: -2` = rim-only, used
+under the ink timeline's 2D seals). **Gotcha:** the node shader's scalars are packed
+four to an attribute (`iLook`, `iState`, `iAura` in `NodeLayer`) because desktop
+Electron's ANGLE/D3D11 backend also spends an attribute slot on `gl_InstanceID` —
+one too many and the program fails to link ("Too many attributes" = nodes and
+timeline pins vanish, links still draw). Headless Edge/the web build does NOT
+catch it; pack new per-node scalars into vec4s and check on desktop. Also drawn: a
+**line effect** on the bearer's timeline lifeline and on graph bonds whose two
+ends share it (`auraLineBetween`), and an optional **tint** (node ring, lifeline
+colour). Newly assigned auras **ignite**: a staggered shockwave cascading down the
+generations (`iAura.z` ignite start, `AURA_IGNITE_DUR`; never under reduced
+motion). Hosted: `factions.aura` column (`supabase/add_tag_auras.sql`). Tests:
+`tests/auras.test.js` (also pins `AURA_LINES` to `LINE_FX` and the shader ids).
 **Chronicle** (`src/shared/chronicle.ts` + the `eras:*` / `events:*` channels;
 UI in `components/chronicle/`, 📜 toggle on the Timeline and Graph): project-scoped
 **eras** (named spans, open ends allowed, colour + icon) and **story events** (a
@@ -233,6 +289,32 @@ current-era chip + track stripes on the Time slider. Dated events stretch the
 Timeline axis (`computeTimelineLayout` `extraYears`). Not yet in `supabase.ts`
 (the store treats a failed load as an empty chronicle). Tests:
 `tests/chronicle.test.js`.
+**Census** (`components/time/censusMath.ts` + `CensusPanel.vue`, people button on the
+Time slider): a live demographic ticker for the scrubbed year. `buildCensus(persons,
+relationships, relTypeRoles, { refYear })` sweeps the data span once per data change
+so `censusAt(index, year)` is an O(1) read: alive, couples (`symmetryRole`
+'horizontal', not `ended`), mean/median age, decade-to-date births/deaths, generations
+alive, gender split (`gender_t`), oldest living; series via `populationSeries` /
+`decadeSeries` / `groupSum`. Rules (file header): whole years; born/died in Y counts
+in Y; unknown death = alive ≤ 100 years and not past `store.currentDate`; undated
+bonds start 25 years into the shared life (as on the Timeline). Numbers ease via rAF
+(instant under reduced motion); sparkline click = travel there; open state per viewer
+(localStorage `familytree.census.open`); only mounted while open. Tests:
+`tests/census.test.js`.
+**Family fingerprint** (WILD_IDEAS D4; `src/shared/fingerprint.ts` + the read channel
+`projects:fingerprints`, `lib/familyFingerprint.ts`, `components/fingerprint/`): pure
+O(n + e) `FingerprintFeatures` per project (generations via `symmetryRole`,
+families/branching, couples, founding lines, islands, decade span, gender balance, top
+tag colours, FNV seed) → a deterministic mandala; ONE shape list rendered by both
+`drawMandala` (canvas) and `mandalaToSvg`. Rings = generations, petals = families,
+star = founding lines, rosette = couples, halo = decades, satellites = islands.
+Randomness is seeded by (seed, slot), never by counts, so growth nudges it gently. The
+store caches other projects (`fingerprints`, fetched with `fetchProjectsOverview`) and
+derives the active one live (`activeFingerprint`). `FingerprintMandala.vue` draws
+lazily, debounces, spins via CSS only; `FingerprintDialog.vue`
+(`store.openFingerprint(id)`) = legend + PNG/SVG download. Cover art on Projects page
+cards/rows and UserPage project cards. Supabase computes it from paged selects, falling
+back to `countsOnlyFeatures`. Tests: `tests/fingerprint.test.js`.
 **Kinship** (`components/kinship/`, graph header 🧬): a pure engine in
 `kinshipGraph.ts` (KinIndex from persons + relationships via `symmetryRole`;
 `bloodFrom` = closest common ancestor → (up, down) on the cousin chart with
@@ -319,8 +401,22 @@ nodes painted back-to-front via `depthOrder`, covered names dimmed by `occlusion
 `tiltProjection()` puts the same mapping in the GPU projection; nodes are screen-space
 billboards (NodeMaterial adds the corner offset in clip space), the atmosphere draws in a
 separate flat pass, and `GroundGrid.js` fades in a floor (tests: `tests/graphTilt.test.js`).
-Node shapes/anchors live in `graph/webgl/nodeShapes.js`; the `gravestone` shape stands ON
-its point (so in Birth it rests on its birth-year line) — the `graveyard` theme preset uses it. One graph
+Node shapes/anchors live in `graph/webgl/nodeShapes.js`; the standing shapes `gravestone`,
+`plate` and `flatplate` stand ON their point (so in Birth they rest on their birth-year line; they must
+share one `lift`; the plates carry `labelAbove`, so their names sit above the crown) — the
+`graveyard` theme preset uses the gravestone. **Constellation skin** (`nodeShape: 'star'`,
+id 11, preset `constellation`; pure math in `graph/constellation.ts`, tests
+`tests/constellation.test.js`): brightness = log2 of the descendant count (kinship index
+`children`, full at 64) drives core/glow/spikes (`starNode` in `NodeMaterial.js`) and a
+radius multiplier (`starSizeMul`); the departed twinkle off `uDecorTime` (`starTwinkle`
+setting; frozen under reduced motion, performance mode and captures). Star values ride in
+`iState.x` (`packStarState`: selected + 2·(twinkle + 2·level)) — NO new attribute; keep
+it that way. Light grounds (`uStarLight`) print an ink star atlas; ink keeps roundels.
+Lines use the `starline` line effect (id 10, also in `AURA_LINES`), the sky is the
+`nightsky` background mode (dark grounds only), labels switch to a thin italic serif.
+Standing-shape checks in the shader go through `standingShape()` (8–10), not `>= 8`. The
+Export dialog offers a star-chart poster (`export/starChartPoster.ts`: planisphere /
+atlas plate) while the graph wears star nodes. One graph
 **Scene** spans them all — `scene.layouts[type]` holds each type's own
 `{positions,config}` and `scene.type` names the active one, so switching type
 stays in the same scene and reveals that type's arrangement (flat
@@ -344,9 +440,49 @@ stay smooth with thousands of people:
 - timeline (`TimelineView`) — WebGL. Pure layout in
   `components/timeline/timelineLayout.js` (world units, recomputed on data changes
   only); drawing in `components/timeline/TimelineRenderer.js` — instanced lifelines,
-  pulsing dots, marriage/birth ribbons and avatar pins, with a bg canvas for the year
+  pulsing dots, marriage ropes and avatar pins, with a bg canvas for the year
   grid and an fg canvas for viewport-culled labels/badges/gutter. Hit tests are
-  analytic; style changes tween. Lifelines are a `LifelineLayer` (looks: classic/
+  analytic; style changes tween. **Family lines** (`timeline/timelineLinks.ts`, pure;
+  tests `tests/timelineLinks.test.js`): `buildFamilies` groups each child's parents
+  into families (vertical-role links; married pairs, co-parents, singles; adoptive
+  kept separate) → one **stem** per couple hanging from their rope's low point (a
+  dashed bar if unmarried) and one **branch** per child that leaves the stem higher
+  the further it reaches; a branch is cut into pieces where it passes under a living
+  lifeline (**bridges**, `bridgePieces`), and `renderer.linkAt` drives the hover card
+  (lights the family, explains the line; click selects). `computeLaneOrder` refines
+  the tree order with `optimizeLaneOrder` — adjacent swaps that only count crossings
+  over lives alive at that time (a couple's stem is in the way until their last
+  child). Three **modes** per timeline scene (`scene.config.mode`, bottom-bar
+  Lanes/Sprout/Rivers like the graph's layout types): Lanes, **Sprout** —
+  `packSproutLanes` reuses lanes once their occupant is gone and each child's lifeline
+  peels out of its parents' stem (`_linkGeometry` → `_avDy`: its pin sits below the
+  birth) — and **Household rivers** (pure layout `timeline/householdRivers.ts`, tests
+  `tests/householdRivers.test.js`): channels are households; a couple shares one and
+  their children are born inside it, so containment replaces stems/branches
+  (`layout.families`/`branches` empty, data in `layout.rivers`). Lives cross only on
+  marriage, a divorce with an `ended` year, leaving home at `timeline_leaveHomeAge`
+  (default 25), or following their last parent at home. Greedy nearest-anchor
+  placement that reuses x-space; `p.path` (flat `[year, x, …]`) per person, `edges`
+  per household. Renderer glue in `timeline/TimelineRivers.js` (one `LifelineLayer`
+  capsule per segment, so every look/shadow/halo applies; `RiverLayer.js` bands;
+  segment-based `personAt`; `linkAt` → `{ kind: 'household' }`; ropes via
+  `_ropeLanes(m)`). Sprout and Rivers positions are computed, so lane drag/nudge is
+  off there (Time drag still works). **Coordinate pipeline** (`timeline/timeWarp.ts`,
+  `timelineTilt.ts`, `tiltCanvas.ts`; tests `tests/timeWarp.test.js`,
+  `tests/timelineTilt.test.js`): year → `axisOf` (the **time warp** — a monotone,
+  invertible piecewise-linear fisheye from a Gaussian-smoothed birth density, stretch
+  clamped 0.25–4×, span preserved, blended by the tweened `setWarp(k)`) → flat stage px
+  (`sy`) → screen (`project` / `toFlat`: the graph's coords.js tilt + yaw homography;
+  `tiltProjection` drives the GL camera). Layout stays in real years — ALWAYS use
+  `sy` / `yearAt`, never `(year - minYear) * px`. Pointer input arrives via
+  `stagePoint` (flat `x,y` + screen `sx,sy`); hit tests work in flat px, DOM popups in
+  screen px. Tilted, the 2D canvases are `TiltCanvas` proxies (board drawing projected;
+  labels/pills upright via `billboard()`, hit rects via `frameRectToFlat`); family
+  ropes/stems/branches rise off the board (`arcHeight` grows with reach) by CPU lift
+  (`liftPoint`) — no shader changes. Settings `timeline_timeWarp`/`warpStrength`/
+  `viewTilt`/`tiltAngle`/`tiltYaw`/`arcLift` (Style Studio Timeline chapters Time and
+  Camera), bottom-bar toggles, T / Q / E / Alt-drag. Remaining ideas:
+  `docs/WILD_IDEAS.md` §I. Lifelines are a `LifelineLayer` (looks: classic/
   tube/glass/glow + every graph line effect, a drop-shadow pass, selection halo),
   styled by `store.timelineSettings` (`timeline_*` settings keys; edited in the
   Style Studio's Timeline layer, `style/TimelineStyleSheet.vue`: looks, canvas
@@ -378,7 +514,17 @@ stay smooth with thousands of people:
   `components/factions/factionLayout.js`, drawing
   in `components/factions/webgl/FactionsRenderer.js` (zone discs, dash-flow tethers,
   membership arcs, person nodes; overlay canvas for header pills/labels/ghost). The
-  d3-force simulation stays in the view and pokes the renderer per tick.
+  d3-force simulation stays in the view and pokes the renderer per tick. Two zone
+  styles (`store.groupsSettings.zoneStyle`, `groups_*` settings keys; toolbar
+  Rings/Venn switch + the Style Studio's Groups layer, `style/GroupsStyleSheet.vue`):
+  **rings** (discs + tethers) and **venn** — each group is an elastic membrane that
+  stretches to wrap its outside members, so groups sharing people overlap around
+  them. Pure math in `factions/vennLayout.ts` (polar outlines `membraneShape`,
+  `vennTargets` that keep people out of foreign discs, `arrangeVenn` = the Arrange
+  button in Venn; tests `tests/vennLayout.test.js`); drawn by
+  `factions/webgl/MembraneLayer.js` (outlines in a float texture → true SDF per
+  fragment; overlaps shaded as lit lenses, each pair painted once). The renderer
+  tweens a `_morph` 0↔1 and hands over to ZoneLayer at 0; tethers fade with it.
 - directory (`PeopleView`) and relationships (`RelationshipsView`) — DOM, but
   **virtualized**: only cards/rows near the viewport exist in the DOM. The right
   dock's Directory roster is virtualized the same way. The Directory's viewing
@@ -446,7 +592,21 @@ stay smooth with thousands of people:
   CPU, it exhausts GPU memory), `wardrobe` (garments = offset/relaxed body shells with
   alpha-clipped hems; skirt helper for dresses), `poses` (`twist` = extrinsic, `roll` =
   intrinsic; left-arm z− lowers), `HumanStage` (lights, GTAO — strands live on layer 1
-  so the AO normal pass skips them — camera focus, sculpt picking, snapshots).
+  so the AO normal pass skips them — AgX tone mapping, bloom + the `GradeShader` pass,
+  camera focus, sculpt picking, snapshots), `studio.ts` (light presets as data: each also
+  drives a cached softbox PMREM environment so catchlights match the lights, the cyc
+  backdrop + seamless floor, dust motes, podium, grade; Studio/Atelier/Cinematic are the
+  game-creator looks). Hair shades off a hair-MASS normal (`uMass`: scalp 1, beard/brows
+  low) and clears clothing via `torsoPad`; strands are re-projected out of the hull after
+  resample + curl (`toBatch` `clear`), or they clip into the scalp. `body.ideal` layers the
+  `IDEAL_SHAPE` beauty pass (catalog.ts) under the user's sliders. Skin albedo = tone ×
+  (CC0 MakeHuman photo ÷ its mean), young/old × f/m in `assets/skin/` (old pair lazy-loaded).
+  **Grab handles** (`sculptHandles.ts`, tests in human3dMath): BDO-style landmark points
+  found on the mesh (mostly "the vertex this morph target moves most"); a drag in the
+  character frame solves the slider value that moves the point by exactly the pull
+  (`solveSlider`), so front view = width/height, profile = depth. Gotchas: MakeHuman's
+  `eye-corner1` is the OUTER corner; its rest pose bends the elbows ~45° forward (poses
+  must straighten them with a negative forearm flex).
   UI: `Character3DEditor.vue` + `H3Slider.vue`; slider catalogue `catalog.ts`, pure look
   logic (presets, 2D↔3D, randomize, genetics) `model3d.ts`; strings under `human3d.*`.
   Tests: `tests/human3dMath.test.js`.
@@ -479,6 +639,33 @@ medium — `people/handscrollLayout.ts`), profile (`store.profileStyle`:
 ENDS in `:is(...)` gets Vue's scope attribute on `:root` and silently never matches —
 expand it. Tests: `tests/inkArt.test.js`, `inkChrome`, `profileScroll`,
 `handscrollLayout`, plus ink blocks in `graphMath`/`viewMath`/`mapMath`.
+
+**The Medieval theme** — a fourth app theme (`store.theme === 'medieval'`;
+`store.isMedieval`, light for renderers via `store.isLightTheme`;
+`store.toggleMedieval()` = the topbar shield, sharing ink's `returnTheme`). An
+illuminated codex: vellum, iron-gall ink, lapis accent (locked `!important`), gold
+leaf, vermilion rubrics (eyebrows). Tokens, @font-faces and shell dress live in
+`styles/medieval.css` (topbar = tooled-leather headband, icon rail = gilt leather
+spine, primary = lapis enamel in a gilt bezel, badges = wax seals, spinner = a
+turning compass rose). It dresses the ink **hook classes** too — `.ink-mount`
+(gilt frame + corner fleurons), `.ink-unroll` (the leaf turns open from its
+spine), `.ink-rollers` (a charter's wax seal hangs below), `.ink-veil`
+(candlelight), `.ink-bloom`/`.ink-underline`/`.ink-rule` — so a component that
+wears them needs nothing extra. Fonts are bundled SIL-OFL woff2s in
+`assets/medieval/fonts/` (Codex Gothic = Grenze Gotisch, Codex Fraktur =
+UnifrakturMaguntia, Codex Caps = Cinzel; body reuses Ink Serif; no CJK — falls
+back to the system serif). `lib/medievalArt.ts` holds the deterministic painters
+(vellum, `nibStroke` broad-nib pen, flourishes, corner fleurons, compass rose,
+castle `skylineDataUrl`, `waxSealDataUrl`, `burnMaskUrl`) plus pure heraldry —
+`blazonFor(id, gender)` → `medievalAvatarBg` gives each person a stable coat of
+arms (gender = the colour, rule of tincture kept); `installMedievalAssets()`
+publishes `--med-*` url() properties. Switches into/out of it burn through the
+page (`themeReveal.js` style `'burn'`). Full-screen pages get
+`ui/MedievalBackdrop.vue` via `InkBackdrop.vue` (candlelight, turning rose,
+castles, dust motes); the graph gets `graph/MedievalBackdrop.js` (vellum + a
+portolan's rhumb-line network + castles, compositor-only parallax). Graph presets
+`heraldry` (shield nodes, gilded lines, embers) and `illuminated`. Canvas views
+otherwise render as the light theme. Tests: `tests/medievalArt.test.js`.
 
 ## Conventions
 

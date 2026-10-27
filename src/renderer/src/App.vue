@@ -167,6 +167,19 @@
       >
         <span class="ink-toggle-seal" aria-hidden="true">墨</span>
       </button>
+      <!-- the illuminated medieval theme, toggled by raising a shield -->
+      <button
+        class="icon-btn med-toggle"
+        :class="{ on: store.isMedieval }"
+        :title="store.isMedieval ? t('topbar.medievalOff') : t('topbar.medievalOn')"
+        :aria-label="store.isMedieval ? t('topbar.medievalOff') : t('topbar.medievalOn')"
+        :aria-pressed="store.isMedieval"
+        @click="toggleMedieval"
+      >
+        <span class="med-toggle-shield" aria-hidden="true">
+          <UiIcon name="castle" :size="11" :stroke="2.2" />
+        </span>
+      </button>
       <button
         class="icon-btn theme-toggle"
         :class="store.isLightTheme ? 'light' : 'dark'"
@@ -284,6 +297,7 @@
     <ProjectsPage />
     <BrowsePage />
     <PricingModal />
+    <FingerprintDialog />
     <!-- Project file import (Project ▾ → Import project file) -->
     <input
       ref="importInput"
@@ -371,6 +385,7 @@ import UserPage from './components/UserPage.vue'
 import ProjectsPage from './components/ProjectsPage.vue'
 import BrowsePage from './components/BrowsePage.vue'
 import PricingModal from './components/billing/PricingModal.vue'
+import FingerprintDialog from './components/fingerprint/FingerprintDialog.vue'
 import TransitionCurtain from './components/TransitionCurtain.vue'
 import TimeSlider from './components/time/TimeSlider.vue'
 import DialogHost from './components/ui/DialogHost.vue'
@@ -394,7 +409,7 @@ const importInput = ref(null)
 const MOD = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent) ? '⌘' : 'Ctrl'
 
 function toggleTheme(e) {
-  // ink is a paper (light) theme — the sun/moon takes it to dark
+  // ink and medieval are paper (light) themes — the sun/moon takes them to dark
   store.setTheme(store.isLightTheme ? 'dark' : 'light', {
     origin: { x: e.clientX, y: e.clientY }
   })
@@ -402,6 +417,10 @@ function toggleTheme(e) {
 
 function toggleInk(e) {
   store.toggleInk({ origin: { x: e.clientX, y: e.clientY } })
+}
+
+function toggleMedieval(e) {
+  store.toggleMedieval({ origin: { x: e.clientX, y: e.clientY } })
 }
 
 // View switches reveal the incoming view as a circle growing from wherever
@@ -567,6 +586,7 @@ function historyHotkeysBlocked() {
     authOpen.value ||
     store.formOpen ||
     store.pricingOpen ||
+    !!store.fingerprintProjectId ||
     !!store.chronicleEditor
   )
 }
@@ -1135,6 +1155,36 @@ onUnmounted(() => {
   background: #b3352a;
   border-color: #b3352a;
   box-shadow: 0 1px 4px rgba(140, 36, 28, 0.35);
+  animation: ink-toggle-stamp 0.5s var(--ease-spring);
+}
+/* the shield: an outlined escutcheon; on, it is enamelled lapis with a gilt
+   edge and a gold castle, struck like a blazon */
+.med-toggle {
+  position: relative;
+}
+.med-toggle-shield {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 20px;
+  color: var(--t2);
+  border: 1.5px solid currentColor;
+  border-radius: 2px 2px 50% 50% / 2px 2px 62% 62%;
+  transition:
+    color var(--dur) ease,
+    background var(--dur) ease,
+    border-color var(--dur) ease,
+    transform 0.45s var(--ease-spring);
+}
+.med-toggle:hover .med-toggle-shield {
+  color: var(--t1);
+  transform: rotate(6deg) scale(1.06);
+}
+.med-toggle.on .med-toggle-shield {
+  color: #f1d88c;
+  background: linear-gradient(180deg, #2f5aa6, #24478a 60%, #172f5e);
+  border-color: #c9a043;
+  box-shadow: 0 1px 4px rgba(20, 36, 80, 0.4);
   animation: ink-toggle-stamp 0.5s var(--ease-spring);
 }
 @keyframes ink-toggle-stamp {

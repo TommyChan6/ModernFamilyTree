@@ -137,6 +137,8 @@ export interface Collision {
   hull: Hull
   /** Optional second radial hull (the torso). */
   torso?: Hull | null
+  /** Extra clearance over the torso hull (dm) — hair rests ON clothing. */
+  torsoPad?: number
   parts: Collider[]
 }
 
@@ -183,7 +185,7 @@ export function collide(
 ): boolean {
   if ('hull' in col) {
     let moved = collideHull(col.hull, p, o, margin)
-    if (col.torso) moved = collideHull(col.torso, p, o, margin) || moved
+    if (col.torso) moved = collideHull(col.torso, p, o, margin + (col.torsoPad || 0)) || moved
     for (const k of col.parts) moved = pushCollider(k, p, o, margin) || moved
     return moved
   }

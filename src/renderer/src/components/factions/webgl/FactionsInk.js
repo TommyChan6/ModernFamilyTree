@@ -100,7 +100,7 @@ export function drawInkOverlay(r) {
     ctx.font = `${14 * k * ps}px ${kai}`
     const textW = ctx.measureText(z.label).width + ctx.measureText(String(z.count)).width
     const w = Math.max(z.headerW * k * ps, textW + h + 26 * k * ps)
-    const cs = worldToScreen(z.x, z.y - z.r - 30 + 13, t)
+    const cs = worldToScreen(z.x, r.zoneTop(z) - 30 + 13, t)
     const x = cs.x - w / 2,
       y = cs.y - h / 2
     if (x + w < -20 || x > r.width + 20 || y + h < -40 || y > r.height + 20) continue

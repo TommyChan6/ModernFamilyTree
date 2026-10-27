@@ -127,6 +127,21 @@ defineProps({ id: { type: String, required: true } })
   inset: 4.5px 0;
   background: rgba(255, 248, 224, 0.35);
 }
+/* Star chart: a fine silver line between two stars, stopping short of each. */
+.fx-prev-starline {
+  background: #070b1c;
+}
+.fx-prev-starline::before {
+  inset: 4.5px 9px;
+  background: rgba(205, 220, 255, 0.75);
+  box-shadow: 0 0 3px rgba(205, 220, 255, 0.6);
+}
+.fx-prev-starline::after {
+  background:
+    radial-gradient(circle 2px at 4px 50%, #fff 60%, transparent 75%),
+    radial-gradient(circle 2px at calc(100% - 4px) 50%, #fff 60%, transparent 75%);
+  animation: fxp-twinkle 1.8s ease-in-out infinite;
+}
 .fx-prev-gilded {
   background: linear-gradient(180deg, #5b3a07, #f2c45a 50%, #5b3a07);
 }

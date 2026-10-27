@@ -99,6 +99,17 @@ export const LINE_FX = [
     label: 'Gilded',
     icon: 'crown',
     hint: 'A royal gold rope with a shine that travels its length'
+  },
+  {
+    // The constellation skin's lines: thin and crisp, a faint glow, and a
+    // small gap at each end so the line stops short of its star (star charts).
+    id: 'starline',
+    n: 10,
+    pad: 3.2,
+    body: 1.6,
+    label: 'Star chart',
+    icon: 'star',
+    hint: 'Constellation lines — fine silver strokes that stop short of each star'
   }
 ].map((f) => ({
   ...f,
@@ -331,6 +342,16 @@ export const FX_GLSL = /* glsl */ `
       lay(acc, gold, exp(-outer * 2.2) * (1.0 - tube) * (0.28 + 0.45 * spec) * uFxGlow);
       lay(acc, mix(dark, gold, band * (0.55 + 0.45 * twist)), tube);
       lay(acc, fxHi(gold), (spec * band * 0.85 + glint) * tube);
+    } else if (id == 10) {
+      // ── Star chart: a crisp constellation line ──
+      vec3 sCol = mix(baseCol, vec3(0.78, 0.86, 1.0), fxTint(0.75));
+      float gap = min(15.0, len * 0.2);
+      float ends = smoothstep(gap - 2.0, gap + 4.0, arc)
+                 * (1.0 - smoothstep(len - gap - 4.0, len - gap + 2.0, arc));
+      float shimmer = 0.86 + 0.14 * sin(arc * 0.045 - t * 0.7 + seed * 6.0);
+      float fine = 1.0 - smoothstep(0.55 - aa, 0.55 + aa, x); // crisper than the core
+      lay(acc, sCol, exp(-max(x - 0.55, 0.0) * 1.6) * (1.0 - fine) * 0.2 * uFxGlow * ends);
+      lay(acc, mix(sCol, fxHi(sCol), 0.45), fine * 0.62 * ends * shimmer);
     } else {
       lay(acc, baseCol, tube);
     }

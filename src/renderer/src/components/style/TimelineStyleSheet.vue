@@ -129,6 +129,18 @@
           :format="pct"
           @update:model-value="set('eraIntensity', $event)"
         />
+        <StSlider
+          skey="leaveHomeAge"
+          :label="t('timeline.style.leaveHome')"
+          :model-value="st.leaveHomeAge ?? 25"
+          :min="14"
+          :max="45"
+          :step="1"
+          :format="ageFmt"
+          :disabled="!riversOn"
+          @update:model-value="set('leaveHomeAge', $event)"
+        />
+        <p class="st-hint">{{ t('timeline.style.leaveHomeHint') }}</p>
       </section>
     </template>
 
@@ -171,6 +183,73 @@
         />
       </section>
     </template>
+
+    <!-- ── Time: the warped axis (stretch busy years) ── -->
+    <template v-else-if="chapter === 'time'">
+      <section class="st-section">
+        <StSwitch
+          skey="timeWarp"
+          :label="t('timeline.style.timeWarp')"
+          :hint="t('timeline.style.timeWarpHint')"
+          :model-value="st.timeWarp"
+          @update:model-value="set('timeWarp', $event)"
+        />
+        <StSlider
+          skey="warpStrength"
+          :label="t('timeline.style.warpStrength')"
+          :model-value="st.warpStrength"
+          :min="0.1"
+          :max="1"
+          :step="0.05"
+          :format="pct"
+          @update:model-value="setOn('timeWarp', 'warpStrength', $event)"
+        />
+      </section>
+      <p class="st-note">{{ t('timeline.style.warpNote') }}</p>
+    </template>
+
+    <!-- ── Camera: the perspective tilt ── -->
+    <template v-else-if="chapter === 'camera'">
+      <section class="st-section">
+        <StSwitch
+          skey="viewTilt"
+          :label="t('timeline.style.tilt')"
+          :model-value="st.viewTilt"
+          @update:model-value="set('viewTilt', $event)"
+        />
+        <StSlider
+          skey="tiltAngle"
+          :label="t('timeline.style.tiltAngle')"
+          :model-value="st.tiltAngle"
+          :min="8"
+          :max="64"
+          :step="1"
+          :format="(v) => v + '°'"
+          @update:model-value="setOn('viewTilt', 'tiltAngle', $event)"
+        />
+        <StSlider
+          skey="tiltYaw"
+          :label="t('timeline.style.tiltYaw')"
+          :model-value="st.tiltYaw"
+          :min="-180"
+          :max="180"
+          :step="5"
+          :format="(v) => v + '°'"
+          @update:model-value="setOn('viewTilt', 'tiltYaw', $event)"
+        />
+        <StSlider
+          skey="arcLift"
+          :label="t('timeline.style.arcLift')"
+          :model-value="st.arcLift"
+          :min="0"
+          :max="2"
+          :step="0.05"
+          :format="pct"
+          @update:model-value="setOn('viewTilt', 'arcLift', $event)"
+        />
+      </section>
+      <p class="st-note">{{ t('timeline.style.tiltHint') }}</p>
+    </template>
   </div>
 </template>
 
@@ -193,8 +272,21 @@ const store = useMainStore()
 const { t } = useI18n()
 const st = computed(() => store.timelineSettings)
 const pct = (v) => Math.round(v * 100) + '%'
+const ageFmt = (v) => t('timeline.style.ageYears', { n: Math.round(v) })
+// The leaving age only shapes the Household rivers mode (per timeline scene).
+const riversOn = computed(
+  () =>
+    store.timelineScenes?.find((sc) => sc.id === store.activeSceneIds?.timeline)?.config?.mode ===
+    'rivers'
+)
 function set(key, value) {
   store.updateTimelineSetting(key, value)
+}
+// Dragging a tilt / warp slider also turns its switch on — the sliders are a
+// way in, too.
+function setOn(flag, key, value) {
+  if (st.value[flag]) store.updateTimelineSetting(key, value)
+  else store.applyTimelineSettings({ [key]: value, [flag]: true })
 }
 
 const BASE_ICONS = { classic: 'minus', tube: 'test-tube', glass: 'gem', glow: 'lightbulb' }

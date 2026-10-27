@@ -1,5 +1,42 @@
 // English — the source locale and fallback for every other language.
 export default {
+  // Relationship dynamics — the sentiment layer + the graph's Dynamics lens
+  sentiment: {
+    lens: 'Dynamics',
+    lensHint: 'Recolour every bond warm ↔ cold by its feeling; width shows how strongly it is felt',
+    legendTitle: 'Dynamics',
+    close: 'Turn off the Dynamics lens',
+    cold: 'Cold',
+    neutral: 'Neutral',
+    warm: 'Warm',
+    faint: 'Faint',
+    strong: 'Strong',
+    widthNote: 'Line width = intensity',
+    ringNote: 'Rings = each person’s overall temperature',
+    counts: '{warm} warm · {neutral} neutral · {cold} cold',
+    feeling: 'Feeling',
+    intensity: 'Intensity',
+    feelingAria: 'Feeling, from cold to warm',
+    intensityAria: 'Intensity, from faint to strong',
+    fromType: 'From type',
+    fromTypeTitle: 'Use this type’s default feeling',
+    defaultIntensity: 'Default',
+    defaultIntensityTitle: 'Use the default intensity',
+    typeFeelingHint:
+      'How this kind of bond feels by default — the Dynamics lens colours it on the cold ↔ warm ramp. Single bonds can override it.',
+    levels: {
+      hostile: 'Hostile',
+      cool: 'Cool',
+      neutral: 'Neutral',
+      warm: 'Warm',
+      loving: 'Loving'
+    },
+    style: {
+      title: 'Dynamics lens',
+      warm: 'Warm feeling',
+      cold: 'Cold feeling'
+    }
+  },
   topbar: {
     search: 'Jump to a person',
     export: 'Export',
@@ -15,6 +52,8 @@ export default {
     darkMode: 'Dark mode',
     inkOn: 'Ink painting theme (水墨)',
     inkOff: 'Leave the ink painting theme',
+    medievalOn: 'Medieval codex theme',
+    medievalOff: 'Leave the medieval theme',
     newProject: 'New project',
     closeProject: 'Close project',
     undo: 'Undo the last data edit',
@@ -548,6 +587,63 @@ export default {
     importFailed: 'Import failed: {error}',
     importPhotos: 'Photos are not included in project files.',
     accent: 'Accent colour updated'
+  },
+  fingerprint: {
+    title: 'Family fingerprint',
+    menu: 'Family fingerprint',
+    open: 'View the family fingerprint',
+    ariaOf: 'Family fingerprint of {name}',
+    close: 'Close',
+    subtitle:
+      'A crest drawn from the shape of this tree. It is unique to this project and redraws itself as the family grows.',
+    partial: 'Drawn from counts only — the full structure is not available here.',
+    downloadPng: 'Download PNG',
+    downloadSvg: 'Download SVG',
+    saved: 'Saved {name}',
+    failed: 'Could not create the image',
+    living: 'Same tree, same crest: add a person and it shifts gently.',
+    legend: {
+      rings: {
+        label: 'Rings',
+        text: 'One per generation, with a bead for each person ({n} generations, {m} people)'
+      },
+      petals: {
+        label: 'Petals',
+        text: 'One per family, repeated at each star point and rising from the parents’ ring ({n} families)'
+      },
+      shape: {
+        label: 'Petal shape',
+        text: 'Longer = more children per family (average {n}); sharper = more uneven family sizes'
+      },
+      symmetry: {
+        label: 'Star',
+        text: 'One point per founding line, at least three ({m} founding lines)'
+      },
+      rosette: {
+        label: 'Rosette',
+        text: 'Interlaced circles for couples, diamonds for remarriages ({n} couples, {m} remarried)'
+      },
+      core: {
+        label: 'Core',
+        text: 'Split by gender balance ({n}% / {m}%)'
+      },
+      threads: {
+        label: 'Threads',
+        text: 'Friendships, rivalries and other social bonds ({n})'
+      },
+      halo: {
+        label: 'Halo',
+        text: 'One bead per decade spanned, large beads on centuries ({n} decades)'
+      },
+      satellites: {
+        label: 'Satellites',
+        text: 'Groups not joined to the main tree; sparks for people with no bonds ({n} groups, {m} alone)'
+      },
+      tints: {
+        label: 'Colours',
+        text: 'Petals take the most-used tag colours ({n} of {m} tags)'
+      }
+    }
   },
   projectMenu: {
     button: 'Project',
@@ -1108,15 +1204,17 @@ export default {
     },
     theme: {
       title: 'Theme',
-      desc: 'Switch between dark, light and the 水墨 ink-painting interface.',
+      desc: 'Switch between dark, light, the 水墨 ink-painting and the illuminated medieval interface.',
       light: 'Light',
       dark: 'Dark',
-      ink: 'Ink'
+      ink: 'Ink',
+      medieval: 'Medieval'
     },
     accent: {
       title: 'Accent colour',
       desc: 'Tints buttons, highlights and selections across the whole app.',
       inkNote: 'The ink theme always stamps in cinnabar seal red.',
+      medievalNote: 'The medieval theme is always illuminated in lapis and gold.',
       custom: 'Custom colour',
       reset: 'Reset to default',
       presets: {
@@ -1279,6 +1377,40 @@ export default {
     camera: 'Camera',
     lighting: 'Lighting',
     dragToSculpt: 'drag to sculpt · click to edit',
+    handleDepthHint: 'turn to the side to pull in depth',
+    handle: {
+      crown: 'Top of head',
+      headSide: 'Side of head',
+      forehead: 'Forehead',
+      temple: 'Temple',
+      brow: 'Brow',
+      browTail: 'Brow tail',
+      eyeInner: 'Inner eye corner',
+      eyeOuter: 'Outer eye corner',
+      lid: 'Upper lid',
+      noseBridge: 'Nose bridge',
+      noseTip: 'Nose tip',
+      noseWing: 'Side of nose',
+      cheekbone: 'Cheekbone',
+      cheek: 'Cheek',
+      upperLip: 'Upper lip',
+      lowerLip: 'Lower lip',
+      mouthCorner: 'Mouth corner',
+      chin: 'Chin',
+      chinSide: 'Side of chin',
+      jawCorner: 'Jaw corner',
+      ear: 'Ear',
+      neck: 'Neck',
+      shoulder: 'Shoulder',
+      bust: 'Chest',
+      waist: 'Waist',
+      belly: 'Belly',
+      hip: 'Hip',
+      glutes: 'Glutes',
+      upperArm: 'Upper arm',
+      thigh: 'Thigh',
+      calf: 'Calf'
+    },
     clickToEdit: 'click to edit',
     expression: 'Expression',
     undo: 'Undo',
@@ -1470,8 +1602,8 @@ export default {
       'eye-height1-decr-incr': 'Inner opening',
       'eye-height2-decr-incr': 'Middle opening',
       'eye-height3-decr-incr': 'Outer opening',
-      'eye-corner1-down-up': 'Inner corner',
-      'eye-corner2-down-up': 'Outer corner (tilt)',
+      'eye-corner1-down-up': 'Outer corner (tilt)',
+      'eye-corner2-down-up': 'Inner corner',
       'eye-push1-in-out': 'Inner depth',
       'eye-push2-in-out': 'Outer depth',
       'eye-epicanthus-in-out': 'Epicanthic fold',
@@ -1614,7 +1746,8 @@ export default {
       muscle: 'Muscle',
       proportions: 'Proportions',
       breastSize: 'Bust',
-      breastFirmness: 'Bust firmness'
+      breastFirmness: 'Bust firmness',
+      ideal: 'Idealize'
     },
     anc: {
       african: 'African',
@@ -1769,6 +1902,8 @@ export default {
     },
     light: {
       studio: 'Studio',
+      atelier: 'Atelier',
+      cinematic: 'Cinematic',
       daylight: 'Daylight',
       golden: 'Golden hour',
       moonlight: 'Moonlight',
@@ -2271,9 +2406,12 @@ export default {
       camera: 'Camera',
       physics: 'Physics',
       lifelines: 'Lifelines',
+      time: 'Time',
       canvas: 'Canvas',
       cards: 'Cards',
-      mapStyle: 'Map style'
+      mapStyle: 'Map style',
+      shapes: 'Shapes',
+      auras: 'Special effects'
     },
     saved: {
       deviceAll: 'Saved on this device · every project, every view',
@@ -2317,6 +2455,133 @@ export default {
     },
     directory: {
       cardModesOnly: 'Card faces show in the Grid and card-stage modes.'
+    },
+    groups: {
+      shape: 'Group shape',
+      shapeSub: 'How a group is drawn, and how it shows the people it shares with other groups.',
+      ringsBlurb: 'Fixed circles. Shared people sit between their groups, tethered to each.',
+      vennBlurb:
+        'Living membranes. Each group stretches to wrap its people, so shared members sit where the groups overlap.',
+      preview: 'Preview of the {style} style',
+      softness: 'Softness',
+      softTaut: 'Taut',
+      softFluid: 'Fluid',
+      lens: 'Lens glow',
+      lensHint: 'Shade the overlaps as lit lenses',
+      arrangeTip:
+        'Arrange in the toolbar slides groups that share people into overlap and keeps the rest apart.',
+      ringsTip: 'Switch to Venn to see shared members as overlaps instead of tethers.'
+    }
+  },
+  auras: {
+    intro:
+      'Give a tag or a trait a special effect. Everyone who carries it wears it in the Graph and the Timeline.',
+    active: 'Active effects',
+    add: 'Add effect',
+    addTitle: 'Give an effect to…',
+    cancel: 'Cancel',
+    kinds: { tag: 'Tag', trait: 'Trait' },
+    searchTags: 'Find a tag…',
+    searchTraits: 'Find a trait…',
+    noTags: 'No tags yet. Tag a {noun} on their profile, then give the tag an effect here.',
+    noTraits: 'No traits yet.',
+    noMatch: 'Nothing matches “{q}”',
+    hasEffect: 'Has an effect',
+    ruleCount: 'Effects: {n}',
+    empty: {
+      title: 'No special effects yet',
+      body: 'Crown your royals, set your mages alight, frost the northerners. Pick a tag or a trait to begin.',
+      cta: 'Add the first effect'
+    },
+    bearersNone: 'No one yet',
+    bearersOne: '{n} {noun}',
+    bearersOther: '{n} {noun}s',
+    draft: 'Not saved',
+    draftHint: 'A suggested look. Change anything, or keep it as it is.',
+    keep: 'Keep',
+    edit: 'Edit this effect',
+    collapse: 'Collapse',
+    remove: 'Remove this effect',
+    discard: 'Discard',
+    removed: 'Effect removed from “{name}”',
+    saveFailed: 'Couldn’t save the effect',
+    tagMembers: 'Everyone with this tag',
+    preview: {
+      label: 'Live preview',
+      replay: 'Replay the ignition',
+      sample: 'A sample {noun} wearing this effect'
+    },
+    presets: {
+      title: 'Presets',
+      royal: 'Royal',
+      saint: 'Saint',
+      inferno: 'Inferno',
+      frostborn: 'Frostborn',
+      arcane: 'Arcane',
+      cursed: 'Cursed',
+      stormcaller: 'Stormcaller',
+      blossom: 'Blossom',
+      bloodline: 'Bloodline'
+    },
+    ornament: 'Ornament',
+    ornaments: {
+      none: { label: 'None', hint: 'No ornament — just the line and the tint' },
+      halo: { label: 'Halo', hint: 'A saint’s nimbus glowing behind the head' },
+      flame: { label: 'Flame', hint: 'Flames licking up around the node' },
+      frost: { label: 'Frost', hint: 'Ice crystals creeping over the rim' },
+      sparkle: { label: 'Sparkle', hint: 'Twinkling stars drifting around' },
+      crown: { label: 'Crown', hint: 'A crown resting on top' },
+      shadow: { label: 'Shadow', hint: 'Dark smoke curling out from behind' },
+      storm: { label: 'Storm', hint: 'Lightning crackling around the rim' },
+      bloom: { label: 'Bloom', hint: 'Petals drifting in a slow circle' },
+      aura: { label: 'Aura', hint: 'A paired golden ring shimmering around the rim' },
+      runes: { label: 'Runes', hint: 'A slowly turning ring of runes' },
+      orbit: { label: 'Orbit', hint: 'A spark circling the node' },
+      burst: { label: 'Burst', hint: 'A spiked starburst behind the node' },
+      pulse: { label: 'Pulse', hint: 'Echo rings beating outward' }
+    },
+    color: 'Colour',
+    tint: 'Tint',
+    tintHint: 'Ring the node and colour the lifeline in this colour',
+    line: 'Line effect',
+    lineHint: 'Runs down their lifeline, and along bonds between two bearers.',
+    noLine: 'Plain',
+    when: {
+      title: 'Who wears it',
+      any: 'Any value',
+      is: 'Is one of',
+      contains: 'Contains',
+      range: 'In range',
+      checkedNote: 'Everyone with this box checked wears the effect.',
+      pickOptions: 'Pick at least one option.',
+      noOptions: 'This trait has no options yet.',
+      containsPh: 'Type a word, press Enter',
+      addWord: 'Add',
+      removeWord: 'Remove “{v}”',
+      needWord: 'Add at least one word.',
+      needBound: 'Set a lower or an upper bound.',
+      min: 'From',
+      max: 'To',
+      minYear: 'From year',
+      maxYear: 'To year',
+      scale: 'Scale with value',
+      scaleHint: 'Higher values wear a stronger ornament',
+      sumAny: 'Has any value',
+      sumChecked: 'When checked',
+      sumIs: 'Is {v}',
+      sumContains: 'Contains “{v}”',
+      sumBetween: '{min} to {max}',
+      sumAtLeast: '{min} or more',
+      sumAtMost: 'Up to {max}',
+      sumYearBetween: 'Years {min}–{max}',
+      sumYearFrom: 'From {min}',
+      sumYearUntil: 'Until {max}',
+      sumScaled: 'scales with value'
+    },
+    entry: {
+      trait: 'Special effect…',
+      traitHint: 'Make everyone with it glow',
+      tag: 'Special effect'
     }
   },
   graphStyle: {
@@ -2359,6 +2624,7 @@ export default {
       showLabels: 'Show labels',
       showAge: 'Show age',
       glowOnHover: 'Glow on hover',
+      starTwinkle: 'Departed stars twinkle',
       unknown: 'Unknown',
       lineStyle: 'Line style',
       lineOpacity: 'Line opacity',
@@ -2378,10 +2644,14 @@ export default {
       repulsion: 'Repulsion'
     },
     brushOwns: 'Brush strokes own the lines right now — effects resume on any other line style.',
+    starHint: 'Brighter, bigger stars have more descendants. Photos show on hover.',
     useOrganic: 'Use Organic',
     reset: 'Reset all',
     shapes: {
       gravestone: 'Gravestone',
+      plate: 'Plate',
+      flatplate: 'Flat plate',
+      star: 'Star',
       circle: 'Circle',
       square: 'Square',
       diamond: 'Diamond',
@@ -2448,7 +2718,8 @@ export default {
       rain: 'Rain',
       motes: 'Motes',
       mist: 'Mist',
-      plum: 'Plum'
+      plum: 'Plum',
+      nightsky: 'Night sky'
     },
     fxScopes: {
       lineage: {
@@ -2504,12 +2775,28 @@ export default {
       gilded: {
         label: 'Gilded',
         hint: 'A royal gold rope with a shine that travels its length'
+      },
+      starline: {
+        label: 'Star chart',
+        hint: 'Constellation lines — fine silver strokes that stop short of each star'
       }
     },
     themes: {
+      constellation: {
+        name: 'Constellation',
+        tagline: 'A night sky — brighter stars have more descendants'
+      },
       graveyard: {
         name: 'Graveyard',
         tagline: 'Headstones on their birth-year ground — best in the Birth layout'
+      },
+      heraldry: {
+        name: 'Heraldry',
+        tagline: 'Coats of arms — shields on gilded lines, embers on the wind'
+      },
+      illuminated: {
+        name: 'Illuminated',
+        tagline: 'A manuscript leaf — lapis and gold leaf, dust in the candlelight'
       },
       classic: {
         name: 'Classic',
@@ -2771,6 +3058,38 @@ export default {
     fitAll: 'Fit all',
     refresh: 'Refresh layout — re-run the family tree algorithm',
     refreshAria: 'Refresh layout',
+    warpToggle: 'Stretch busy years — widen the axis where births cluster',
+    tiltToggle: 'Tilt the timeline into 3D (T)',
+    modes: {
+      lanes: {
+        label: 'Lanes',
+        title:
+          'Every life keeps its own lane — family stems and bridged branches show who descends from whom'
+      },
+      sprout: {
+        label: 'Sprout',
+        title:
+          'Lives sprout out of their parents’ family stem and reuse lanes once their last owner is gone — compact and flowing'
+      },
+      rivers: {
+        label: 'Rivers',
+        title:
+          'Household rivers — each household is a channel: children are born inside their parents’ channel, and a life only crosses over when it marries or leaves home'
+      }
+    },
+    river: {
+      household: 'Household of {names}',
+      own: '{name}’s own household',
+      joined: 'Joined: {names}'
+    },
+    bond: {
+      born: 'Born {year}',
+      childOf: 'Child of {names}',
+      adoptedBy: 'Adopted by {names}',
+      ageAt: '{name} was {age}',
+      oneChild: '1 child',
+      children: '{n} children'
+    },
     zoomAxes: 'Time axis {v} · lanes {h}',
     focus: {
       title: 'Focus',
@@ -2914,6 +3233,21 @@ export default {
       ageTicks: 'Age ticks',
       ageTicksHint: 'A notch every decade of each life',
       eraWash: 'Era wash',
+      leaveHome: 'Leaving home',
+      leaveHomeHint:
+        'Household rivers: unmarried adults move to a channel of their own at this age',
+      ageYears: 'age {n}',
+      timeWarp: 'Stretch busy years',
+      timeWarpHint: 'Siblings born a year apart separate; empty decades fold away',
+      warpStrength: 'Stretch',
+      warpNote:
+        'The grid stays on real years — its rules simply crowd where time is stretched. The stripe down the year gutter shows it: accent = stretched, grey = squeezed.',
+      tilt: 'Tilt into 3D',
+      tiltAngle: 'Tilt angle',
+      tiltYaw: 'Turn',
+      arcLift: 'Arc height',
+      tiltHint:
+        'T tilts, Q / E turn, Alt-drag sets the angle and turn. Family arcs rise off the board — turn it to pull overlapping arcs apart.',
       density: 'Density',
       colours: 'Colours',
       segs: {
@@ -3021,6 +3355,36 @@ export default {
     speed: 'Playback speed — {speed}',
     reverse: 'Reverse playback direction',
     loop: 'Loop playback'
+  },
+  census: {
+    toggle: 'Census: live demographics for this year',
+    title: 'Census',
+    close: 'Close the census',
+    emptyTitle: 'No one to count yet',
+    emptyBody:
+      'Give people a birth year and the census will tally who was alive in every year you travel to.',
+    alive: 'Alive',
+    couples: 'Couples',
+    meanAge: 'Mean age',
+    medianAge: 'Median age',
+    nobody: 'No one is alive in {year}',
+    trend: '{delta} compared with ten years earlier',
+    genderSplit: 'Male: {male} · Female: {female} · Other or unknown: {other}',
+    decade: '{decade}s',
+    decadeSpan: '{from}–{to}',
+    bornIn: 'Born in the {decade}',
+    diedIn: 'Died in the {decade}',
+    generations: 'Generations alive',
+    oldest: 'Oldest living',
+    ageShort: 'age {age}',
+    selectPerson: 'Select {name}',
+    population: 'Population',
+    populationAria: 'Population over time. Click to travel to a year.',
+    mortality: 'Deaths per decade',
+    noDeaths: 'No deaths recorded',
+    mortalityAria: 'Recorded deaths per decade. Click to travel to a year.',
+    hoverValue: '{year}: {value}',
+    hoverDeaths: '{decade}: {value}'
   },
   chronicle: {
     now: 'now',
@@ -3242,6 +3606,14 @@ export default {
     title: 'Groups',
     hint: 'Drag people into rings · Drag rings to arrange · Click a person to manage',
     arrangeTitle: 'Arrange groups in a ring',
+    arrangeVennTitle: 'Pull groups that share people into overlap, keep the rest apart',
+    style: {
+      label: 'Group style',
+      rings: 'Rings',
+      venn: 'Venn',
+      ringsHint: 'Fixed circles, with shared people tethered between them',
+      vennHint: 'Circles stretch to wrap shared people and overlap like a Venn diagram'
+    },
     arrange: 'Arrange',
     newGroup: 'New group',
     emptySceneTitle: 'No groups in this scene',
@@ -4663,6 +5035,18 @@ export default {
     born: 'b. {year}',
     noMatches: 'No matches'
   },
+  starChart: {
+    section: 'Star chart poster',
+    toggle: 'Frame as a star chart',
+    frame: {
+      circle: 'Planisphere',
+      rect: 'Atlas plate'
+    },
+    hint: 'Printed on a night sky, with an hour ring and a legend.',
+    autoSubtitle: 'A chart of {count} stars',
+    legend: 'Brightness = descendants',
+    hour: '{h}h'
+  },
   exportModal: {
     title: 'Export image',
     sub: 'Compose a picture of your project and save it anywhere',
@@ -5205,6 +5589,38 @@ export default {
       people: '{n} people',
       projects: '{n} projects',
       photos: '{n} photos'
+    }
+  },
+  // Name generator (WILD_IDEAS C2) — the dice beside the name slot
+  nameGen: {
+    dice: 'Suggest a name',
+    title: 'Name generator',
+    close: 'Close',
+    source: 'Sounds like',
+    ownTags: 'Suggested tags',
+    otherTags: 'Other tags',
+    cultures: 'Cultures',
+    tagOption: '{label} ({n})',
+    blendNote: 'Learned from {n} names, blended with {culture}.',
+    useName: 'Use “{name}”',
+    empty: 'No names came out. Try another source.',
+    reroll: 'Reroll',
+    surnameFrom: {
+      patronym: "Surname from the father's name",
+      parent: 'Surname from the parents',
+      tag: "The tag's most common surname",
+      generated: 'Generated surname'
+    },
+    corpus: {
+      english: 'English & Anglo-Saxon',
+      norse: 'Norse',
+      roman: 'Roman',
+      slavic: 'Slavic',
+      celtic: 'Celtic',
+      elvish: 'High fantasy (elvish)',
+      dwarven: 'Dwarven & orcish',
+      japanese: 'Japanese',
+      chinese: 'Chinese (pinyin)'
     }
   }
 }

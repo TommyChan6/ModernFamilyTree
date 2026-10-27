@@ -63,6 +63,15 @@
           <UiIcon class="pmenu-icon" name="file-up" :size="16" />
           {{ t('projectMenu.importJson') }}
         </button>
+        <button
+          class="pmenu-item"
+          role="menuitem"
+          :title="t('fingerprint.open')"
+          @click="openFingerprint"
+        >
+          <UiIcon class="pmenu-icon" name="fingerprint" :size="16" />
+          {{ t('fingerprint.menu') }}
+        </button>
 
         <div class="pmenu-sep"></div>
 
@@ -135,6 +144,11 @@ const open = ref(false)
 function emitAnd(evt) {
   open.value = false
   emit(evt)
+}
+
+function openFingerprint() {
+  open.value = false
+  store.openFingerprint(store.activeProjectId)
 }
 
 // Couples = every 'horizontal' (couple-role) bond, not just the builtin

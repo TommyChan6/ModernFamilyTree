@@ -113,6 +113,16 @@
       >
         <UiIcon name="square" :size="13" />
       </button>
+      <button
+        class="ts-btn ts-btn-census"
+        :class="{ 'ts-btn-active': censusOpen }"
+        :title="t('census.toggle')"
+        :aria-label="t('census.toggle')"
+        :aria-pressed="censusOpen"
+        @click="toggleCensus"
+      >
+        <UiIcon name="users-round" :size="13" />
+      </button>
       <template v-if="store.caps.timeControls">
         <div class="ts-ctrl-sep"></div>
         <div class="ts-btn-row">
@@ -179,6 +189,9 @@
       </template>
     </div>
 
+    <!-- The living census: a demographic ticker for the scrubbed year -->
+    <CensusPanel v-if="censusOpen" @close="toggleCensus" />
+
     <!-- Event feed: what just happened while time flows -->
     <div class="ts-feed">
       <TransitionGroup name="ts-toast">
@@ -207,6 +220,7 @@ import UiIcon from '../ui/UiIcon.js'
 import { hasIcon } from '../ui/icons.js'
 import { useI18n } from '../../i18n'
 import { defaultNameLabel } from '../../lib/dataLabels'
+import CensusPanel from './CensusPanel.vue'
 
 const store = useMainStore()
 const { t } = useI18n()
@@ -289,6 +303,25 @@ const DENSITY_BUCKETS = 48
 const density = computed(() =>
   rangeRef.value ? bucketizeEvents(tt.events.value, rangeRef.value, DENSITY_BUCKETS) : []
 )
+
+// ── The census ticker (open/closed remembered per viewer) ─────────────────
+const CENSUS_KEY = 'familytree.census.open'
+function readCensusOpen() {
+  try {
+    return localStorage.getItem(CENSUS_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+const censusOpen = ref(readCensusOpen())
+function toggleCensus() {
+  censusOpen.value = !censusOpen.value
+  try {
+    localStorage.setItem(CENSUS_KEY, censusOpen.value ? '1' : '0')
+  } catch {
+    /* storage blocked — the toggle still works for this session */
+  }
+}
 
 // ── Scrub the track ─────────────────────────────────────────────────────────
 const trackEl = ref(null)

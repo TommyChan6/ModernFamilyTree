@@ -1,0 +1,953 @@
+/* ── Medieval theme: the illuminated codex ─────────────────────────────────
+   A fourth app theme beside dark/light/ink: calfskin vellum, iron-gall ink,
+   ultramarine (lapis lazuli) as the accent, gold leaf for ornament and the
+   rubricator's vermilion for headings and warnings. Selected with
+   store.setTheme('medieval') — <html data-theme="medieval">. It is a LIGHT
+   theme for every renderer that asks `isLight` (store.isLightTheme); views
+   that dress up check store.isMedieval.
+
+   The app is dressed as a book in a castle scriptorium: the topbar is the
+   tooled-leather headband of the binding, the icon rail the gilt spine with
+   its raised bands, panels and modals are illuminated leaves framed in gold
+   with corner fleurons that open like a turning page, a charter's wax seal
+   hangs beneath the dialogs that let it, people wear their own coats of arms
+   (lib/medievalArt.ts blazonFor) and the theme switches in by burning through
+   the page.
+
+   The mounted-panel hook classes the ink theme introduced (.ink-mount,
+   .ink-unroll, .ink-rollers, .ink-veil, .ink-bloom, .ink-underline,
+   .ink-rule) are theme-agnostic hooks: ~60 components already wear them, and
+   this file gives each its medieval dress — no component has to change.
+
+   Textures (--med-vellum, --med-divider, --med-rose, --med-seal,
+   --med-corner-*…) are generated once at runtime by lib/medievalArt.ts
+   installMedievalAssets() and set on <html> as url() custom properties.
+
+   Fonts (assets/medieval/fonts, all SIL OFL 1.1 — licences beside the files):
+     Codex Gothic  Grenze Gotisch — headings, names (a readable textura)
+     Codex Fraktur UnifrakturMaguntia — illuminated initials, watermarks
+     Codex Caps    Cinzel — rubrics, eyebrows, numerals (Roman inscriptional)
+     Ink Serif     EB Garamond (shared with the ink theme) — body text
+   None of them carry CJK: Chinese falls back to the system book serif. */
+
+@font-face {
+  font-family: 'Codex Gothic';
+  src: url('../assets/medieval/fonts/GrenzeGotisch-latin.woff2') format('woff2');
+  font-weight: 400 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Codex Fraktur';
+  src: url('../assets/medieval/fonts/UnifrakturMaguntia-latin.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Codex Caps';
+  src: url('../assets/medieval/fonts/Cinzel-latin.woff2') format('woff2');
+  font-weight: 400 900;
+  font-display: swap;
+}
+
+:root {
+  --font-gothic: 'Codex Gothic', 'Songti SC', 'STSong', 'SimSun', 'Noto Serif CJK SC', serif;
+  --font-fraktur: 'Codex Fraktur', 'Codex Gothic', serif;
+  --font-caps: 'Codex Caps', 'Ink Serif', 'Songti SC', 'STSong', Georgia, serif;
+  --font-codex-serif:
+    'Ink Serif', 'Songti SC', 'STSong', 'SimSun', 'Noto Serif CJK SC', Georgia, serif;
+  /* the illuminator's pigments — usable from any theme */
+  --med-ink: #2b1d12;
+  --med-gold: #c9a043;
+  --med-gold-light: #f1d88c;
+  --med-gold-deep: #8a641c;
+  --med-lapis: #24478a;
+  --med-lapis-rgb: 36, 71, 138;
+  --med-vermilion: #a8321e;
+  --med-vermilion-rgb: 168, 50, 30;
+  --med-wax: #8e1f1a;
+  --med-gilt: linear-gradient(
+    160deg,
+    #f4dd95 0%,
+    #c9a043 34%,
+    #e8c870 52%,
+    #9a7322 78%,
+    #d6b25a 100%
+  );
+  --med-leather: linear-gradient(180deg, #3d130e, #6d2419 40%, #5a1c14 62%, #2e0e0a);
+}
+
+/* ── Tokens ──────────────────────────────────────────────────────────────── */
+/* The accent family is !important (as in ink): the user's accent is written
+   inline on <html> by store.setAccent(), and the codex is defined by its
+   lapis and gold. */
+:root[data-theme='medieval'] {
+  --bg: #e7d5ae;
+  --surface: #f2e5c6;
+  --glass-strong: rgba(242, 229, 198, 0.9);
+  --glass-soft: rgba(242, 229, 198, 0.9);
+  --elevated: #eadab4;
+  --hover: #e0cca1;
+  --border: rgba(66, 42, 18, 0.18);
+  --border-strong: rgba(66, 42, 18, 0.34);
+
+  --accent: #24478a !important;
+  --accent-rgb: 36, 71, 138 !important;
+  --accent-hover: #1a366d !important;
+  --accent-2: #a07a26 !important;
+  --on-accent: #f7eed6 !important;
+  --adim: rgba(36, 71, 138, 0.12) !important;
+
+  --pink: #9a4a5e;
+  --amber: #a87b1c;
+  --green: #2f6b4f;
+  --danger: #a8321e;
+  --danger-rgb: 168, 50, 30;
+  --kin-blood: #a8321e;
+  --kin-spouse: #9a4a5e;
+  --kin-marriage: #2f6b6b;
+  --kin-step: #5f4a86;
+  --kin-social: #2f6b4f;
+  --kin-distant: #85745a;
+
+  --t1: #2a1c10;
+  --t2: #52402b;
+  --t3: #786349;
+
+  --shadow-sm: 0 1px 3px rgba(60, 36, 12, 0.16);
+  --shadow: 0 6px 22px rgba(60, 36, 12, 0.18);
+  --shadow-lg: 0 22px 54px rgba(50, 28, 8, 0.26);
+  --glow: 0 0 14px rgba(201, 160, 67, 0.35);
+  --focus-ring: 0 0 0 3px rgba(36, 71, 138, 0.28);
+
+  --font: var(--font-codex-serif);
+
+  /* leaves are cut square; only bosses and seals are round */
+  --r-xs: 2px;
+  --r-sm: 3px;
+  --r-md: 4px;
+  --r-lg: 6px;
+  --r-xl: 8px;
+
+  /* heavy pages settle with weight */
+  --ease-out: cubic-bezier(0.22, 0.9, 0.3, 1);
+  --dur: 0.22s;
+  --dur-slow: 0.4s;
+
+  /* a clean leaf: the light vellum, veiled. Use as
+     `background: var(--med-sheet), var(--surface)` with background-size 512px. */
+  --med-sheet:
+    linear-gradient(rgba(246, 236, 212, 0.5), rgba(246, 236, 212, 0.5)),
+    var(--med-vellum-light, none);
+
+  /* the illuminated frame: ink hairline, gold band, dark rule, vellum
+     margin, outer ink hairline */
+  --med-frame-rings:
+    0 0 0 1px rgba(66, 42, 18, 0.5), 0 0 0 3px #c9a043, 0 0 0 4px rgba(110, 76, 20, 0.7),
+    0 0 0 8px #efe0bb, 0 0 0 9px rgba(66, 42, 18, 0.4);
+
+  color-scheme: light;
+}
+
+/* ── Vellum everywhere, by candlelight ───────────────────────────────────── */
+:root[data-theme='medieval'] body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 120% 95% at 50% 40%, transparent 50%, rgba(90, 52, 16, 0.16)),
+    linear-gradient(rgba(231, 213, 174, 0.3), rgba(231, 213, 174, 0.3)), var(--med-vellum, none);
+  background-size:
+    100% 100%,
+    100% 100%,
+    512px 512px;
+  font-size: 14px; /* Garamond reads small — a size up keeps it legible */
+}
+:root[data-theme='medieval'] ::selection {
+  background: rgba(201, 160, 67, 0.38);
+  color: inherit;
+}
+
+/* Textura for headings, set in iron-gall ink */
+:root[data-theme='medieval'] :is(h1, h2, h3) {
+  font-family: var(--font-gothic);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+/* eyebrows are rubrics: Roman capitals in the rubricator's red */
+:root[data-theme='medieval'] .eyebrow {
+  font-family: var(--font-caps);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--med-vermilion);
+}
+
+/* ── Primitives ──────────────────────────────────────────────────────────── */
+/* Buttons warm as if a candle were brought near: a gold glow spreads from
+   the centre on hover (a background layer whose size transitions). */
+:where(:root[data-theme='medieval']) .btn {
+  border-color: var(--border-strong);
+  background:
+    radial-gradient(
+        closest-side,
+        rgba(214, 170, 70, 0.26),
+        rgba(214, 170, 70, 0.08) 60%,
+        transparent
+      )
+      center / 0% 0% no-repeat,
+    color-mix(in srgb, var(--surface) 75%, transparent);
+  border-radius: 3px;
+  font-family: var(--font-codex-serif);
+  transition:
+    background-size 0.5s var(--ease-out),
+    background-color var(--dur) ease,
+    color var(--dur) ease,
+    border-color var(--dur) ease,
+    box-shadow var(--dur-slow) ease,
+    opacity var(--dur) ease;
+}
+:where(:root[data-theme='medieval']) .btn:hover:not(:disabled) {
+  background:
+    radial-gradient(
+        closest-side,
+        rgba(214, 170, 70, 0.26),
+        rgba(214, 170, 70, 0.08) 60%,
+        transparent
+      )
+      center / 240% 240% no-repeat,
+    color-mix(in srgb, var(--surface) 75%, transparent);
+  border-color: rgba(138, 100, 28, 0.6);
+}
+:where(:root[data-theme='medieval']) :is(.btn-ghost, .btn-outline) {
+  background-color: transparent;
+}
+:where(:root[data-theme='medieval']) .btn-ghost:not(:hover) {
+  border-color: transparent;
+}
+/* the primary button is a lapis enamel plaque in a gilded bezel */
+:where(:root[data-theme='medieval']) .btn-primary,
+:where(:root[data-theme='medieval']) .btn-primary:hover:not(:disabled) {
+  background:
+    radial-gradient(120% 140% at 30% 15%, rgba(160, 190, 255, 0.24), transparent 55%),
+    linear-gradient(180deg, #2f5aa6, var(--accent) 55%, #18315f);
+  color: var(--on-accent);
+  border-color: transparent;
+  border-radius: 3px;
+  box-shadow:
+    inset 0 0 0 1px #8a641c,
+    inset 0 0 0 2px rgba(241, 216, 140, 0.75),
+    inset 0 0 0 3px rgba(20, 30, 60, 0.4),
+    0 2px 6px rgba(20, 36, 80, 0.3);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+:where(:root[data-theme='medieval']) .btn-primary:hover:not(:disabled) {
+  background:
+    radial-gradient(120% 140% at 30% 15%, rgba(160, 190, 255, 0.3), transparent 55%),
+    linear-gradient(180deg, #3463b3, #24478a 55%, #1a366d);
+  box-shadow:
+    inset 0 0 0 1px #8a641c,
+    inset 0 0 0 2px rgba(241, 216, 140, 0.95),
+    inset 0 0 0 3px rgba(20, 30, 60, 0.4),
+    0 4px 14px rgba(20, 36, 80, 0.36),
+    0 0 12px rgba(201, 160, 67, 0.3);
+}
+:where(:root[data-theme='medieval']) .btn-primary:active:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 1px #8a641c,
+    inset 0 0 0 2px rgba(241, 216, 140, 0.6),
+    inset 0 2px 8px rgba(5, 12, 30, 0.5);
+}
+/* the sheen is a glint of gold leaf crossing the enamel */
+:where(:root[data-theme='medieval']) .btn-primary::before {
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255, 230, 160, 0.42) 50%,
+    transparent 65%
+  );
+}
+:where(:root[data-theme='medieval']) .btn-soft {
+  background-color: rgba(36, 71, 138, 0.09);
+}
+:where(:root[data-theme='medieval']) .btn-soft:hover:not(:disabled) {
+  background-color: rgba(36, 71, 138, 0.15);
+}
+:where(:root[data-theme='medieval']) .btn-danger {
+  background-color: rgba(var(--danger-rgb), 0.08);
+  border-color: rgba(var(--danger-rgb), 0.32);
+}
+:where(:root[data-theme='medieval']) .btn-danger:hover:not(:disabled) {
+  background-color: rgba(var(--danger-rgb), 0.15);
+  border-color: rgba(var(--danger-rgb), 0.55);
+}
+/* destructive = sealed in red wax */
+:where(:root[data-theme='medieval']) .btn-danger-solid,
+:where(:root[data-theme='medieval']) .btn-danger-solid:hover:not(:disabled) {
+  background:
+    radial-gradient(120% 140% at 30% 15%, rgba(255, 190, 170, 0.22), transparent 55%),
+    linear-gradient(180deg, #b83a2c, var(--danger) 55%, #6e1a10);
+  color: var(--on-accent);
+  border-color: transparent;
+  box-shadow:
+    inset 0 0 0 1px rgba(60, 10, 5, 0.5),
+    0 2px 6px rgba(110, 26, 16, 0.3);
+}
+:where(:root[data-theme='medieval']) .btn-danger-solid:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--danger) 86%, #000);
+}
+
+:where(:root[data-theme='medieval']) .icon-btn {
+  background: radial-gradient(closest-side, rgba(214, 170, 70, 0.3), transparent) center / 0% 0%
+    no-repeat;
+  transition:
+    background-size 0.45s var(--ease-out),
+    color var(--dur) ease,
+    transform var(--dur-slow) var(--ease-spring);
+}
+:where(:root[data-theme='medieval']) .icon-btn:hover:not(:disabled) {
+  background: radial-gradient(closest-side, rgba(214, 170, 70, 0.3), transparent) center / 130% 130%
+    no-repeat;
+}
+:where(:root[data-theme='medieval']) .icon-btn.is-active {
+  background: radial-gradient(closest-side, rgba(36, 71, 138, 0.18), transparent) center / 130% 130%
+    no-repeat;
+}
+
+/* counts are little wax seals */
+:where(:root[data-theme='medieval']) .badge {
+  background: radial-gradient(circle at 35% 30%, #c4463a, var(--med-wax) 60%, #5e130e);
+  color: #f7e6d2;
+  box-shadow:
+    inset 0 0 0 1px rgba(60, 8, 4, 0.5),
+    0 1px 2px rgba(60, 20, 8, 0.3);
+  border-radius: 999px;
+  font-family: var(--font-caps);
+  font-weight: 700;
+}
+:where(:root[data-theme='medieval']) .chip {
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(201, 160, 67, 0.32);
+}
+:where(:root[data-theme='medieval']) .chip.is-active,
+:where(:root[data-theme='medieval']) .chip.active {
+  background: rgba(36, 71, 138, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(201, 160, 67, 0.7);
+}
+:where(:root[data-theme='medieval']) .seg {
+  background: color-mix(in srgb, var(--elevated) 75%, transparent);
+  border-radius: 3px;
+}
+:where(:root[data-theme='medieval']) .seg-btn {
+  border-radius: 2px;
+}
+/* the chosen segment is a small gilt-framed plaque */
+:where(:root[data-theme='medieval']) .seg-btn.active,
+:where(:root[data-theme='medieval']) .seg-btn.is-active {
+  background: var(--med-sheet), var(--surface);
+  background-size: 512px 512px;
+  box-shadow:
+    inset 0 0 0 1px rgba(138, 100, 28, 0.55),
+    inset 0 0 0 2px rgba(241, 216, 140, 0.5),
+    0 1px 2px rgba(60, 36, 12, 0.18);
+}
+/* the switch: an iron stud slides onto lapis and turns to gold */
+:where(:root[data-theme='medieval']) input[type='checkbox'].switch {
+  background: rgba(255, 248, 230, 0.55);
+  border-color: var(--border-strong);
+}
+:where(:root[data-theme='medieval']) input[type='checkbox'].switch::after {
+  background: radial-gradient(circle at 35% 30%, #8a8580, #4a4440);
+}
+:where(:root[data-theme='medieval']) input[type='checkbox'].switch:checked {
+  background: linear-gradient(180deg, #2f5aa6, var(--accent));
+  border-color: #8a641c;
+}
+:where(:root[data-theme='medieval']) input[type='checkbox'].switch:checked::after {
+  background: radial-gradient(circle at 35% 30%, #f6e2a4, #c9a043 55%, #8a641c);
+}
+
+/* Cards are leaves of the codex framed by a gilt rule */
+:where(:root[data-theme='medieval']) .card {
+  background: var(--med-sheet), var(--surface);
+  background-size: 512px 512px;
+  border-color: rgba(66, 42, 18, 0.26);
+  box-shadow:
+    0 0 0 2px rgba(201, 160, 67, 0.55),
+    0 0 0 3px rgba(66, 42, 18, 0.18),
+    var(--shadow-sm);
+}
+:where(:root[data-theme='medieval']) .glass {
+  background: var(--glass-strong);
+  backdrop-filter: blur(10px) sepia(0.15);
+}
+
+/* Inputs: vellum wells; focus lays a lapis rule with a gold glint */
+:where(:root[data-theme='medieval'])
+  :is(
+    input[type='text'],
+    input[type='search'],
+    input[type='email'],
+    input[type='password'],
+    input[type='number'],
+    input:not([type]),
+    textarea,
+    select
+  ) {
+  font-family: var(--font);
+  font-size: 13.5px;
+  background-color: rgba(255, 249, 232, 0.55);
+  border-color: rgba(66, 42, 18, 0.24);
+  box-shadow: inset 0 1px 2px rgba(60, 36, 12, 0.08);
+}
+:where(:root[data-theme='medieval'])
+  :is(
+    input[type='text'],
+    input[type='search'],
+    input[type='email'],
+    input[type='password'],
+    input[type='number'],
+    input:not([type]),
+    textarea,
+    select
+  ):focus {
+  border-color: rgba(36, 71, 138, 0.6);
+  background-color: rgba(255, 251, 240, 0.85);
+  box-shadow:
+    inset 0 -1px 0 rgba(36, 71, 138, 0.5),
+    0 0 0 3px rgba(201, 160, 67, 0.22);
+}
+:where(:root[data-theme='medieval']) select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.4 6 6.4 11 1.4' stroke='%2352402b' stroke-width='1.8' fill='none' stroke-linejoin='bevel'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  background-size: 10px;
+  padding-right: 26px;
+}
+
+/* Section dividers are a rubricated pen flourish */
+:root[data-theme='medieval'] .divider {
+  height: 9px;
+  background: none;
+  -webkit-mask: var(--med-divider) center / 100% 100% no-repeat;
+  mask: var(--med-divider) center / 100% 100% no-repeat;
+  background-color: rgba(168, 50, 30, 0.55);
+}
+
+/* Scrollbars: a strip of brown leather */
+:root[data-theme='medieval'] ::-webkit-scrollbar-thumb {
+  background: rgba(90, 50, 22, 0.3);
+  border-radius: 2px;
+}
+:root[data-theme='medieval'] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(90, 50, 22, 0.5);
+}
+
+:where(:root[data-theme='medieval']) kbd {
+  font-family: var(--font-caps);
+  font-size: 10.5px;
+  font-weight: 700;
+  background: var(--surface);
+  border-color: rgba(138, 100, 28, 0.5);
+}
+
+/* Loaders: the spinner is a compass rose turning; skeletons breathe candlelight */
+:where(:root[data-theme='medieval']) .spinner,
+:where(:root[data-theme='medieval']) .btn.is-loading::after {
+  border: none;
+  border-radius: 0;
+  background-color: rgba(43, 29, 18, 0.78);
+  -webkit-mask: var(--med-rose) center / contain no-repeat;
+  mask: var(--med-rose) center / contain no-repeat;
+  animation: ui-spin 2.4s cubic-bezier(0.45, 0.05, 0.4, 0.95) infinite;
+}
+:where(:root[data-theme='medieval']) .btn-primary.is-loading::after,
+:where(:root[data-theme='medieval']) .btn-danger-solid.is-loading::after {
+  background-color: #f7eed6;
+}
+:where(:root[data-theme='medieval']) .skeleton {
+  background: rgba(120, 84, 36, 0.09);
+}
+:where(:root[data-theme='medieval']) .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(214, 170, 70, 0.16), transparent);
+}
+
+/* Floating overlay panes over the canvas views: a small gilt-framed leaf */
+:root[data-theme='medieval'] .canvas-pane {
+  background: var(--med-sheet), var(--surface);
+  background-size: 512px 512px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(66, 42, 18, 0.4);
+  border-radius: 3px;
+  box-shadow:
+    0 0 0 2px #c9a043,
+    0 0 0 3px rgba(110, 76, 20, 0.5),
+    var(--shadow);
+}
+
+/* ── App shell: the binding ──────────────────────────────────────────────── */
+/* The topbar is the head of the book: a band of oxblood leather tooled with
+   a line of gold dots along its top, the leaf beneath, and a gilt double
+   rule where the page (the workspace) begins. */
+:root[data-theme='medieval'] .topbar {
+  position: relative;
+  padding-top: 6px;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 228, 0.5), rgba(255, 248, 228, 0) 70%),
+    var(--med-vellum-light, none) 0 0 / 512px 512px,
+    #eddcb6;
+  border-bottom-color: transparent;
+  box-shadow:
+    0 1px 0 rgba(66, 42, 18, 0.45),
+    0 3px 0 #c9a043,
+    0 4px 0 rgba(110, 76, 20, 0.6),
+    0 12px 18px -10px rgba(60, 36, 12, 0.3);
+}
+:root[data-theme='medieval'] .topbar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 7px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle, #e8c870 0 1.1px, transparent 1.5px) 0 50% / 12px 100% repeat-x,
+    linear-gradient(180deg, transparent 6px, rgba(201, 160, 67, 0.8) 6px),
+    var(--med-leather);
+  box-shadow: 0 2px 3px rgba(40, 14, 6, 0.35);
+  z-index: 6;
+  animation: med-band-in 0.9s var(--ease-out) both;
+}
+@keyframes med-band-in {
+  from {
+    transform: scaleX(0.4);
+    opacity: 0;
+  }
+}
+
+/* The app mark becomes the family's wax seal */
+:root[data-theme='medieval'] .home-btn {
+  border: none;
+  border-radius: 50%;
+  background: var(--med-seal, var(--med-wax)) center / 32px 32px no-repeat;
+  box-shadow: none;
+  filter: drop-shadow(0 1px 2px rgba(60, 10, 5, 0.35));
+  transition: transform 0.45s var(--ease-spring);
+}
+:root[data-theme='medieval'] .home-btn:hover {
+  box-shadow: none;
+  transform: rotate(-8deg) scale(1.07);
+}
+:root[data-theme='medieval'] .home-btn-mark {
+  opacity: 0;
+}
+
+/* The project button is the title cartouche: a framed label in textura */
+:root[data-theme='medieval'] .projects-btn {
+  border-radius: 2px;
+  border-color: rgba(110, 76, 20, 0.55);
+  background: var(--med-sheet), var(--surface);
+  background-size: 512px 512px;
+  box-shadow:
+    inset 0 0 0 2px var(--surface),
+    inset 0 0 0 3px rgba(201, 160, 67, 0.55);
+}
+:root[data-theme='medieval'] .projects-btn:hover {
+  border-color: #8a641c;
+  box-shadow:
+    inset 0 0 0 2px var(--surface),
+    inset 0 0 0 3px rgba(201, 160, 67, 0.9),
+    0 3px 10px rgba(60, 36, 12, 0.2);
+}
+:root[data-theme='medieval'] .projects-btn-current {
+  font-family: var(--font-gothic);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--t1);
+}
+:root[data-theme='medieval'] .projects-btn-count {
+  background: radial-gradient(circle at 35% 30%, #c4463a, var(--med-wax) 60%, #5e130e);
+  color: #f7e6d2;
+  border-radius: 999px;
+}
+:root[data-theme='medieval'] .upgrade-pill {
+  border-radius: 2px;
+  background: var(--med-gilt);
+  color: var(--med-ink);
+  box-shadow:
+    inset 0 0 0 1px rgba(90, 60, 10, 0.55),
+    0 1px 3px rgba(90, 60, 10, 0.3);
+  font-family: var(--font-caps);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+:root[data-theme='medieval'] .upgrade-pill-spark {
+  color: var(--med-vermilion);
+}
+:root[data-theme='medieval'] .mode-picker-label {
+  font-family: var(--font-caps);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  font-size: 11.5px;
+}
+:root[data-theme='medieval'] .mode-picker,
+:root[data-theme='medieval'] .labs-btn {
+  border-radius: 2px;
+  background-color: rgba(255, 249, 232, 0.5);
+}
+
+/* The icon rail is the spine: oxblood leather, its raised bands picked out
+   in gold, the views tooled in gold leaf. The open view sits on a gilded
+   plaque. */
+:root[data-theme='medieval'] .icon-rail {
+  border-right: 1px solid #2e0e0a;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.28),
+      transparent 18%,
+      transparent 82%,
+      rgba(0, 0, 0, 0.32)
+    ),
+    radial-gradient(ellipse 140% 30% at 50% 0%, rgba(255, 210, 160, 0.1), transparent),
+    linear-gradient(180deg, #5a1d15, #6d2419 50%, #4a160f);
+  box-shadow: inset -1px 0 0 rgba(201, 160, 67, 0.35);
+}
+:root[data-theme='medieval'] .icon-rail::before,
+:root[data-theme='medieval'] .icon-rail::after {
+  /* the raised bands: a leather ridge with a gold fillet either side */
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 7px;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, #c9a043 0 1px, transparent 1px 6px, #c9a043 6px 7px),
+    linear-gradient(180deg, #4a160f, #8a3424 45%, #4a160f);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme='medieval'] .icon-rail::before {
+  top: 4px;
+}
+:root[data-theme='medieval'] .icon-rail::after {
+  bottom: 4px;
+}
+:root[data-theme='medieval'] .rail-btn {
+  color: #d8b866;
+  border-radius: 3px;
+  background: radial-gradient(closest-side, rgba(241, 216, 140, 0.22), transparent) center / 0% 0%
+    no-repeat;
+  transition:
+    background-size 0.45s var(--ease-out),
+    color var(--dur-fast);
+}
+:root[data-theme='medieval'] .rail-btn:hover,
+:root[data-theme='medieval'] .rail-views .rail-btn:hover {
+  color: #f6e2a4;
+  background: radial-gradient(closest-side, rgba(241, 216, 140, 0.22), transparent) center / 120%
+    120% no-repeat;
+}
+:root[data-theme='medieval'] .rail-indicator {
+  inset: 3px;
+  width: 34px;
+  height: 34px;
+  border-radius: 3px;
+  background: var(--med-gilt);
+  box-shadow:
+    inset 0 0 0 1px rgba(90, 60, 10, 0.7),
+    inset 0 0 0 2px rgba(255, 240, 190, 0.45),
+    0 1px 4px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme='medieval'] .rail-indicator::before {
+  display: none;
+}
+:root[data-theme='medieval'] .rail-btn.active,
+:root[data-theme='medieval'] .rail-btn.active:hover {
+  color: #3d130e;
+  background: none;
+}
+:root[data-theme='medieval'] .rail-btn.active .rail-icon {
+  animation: med-rail-strike 0.5s cubic-bezier(0.3, 1.25, 0.5, 1);
+}
+@keyframes med-rail-strike {
+  0% {
+    transform: scale(1.3);
+    opacity: 0.4;
+  }
+  60% {
+    transform: scale(0.94);
+    opacity: 1;
+  }
+}
+:root[data-theme='medieval'] .rail-style.active {
+  color: #f6e2a4;
+  background: radial-gradient(closest-side, rgba(241, 216, 140, 0.28), transparent);
+}
+:root[data-theme='medieval'] .rail-add:hover {
+  color: #fff1c8;
+}
+:root[data-theme='medieval'] .rail-sep {
+  /* a gold lozenge on a gilt fillet */
+  width: 26px;
+  height: 9px;
+  background:
+    linear-gradient(45deg, transparent 35%, #d8b866 35% 65%, transparent 65%) center / 9px 9px
+      no-repeat,
+    linear-gradient(-45deg, transparent 35%, #d8b866 35% 65%, transparent 65%) center / 9px 9px
+      no-repeat,
+    linear-gradient(rgba(216, 184, 102, 0.6), rgba(216, 184, 102, 0.6)) center / 100% 1px no-repeat;
+}
+/* the flyout label: a small vellum tag in a gilt rule */
+:root[data-theme='medieval'] .rail-btn[data-tip]::after {
+  border-radius: 2px;
+  background: var(--med-sheet), var(--surface);
+  background-size: 512px 512px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(66, 42, 18, 0.45);
+  box-shadow:
+    0 0 0 2px #c9a043,
+    0 0 0 3px rgba(110, 76, 20, 0.5),
+    var(--shadow-sm);
+  font-size: 13px;
+  color: var(--t1);
+}
+
+/* The workspace is the open page: a far country of castles and woods rises
+   faintly at its foot — visible behind the DOM views, covered by the canvas
+   views (which paint their own ground). */
+:root[data-theme='medieval'] .workspace {
+  position: relative;
+  isolation: isolate;
+}
+:root[data-theme='medieval'] .workspace::before {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 230px;
+  background: var(--med-skyline, none) center bottom / 1400px 230px repeat-x;
+  opacity: 0.17;
+  pointer-events: none;
+  z-index: -1;
+  animation: med-country-rise 2.2s var(--ease-out) both;
+}
+@keyframes med-country-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+:root[data-theme='medieval'] .resize-handle:hover,
+:root[data-theme='medieval'] .resize-handle:active {
+  background: var(--med-gilt);
+  opacity: 0.7;
+}
+
+/* ── Illuminated leaves: panels & modals ─────────────────────────────────── */
+/* .ink-mount — in medieval, the box is a leaf of vellum framed in gold with
+   a fleuron in each corner. */
+:root[data-theme='medieval'] .ink-mount {
+  background:
+    var(--med-corner-tl, none) top left / 30px 30px no-repeat,
+    var(--med-corner-tr, none) top right / 30px 30px no-repeat,
+    var(--med-corner-bl, none) bottom left / 30px 30px no-repeat,
+    var(--med-corner-br, none) bottom right / 30px 30px no-repeat,
+    var(--med-sheet),
+    var(--surface);
+  background-size:
+    30px 30px,
+    30px 30px,
+    30px 30px,
+    30px 30px,
+    512px 512px,
+    auto;
+  border-color: rgba(66, 42, 18, 0.5);
+  border-radius: 2px;
+  box-shadow:
+    var(--med-frame-rings),
+    0 30px 70px rgba(40, 20, 4, 0.36);
+}
+/* .ink-unroll — the leaf turns open from its spine (left edge) and settles.
+   Transform/opacity only. */
+:root[data-theme='medieval'] .ink-unroll {
+  animation: med-page-open 0.46s cubic-bezier(0.2, 0.85, 0.3, 1.04) backwards;
+  transform-origin: 0 50%;
+}
+@keyframes med-page-open {
+  from {
+    transform: perspective(1600px) rotateY(-32deg) translateX(-8px);
+    opacity: 0;
+  }
+  45% {
+    opacity: 1;
+  }
+}
+:root[data-theme='medieval'] [class*='-leave-active'] .ink-unroll,
+:root[data-theme='medieval'] .ink-unroll[class*='-leave-active'] {
+  transition:
+    transform 0.2s cubic-bezier(0.4, 0, 0.6, 1),
+    opacity 0.2s ease-in;
+}
+:root[data-theme='medieval'] [class*='-leave-to'] .ink-unroll,
+:root[data-theme='medieval'] .ink-unroll[class*='-leave-to'] {
+  transform: perspective(1600px) rotateY(20deg);
+  opacity: 0;
+}
+/* .ink-rollers — boxes that don't clip their overflow carry a charter's
+   seal: red wax on a lapis ribbon, hanging from the foot of the leaf. It
+   swings in after the page opens. */
+:root[data-theme='medieval'] .ink-rollers::after {
+  content: '';
+  position: absolute;
+  left: calc(50% - 21px);
+  top: calc(100% + 2px);
+  width: 42px;
+  height: 66px;
+  pointer-events: none;
+  background:
+    var(--med-seal, none) center bottom / 42px 42px no-repeat,
+    linear-gradient(
+        90deg,
+        transparent 13px,
+        #1f3d78 13px 19px,
+        transparent 19px 23px,
+        #1f3d78 23px 29px,
+        transparent 29px
+      )
+      0 0 / 100% 34px no-repeat;
+  filter: drop-shadow(0 3px 3px rgba(40, 12, 4, 0.4));
+  transform-origin: 50% 0;
+  z-index: 3;
+  animation: med-seal-swing 1.1s 0.25s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
+}
+@keyframes med-seal-swing {
+  from {
+    transform: translateY(-30px) rotate(-14deg);
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+:root[data-theme='medieval'] [class*='-leave-to'] .ink-rollers::after,
+:root[data-theme='medieval'] .ink-rollers[class*='-leave-to']::after {
+  opacity: 0;
+}
+
+/* Modal veils: the room darkens to a pool of candlelight */
+:root[data-theme='medieval'] .ink-veil {
+  background: radial-gradient(
+    ellipse at 50% 42%,
+    rgba(60, 34, 10, 0.2),
+    rgba(30, 16, 4, 0.48) 70%,
+    rgba(16, 8, 2, 0.62)
+  );
+  backdrop-filter: blur(2px) sepia(0.35);
+  -webkit-backdrop-filter: blur(2px) sepia(0.35);
+}
+
+/* .ink-bloom — candle warmth blooming from the centre on hover */
+:root[data-theme='medieval'] .ink-bloom {
+  background-image: radial-gradient(
+    closest-side,
+    rgba(214, 170, 70, 0.22),
+    rgba(214, 170, 70, 0.07) 62%,
+    transparent
+  );
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 0% 0%;
+  transition: background-size 0.55s var(--ease-out);
+}
+:root[data-theme='medieval'] .ink-bloom:hover,
+:root[data-theme='medieval'] .ink-bloom:focus-visible {
+  background-size: 220% 260%;
+}
+/* .ink-underline / .ink-rule — the pen flourish instead of the brush */
+:root[data-theme='medieval'] .ink-underline::after {
+  -webkit-mask-image: var(--med-underline);
+  mask-image: var(--med-underline);
+}
+:root[data-theme='medieval'] .ink-rule {
+  height: 9px;
+  -webkit-mask-image: var(--med-divider);
+  mask-image: var(--med-divider);
+  color: var(--med-vermilion);
+  opacity: 0.55;
+}
+
+/* ── Ornaments any component may use ────────────────────────────────────── */
+/* .med-initial — an illuminated initial: a fraktur letter in gold leaf on a
+   lapis ground, set in a gilt square (put the letter inside). */
+.med-initial {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5em;
+  height: 1.5em;
+  font-family: var(--font-fraktur);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--med-gold-light);
+  text-shadow:
+    0 1px 0 #8a641c,
+    0 0 6px rgba(241, 216, 140, 0.45);
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.16), transparent 60%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 6px),
+    var(--med-lapis);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 0 0 1px #8a641c,
+    inset 0 0 0 3px #c9a043,
+    inset 0 0 0 4px rgba(60, 40, 8, 0.5),
+    0 2px 6px rgba(20, 30, 60, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='medieval'] .topbar::before,
+  :root[data-theme='medieval'] .workspace::before,
+  :root[data-theme='medieval'] .ink-unroll,
+  :root[data-theme='medieval'] .ink-rollers::after,
+  :root[data-theme='medieval'] .rail-btn.active .rail-icon {
+    animation: none;
+  }
+  :root[data-theme='medieval'] .spinner {
+    animation-duration: 4s;
+  }
+}
+
+/* ── Theme switch into / out of medieval: the page burns through
+   (lib/themeReveal.js). The incoming theme shows through a flame-edged hole
+   that grows from the click; the outgoing page scorches as it goes. ── */
+html.med-reveal::view-transition-new(root) {
+  -webkit-mask-image: var(--med-burn-mask);
+  mask-image: var(--med-burn-mask);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  mask-size: 0 0;
+}
+html.med-reveal::view-transition-old(root) {
+  animation: med-scorch 1.4s ease-in both;
+}
+@keyframes med-scorch {
+  from {
+    filter: none;
+  }
+  to {
+    filter: sepia(0.7) saturate(1.4) brightness(0.72);
+  }
+}
+
+/* People wear their arms (lib/medievalArt.ts medievalAvatarBg): an initial
+   set over a metal half of the field needs an ink outline to read. */
+:root[data-theme='medieval'] :is(.rv-avatar, .insp-avatar, .avatar) {
+  color: #fbf3df;
+  text-shadow:
+    0 0 2px rgba(30, 18, 8, 0.95),
+    0 1px 2px rgba(30, 18, 8, 0.8);
+  box-shadow:
+    0 0 0 1.5px #c9a043,
+    0 0 0 2.5px rgba(66, 42, 18, 0.45);
+}

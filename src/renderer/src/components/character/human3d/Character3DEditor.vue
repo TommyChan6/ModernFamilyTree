@@ -102,6 +102,45 @@
         </span>
       </div>
 
+      <!-- Grab handles: pull a landmark (nose tip, chin, mouth corner…) -->
+      <div v-if="handleZone && !loading && !error" class="h3e-handles">
+        <button
+          v-for="h in zoneHandles"
+          :key="h.key"
+          :ref="(el) => bindHandle(h.key, el)"
+          class="h3e-handle"
+          :class="{ hot: hotHandle === h.key, active: hDrag && hDrag.key === h.key }"
+          :aria-label="handleLabel(h)"
+          @pointerdown="startHandle(h, $event)"
+          @pointerenter="enterHandle(h.key)"
+          @pointerleave="leaveHandle(h.key)"
+        ></button>
+      </div>
+      <Transition name="h3e-fade">
+        <div
+          v-if="hotInfo && !hDrag"
+          class="h3e-handle-tip"
+          :style="{ left: hotXY.x + 18 + 'px', top: hotXY.y - 12 + 'px' }"
+        >
+          <b>{{ handleLabel(hotInfo) }}</b>
+          <span v-for="ax in handleAxes(hotInfo)" :key="ax.axis" class="h3e-handle-axis">
+            <UiIcon :name="AXIS_ICON[ax.axis]" :size="13" />
+            {{ sliderLabel(ax.slider) }}
+          </span>
+          <em v-if="hotInfo.handle.axes.z">{{
+            L('handleDepthHint', 'turn to the side to pull in depth')
+          }}</em>
+        </div>
+      </Transition>
+      <div v-if="hDrag" class="h3e-sculpt-hud">
+        <b class="h3e-hud-title">{{ handleLabel(hDrag) }}</b>
+        <span v-for="ax in hDrag.axes" :key="ax.axis" :class="{ 'h3e-hud-off': !ax.reach }">
+          <UiIcon :name="AXIS_ICON[ax.axis]" :size="14" />
+          {{ sliderLabel(ax.slider) }}
+          <i>{{ fmtShape(shapeValue(ax.slider)) }}</i>
+        </span>
+      </div>
+
       <div class="h3e-expr" role="group" :aria-label="L('expression', 'Expression')">
         <button
           v-for="e in EXPRESSIONS"
@@ -1005,6 +1044,7 @@ import { PATTERNS } from './fabricMaterial'
 import { POSES, EXPRESSIONS } from './poses'
 import { LIGHT_PRESETS } from './studio'
 import { REGION_BY_GROUP } from './regions'
+import { axisResponse, axisVector, solveSlider } from './sculptHandles'
 import {
   BLUSH_COLORS,
   CLOTH_COLORS,
@@ -1514,6 +1554,9 @@ onMounted(() => {
   s.onReady = () => {
     s.apply(plainModel(), true)
     s.focus('full', true)
+    allHandles.value = s.handlePoints.map((p) => ({ key: p.key, handle: p.handle, side: p.side }))
+    cancelAnimationFrame(handleRaf)
+    tickHandles()
     // a cinematic first look: glide to the face
     setTimeout(() => focusFor(category.value, sub.value), 250)
     loading.value = false
@@ -1528,6 +1571,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   cancelAnimationFrame(applyRaf)
+  cancelAnimationFrame(handleRaf)
   clearTimeout(thumbTimer)
   stage.value?.dispose()
   stage.value = null
@@ -1545,11 +1589,155 @@ function regionCategory(r) {
   return [r.group, '']
 }
 
+// ── Grab handles (sculptHandles.ts): BDO-style landmark points ──────────────
+const AXIS_ICON = { x: 'move-horizontal', y: 'move-vertical', z: 'move-diagonal-2' }
+/** Which handles show: face handles in Face, body handles in Body. */
+const handleZone = computed(() =>
+  !sculptMode.value
+    ? null
+    : category.value === 'face'
+      ? 'face'
+      : category.value === 'body'
+        ? 'body'
+        : null
+)
+const allHandles = shallowRef([])
+const zoneHandles = computed(() =>
+  allHandles.value.filter((h) => h.handle.zone === handleZone.value)
+)
+const hotHandle = ref(null)
+const hotXY = ref({ x: 0, y: 0 })
+const hotInfo = computed(() => allHandles.value.find((h) => h.key === hotHandle.value) || null)
+const hDrag = shallowRef(null)
+const handleEls = new Map()
+let handleRaf = 0
+
+function bindHandle(key, el) {
+  if (el) handleEls.set(key, el)
+  else handleEls.delete(key)
+}
+function handleLabel(h) {
+  return L('handle.' + h.handle.id, h.handle.label)
+}
+function handleAxes(h) {
+  return ['x', 'y', 'z']
+    .filter((a) => h.handle.axes[a])
+    .map((a) => ({ axis: a, slider: h.handle.axes[a] }))
+}
+function fmtShape(v) {
+  const n = Math.round((v || 0) * 100)
+  return (n > 0 ? '+' : '') + n
+}
+function enterHandle(key) {
+  if (!hDrag.value) hotHandle.value = key
+  hoverRegion.value = null
+  stage.value?.setHighlight(null)
+}
+function leaveHandle(key) {
+  if (hotHandle.value === key && !hDrag.value) hotHandle.value = null
+}
+
+/** Per frame: pin every dot to its landmark (direct style writes, no re-render). */
+function tickHandles() {
+  handleRaf = requestAnimationFrame(tickHandles)
+  const s = stage.value
+  const zone = handleZone.value
+  if (!s || !zone || loading.value) return
+  const pts = s.projectHandles(zone)
+  // face points crowd into a blob when the head is small on screen: hide them
+  let show = 1
+  if (zone === 'face') {
+    const crown = pts.find((p) => p.key === 'crown')
+    const chin = pts.find((p) => p.key === 'chin')
+    const span = crown && chin ? Math.hypot(crown.x - chin.x, crown.y - chin.y) : 0
+    show = Math.max(0, Math.min(1, (span - 120) / 80))
+  }
+  for (const p of pts) {
+    const el = handleEls.get(p.key)
+    if (!el) continue
+    const dragging = hDrag.value?.key === p.key
+    const vis = dragging ? 1 : p.facing * show
+    el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%) scale(${0.65 + 0.35 * vis})`
+    el.style.opacity = String(vis > 0.02 ? 0.3 + 0.7 * vis : 0)
+    el.style.pointerEvents = vis > 0.15 ? 'auto' : 'none'
+    if (p.key === hotHandle.value || dragging) hotXY.value = { x: p.x, y: p.y }
+  }
+}
+
+function startHandle(h, e) {
+  const s = stage.value
+  if (!s || !s.asset || e.button !== 0) return
+  e.preventDefault()
+  const p = s.handlePoints.find((x) => x.key === h.key)
+  if (!p) return
+  s.controls.enabled = false
+  const axes = []
+  for (const axis of ['x', 'y', 'z']) {
+    const r = axisResponse(s.asset, p, axis)
+    if (!r) continue
+    const vec = axisVector(axis, p.side)
+    // only axes this view can actually drag (profile = depth, front = width)
+    axes.push({ axis, ...r, vec, start: shapeValue(r.slider), reach: s.axisReach(vec) > 0.35 })
+  }
+  hotHandle.value = h.key
+  hDrag.value = {
+    key: h.key,
+    handle: h.handle,
+    point: p,
+    x0: e.clientX,
+    y0: e.clientY,
+    world: s.handleWorld(p).clone(),
+    axes,
+    moved: false
+  }
+  stageHost.value.setPointerCapture?.(e.pointerId)
+}
+
+function dragHandleTo(e) {
+  const d = hDrag.value
+  const s = stage.value
+  if (!d || !s) return
+  const dx = e.clientX - d.x0
+  const dy = e.clientY - d.y0
+  if (Math.hypot(dx, dy) > 3) d.moved = true
+  if (!d.moved) return
+  const local = s.dragToLocal(d.world, dx, dy)
+  live((m) => {
+    for (const ax of d.axes) {
+      if (!ax.reach) continue
+      const pull = local.x * ax.vec[0] + local.y * ax.vec[1] + local.z * ax.vec[2]
+      const v = solveSlider(ax.start, pull, ax.dMax, ax.dMin)
+      if (Math.abs(v) < 0.005) delete m.shape[ax.slider]
+      else m.shape[ax.slider] = v
+    }
+  })
+}
+
+function endHandleDrag() {
+  const d = hDrag.value
+  hDrag.value = null
+  if (stage.value) stage.value.controls.enabled = true
+  if (!d) return
+  if (d.moved) done()
+  else {
+    // a click on a point opens its sliders
+    const [cat, sb] = regionCategory({ group: d.handle.group })
+    category.value = cat
+    sub.value = sb || FIRST_SUB[cat] || ''
+    search.value = ''
+  }
+}
+
 function onStageMove(e) {
   const s = stage.value
   if (!s || loading.value) return
   const rect = stageHost.value.getBoundingClientRect()
   hoverXY.value = { x: e.clientX - rect.left + 16, y: e.clientY - rect.top + 12 }
+  if (hDrag.value) {
+    dragHandleTo(e)
+    return
+  }
+  if (hotHandle.value) return
   if (drag.value) {
     const d = drag.value
     const dx = (e.clientX - d.x0) / 220
@@ -1578,9 +1766,12 @@ function onStageMove(e) {
 function onStageDown(e) {
   const s = stage.value
   if (!s || loading.value || e.button !== 0) return
+  // grab handles run their own drag (this capture-phase handler fires first)
+  if (e.target?.closest?.('.h3e-handle')) return
   downAt = { x: e.clientX, y: e.clientY, region: hoverRegion.value }
   const r = hoverRegion.value
-  if (sculptMode.value && r && (r.sculptX || r.sculptY)) {
+  // where grab points are shown they replace the coarse region drag
+  if (sculptMode.value && !handleZone.value && r && (r.sculptX || r.sculptY)) {
     // claim the drag before OrbitControls sees it
     s.controls.enabled = false
     drag.value = {
@@ -1595,6 +1786,10 @@ function onStageDown(e) {
 }
 
 function onStageUp(e) {
+  if (hDrag.value) {
+    endHandleDrag()
+    return
+  }
   const s = stage.value
   const moved = downAt ? Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) : 99
   if (drag.value) {
@@ -1613,7 +1808,7 @@ function onStageUp(e) {
 }
 
 function onStageLeave() {
-  if (drag.value) return
+  if (drag.value || hDrag.value) return
   hoverRegion.value = null
   stage.value?.setHighlight(null)
 }
@@ -1900,6 +2095,117 @@ defineExpose({ snapshot, randomize, flash, onKey })
 .h3e-hover-tag span {
   font-size: 11.5px;
   color: #aeb6c6;
+}
+
+/* Grab handles: small glass beads pinned to landmarks */
+.h3e-handles {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+  /* quiet until the pointer is on the stage, so the look reads unobstructed */
+  opacity: 0.35;
+  transition: opacity var(--dur) var(--ease-out);
+}
+
+.h3e-stage:hover .h3e-handles,
+.h3e-stage.sculpting .h3e-handles {
+  opacity: 1;
+}
+
+.h3e-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.92);
+  background: rgba(var(--accent-rgb), 0.55);
+  box-shadow:
+    0 0 0 3px rgba(var(--accent-rgb), 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.45);
+  cursor: grab;
+  opacity: 0;
+  transition:
+    width var(--dur) var(--ease-out),
+    height var(--dur) var(--ease-out),
+    background var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+  will-change: transform, opacity;
+}
+
+/* the focus ring + press feedback every <button> gets would fight the pinning */
+.h3e-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.h3e-handle.hot {
+  width: 17px;
+  height: 17px;
+  background: var(--accent);
+  box-shadow:
+    0 0 0 5px rgba(var(--accent-rgb), 0.28),
+    0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.h3e-handle.active {
+  width: 19px;
+  height: 19px;
+  background: var(--accent);
+  cursor: grabbing;
+  box-shadow:
+    0 0 0 8px rgba(var(--accent-rgb), 0.22),
+    0 0 22px rgba(var(--accent-rgb), 0.7);
+}
+
+.h3e-handle-tip {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 11px;
+  border-radius: 10px;
+  background: rgba(10, 12, 18, 0.78);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(var(--accent-rgb), 0.5);
+  color: #fff;
+  font-size: 12.5px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.h3e-handle-axis {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: #c9d0dc;
+}
+
+.h3e-handle-tip em {
+  font-size: 11px;
+  font-style: normal;
+  color: #97a0b1;
+}
+
+.h3e-hud-title {
+  font-weight: 700;
+}
+
+.h3e-sculpt-hud i {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* an axis this view can't drag (e.g. depth from the front) */
+.h3e-sculpt-hud .h3e-hud-off {
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .h3e-sculpt-hud {

@@ -51,9 +51,10 @@ export function paintEyeCanvas(look: EyeLook, size = 1024): HTMLCanvasElement {
 
   // ── Sclera ──
   const scl = g.createRadialGradient(c, c, irisR, c, c, c)
-  scl.addColorStop(0, '#f4efe9')
-  scl.addColorStop(0.55, '#ede3dc')
-  scl.addColorStop(1, `rgb(${226}, ${190 - look.scleraRed * 40}, ${182 - look.scleraRed * 50})`)
+  // a real sclera is never paper-white: warm ivory, pinker toward the rim
+  scl.addColorStop(0, '#ebe5de')
+  scl.addColorStop(0.5, '#e2d7cf')
+  scl.addColorStop(1, `rgb(${214}, ${176 - look.scleraRed * 40}, ${168 - look.scleraRed * 50})`)
   g.fillStyle = scl
   g.fillRect(0, 0, size, size)
   // Veins: wandering threads from the rim inward
@@ -237,7 +238,8 @@ vEyeCam = ( inverse( modelMatrix ) * vec4( cameraPosition, 1.0 ) ).xyz;`
         `#include <common>
 varying vec3 vEyeLocal;
 varying vec3 vEyeCam;
-uniform float uPupil, uIrisUV, uCosIris;`
+uniform float uPupil, uIrisUV, uCosIris;
+vec3 eyeIrisGlow = vec3( 0.0 );`
       )
       .replace(
         '#include <map_fragment>',
@@ -252,8 +254,24 @@ uniform float uPupil, uIrisUV, uCosIris;`
   float pupil = 0.18 + uPupil * 0.32;
   float pm = 1.0 - smoothstep( pupil - 0.02, pupil + 0.015, r );
   texel.rgb = mix( texel.rgb, vec3( 0.006 ), pm );
+  // eye occlusion: the socket and lids shade the ball — the upper lid casts
+  // a soft shadow across the top, and the sclera darkens toward the corners
+  // (what keeps eyes from looking pasted on)
+  float front = smoothstep( 0.35, 0.9, vEyeLocal.z );
+  float lid = 1.0 - smoothstep( -0.05, 0.55, vEyeLocal.y ) * 0.55;
+  float occ = mix( 0.42, 1.0, front ) * lid;
+  // the iris sits behind the lens and stays rich even in the lid shadow
+  float iris = 1.0 - smoothstep( 0.92, 1.05, r );
+  texel.rgb *= mix( occ, mix( occ, 1.0, 0.5 ), iris );
   diffuseColor *= texel;
+  eyeIrisGlow = texel.rgb * iris * ( 1.0 - pm );
 }`
+      )
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+// light caught and scattered inside the iris (the "alive" glow of game eyes)
+totalEmissiveRadiance += eyeIrisGlow * 0.06;`
       )
       .replace(
         '#include <roughnessmap_fragment>',
@@ -262,7 +280,7 @@ uniform float uPupil, uIrisUV, uCosIris;`
 roughnessFactor = mix( roughnessFactor, 0.12, smoothstep( uCosIris - 0.05, uCosIris + 0.02, vEyeLocal.z ) );`
       )
   }
-  mat.customProgramCacheKey = () => 'human3d-eye-v1'
+  mat.customProgramCacheKey = () => 'human3d-eye-v2'
   return { material: mat, uniforms }
 }
 

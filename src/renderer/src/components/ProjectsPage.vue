@@ -160,6 +160,14 @@
                           :style="{ animationDelay: st.tw + 's', animationDuration: st.dur + 's' }"
                         />
                       </svg>
+                      <button
+                        class="pp-crest"
+                        :title="t('fingerprint.open')"
+                        :aria-label="t('fingerprint.open')"
+                        @click.stop="menuFingerprint(p)"
+                      >
+                        <FingerprintMandala :project-id="p.id" :hue="hueOf(p)" />
+                      </button>
                     </div>
                     <div class="pp-glare"></div>
 
@@ -210,6 +218,9 @@
                           </button>
                           <button class="pp-menu-item" @click="openEdit(p)">
                             <UiIcon name="square-pen" :size="14" />{{ t('projectsPage.menu.edit') }}
+                          </button>
+                          <button class="pp-menu-item" @click="menuFingerprint(p)">
+                            <UiIcon name="fingerprint" :size="14" />{{ t('fingerprint.menu') }}
                           </button>
                           <button class="pp-menu-item" @click="duplicate(p)">
                             <UiIcon name="copy" :size="14" />{{ t('projectsPage.menu.duplicate') }}
@@ -359,6 +370,7 @@
                         :style="{ animationDelay: st.tw + 's', animationDuration: st.dur + 's' }"
                       />
                     </svg>
+                    <FingerprintMandala class="pp-row-crest" :project-id="p.id" :hue="hueOf(p)" />
                   </div>
                   <div class="pp-row-main">
                     <div class="pp-row-toprow">
@@ -441,6 +453,9 @@
                         </button>
                         <button class="pp-menu-item" @click="openEdit(p)">
                           <UiIcon name="square-pen" :size="14" />{{ t('projectsPage.menu.edit') }}
+                        </button>
+                        <button class="pp-menu-item" @click="menuFingerprint(p)">
+                          <UiIcon name="fingerprint" :size="14" />{{ t('fingerprint.menu') }}
                         </button>
                         <button class="pp-menu-item" @click="duplicate(p)">
                           <UiIcon name="copy" :size="14" />{{ t('projectsPage.menu.duplicate') }}
@@ -611,6 +626,7 @@ import { useI18n } from '../i18n'
 import { defaultNameLabel } from '../lib/dataLabels'
 import { ACCESS_ICONS, ACCESS_MODES } from './browse/browseModel'
 import AdSlot from './billing/AdSlot.vue'
+import FingerprintMandala from './fingerprint/FingerprintMandala.vue'
 import InkBackdrop from './ui/InkBackdrop.vue'
 import SearchField from './ui/SearchField.vue'
 import UiIcon from './ui/UiIcon.js'
@@ -864,6 +880,11 @@ function menuDelete(p) {
   confirmId.value = p.id
 }
 
+function menuFingerprint(p) {
+  menuId.value = null
+  store.openFingerprint(p.id)
+}
+
 async function toggleFavorite(p) {
   burstId.value = p.favorite ? null : p.id
   setTimeout(() => (burstId.value = null), 650)
@@ -987,8 +1008,8 @@ let sky = null
 
 function startSky() {
   const canvas = skyRef.value
-  // The ink theme paints a still paper backdrop instead — no rAF loop at all.
-  if (!canvas || sky || store.isInk) return
+  // The ink and medieval themes paint a still backdrop instead — no rAF loop at all.
+  if (!canvas || sky || store.isInk || store.isMedieval) return
   const ctx = canvas.getContext('2d')
   const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
   const state = {
@@ -1105,12 +1126,12 @@ function stopSky() {
   sky = null
 }
 
-// Switching into / out of ink while the page is open swaps sky ⇄ paper.
+// Switching into / out of ink or medieval while the page is open swaps sky ⇄ paper.
 watch(
-  () => store.isInk,
-  (ink) => {
+  () => store.isInk || store.isMedieval,
+  (paper) => {
     if (!store.projectsPageOpen) return
-    if (ink) stopSky()
+    if (paper) stopSky()
     else nextTick(startSky)
   }
 )
@@ -1794,6 +1815,42 @@ function fmtDate(s) {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+/* Family fingerprint crest (components/fingerprint/) — the cover art. */
+.pp-crest {
+  position: absolute;
+  top: -3px;
+  right: 8px;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: zoom-in;
+  z-index: 2;
+  transition: transform 0.3s var(--ease-out, ease-out);
+}
+
+.pp-crest:hover {
+  transform: scale(1.08) rotate(-6deg);
+}
+
+.pp-crest:focus-visible {
+  outline: 2px solid var(--pa);
+  outline-offset: 2px;
+}
+
+.pp-row-const {
+  position: relative;
+}
+
+.pp-row-crest {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 36px;
 }
 
 .pp-const-line {
@@ -3050,8 +3107,13 @@ function fmtDate(s) {
    <InkBackdrop> replaces the starfield, whose rAF loop never starts in ink).
    Each project card is a leaf in a silk mount; its constellation is drawn in
    ink with the project's colour ground into it. */
-:root[data-theme='ink'] .pp-root {
+:root[data-theme='ink'] .pp-root,
+:root[data-theme='medieval'] .pp-root {
   background: var(--bg);
+}
+:root[data-theme='medieval'] .pp-sky,
+:root[data-theme='medieval'] .pp-aurora {
+  display: none;
 }
 :root[data-theme='ink'] .pp-sky,
 :root[data-theme='ink'] .pp-aurora {

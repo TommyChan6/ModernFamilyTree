@@ -5,6 +5,7 @@ import os from 'os'
 import { randomUUID } from 'crypto'
 import { channelHandlers } from '../src/shared/dbCore'
 import { BUILTIN_REL_TYPES } from '../src/shared/relTypes'
+import { BUILTIN_SENTIMENT } from '../src/shared/sentiment'
 
 // Env for exercising the shared channel handlers directly
 const handlerEnv = {
@@ -243,5 +244,128 @@ describe('relationships channels against the registry', () => {
     expect(() =>
       channelHandlers['relationships:update'](db, { id: rel.id, type: 'bogus' }, handlerEnv)
     ).toThrow(/Unknown relationship type/)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('relationship dynamics — the sentiment layer', () => {
+  it('seeds every builtin with its default sentiment', () => {
+    initDB()
+    const { db } = getDB()
+    const defs = channelHandlers['relTypes:getAll'](db, {}, handlerEnv)
+    for (const spec of BUILTIN_REL_TYPES) {
+      expect(defs.find((d) => d.key === spec.key).sentiment).toBe(spec.sentiment)
+    }
+    const p = channelHandlers['projects:create'](db, { name: 'Warm' }, handlerEnv)
+    const spouse = defsOf(db, p.id).find((d) => d.key === 'spouse')
+    expect(spouse.sentiment).toBe(BUILTIN_SENTIMENT.spouse)
+  })
+
+  it('migration backfills sentiment on defs saved before the layer', async () => {
+    initDB()
+    const dbPath = path.join(tmpDir, 'db', 'familytree.json')
+    const raw = JSON.parse(fs.readFileSync(dbPath, 'utf8'))
+    const custom = {
+      ...Object.values(raw.rel_type_defs)[0],
+      id: 'custom-1',
+      key: 'custom-1',
+      builtin: false
+    }
+    raw.rel_type_defs[custom.id] = custom
+    for (const d of Object.values(raw.rel_type_defs)) delete d.sentiment
+    fs.writeFileSync(dbPath, JSON.stringify(raw))
+
+    vi.resetModules()
+    const mod2 = await import('../src/main/db.js')
+    mod2.initDB()
+    const { db, activeProjectId } = mod2.getDB()
+    const defs = defsOf(db, activeProjectId)
+    expect(defs.find((d) => d.key === 'rival').sentiment).toBe(BUILTIN_SENTIMENT.rival)
+    expect(defs.find((d) => d.key === 'spouse').sentiment).toBe(BUILTIN_SENTIMENT.spouse)
+    expect(defs.find((d) => d.id === 'custom-1').sentiment).toBe(0)
+    // persisted, and a second pass is a no-op
+    const saved = JSON.parse(fs.readFileSync(dbPath, 'utf8'))
+    expect(saved.rel_type_defs['custom-1'].sentiment).toBe(0)
+  })
+
+  it('relTypes:create/update clamp sentiment; builtins stay tunable', () => {
+    initDB()
+    const { db } = getDB()
+    const fresh = channelHandlers['relTypes:create'](db, { label: 'Feud' }, handlerEnv)
+    expect(fresh.sentiment).toBe(0)
+    const cold = channelHandlers['relTypes:create'](
+      db,
+      { label: 'Nemesis', sentiment: -7 },
+      handlerEnv
+    )
+    expect(cold.sentiment).toBe(-1)
+    const rival = channelHandlers['relTypes:getAll'](db, {}, handlerEnv).find(
+      (d) => d.key === 'rival'
+    )
+    const upd = channelHandlers['relTypes:update'](
+      db,
+      { id: rival.id, sentiment: 'junk' },
+      handlerEnv
+    )
+    expect(upd.sentiment).toBe(0)
+    expect(
+      channelHandlers['relTypes:update'](db, { id: rival.id, sentiment: 0.4 }, handlerEnv).sentiment
+    ).toBe(0.4)
+    expect(upd.builtin).toBe(true)
+  })
+
+  it('relationships:create/update clamp edge sentiment & intensity (null = inherit)', () => {
+    initDB()
+    const { db, activeProjectId } = getDB()
+    const [a, b] = Object.values(db.persons).filter((p) => p.project_id === activeProjectId)
+    const plain = channelHandlers['relationships:create'](
+      db,
+      { person_a_id: a.id, person_b_id: b.id, type: 'friends' },
+      handlerEnv
+    )
+    expect(plain.sentiment).toBe(null)
+    expect(plain.intensity).toBe(null)
+    const rel = channelHandlers['relationships:create'](
+      db,
+      { person_a_id: a.id, person_b_id: b.id, type: 'rival', sentiment: -4, intensity: 3 },
+      handlerEnv
+    )
+    expect(rel.sentiment).toBe(-1)
+    expect(rel.intensity).toBe(1)
+    let upd = channelHandlers['relationships:update'](
+      db,
+      { id: rel.id, sentiment: 0.35, intensity: -1 },
+      handlerEnv
+    )
+    expect(upd.sentiment).toBe(0.35)
+    expect(upd.intensity).toBe(0)
+    upd = channelHandlers['relationships:update'](
+      db,
+      { id: rel.id, sentiment: null, intensity: 'x' },
+      handlerEnv
+    )
+    expect(upd.sentiment).toBe(null)
+    expect(upd.intensity).toBe(null)
+    // untouched when absent from the patch
+    channelHandlers['relationships:update'](db, { id: rel.id, intensity: 0.8 }, handlerEnv)
+    upd = channelHandlers['relationships:update'](db, { id: rel.id, label: 'x' }, handlerEnv)
+    expect(upd.intensity).toBe(0.8)
+  })
+
+  it('edge feelings survive undo/redo', () => {
+    initDB()
+    const { db, activeProjectId } = getDB()
+    const [a, b] = Object.values(db.persons).filter((p) => p.project_id === activeProjectId)
+    const rel = channelHandlers['relationships:create'](
+      db,
+      { person_a_id: a.id, person_b_id: b.id, type: 'friends', sentiment: 0.2 },
+      handlerEnv
+    )
+    channelHandlers['relationships:update'](db, { id: rel.id, sentiment: -0.9 }, handlerEnv)
+    expect(db.relationships[rel.id].sentiment).toBe(-0.9)
+    channelHandlers['history:undo'](db, {}, handlerEnv)
+    expect(db.relationships[rel.id].sentiment).toBe(0.2)
+    channelHandlers['history:redo'](db, {}, handlerEnv)
+    expect(db.relationships[rel.id].sentiment).toBe(-0.9)
   })
 })

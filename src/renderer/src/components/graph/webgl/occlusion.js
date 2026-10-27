@@ -13,6 +13,13 @@ export function bodyBox(shape, sx, sy, R) {
     // upright 0.70r wide each side (plinth 0.83r), 1.85r tall above the foot
     return { x0: sx - 0.83 * R, y0: sy - 1.85 * R, x1: sx + 0.83 * R, y1: sy }
   }
+  if (shape === 'plate') {
+    // 0.66r each side plus the slab's edge, 1.9r tall above the foot
+    return { x0: sx - 0.66 * R, y0: sy - 1.98 * R, x1: sx + 0.76 * R, y1: sy }
+  }
+  if (shape === 'flatplate') {
+    return { x0: sx - 0.64 * R, y0: sy - 1.85 * R, x1: sx + 0.64 * R, y1: sy }
+  }
   return { x0: sx - R, y0: sy - R, x1: sx + R, y1: sy + R }
 }
 

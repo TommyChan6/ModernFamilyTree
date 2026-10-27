@@ -32,7 +32,7 @@
             </span>
             <span class="ast-theme-name">
               <span v-if="th === 'ink'" class="ast-seal">墨</span>
-              <UiIcon v-else :name="th === 'light' ? 'sun' : 'moon'" :size="14" />
+              <UiIcon v-else :name="THEME_ICONS[th]" :size="14" />
               {{ t('settings.theme.' + th) }}
             </span>
           </button>
@@ -42,7 +42,13 @@
       <section class="st-section" data-skey="accent">
         <h4 class="st-sec-title">{{ t('settings.accent.title') }}</h4>
         <p class="st-note">
-          {{ store.isInk ? t('settings.accent.inkNote') : t('settings.accent.desc') }}
+          {{
+            store.isInk
+              ? t('settings.accent.inkNote')
+              : store.isMedieval
+                ? t('settings.accent.medievalNote')
+                : t('settings.accent.desc')
+          }}
         </p>
         <div class="ast-accents">
           <button
@@ -153,6 +159,27 @@
           </template>
         </StColor>
       </section>
+      <!-- The Dynamics lens's warm ↔ cold ramp ('' = the theme's default) -->
+      <section class="st-section">
+        <h4 class="st-sec-title">{{ t('sentiment.style.title') }}</h4>
+        <div
+          class="ast-dyn-ramp"
+          :style="{ background: `linear-gradient(90deg, ${dynGradient})` }"
+          aria-hidden="true"
+        ></div>
+        <StColor
+          v-for="d in DYNAMICS"
+          :key="d.key"
+          :skey="d.key"
+          :label="t(d.labelKey)"
+          :model-value="store.dynamicsPalette[d.side]"
+          @update:model-value="setG(d.key, $event)"
+        >
+          <template #lead>
+            <i class="ast-bond" :style="{ color: store.dynamicsPalette[d.side] }"></i>
+          </template>
+        </StColor>
+      </section>
       <p class="st-hint">
         <UiIcon name="wand-sparkles" :size="13" />{{ t('styleStudio.palette.lookNote') }}
       </p>
@@ -185,6 +212,11 @@
         </button>
       </div>
     </template>
+
+    <!-- ── Special effects (tag / trait auras) ── -->
+    <section v-else-if="chapter === 'auras'" class="st-section" data-skey="auras">
+      <AurasSheet />
+    </section>
   </div>
 </template>
 
@@ -196,6 +228,8 @@ import { ACCENT_PRESETS, DEFAULT_ACCENT } from '../../lib/accent.js'
 import { THEME_KEYS } from '../graph/graphThemes.js'
 import UiIcon from '../ui/UiIcon.js'
 import StColor from './StColor.vue'
+import AurasSheet from '../auras/AurasSheet.vue'
+import { sentimentGradient } from '../../../../shared/sentiment'
 
 defineProps({ chapter: { type: String, required: true } })
 
@@ -204,7 +238,8 @@ const { t } = useI18n()
 const gs = computed(() => store.graphSettings)
 const gradId = `ast-g-${Math.random().toString(36).slice(2, 8)}`
 
-const THEMES = ['dark', 'light', 'ink']
+const THEMES = ['dark', 'light', 'ink', 'medieval']
+const THEME_ICONS = { dark: 'moon', light: 'sun', medieval: 'castle' }
 const PEOPLE = [
   { key: 'maleColor', labelKey: 'data.gender.male' },
   { key: 'femaleColor', labelKey: 'data.gender.female' },
@@ -215,6 +250,11 @@ const BONDS = [
   { key: 'spouseColor', labelKey: 'data.relTypes.spouse', dashed: true },
   { key: 'adoptedColor', labelKey: 'data.relTypes.adopted', dashed: true }
 ]
+const DYNAMICS = [
+  { key: 'dynamicsWarm', side: 'warm', labelKey: 'sentiment.style.warm' },
+  { key: 'dynamicsCold', side: 'cold', labelKey: 'sentiment.style.cold' }
+]
+const dynGradient = computed(() => sentimentGradient(store.dynamicsPalette))
 const PROFILES = [
   { id: 'cinematic', icon: 'clapperboard' },
   { id: 'scroll', icon: 'scroll' }
@@ -243,10 +283,17 @@ function setG(key, value) {
 </script>
 
 <style scoped>
+/* ── Dynamics ramp (cold → neutral → warm) ── */
+.ast-dyn-ramp {
+  height: 6px;
+  margin: 2px 0 6px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
 /* ── Theme windows ── */
 .ast-themes {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
 }
 .ast-theme {
@@ -287,6 +334,13 @@ function setG(key, value) {
   --w-node: #2e2620;
   --w-text: #2a211a;
 }
+.ast-medieval {
+  --w-bg: #e7d5ae;
+  --w-surface: #f2e5c6;
+  --w-line: rgba(43, 29, 18, 0.62);
+  --w-node: #8a641c;
+  --w-text: #2a1c10;
+}
 .ast-theme:hover {
   transform: translateY(-3px) rotate(-1deg);
   border-color: var(--border-strong);
@@ -310,6 +364,17 @@ function setG(key, value) {
 .ast-ink .ast-win {
   background:
     radial-gradient(120% 90% at 70% 30%, rgba(255, 250, 235, 0.6), transparent 60%), var(--w-bg);
+}
+.ast-medieval .ast-win {
+  background:
+    radial-gradient(120% 95% at 50% 40%, transparent 50%, rgba(90, 52, 16, 0.22)), var(--w-bg);
+}
+/* the leather spine and the gilt rule under the headband */
+.ast-medieval .ast-rail {
+  background: linear-gradient(180deg, #5a1d15, #6d2419 50%, #4a160f);
+}
+.ast-medieval .ast-bar {
+  box-shadow: 0 1.5px 0 #c9a043;
 }
 .ast-bar,
 .ast-rail {
@@ -354,6 +419,9 @@ function setG(key, value) {
 }
 .ast-ink .ast-acc {
   fill: #b3352a; /* ink locks its cinnabar accent */
+}
+.ast-medieval .ast-acc {
+  fill: #24478a; /* medieval locks its lapis accent */
 }
 .ast-theme.on .ast-node {
   animation: st-breathe 2.4s ease-in-out infinite;

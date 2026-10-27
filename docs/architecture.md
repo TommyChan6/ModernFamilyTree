@@ -204,7 +204,7 @@ detects the missing preload bridge and uses the browser-local backend.
 | Graph engine | [`components/graph/`](../src/renderer/src/components/graph/) | Pure layout/style helpers + the animation composable + the tree's WebGL renderer (`graph/webgl/`). |
 | Shared WebGL layers | [`components/webgl/`](../src/renderer/src/components/webgl/) | Instanced capsule/dot/ribbon/arc draw layers + overlay-canvas helpers, shared by the timeline and groups renderers. |
 | Timeline engine | [`components/timeline/`](../src/renderer/src/components/timeline/) | Pure layout math (`timelineLayout.js`) + Three.js renderer (`TimelineRenderer.js`). |
-| Groups engine | [`components/factions/`](../src/renderer/src/components/factions/) | Pure layout math (`factionLayout.js`) + Three.js renderer (`webgl/`). |
+| Groups engine | [`components/factions/`](../src/renderer/src/components/factions/) | Pure layout math (`factionLayout.js`; the Venn style's membranes, targets and arrange in `vennLayout.ts`) + Three.js renderer (`webgl/`: `ZoneLayer` discs for Rings, `MembraneLayer` for Venn). |
 | Styling | [`styles/global.css`](../src/renderer/src/styles/global.css) | Design tokens (CSS variables) and shared component classes. |
 
 See also: [graph.md](./graph.md) · [data-model.md](./data-model.md) · [ipc-api.md](./ipc-api.md) · [design.md](./design.md)

@@ -27,6 +27,17 @@
           墨
         </button>
         <button
+          class="icon-btn home-med-btn"
+          :class="{ on: store.isMedieval }"
+          type="button"
+          :title="store.isMedieval ? t('topbar.medievalOff') : t('topbar.medievalOn')"
+          :aria-label="store.isMedieval ? t('topbar.medievalOff') : t('topbar.medievalOn')"
+          :aria-pressed="store.isMedieval"
+          @click="store.toggleMedieval()"
+        >
+          <UiIcon name="castle" :size="16" />
+        </button>
+        <button
           class="icon-btn"
           type="button"
           :title="store.isLightTheme ? t('topbar.darkMode') : t('topbar.lightMode')"
@@ -2392,5 +2403,17 @@ onUnmounted(() => {
   color: #fbf4e6;
   background: #b3352a;
   border-radius: 4px;
+}
+.home-med-btn.on {
+  color: #f1d88c;
+  background: linear-gradient(180deg, #2f5aa6, #24478a 60%, #172f5e);
+  box-shadow: inset 0 0 0 1px #c9a043;
+  border-radius: 3px;
+}
+/* ── Medieval: the hero is a leaf of vellum by candlelight (<InkBackdrop>
+   hands over to MedievalBackdrop); the aurora and grain belong to the night. */
+:root[data-theme='medieval'] .hero-aurora,
+:root[data-theme='medieval'] .hero-grain {
+  display: none;
 }
 </style>

@@ -184,6 +184,11 @@
                   @click="openProject(p.id)"
                 >
                   <div class="up-project-head">
+                    <FingerprintMandala
+                      class="up-project-crest"
+                      :project-id="p.id"
+                      :hue="typeof p.hue === 'number' ? p.hue : null"
+                    />
                     <span class="up-project-name">{{ defaultNameLabel(p.name) }}</span>
                     <span v-if="p.id === store.activeProjectId" class="up-project-current">{{
                       t('account.projects.current')
@@ -281,6 +286,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import BillingPanel from './billing/BillingPanel.vue'
+import FingerprintMandala from './fingerprint/FingerprintMandala.vue'
 import InkBackdrop from './ui/InkBackdrop.vue'
 import UiIcon from './ui/UiIcon.js'
 import { useMainStore } from '../store/index.js'
@@ -1096,6 +1102,18 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
+/* Family fingerprint crest (components/fingerprint/). */
+.up-project-crest {
+  flex: 0 0 34px;
+  width: 34px;
+  margin: -4px 0 -4px -4px;
+}
+
+.up-project-head .up-project-name {
+  flex: 1;
+  min-width: 0;
+}
+
 .up-project-current {
   flex-shrink: 0;
   padding: 1px 8px;
@@ -1350,7 +1368,8 @@ onUnmounted(() => {
 /* ── 水墨 ink theme ───────────────────────────────────────────────────────
    The profile is an album leaf: paper backdrop (<InkBackdrop>), the avatar a
    name seal (名章) in the chosen colour, cards in narrow silk mounts. */
-:root[data-theme='ink'] .up-aurora {
+:root[data-theme='ink'] .up-aurora,
+:root[data-theme='medieval'] .up-aurora {
   display: none;
 }
 :root[data-theme='ink'] .up-back,

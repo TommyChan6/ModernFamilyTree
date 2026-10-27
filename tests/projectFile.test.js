@@ -150,6 +150,32 @@ describe('projects:import', () => {
     expect(rowsOf(db, 'rel_type_defs', created.id).some((d) => d.key === 'spouse')).toBe(true)
   })
 
+  it('carries relationship dynamics (edge + type sentiment) and backfills old files', () => {
+    const [a, b] = rowsOf(db, 'persons', srcId)
+    invoke(db, 'relationships:create', {
+      person_a_id: a.id,
+      person_b_id: b.id,
+      type: 'rival',
+      sentiment: -0.6,
+      intensity: 0.9
+    })
+    const rival = rowsOf(db, 'rel_type_defs', srcId).find((d) => d.key === 'rival')
+    invoke(db, 'relTypes:update', { id: rival.id, sentiment: -0.3 })
+    const file = viaDisk(invoke(db, 'projects:export', {}))
+    const created = invoke(db, 'projects:import', { file })
+    const edge = rowsOf(db, 'relationships', created.id).find((r) => r.type === 'rival')
+    expect(edge.sentiment).toBe(-0.6)
+    expect(edge.intensity).toBe(0.9)
+    const def = rowsOf(db, 'rel_type_defs', created.id).find((d) => d.key === 'rival')
+    expect(def.sentiment).toBe(-0.3)
+    // A file from before the sentiment layer gets defaults on import.
+    for (const d of file.rows.rel_type_defs) delete d.sentiment
+    const old = invoke(db, 'projects:import', { file })
+    const oldSpouse = rowsOf(db, 'rel_type_defs', old.id).find((d) => d.key === 'spouse')
+    expect(typeof oldSpouse.sentiment).toBe('number')
+    expect(oldSpouse.sentiment).toBeGreaterThan(0)
+  })
+
   it('enforces the project quota for signed-in users', () => {
     const user = { id: 'u1', plan: 'free' }
     db.users = { u1: { ...user, username: 'u1' } }

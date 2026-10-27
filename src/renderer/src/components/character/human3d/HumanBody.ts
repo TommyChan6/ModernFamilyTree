@@ -21,6 +21,8 @@ import {
 
 export const DM = 0.1 // decimetres → metres
 
+const tmpHead = new THREE.Vector3()
+
 /** One subdivided, skinned surface (body, teeth, tongue, skirt). */
 export interface SurfacePart {
   key: string
@@ -182,7 +184,7 @@ export class HumanBody {
       }
       geometry.setAttribute('aMaskA', pack(['flush', 'eyeUpper', 'eyeLower', 'thin']))
       geometry.setAttribute('aMaskB', pack([null, null, 'lips', 'brow']))
-      geometry.setAttribute('aMaskC', pack(['forehead', 'crow', 'naso', null]))
+      geometry.setAttribute('aMaskC', pack(['forehead', 'crow', 'naso', 'scalp']))
       if (this.gpuMorphDeltas.length) {
         geometry.morphAttributes.position = this.gpuMorphDeltas.map(
           () => new THREE.BufferAttribute(new Float32Array(n * 3), 3)
@@ -275,6 +277,16 @@ export class HumanBody {
     out.sub(this.boneHead(anchor.bone, new THREE.Vector3()))
     bone.updateWorldMatrix(true, false)
     return out.applyMatrix4(bone.matrixWorld)
+  }
+
+  /** World position of a cage vertex carried by `bone` through shape + pose. */
+  vertexWorld(v: number, bone: string, out: THREE.Vector3) {
+    out.set(this.cage[v * 3], this.cage[v * 3 + 1], this.cage[v * 3 + 2])
+    const b = this.boneByName.get(bone)
+    if (!b) return this.rig.localToWorld(out)
+    out.sub(this.boneHead(bone, tmpHead))
+    b.updateWorldMatrix(true, false)
+    return out.applyMatrix4(b.matrixWorld)
   }
 
   private updatePart(part: SurfacePart) {

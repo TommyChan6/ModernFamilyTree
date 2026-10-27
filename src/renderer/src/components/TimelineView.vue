@@ -46,9 +46,9 @@
         tool ? 'tool-' + tool : '',
         {
           dragging: panning,
-          hoverable: !!hoverId || !!hoverBadge,
+          hoverable: !!hoverId || !!hoverBadge || !!hoverLink,
           'tool-grab': retimeHover,
-          'lane-grab': !tool && !!hoverId,
+          'lane-grab': !tool && !!hoverId && timelineMode === 'lanes',
           'time-grab': !tool && !!hoverId && store.timeDrag,
           'tool-grabbing': handleDragging
         }
@@ -133,6 +133,40 @@
           @click="zoomBy(0.75)"
         >
           <UiIcon name="zoom-out" :size="16" />
+        </button>
+        <div class="tl-ctrl-sep"></div>
+        <button
+          v-for="m in timelineModes"
+          :key="m.id"
+          class="tl-ctrl-btn tl-ctrl-wide"
+          :class="{ 'tl-ctrl-active': timelineMode === m.id }"
+          :title="tr(`timeline.modes.${m.id}.title`)"
+          :aria-pressed="timelineMode === m.id"
+          @click="setTimelineMode(m.id)"
+        >
+          <UiIcon :name="m.icon" :size="16" />{{ tr(`timeline.modes.${m.id}.label`) }}
+        </button>
+        <div class="tl-ctrl-sep"></div>
+        <!-- The coordinate pipeline's two knobs: stretch busy years, tilt to 3D -->
+        <button
+          class="tl-ctrl-btn"
+          :class="{ 'tl-ctrl-active': warpOn }"
+          :title="tr('timeline.warpToggle')"
+          :aria-label="tr('timeline.warpToggle')"
+          :aria-pressed="warpOn"
+          @click="toggleWarp"
+        >
+          <UiIcon name="unfold-vertical" :size="16" />
+        </button>
+        <button
+          class="tl-ctrl-btn"
+          :class="{ 'tl-ctrl-active': tiltOn }"
+          :title="tr('timeline.tiltToggle')"
+          :aria-label="tr('timeline.tiltToggle')"
+          :aria-pressed="tiltOn"
+          @click="toggleTilt"
+        >
+          <UiIcon name="rotate-3d" :size="16" />
         </button>
         <div class="tl-ctrl-sep"></div>
         <button
@@ -302,6 +336,25 @@
         </div>
       </Transition>
 
+      <!-- Family-line hover card: whose branch / stem this is -->
+      <Transition name="chtip">
+        <div
+          v-if="bondTip && !chronTip"
+          :key="bondTip.key"
+          class="tl-chtip"
+          :style="{ left: bondTip.x + 'px', top: bondTip.y + 'px', '--c': bondTip.color }"
+        >
+          <div class="tl-chtip-head">
+            <span class="tl-chtip-ic"><UiIcon :name="bondTip.icon" :size="14" /></span>
+            <b>{{ bondTip.title }}</b>
+          </div>
+          <div class="tl-chtip-when">{{ bondTip.when }}</div>
+          <div v-for="(line, i) in bondTip.lines" :key="i" class="tl-chtip-cast">
+            <UiIcon :name="line.icon" :size="13" />{{ line.text }}
+          </div>
+        </div>
+      </Transition>
+
       <!-- Marriage year edit popup -->
       <Transition name="medit">
         <div
@@ -397,7 +450,7 @@
       <div
         v-if="nameBubble"
         class="tl-bubble"
-        :style="{ left: nameBubble.x + 'px', top: nameBubble.y + 'px', '--mc': nameBubble.color }"
+        :style="{ left: nameBubble.sx + 'px', top: nameBubble.sy + 'px', '--mc': nameBubble.color }"
         @pointerdown.stop
         @click.stop
         @dblclick.stop
@@ -520,6 +573,7 @@ import { yearDate } from '../../../shared/calendarMath'
 import {
   computeTimelineLayout,
   computeLaneOrder,
+  TIMELINE_MODES,
   GUTTER,
   Y_PAD,
   X0,
@@ -564,6 +618,8 @@ import KinshipQuiz from './kinship/KinshipQuiz.vue'
 import TraceCard from './kinship/TraceCard.vue'
 import { useKinship, kinClass, kinPalette } from './kinship/useKinship'
 import { shortestPath } from './graph/graphInsights.js'
+import { auraShaderId } from './graph/webgl/NodeMaterial.js'
+import { TILT_MAX } from './graph/webgl/coords.js'
 
 const store = useMainStore()
 const tt = useTimeTravel()
@@ -627,6 +683,10 @@ const ty = ref(0)
 const panning = ref(false)
 const hoverId = ref(null)
 const hoverBadge = ref(null)
+// A family line under the cursor: { key, famId, branchIds: Set, ids: Set }
+// (a child's branch, or a couple's stem = the whole family).
+const hoverLink = ref(null)
+const bondTip = ref(null)
 const mEdit = ref(null)
 const meditInputRef = ref(null)
 const searchQuery = ref('')
@@ -694,6 +754,7 @@ function focusDimmed(id) {
 
 function isDimmed(id) {
   if (pathActive.value) return !pathIdSet.value.has(id)
+  if (hoverLink.value) return !hoverLink.value.ids.has(id)
   if (kinWalkSet.value) return !kinWalkSet.value.has(id)
   if (kinLensMap.value && !hoverId.value) return !kinIncluded(kinLensMap.value.get(id))
   if (hoverId.value) return !relatedSet.value.has(id)
@@ -703,6 +764,7 @@ function isDimmed(id) {
 }
 function connDimmed(ids) {
   if (pathActive.value) return !ids.every((id) => pathIdSet.value.has(id))
+  if (hoverLink.value) return !ids.every((id) => hoverLink.value.ids.has(id))
   if (kinWalkSet.value) return !ids.every((id) => kinWalkSet.value.has(id))
   if (kinLensMap.value && !hoverId.value)
     return !ids.every((id) => kinIncluded(kinLensMap.value.get(id)))
@@ -755,6 +817,8 @@ function genderColor(g) {
 // family-tree layout algorithm on demand and the lanes glide into place.
 const refYear = computed(() => store.currentDate?.year ?? new Date().getFullYear())
 const laneOrder = ref(null)
+const laneOrderFor = () =>
+  computeLaneOrder(store.persons, store.relationships, store.relTypeRoles, refYear.value)
 // A life created from the canvas claims the lane it was placed in (instead of
 // appending on the far right): { before: Set<id>, opts } until it arrives.
 let pendingLane = null
@@ -768,11 +832,37 @@ const savedLaneOrder = computed(() => {
   const o = activeTimelineScene.value?.config?.laneOrder
   return Array.isArray(o) && o.length ? o : null
 })
+// ── Modes (like the graph's layout types, one per timeline scene) ───────────
+// Lanes: every life keeps its own lane; family stems + bridged branches show
+// who descends from whom. Sprout: lives grow out of their parents' stem into
+// lanes reused once their occupant is gone (computed — no lane dragging).
+// Rivers: channels are households — children are born inside their parents'
+// channel and lives only cross when they marry or leave home (computed too).
+const timelineModes = [
+  { id: 'lanes', icon: 'columns-3' },
+  { id: 'sprout', icon: 'sprout' },
+  { id: 'rivers', icon: 'waves' }
+]
+const modeFallback = ref('lanes') // no scene yet (the default scene arrives with data)
+const timelineMode = computed(() => {
+  const scene = activeTimelineScene.value
+  const m = scene ? scene.config?.mode : modeFallback.value
+  return TIMELINE_MODES.includes(m) ? m : 'lanes'
+})
+async function setTimelineMode(mode) {
+  if (mode === timelineMode.value) return
+  const scene = activeTimelineScene.value
+  modeFallback.value = mode
+  hoverLink.value = null
+  if (!scene) return
+  await store.saveScene({
+    id: scene.id,
+    config: JSON.parse(JSON.stringify({ ...(scene.config || {}), mode }))
+  })
+}
 let lanesSaving = 0 // our own writes in flight — don't echo them back
 function freshLaneOrder() {
-  return savedLaneOrder.value
-    ? [...savedLaneOrder.value]
-    : computeLaneOrder(store.persons, store.relationships, store.relTypeRoles)
+  return savedLaneOrder.value ? [...savedLaneOrder.value] : laneOrderFor()
 }
 watch(
   () => store.activeProjectId,
@@ -851,9 +941,7 @@ async function restoreLanes(state) {
 const refreshSpinning = ref(false)
 let refreshSpinTimer = 0
 function refreshLayout() {
-  commitLanes(computeLaneOrder(store.persons, store.relationships, store.relTypeRoles), {
-    label: 'layout'
-  })
+  commitLanes(laneOrderFor(), { label: 'layout' })
   refreshSpinning.value = true
   if (refreshSpinTimer) clearTimeout(refreshSpinTimer)
   refreshSpinTimer = setTimeout(() => {
@@ -872,8 +960,9 @@ const layout = computed(() =>
     store.relationships,
     refYear.value,
     laneOrder.value,
-    null,
-    eventYears.value
+    store.relTypeRoles,
+    eventYears.value,
+    { mode: timelineMode.value, leaveHomeAge: store.timelineSettings.leaveHomeAge ?? 25 }
   )
 )
 
@@ -913,8 +1002,8 @@ function chronTipFor(hit, p) {
       when: `${fmtDate(e.start) || '…'} – ${fmtDate(e.end) || tr('timeline.tip.now')}`,
       cast: '',
       text: e.description,
-      x: Math.min(p.x + 14, stageW.value - 260),
-      y: p.y + 16
+      x: Math.min((p.sx ?? p.x) + 14, stageW.value - 260),
+      y: (p.sy ?? p.y) + 16
     }
   }
   const ev = store.events.find((x) => x.id === hit.id)
@@ -936,8 +1025,8 @@ function chronTipFor(hit, p) {
     cast:
       names.length > 4 ? `${names.slice(0, 3).join(', ')} +${names.length - 3}` : names.join(', '),
     text: ev.description,
-    x: Math.min(p.x + 14, stageW.value - 260),
-    y: p.y + 16
+    x: Math.min((p.sx ?? p.x) + 14, stageW.value - 260),
+    y: (p.sy ?? p.y) + 16
   }
 }
 
@@ -945,13 +1034,19 @@ function chronTipFor(hit, p) {
 function jumpToYear(year) {
   if (year == null || !Number.isFinite(year)) return
   const px = pxPerYear.value
-  const nty = stageH.value / 2 - ((year - layout.value.minYear) * px + Y_PAD)
+  const nty = stageH.value / 2 - ((axisOf(year) - layout.value.minYear) * px + Y_PAD)
   tweenTo(px, laneScale.value, tx.value, nty, 420)
 }
 
-/** The year under a screen y. */
+/** The real year at a flat stage y (through the time warp, if on). */
 function yearAtY(y) {
+  if (renderer) return renderer.yearAt(y)
   return (y - ty.value - Y_PAD) / pxPerYear.value + layout.value.minYear
+}
+/** A real year's position on the (possibly warped) axis, in axis years —
+ *  what the linear camera math (ty = … (axis − minYear) · px …) works in. */
+function axisOf(year) {
+  return renderer ? renderer.axisOf(year) : year
 }
 
 // Double-click empty timeline: a new event at that year (the person under
@@ -992,7 +1087,7 @@ const relatedSet = computed(() => {
 // renderer tweens the change); lifeline *growth* up to the year is handled by
 // the renderer itself via the getTimeYear hook.
 function personVisual(p) {
-  const hovered = hoverId.value === p.id
+  const hovered = hoverId.value === p.id || !!hoverLink.value?.ids.has(p.id)
   const lit = searchOn.value && searchSet.value.has(p.id)
   const selected = selectedSet.value.has(p.id)
   const onPath = pathIdSet.value.has(p.id)
@@ -1001,7 +1096,12 @@ function personVisual(p) {
   const notYet = p.birthYear > tt.gateYear.value || p.birthYear < tt.gateStartYear.value
   // Kinship lens: every relative rings in their kin colour.
   const k = kinLensMap.value ? kinLensMap.value.get(p.id) : null
-  const ring = k && kinIncluded(k) ? kinColors.value[kinClass(k)] : null
+  const kinRing = k && kinIncluded(k) ? kinColors.value[kinClass(k)] : null
+  // Aura (a tag/trait's special effect): an ornament on the pin, an optional
+  // line effect on the lifeline, and an optional tint for the lifeline + ring.
+  const au = store.auraOf?.get(p.id)
+  const tint = au?.tint || null
+  const ring = kinRing || tint
   const strong = hovered || lit || selected || onPath || anchored || lifted
   return {
     opacity: notYet ? 0 : isDimmed(p.id) ? 0.22 : 1,
@@ -1019,8 +1119,15 @@ function personVisual(p) {
     selected,
     halo: selected || onPath || anchored || lifted ? 1 : hovered ? 0.55 : 0,
     ring,
-    color: genderColor(p.gender),
-    imageUrl: p.image ? api.getImageUrl(p.image) || null : null
+    color: tint || genderColor(p.gender),
+    // The pin keeps the gender fill; a tint only rings it (as on the graph).
+    pinColor: tint ? genderColor(p.gender) : null,
+    imageUrl: p.image ? api.getImageUrl(p.image) || null : null,
+    aura:
+      au && au.ornament !== 'none'
+        ? { id: auraShaderId(au.ornament), k: au.intensity, color: au.color, ornament: au.ornament }
+        : null,
+    auraLine: au && au.line && au.line !== 'none' ? au.line : null
   }
 }
 
@@ -1041,10 +1148,21 @@ function marriageVisual(m) {
   }
 }
 
+// A family line is on a trace / kin walk when a parent AND a child are (the
+// chain runs through one parent, not necessarily both).
+function linkDimmed(children, parents, ids = [...parents, ...children]) {
+  const on = (set) => children.some((id) => set.has(id)) && parents.some((id) => set.has(id))
+  if (pathActive.value) return !on(pathIdSet.value)
+  if (kinWalkSet.value) return !on(kinWalkSet.value)
+  return connDimmed(ids)
+}
+
+// A child's branch (b.ids = its parents, then the child).
 function birthVisual(b) {
   const notYet = b.year > tt.gateYear.value || b.year < tt.gateStartYear.value
-  const group = notYet ? 0 : connDimmed(b.ids) ? 0.08 : 1
-  const lit = hoverId.value && b.ids.includes(hoverId.value)
+  const hl = hoverLink.value
+  const lit = hl ? hl.branchIds.has(b.id) : hoverId.value && b.ids.includes(hoverId.value)
+  const group = notYet ? 0 : (hl ? !lit : linkDimmed([b.childId], b.parents)) ? 0.08 : 1
   return {
     lineOpacity: (lit ? 0.95 : 0.55) * group,
     width: lit ? 2.2 : 1.8,
@@ -1053,6 +1171,34 @@ function birthVisual(b) {
     dotOpacity: 0.8 * group,
     color: colors.value.parentChild
   }
+}
+
+// A couple's stem (and co-parent bar): lit with any of its family.
+function familyVisual(f) {
+  const notYet = f.firstYear > tt.gateYear.value || f.lastYear < tt.gateStartYear.value
+  const hl = hoverLink.value
+  const ids = [...f.parents, ...f.children]
+  const lit = hl
+    ? hl.famId === f.id
+    : !!hoverId.value && (f.parents.includes(hoverId.value) || f.children.includes(hoverId.value))
+  const dim = hl ? !lit : !lit && linkDimmed(f.children, f.parents, ids)
+  const group = notYet ? 0 : dim ? 0.08 : 1
+  return {
+    lineOpacity: (lit ? 0.95 : 0.55) * group,
+    width: lit ? 2.2 : 1.8,
+    dashLen: f.adopted ? 4 : 0,
+    dashGap: f.adopted ? 4 : 0,
+    color: colors.value.parentChild
+  }
+}
+
+// A household channel (rivers): brighter while hovered, faded with its people.
+function householdVisual(h) {
+  const hl = hoverLink.value
+  const lit = hl ? hl.householdId === h.id : !!hoverId.value && h.members.includes(hoverId.value)
+  const notYet = h.start > tt.gateYear.value || h.end < tt.gateStartYear.value
+  const dim = hl ? !lit : !lit && connDimmed(h.members)
+  return { opacity: notYet ? 0 : dim ? 0.35 : 1, lit }
 }
 
 // ── Pan / zoom mechanics ────────────────────────────────────────────────────
@@ -1100,9 +1246,20 @@ const minimapAdapter = {
       g.strokeStyle = withAlpha(c, 0.6)
       g.beginPath()
       for (const p of list) {
+        if (p.path) {
+          // rivers: the life's polyline
+          for (let k = 0; k < p.path.length; k += 2) {
+            const X = p.path[k + 1] * proj.sx + proj.ox,
+              Y = axisOf(p.path[k]) * proj.sy + proj.oy
+            if (k) g.lineTo(X, Y)
+            else g.moveTo(X, Y)
+          }
+          continue
+        }
+        // (minimap y is axis years, like its view box — the warp included)
         const mx = p.laneX * proj.sx + proj.ox
-        g.moveTo(mx, p.birthYear * proj.sy + proj.oy)
-        g.lineTo(mx, Math.max(p.endYear, p.birthYear + 1) * proj.sy + proj.oy)
+        g.moveTo(mx, axisOf(p.birthYear) * proj.sy + proj.oy)
+        g.lineTo(mx, axisOf(Math.max(p.endYear, p.birthYear + 1)) * proj.sy + proj.oy)
       }
       g.stroke()
     }
@@ -1111,7 +1268,7 @@ const minimapAdapter = {
     const px = pxPerYear.value
     const ls = laneScale.value
     const ntx = stageW.value / 2 - wx * ls
-    const nty = stageH.value / 2 - ((wy - layout.value.minYear) * px + Y_PAD)
+    const nty = stageH.value / 2 - ((wy - layout.value.minYear) * px + Y_PAD) // wy: axis years
     if (opts?.smooth) {
       tweenTo(px, ls, ntx, nty, 260)
     } else {
@@ -1145,11 +1302,15 @@ function clampPan() {
 // transition the DOM (and its listeners) outlives the component.
 function onPointerDown(e) {
   if (e.button !== 0 || !stageEl.value) return
+  // Alt-drag tilts / turns the board (as on the graph)
+  if (e.altKey && renderer) return beginTiltDrag(e)
   if (!tool.value && renderer && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
     const p = stagePoint(e)
     if (p.x > GUTTER && !renderer.chronicleAt(p.x, p.y) && !renderer.badgeAt(p.x, p.y)) {
       const person = livePersonAt(p)
-      if (person) return startLaneDrag(person, p, e)
+      // Sprout lanes are computed: there a life only drags in time.
+      if (person && (timelineMode.value === 'lanes' || store.timeDrag))
+        return startLaneDrag(person, p, e)
     }
   }
   if (tool.value && renderer && !nameBubble.value && !linkPick.value) {
@@ -1168,16 +1329,29 @@ function onPointerDown(e) {
   startY = e.clientY
   startTx = tx.value
   startTy = ty.value
+  startFlat = flatOfClient(e.clientX, e.clientY)
   window.addEventListener('pointermove', onPointerMove)
   window.addEventListener('pointerup', onPointerUp)
+}
+// The flat stage point under a client position (tilted: the board point).
+// Independent of the camera's pan/zoom, so a drag can pin the grabbed spot.
+let startFlat = null
+function flatOfClient(cx, cy) {
+  const rect = stageEl.value?.getBoundingClientRect()
+  const x = cx - (rect?.left || 0),
+    y = cy - (rect?.top || 0)
+  return renderer ? renderer.toFlat(x, y) : { x, y }
 }
 function onPointerMove(e) {
   const dx = e.clientX - startX,
     dy = e.clientY - startY
   if (!moved && Math.hypot(dx, dy) > 4) moved = true
   if (!moved) return
-  tx.value = startTx + dx
-  ty.value = startTy + dy
+  // Flat: the screen delta. Tilted: the grabbed board point stays under the
+  // cursor exactly (the flat delta between where it was and where it is).
+  const f = startFlat && renderer?.tilted ? flatOfClient(e.clientX, e.clientY) : null
+  tx.value = startTx + (f ? f.x - startFlat.x : dx)
+  ty.value = startTy + (f ? f.y - startFlat.y : dy)
   clampPan()
   syncCamera()
 }
@@ -1213,9 +1387,8 @@ function clearStretchKeys() {
 function onWheel(e) {
   if (!stageEl.value) return
   cancelTween()
-  const rect = stageEl.value.getBoundingClientRect()
-  const mx = e.clientX - rect.left
-  const my = e.clientY - rect.top
+  // (tilted: zoom about the board point under the cursor)
+  const { x: mx, y: my } = flatOfClient(e.clientX, e.clientY)
   const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX
   const factor = Math.exp(-delta * 0.0022)
 
@@ -1247,9 +1420,19 @@ function anchorTy(my, oldTy, k) {
 }
 
 // ── Hover / click hit-testing against the renderer ──────────────────────────
+// A pointer on the stage, in FLAT stage px (x, y — what hit tests, edit tools
+// and ghosts work in; the board point under the cursor when tilted) plus the
+// raw screen px (sx, sy — for placing DOM popups). Identical when flat.
 function stagePoint(e) {
   const rect = stageEl.value.getBoundingClientRect()
-  return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  const sx = e.clientX - rect.left,
+    sy = e.clientY - rect.top
+  const f = renderer ? renderer.toFlat(sx, sy) : { x: sx, y: sy }
+  return { x: f.x, y: f.y, sx, sy }
+}
+/** Screen px of a flat stage point (for DOM popups anchored to the canvas). */
+function screenOf(x, y) {
+  return renderer ? renderer.project(x, y) : { x, y, s: 1 }
 }
 
 function onStageMove(e) {
@@ -1258,6 +1441,7 @@ function onStageMove(e) {
   renderer?.setMouseY(panning.value ? null : p.y)
   if (panning.value) {
     chronTip.value = null
+    setHoverLink(null)
     return
   }
   if (tool.value) {
@@ -1278,6 +1462,7 @@ function onStageMove(e) {
       hoverId.value = null
       renderer.markStylesDirty()
     }
+    setHoverLink(null)
     return
   }
   const badge = renderer?.badgeAt(p.x, p.y) || null
@@ -1292,12 +1477,143 @@ function onStageMove(e) {
     hoverId.value = id
     renderer?.markStylesDirty()
   }
+  // A family line under the cursor (only where no life or badge is, and not
+  // through an overlay like the control bar).
+  const onCanvas = e.target instanceof HTMLCanvasElement
+  setHoverLink(onCanvas && !id && !badge && !tool.value ? renderer.linkAt(p.x, p.y) : null, p)
+}
+
+// ── Family-line hover: light the line + its people, explain it in a card ────
+const placedById = computed(() => new Map(layout.value.people.map((q) => [q.id, q])))
+function setHoverLink(hit, p) {
+  const key = hit
+    ? hit.kind === 'household'
+      ? 'h:' + hit.household.id
+      : hit.kind === 'family'
+        ? 'f:' + hit.family.id
+        : 'b:' + hit.branch.id
+    : null
+  if (key !== (hoverLink.value?.key ?? null)) {
+    if (!hit) hoverLink.value = null
+    else if (hit.kind === 'household') {
+      // Rivers: a household channel lights everyone who ever lived in it.
+      const h = hit.household
+      hoverLink.value = {
+        key,
+        famId: null,
+        householdId: h.id,
+        heads: h.heads,
+        branchIds: new Set(),
+        ids: new Set(h.members)
+      }
+    } else if (hit.kind === 'family') {
+      const f = hit.family
+      hoverLink.value = {
+        key,
+        famId: f.id,
+        branchIds: new Set(layout.value.branches.filter((b) => b.famId === f.id).map((b) => b.id)),
+        ids: new Set([...f.parents, ...f.children])
+      }
+    } else {
+      const b = hit.branch
+      hoverLink.value = { key, famId: b.famId, branchIds: new Set([b.id]), ids: new Set(b.ids) }
+    }
+  }
+  bondTip.value = hit && p ? bondTipFor(hit, p) : null
+}
+function fullName(id) {
+  return personById.value.get(id)?.name || tr('timeline.canvas.unnamed')
+}
+function bondTipFor(hit, p) {
+  const base = {
+    x: Math.min((p.sx ?? p.x) + 14, stageW.value - 260),
+    y: (p.sy ?? p.y) + 16,
+    color: colors.value.parentChild
+  }
+  if (hit.kind === 'household') return householdTip(hit.household, base)
+  if (hit.kind === 'branch') {
+    const b = hit.branch
+    const names = b.parents.map(fullName).join(' & ')
+    const ages = b.parents
+      .map((id) => {
+        const q = placedById.value.get(id)
+        const age = q ? Math.floor(b.year - q.birthYear) : -1
+        return age >= 0 ? tr('timeline.bond.ageAt', { name: shortName(id), age }) : null
+      })
+      .filter(Boolean)
+      .join(' · ')
+    const lines = [
+      {
+        icon: 'users',
+        text: tr(b.adopted ? 'timeline.bond.adoptedBy' : 'timeline.bond.childOf', { names })
+      }
+    ]
+    if (ages) lines.push({ icon: 'cake', text: ages })
+    return {
+      ...base,
+      key: 'b:' + b.id,
+      icon: b.adopted ? 'heart-handshake' : 'baby',
+      title: fullName(b.childId),
+      when: tr('timeline.bond.born', { year: Math.floor(b.year) }),
+      lines
+    }
+  }
+  const f = hit.family
+  const kids = f.children.map(shortName)
+  const n = kids.length
+  return {
+    ...base,
+    key: 'f:' + f.id,
+    icon: 'users',
+    title: f.parents.map(fullName).join(' & '),
+    when: tr(n === 1 ? 'timeline.bond.oneChild' : 'timeline.bond.children', { n }),
+    lines: [
+      {
+        icon: 'baby',
+        text: n > 5 ? `${kids.slice(0, 4).join(', ')} +${n - 4}` : kids.join(', ')
+      }
+    ]
+  }
+}
+
+// Rivers: "Household of A & B · 1850–1910 · 6 children".
+function householdTip(h, base) {
+  const kids = h.children.map(shortName)
+  const n = kids.length
+  const lines = []
+  if (n)
+    lines.push({
+      icon: 'baby',
+      text:
+        tr(n === 1 ? 'timeline.bond.oneChild' : 'timeline.bond.children', { n }) +
+        ' · ' +
+        (n > 5 ? `${kids.slice(0, 4).join(', ')} +${n - 4}` : kids.join(', '))
+    })
+  const joined = h.members.filter((id) => !h.heads.includes(id) && !h.children.includes(id))
+  if (joined.length)
+    lines.push({
+      icon: 'users',
+      text: tr('timeline.river.joined', { names: joined.map(shortName).join(', ') })
+    })
+  const to = Math.floor(h.end) >= refYear.value ? tr('timeline.tip.now') : Math.floor(h.end)
+  return {
+    ...base,
+    key: 'h:' + h.id,
+    icon: 'waves',
+    title:
+      h.kind === 'solo'
+        ? tr('timeline.river.own', { name: fullName(h.heads[0]) })
+        : tr('timeline.river.household', { names: h.heads.map(fullName).join(' & ') }),
+    when: `${Math.floor(h.start)}–${to}`,
+    lines
+  }
 }
 
 function onStageLeave() {
   renderer?.setMouseY(null)
   hoverChron.value = null
   chronTip.value = null
+  setHoverLink(null)
   if (hoverId.value) {
     hoverId.value = null
     renderer?.markStylesDirty()
@@ -1331,6 +1647,25 @@ function onStageClick(e) {
   }
   mEdit.value = null
   const person = livePersonAt(p)
+  if (!person && hoverLink.value && !e.ctrlKey && !e.metaKey) {
+    // A branch selects its child; a stem selects the couple.
+    const hl = hoverLink.value
+    if (hl.heads) {
+      // a household channel selects the people whose household it is
+      store.selectPerson(hl.heads[0], { modal: false })
+      if (hl.heads[1]) store.toggleSelectPerson(hl.heads[1])
+      return
+    }
+    const fam = layout.value.families.find((f) => f.id === hl.famId)
+    const branch = hl.branchIds.size === 1 ? [...hl.branchIds][0] : null
+    const b = branch ? layout.value.branches.find((x) => x.id === branch) : null
+    if (b && hl.key.startsWith('b:')) store.selectPerson(b.childId, { modal: false })
+    else if (fam) {
+      store.selectPerson(fam.parents[0], { modal: false })
+      if (fam.parents[1]) store.toggleSelectPerson(fam.parents[1])
+    }
+    return
+  }
   if (person) {
     // ctrl-click (or an armed trace) → trace; shift → multi-select; plain →
     // select (the action pane); double-click opens the profile.
@@ -1438,8 +1773,8 @@ function openMarriageEdit(m, e) {
     names: trunc(m.names, 34),
     year: m.realYear,
     status: m.status,
-    px: Math.min(Math.max(8, p.x - 110), stageW.value - 230),
-    py: Math.min(Math.max(8, p.y + 14), stageH.value - 140)
+    px: Math.min(Math.max(8, p.sx - 110), stageW.value - 230),
+    py: Math.min(Math.max(8, p.sy + 14), stageH.value - 140)
   }
   nextTick(() => meditInputRef.value?.focus())
 }
@@ -1486,7 +1821,7 @@ function focusPerson(id) {
   const px = pxPerYear.value,
     ls = laneScale.value
   const ntx = (stageW.value + GUTTER) / 2 - p.laneX * ls
-  const nty = stageH.value * 0.32 - ((p.birthYear - layout.value.minYear) * px + Y_PAD)
+  const nty = stageH.value * 0.32 - ((axisOf(p.birthYear) - layout.value.minYear) * px + Y_PAD)
   tweenTo(px, ls, ntx, nty, 520)
 }
 
@@ -1885,10 +2220,10 @@ function onToolClick(p) {
           ay: linkAnchor.value.year,
           b: person.id,
           year,
-          x: Math.min(Math.max(160, p.x), stageW.value - 170),
+          x: Math.min(Math.max(160, p.sx ?? p.x), stageW.value - 170),
           // Open upward in the lower half so it never covers the tool HUD.
-          y: p.y > stageH.value * 0.5 ? p.y - 18 : p.y + 18,
-          up: p.y > stageH.value * 0.5
+          y: (p.sy ?? p.y) > stageH.value * 0.5 ? (p.sy ?? p.y) - 18 : (p.sy ?? p.y) + 18,
+          up: (p.sy ?? p.y) > stageH.value * 0.5
         }
         fx?.setGhost(null)
       }
@@ -1903,7 +2238,9 @@ function onToolClick(p) {
 
 // ── Add / Child: the christening bubble ─────────────────────────────────────
 function openBubble(b) {
-  nameBubble.value = { value: '', ...b }
+  // b.x / b.y are flat (the ghost's); sx / sy place the DOM bubble on screen
+  const at = screenOf(b.x, b.y)
+  nameBubble.value = { value: '', ...b, sx: at.x, sy: at.y }
   fx?.setGhost([
     { kind: 'yearline', y: b.y, label: String(b.year), color: b.color, x0: GUTTER },
     { kind: 'ring', x: b.x, y: b.y, r: 15, color: b.color }
@@ -1936,6 +2273,15 @@ function toggleCoParent(id) {
   const b = nameBubble.value
   if (b) b.coParentId = b.coParentId === id ? null : id
 }
+/** Where a life placed at world x joins the lane order. Sprout lanes are
+ *  shared, so there it simply follows whoever's lane it landed in. */
+function laneHintAt(worldX) {
+  if (timelineMode.value === 'lanes') return { worldX }
+  let best = null
+  for (const q of layout.value.people)
+    if (!best || Math.abs(q.laneX - worldX) < Math.abs(best.laneX - worldX)) best = q
+  return best ? { afterId: best.id } : { worldX }
+}
 async function commitBubble(ok) {
   const b = nameBubble.value
   nameBubble.value = null
@@ -1943,7 +2289,7 @@ async function commitBubble(ok) {
   if (!ok || !b) return
   pendingLane = {
     before: new Set(store.persons.map((p) => p.id)),
-    opts: b.mode === 'child' ? { afterId: b.parentId } : { worldX: b.worldX }
+    opts: b.mode === 'child' ? { afterId: b.parentId } : laneHintAt(b.worldX)
   }
   const res = await store.createPerson({ name: b.value.trim(), birth: yearDate(b.year) })
   pendingLane = null
@@ -2116,7 +2462,7 @@ function retimeTarget(p) {
     return {
       kind: 'death',
       person,
-      x: s.x,
+      x: s.x1 ?? s.x,
       y: s.y1,
       year: person.endYear,
       label: person.dead
@@ -2232,7 +2578,7 @@ function startLaneDrag(person, p, e) {
 }
 function laneDragMove() {
   const d = drag
-  if (!d || !d.moved || !renderer) return
+  if (!d || !d.moved || !renderer || timelineMode.value !== 'lanes') return
   if (!liftedSet.value) {
     liftedSet.value = new Set(d.group)
     handleDragging.value = true
@@ -2307,6 +2653,7 @@ function finishLaneDrag(d) {
 }
 /** Shift+←/→: nudge the selected lives one lane over. */
 function nudgeLanes(dir) {
+  if (timelineMode.value !== 'lanes') return false
   const display = layout.value.people.map((x) => x.id)
   const group = display.filter((id) => selectedSet.value.has(id))
   if (!group.length) return false
@@ -2322,18 +2669,29 @@ function nudgeLanes(dir) {
 // With the header's Time drag toggle on, a vertical drag on a life (or the
 // selection it's part of) shifts birth + death by whole years; dropping writes
 // every life as ONE batch, so a single Ctrl+Z puts them all back.
-const shiftDelta = (d) => Math.round((d.last.y - d.start.y) / pxPerYear.value)
+// Whole years between where a drag started and where it is — read off the
+// axis, so it stays exact when time is warped (years aren't evenly spaced).
+const yearsDragged = (d) => Math.round(yearAtY(d.last.y) - yearAtY(d.start.y))
+const shiftDelta = yearsDragged
+// A flat y riding a year, moved `delta` years along the (possibly warped) axis.
+const shiftedY = (y, year, delta) => y + yearY(year + delta) - yearY(year)
 const signed = (n) => (n > 0 ? `+${n}` : String(n))
 function shiftGhost() {
   const d = drag
   if (!d || !fx || !renderer) return
   const c = cssVar('--accent')
   const delta = shiftDelta(d)
-  const dy = delta * pxPerYear.value
   const g = []
   for (const id of d.group) {
     const s = renderer.personScreen(id)
-    if (s) g.push({ kind: 'life', x: s.x, y0: s.y0 + dy, y1: s.y1 + dy, color: c })
+    if (s)
+      g.push({
+        kind: 'life',
+        x: s.x,
+        y0: shiftedY(s.y0, s.p.birthYear, delta),
+        y1: shiftedY(s.y1, s.p.endYear, delta),
+        color: c
+      })
   }
   const s = renderer.personScreen(d.id)
   if (!s) return fx.setGhost(g)
@@ -2345,8 +2703,9 @@ function shiftGhost() {
     const end = b?.death?.year != null ? b.death.year + delta : tr('timeline.tip.now')
     label = `${(b?.birth?.year ?? Math.floor(s.p?.birthYear ?? 0)) + delta}–${end} (${signed(delta)})`
   }
-  g.push({ kind: 'yearline', y: s.y0 + dy, label, color: c, x0: GUTTER })
-  g.push({ kind: 'handle', x: s.x, y: s.y0 + dy, color: c, active: true })
+  const hy = shiftedY(s.y0, s.p.birthYear, delta)
+  g.push({ kind: 'yearline', y: hy, label, color: c, x0: GUTTER })
+  g.push({ kind: 'handle', x: s.x, y: hy, color: c, active: true })
   fx.setGhost(g)
 }
 async function finishShift(d) {
@@ -2388,7 +2747,7 @@ async function finishShift(d) {
 /** Years the drag has moved (rounded) and the retimed values it implies. */
 function retimeResult(d) {
   const h = d.h
-  const delta = Math.round((d.last.y - d.start.y) / pxPerYear.value)
+  const delta = yearsDragged(d)
   const rec = h.person ? personById.value.get(h.person.id) : null
   const b0 = rec?.birth?.year ?? null
   const d0 = rec?.death?.year ?? null
@@ -2430,7 +2789,7 @@ function retimeGhost() {
   if (h.person) {
     const s = renderer.personScreen(h.person.id)
     if (!s) return
-    const dy = (r.delta ?? 0) * pxPerYear.value
+    const dl = r.delta ?? 0
     let y0 = s.y0,
       y1 = s.y1,
       hy = d.last.y,
@@ -2446,8 +2805,8 @@ function retimeGhost() {
         ? tr('timeline.ghost.stillLiving')
         : tr('timeline.ghost.died', { year: r.year })
     } else {
-      y0 += dy
-      y1 += dy
+      y0 = shiftedY(y0, s.p.birthYear, dl)
+      y1 = shiftedY(y1, s.p.endYear, dl)
       const b = personById.value.get(h.person.id)
       text = `${(b?.birth?.year ?? 0) + r.delta}–${b?.death?.year != null ? b.death.year + r.delta : tr('timeline.tip.now')} (${sign(r.delta)})`
     }
@@ -2652,6 +3011,174 @@ function syncFxTheme() {
   })
 }
 
+// ── The coordinate pipeline's knobs: perspective tilt + time warp ───────────
+// Tilt: the graph's board tilt laid over the timeline (timelineTilt.ts): the
+// bottom bar / T toggles it, Q / E turn it, Alt-drag sets angle (up/down) and
+// turn (left/right); it glides in ~0.7 s (snaps under reduced motion). The
+// camera stays the flat one — pan/zoom pin the board point under the cursor.
+// Warp: the year axis stretches where births cluster (timeWarp.ts); toggling
+// or retuning it re-flows the axis smoothly, the year at the stage's centre
+// holding still.
+const TL_DEG = Math.PI / 180
+const TL_TILT_MAX_DEG = Math.round((TILT_MAX * 180) / Math.PI)
+const tiltOn = computed(() => !!store.timelineSettings.viewTilt)
+const warpOn = computed(() => !!store.timelineSettings.timeWarp)
+const tlTiltAngle = () =>
+  Math.min(TL_TILT_MAX_DEG, Math.max(8, Number(store.timelineSettings.tiltAngle) || 48))
+const tlTiltYaw = () => Number(store.timelineSettings.tiltYaw) || 0
+const tlWrapDeg = (d) => ((((d + 180) % 360) + 360) % 360) - 180
+const tlReduced = () => {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  } catch {
+    return false
+  }
+}
+let tiltNow = { tl: 0, yw: 0 }
+let tiltRaf = 0
+let tiltDrag = null // { x0, y0, a0, w0, angle, yaw } while Alt-dragging
+
+function setViewTilt(tl, yw) {
+  tiltNow = { tl, yw }
+  renderer?.setTilt(tl, yw)
+  fx?.setTilt(renderer?.tilted ? renderer.view : null)
+  minimapRef.value?.redraw()
+}
+// Glide tilt AND turn to their targets (ease-out with a whisper of overshoot,
+// like the graph's); the turn takes the short way round.
+function animateTilt() {
+  cancelAnimationFrame(tiltRaf)
+  if (!renderer) return
+  const on = tiltOn.value
+  const toT = on ? tlTiltAngle() * TL_DEG : 0
+  const fromT = tiltNow.tl,
+    fromY = tiltNow.yw
+  const toY = fromY + tlWrapDeg((on ? tlTiltYaw() : 0) - fromY / TL_DEG) * TL_DEG
+  if ((Math.abs(toT - fromT) < 1e-4 && Math.abs(toY - fromY) < 1e-4) || tlReduced()) {
+    setViewTilt(toT, toY)
+    return
+  }
+  const t0 = performance.now()
+  const dur = 720
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / dur)
+    const c = 1.2 // easeOutBack, gentle
+    const e = 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2)
+    setViewTilt(Math.max(0, fromT + (toT - fromT) * e), fromY + (toY - fromY) * e)
+    if (k < 1) tiltRaf = requestAnimationFrame(step)
+  }
+  tiltRaf = requestAnimationFrame(step)
+}
+watch(tiltOn, animateTilt)
+watch(
+  () => [store.timelineSettings.tiltAngle, store.timelineSettings.tiltYaw],
+  () => {
+    if (tiltOn.value && !tiltDrag) animateTilt()
+  }
+)
+function toggleTilt() {
+  store.updateTimelineSetting('viewTilt', !tiltOn.value)
+}
+// Turn the board by `deg` (Q / E). Turning a flat view tilts it first.
+function turnTilt(deg) {
+  const yaw = Math.round(tlWrapDeg(tlTiltYaw() + deg))
+  if (tiltOn.value) store.updateTimelineSetting('tiltYaw', yaw)
+  else store.applyTimelineSettings({ viewTilt: true, tiltYaw: yaw })
+}
+// Alt-drag: up/down tilts, left/right turns — the board follows the hand.
+function beginTiltDrag(e) {
+  e.preventDefault()
+  cancelAnimationFrame(tiltRaf)
+  const a = tiltNow.tl / TL_DEG,
+    w = tiltNow.yw / TL_DEG
+  tiltDrag = { x0: e.clientX, y0: e.clientY, a0: a, w0: w, angle: a, yaw: w }
+  suppressClick = true
+  window.addEventListener('pointermove', moveTiltDrag)
+  window.addEventListener('pointerup', endTiltDrag)
+}
+function moveTiltDrag(e) {
+  if (!tiltDrag) return
+  const a = Math.min(TL_TILT_MAX_DEG, Math.max(0, tiltDrag.a0 + (tiltDrag.y0 - e.clientY) * 0.32))
+  const w = tiltDrag.w0 - (e.clientX - tiltDrag.x0) * 0.4
+  tiltDrag.angle = a
+  tiltDrag.yaw = w
+  setViewTilt(a * TL_DEG, w * TL_DEG)
+}
+function endTiltDrag() {
+  window.removeEventListener('pointermove', moveTiltDrag)
+  window.removeEventListener('pointerup', endTiltDrag)
+  if (!tiltDrag) return
+  const { angle: a, yaw } = tiltDrag
+  tiltDrag = null
+  setTimeout(() => (suppressClick = false), 0)
+  const w = Math.round(tlWrapDeg(yaw))
+  // Nearly flat snaps flat (and switches the tilt off, keeping the turn for
+  // next time); otherwise keep both by hand.
+  if (a < 6) {
+    store.applyTimelineSettings({ viewTilt: false, tiltYaw: w })
+    animateTilt()
+  } else store.applyTimelineSettings({ viewTilt: true, tiltAngle: Math.round(a), tiltYaw: w })
+}
+// T / Q / E — only while the timeline is the live view and nothing else (a
+// dialog, a full-screen page, a text field) owns the keys.
+function onTiltKey(e) {
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return
+  const k = e.key.toLowerCase()
+  if (k !== 't' && k !== 'q' && k !== 'e') return
+  if (!props.active || store.activeView !== 'timeline') return
+  if (store.modalOpen || store.formOpen || store.chronicleEditor) return
+  if (
+    !store.authUser ||
+    store.curtain?.active ||
+    store.userPageOpen ||
+    store.projectsPageOpen ||
+    store.browsePageOpen
+  )
+    return
+  if (document.querySelector('.home') || document.querySelector('.dh-backdrop')) return
+  if (isTypingTarget(e.target) || isTypingTarget(document.activeElement)) return
+  e.preventDefault()
+  if (k === 't') toggleTilt()
+  else turnTilt(k === 'q' ? 30 : -30)
+}
+
+let warpNow = 0
+let warpRaf = 0
+const warpTarget = () =>
+  warpOn.value ? Math.min(1, Math.max(0, Number(store.timelineSettings.warpStrength) || 0)) : 0
+// Re-flow the axis to blend k, holding the year at the stage's centre still.
+function setWarpK(k) {
+  warpNow = k
+  if (!renderer) return
+  const cy = stageH.value / 2
+  const year = renderer.yearAt(cy)
+  renderer.setWarp(k)
+  if (stageH.value && Number.isFinite(year)) ty.value += cy - renderer.sy(year)
+  clampPan()
+  syncCamera()
+}
+function animateWarp() {
+  cancelAnimationFrame(warpRaf)
+  const to = warpTarget(),
+    from = warpNow
+  if (Math.abs(to - from) < 1e-4 || tlReduced() || !renderer) {
+    setWarpK(to)
+    return
+  }
+  const t0 = performance.now()
+  const dur = 650
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / dur)
+    setWarpK(from + (to - from) * (1 - Math.pow(1 - k, 3)))
+    if (k < 1) warpRaf = requestAnimationFrame(step)
+  }
+  warpRaf = requestAnimationFrame(step)
+}
+watch(() => [warpOn.value, store.timelineSettings.warpStrength], animateWarp)
+function toggleWarp() {
+  store.updateTimelineSetting('timeWarp', !warpOn.value)
+}
+
 // ── Lifecycle ───────────────────────────────────────────────────────────────
 let ro = null
 let hasFitted = false
@@ -2662,6 +3189,7 @@ onMounted(() => {
     stageH.value = stageEl.value?.clientHeight || 0
     renderer?.resize(stageW.value, stageH.value)
     fx?.resize(stageW.value, stageH.value)
+    fx?.setTilt(renderer?.tilted ? renderer.view : null)
   }
   renderer = new TimelineRenderer({
     bgCanvas: bgEl.value,
@@ -2671,6 +3199,8 @@ onMounted(() => {
       personVisual,
       marriageVisual,
       birthVisual,
+      familyVisual,
+      householdVisual,
       getRefYear: () => refYear.value,
       getTimeYear: () => tt.year.value, // null = time travel off
       getChronicle: () => ({
@@ -2693,6 +3223,10 @@ onMounted(() => {
   renderer.setHidden(!props.active)
   renderer.setData(layout.value)
   measure()
+  // The saved tilt / warp apply straight away (no glide on the first frame).
+  warpNow = warpTarget()
+  renderer.setWarp(warpNow)
+  if (tiltOn.value) setViewTilt(tlTiltAngle() * TL_DEG, tlTiltYaw() * TL_DEG)
   nextTick(() => {
     measure()
     if (props.active && stageW.value) {
@@ -2714,6 +3248,7 @@ onMounted(() => {
   window.addEventListener('keyup', onStretchKeyUp)
   window.addEventListener('blur', clearStretchKeys)
   window.addEventListener('keydown', onToolKeydown, true)
+  window.addEventListener('keydown', onTiltKey)
   unregisterLaneHistory = store.registerLayoutHistory(restoreLanes, 'timeline')
 
   watch(
@@ -2764,8 +3299,16 @@ watch(
     focusLife,
     linkAnchor,
     pathAnchor,
-    liftedSet
+    liftedSet,
+    hoverLink
   ],
+  () => renderer?.markStylesDirty()
+)
+// Auras: the store rebuilds the person → aura Map on any tag/trait/aura edit,
+// so watching the Map ref (not deep) catches every change; the renderer
+// ignites the people whose ornament changed.
+watch(
+  () => store.auraOf,
   () => renderer?.markStylesDirty()
 )
 // Style pane edits: every look/canvas option re-renders (one shallow watch —
@@ -2799,6 +3342,11 @@ onBeforeUnmount(() => {
   window.removeEventListener('keyup', onStretchKeyUp)
   window.removeEventListener('blur', clearStretchKeys)
   window.removeEventListener('keydown', onToolKeydown, true)
+  window.removeEventListener('keydown', onTiltKey)
+  window.removeEventListener('pointermove', moveTiltDrag)
+  window.removeEventListener('pointerup', endTiltDrag)
+  cancelAnimationFrame(tiltRaf)
+  cancelAnimationFrame(warpRaf)
   unregisterLaneHistory?.()
   stopAutoPan()
   window.removeEventListener('pointermove', onDragMove)
@@ -3356,6 +3904,20 @@ onBeforeUnmount(() => {
 .tl-ctrl-btn:hover {
   background: var(--hover);
   color: var(--t1);
+}
+.tl-ctrl-wide {
+  width: auto;
+  padding: 0 10px;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.tl-ctrl-active,
+.tl-ctrl-active:hover {
+  background: var(--adim);
+  color: var(--accent);
+  border-color: rgba(var(--accent-rgb), 0.3);
 }
 .tl-zoom-label {
   display: inline-flex;

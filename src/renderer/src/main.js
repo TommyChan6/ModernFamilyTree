@@ -5,6 +5,7 @@ import { initObservability } from './lib/observability.js'
 import { installRipple } from './lib/ripple.js'
 import './styles/global.css'
 import './styles/ink.css'
+import './styles/medieval.css'
 
 const app = createApp(App)
 app.use(createPinia())

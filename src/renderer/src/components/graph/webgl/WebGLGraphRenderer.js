@@ -6,17 +6,21 @@ import { AvatarAtlas } from './AvatarAtlas.js'
 import { TextGuideOverlay } from './TextGuideOverlay.js'
 import { Picker } from './Picking.js'
 import { approach, TWEEN_EPS } from './tween.js'
-import { nodeShapeId, nodeDecorId } from './NodeMaterial.js'
+import { nodeShapeId, nodeDecorId, AURA_IGNITE_DUR } from './NodeMaterial.js'
 import { shapeAnchor } from './nodeShapes.js'
 import { tiltProjection, screenToWorld, depthOrder } from './coords.js'
 import { GroundGrid } from './GroundGrid.js'
 import { inkLook, inkSealColor, staggerBirth } from '../inkStyle.js'
 import { InkBackdrop } from '../InkBackdrop.js'
+import { MedievalBackdrop } from '../MedievalBackdrop.js'
 import { POP_DUR, RING_DUR, popDelay, popLabelReveal } from './popAnim.js'
 
 const NOT_BORN = -1e4 // birth time meaning 'already written / settled'
 const WRITE_DUR = 1.1 // brush write-on (s) — LinkMaterial uWriteDur
 const BLOOM_DUR = 1.3 // wash bloom (s) — NodeMaterial uBloomDur
+// Aura ignition cascades down the generations: per-node delay, and its cap.
+const AURA_STAGGER = 0.045
+const AURA_STAGGER_MAX = 1.4
 // Tilt angle at which the depth haze / ground grid reach full strength.
 const TILT_FULL = (50 * Math.PI) / 180
 
@@ -51,7 +55,7 @@ function rgb(hex) {
 // ease toward their targets with frame-rate-independent smoothing, reproducing the old d3
 // transitions. Positions come straight from the (already animated) node objects each frame.
 export class WebGLGraphRenderer {
-  constructor({ glCanvas, overlayCanvas, hooks, backdropEl = null }) {
+  constructor({ glCanvas, overlayCanvas, hooks, backdropEl = null, medBackdropEl = null }) {
     this.hooks = hooks
     this.disposed = false
     this._scheduled = false
@@ -147,7 +151,13 @@ export class WebGLGraphRenderer {
     this._pendingPops = new Map()
     this._popUntil = 0
     this._popColor = null
+    // Aura ignition: a node whose aura changes after the first style sync lights
+    // up with a shockwave; the loop stays alive until the last one has settled.
+    this._auraIgniteUntil = 0
+    this._hasAura = false
+    this._styledOnce = false
     this.backdrop = backdropEl ? new InkBackdrop(backdropEl) : null
+    this.medBackdrop = medBackdropEl ? new MedievalBackdrop(medBackdropEl) : null
     this.picker = new Picker()
 
     this._frame = this._frame.bind(this)
@@ -267,13 +277,15 @@ export class WebGLGraphRenderer {
     this.transform = t
     this.overlay.setCamera(t)
     this.backdrop?.setCamera(t)
+    this.medBackdrop?.setCamera(t)
     this.requestRedraw()
   }
 
-  // `theme` is the app theme string ('dark' | 'light' | 'ink'); optional for
-  // callers that only know light/dark.
+  // `theme` is the app theme string ('dark' | 'light' | 'ink' | 'medieval');
+  // optional for callers that only know light/dark.
   setTheme(isLight, theme) {
     this._appTheme = theme || (isLight ? 'light' : 'dark')
+    this.medBackdrop?.setTheme(this._appTheme)
     this._lookKey = null // re-resolve the ink look (uniforms, halo, overlay) next frame
     this.nodeLayer.setThemeUniforms(isLight)
     this._haloRGB = isLight ? [0.16, 0.2, 0.3] : [1, 1, 1]
@@ -388,12 +400,16 @@ export class WebGLGraphRenderer {
     this._nodeIds.length = nodes.length
     const seen = new Set()
     this._hasNodeGlow = false // any selected/glowing node keeps the pulse loop alive
+    this._hasAura = false // any aura ornament keeps the decor clock turning
+    this._hasTwinkle = false // a departed star twinkling (constellation skin) does too
     // Ink washes bloom in: new nodes (or all of them on a re-paint), staggered.
     const bloom = this._look.nodes && !reducedMotion()
     const rebirth = this._rebirth
     let fresh = 0
     if (bloom) for (const n of nodes) if (rebirth || !this._nodeAnim.has(n.id)) fresh++
     let fi = 0
+    // Ignite only on a real change: never on first load, never for newcomers.
+    const ignite = this._styledOnce && !reducedMotion() ? [] : null
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i],
         v = visual(n)
@@ -401,15 +417,24 @@ export class WebGLGraphRenderer {
       v.avatar = layer >= 1 ? layer : 0 // 0 = silhouette fallback
       v.fillRGB = rgb(v.fill)
       v.borderRGB = rgb(v.border)
+      v.auraRGB = v.aura ? rgb(v.aura.color) : null
+      if (v.aura) this._hasAura = true
+      if (v.star?.twinkle) this._hasTwinkle = true
       this._nodeCache[i] = v
       this._nodeIds[i] = n.id
       seen.add(n.id)
       let a = this._nodeAnim.get(n.id)
       const isNew = !a
+      const auraKey = v.aura ? `${v.aura.id}|${v.aura.color}` : ''
       if (!a) {
-        a = { op: 0, rad: v.radius, glow: 0, born: NOT_BORN }
+        a = { op: 0, rad: v.radius, glow: 0, born: NOT_BORN, auraKey, auraBorn: NOT_BORN }
         this._nodeAnim.set(n.id, a)
       } // new -> fade in
+      else if (auraKey !== a.auraKey) {
+        a.auraKey = auraKey
+        a.auraBorn = NOT_BORN
+        if (auraKey && ignite) ignite.push({ a, y: n.y || 0 })
+      }
       if (bloom && (isNew || rebirth)) {
         a.born = staggerBirth(this._clock, fi++, fresh, { step: 0.05, maxSpread: 0.9 })
         this._inkAnimUntil = Math.max(this._inkAnimUntil, a.born + BLOOM_DUR)
@@ -427,6 +452,16 @@ export class WebGLGraphRenderer {
     }
     for (const id of this._nodeAnim.keys()) if (!seen.has(id)) this._nodeAnim.delete(id)
     this._pendingPops.clear()
+    if (ignite?.length) {
+      // Top to bottom, so a new aura washes down the tree.
+      ignite.sort((p, q) => p.y - q.y)
+      ignite.forEach(({ a }, i) => {
+        a.auraBorn = this._clock + Math.min(i * AURA_STAGGER, AURA_STAGGER_MAX)
+      })
+      const last = ignite[ignite.length - 1].a.auraBorn
+      this._auraIgniteUntil = Math.max(this._auraIgniteUntil, last + AURA_IGNITE_DUR)
+    }
+    if (nodes.length) this._styledOnce = true
   }
 
   _stepNodes(dt) {
@@ -457,7 +492,13 @@ export class WebGLGraphRenderer {
         glow: a.glow,
         avatar: v.avatar,
         born: v.born,
-        pop: a.pop
+        pop: a.pop,
+        auraId: v.aura ? v.aura.id : 0,
+        auraK: v.aura ? v.aura.k : 1,
+        auraRGB: v.auraRGB,
+        auraBorn: a.auraBorn,
+        starK: v.star ? v.star.k : null,
+        starTwinkle: !!v.star?.twinkle
       })
     }
     this.nodeLayer.commitStyles()
@@ -598,10 +639,6 @@ export class WebGLGraphRenderer {
     nu.uShape.value = nodeShapeId(gs.nodeShape)
     nu.uDecor.value = nodeDecorId(gs.nodeDecor)
     nu.uDecorColor.value.set(gs.decorColor || '#d4af37')
-    // Decor ornaments animate only in quality mode; frozen (t=0) keeps them
-    // as static jewellery in performance mode.
-    this._decorAnim =
-      quality === 'quality' && nodeDecorId(gs.nodeDecor) > 0 && gs.nodeDecor !== 'enso'
     // Brush strokes stop short of each roundel so they breathe (留白).
     const gapR = (gs.nodeRadius || 22) * (look.nodes ? 1.16 : 1.04)
     this.linkLayer.material.uniforms.uNodeR.value = gapR
@@ -620,6 +657,15 @@ export class WebGLGraphRenderer {
       this._linkStyleWrite = true
     }
     this._rebirth = false
+    // Decor + aura ornaments animate only in quality mode; frozen (t=0) keeps
+    // them as static jewellery in performance mode and under reduced motion.
+    // (After the style sync: it decides whether anyone wears an aura.)
+    this._decorAnim =
+      quality === 'quality' &&
+      !reducedMotion() &&
+      ((nodeDecorId(gs.nodeDecor) > 0 && gs.nodeDecor !== 'enso') ||
+        this._hasAura ||
+        this._hasTwinkle)
 
     if (this._nodeTweening) this._nodeTweening = this._stepNodes(dt)
 
@@ -712,6 +758,7 @@ export class WebGLGraphRenderer {
       this._linkTweening ||
       this._clock < this._inkAnimUntil ||
       this._clock < this._popUntil ||
+      this._clock < this._auraIgniteUntil ||
       ((this._hasFlow || this._hasNodeGlow || this._hasAmbient || this._decorAnim) &&
         document.visibilityState === 'visible')
     ) {
@@ -758,9 +805,15 @@ export class WebGLGraphRenderer {
         a.glow = a.tglow
       }
       this._stepNodes(0)
-      // A still capture shows every wash fully bloomed (the live attrs re-sync after).
-      this.nodeLayer.born.fill(NOT_BORN)
-      this.nodeLayer.pop.fill(NOT_BORN) // …and everyone at full size
+      // A still capture shows every wash fully bloomed (iState.z), everyone at
+      // full size (iState.w) and every aura settled, never caught mid-shockwave
+      // (iAura.z = ignite start). The live attrs re-sync after.
+      const nl = this.nodeLayer
+      for (let i = 0; i < nl.count; i++) {
+        nl.state[i * 4 + 2] = NOT_BORN
+        nl.state[i * 4 + 3] = NOT_BORN
+        nl.aura[i * 4 + 2] = NOT_BORN
+      }
       const nodes = this.nodes || []
       for (let i = 0; i < nodes.length; i++) this.nodeLayer.setPosition(i, nodes[i].x, nodes[i].y)
       this.nodeLayer.commitPositions()
@@ -839,6 +892,7 @@ export class WebGLGraphRenderer {
     this.ambient.dispose()
     this.grid.dispose()
     this.backdrop?.dispose()
+    this.medBackdrop?.dispose()
     this.renderer.dispose()
   }
 }

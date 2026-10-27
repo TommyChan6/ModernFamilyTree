@@ -14,6 +14,8 @@ import {
 import {
   shapeAnchor,
   shapeLabelDrop,
+  shapeLabelAbove,
+  shapeLabelRise,
   shapeTopLift,
   NODE_SHAPES
 } from '../src/renderer/src/components/graph/webgl/nodeShapes.js'
@@ -218,21 +220,48 @@ describe('screen-space node picking', () => {
 })
 
 describe('node shape anchors', () => {
-  it('only the gravestone stands on its point', () => {
-    expect(NODE_SHAPES).toContain('gravestone')
+  const STANDING = ['gravestone', 'plate', 'flatplate']
+  it('only the standing shapes (gravestone, plate) stand on their point', () => {
+    for (const s of STANDING) expect(NODE_SHAPES).toContain(s)
     for (const s of NODE_SHAPES) {
       const a = shapeAnchor(s)
-      if (s === 'gravestone') expect(a.lift).toBeGreaterThan(0)
+      if (STANDING.includes(s)) expect(a.lift).toBeGreaterThan(0)
       else expect(a.lift).toBe(0)
     }
   })
-  it('labels sit just under a gravestone base, pills above its crown', () => {
-    expect(shapeLabelDrop('gravestone', 20)).toBeLessThan(shapeLabelDrop('circle', 20))
-    expect(shapeTopLift('gravestone', 20)).toBeGreaterThan(shapeTopLift('circle', 20))
+  it('standing shapes share one base line (the shader bakes a single lift)', () => {
+    for (const s of STANDING) expect(shapeAnchor(s).lift).toBe(shapeAnchor('gravestone').lift)
+  })
+  it('labels sit just under a standing base, pills above its crown', () => {
+    for (const s of STANDING) {
+      expect(shapeLabelDrop(s, 20)).toBeLessThan(shapeLabelDrop('circle', 20))
+      expect(shapeTopLift(s, 20)).toBeGreaterThan(shapeTopLift('circle', 20))
+    }
+  })
+  it('plates carry their name above the crown; everything else below', () => {
+    for (const s of NODE_SHAPES) expect(shapeLabelAbove(s)).toBe(s === 'plate' || s === 'flatplate')
+    for (const s of ['plate', 'flatplate']) {
+      // the baseline clears the crown…
+      expect(shapeLabelRise(s, 20)).toBeGreaterThan(shapeAnchor(s).top * 20)
+      // …and pills / badges make room for the name sitting on top
+      expect(shapeTopLift(s, 20, 10)).toBeGreaterThanOrEqual(shapeTopLift(s, 20, 0) + 10)
+    }
+    // names below: nothing extra to clear above the crown
+    expect(shapeTopLift('gravestone', 20, 10)).toBe(shapeTopLift('gravestone', 20, 0))
+  })
+  it('shape ids are append-only (saved settings keep their shape)', () => {
+    expect(NODE_SHAPES.indexOf('gravestone')).toBe(8)
+    expect(NODE_SHAPES.indexOf('plate')).toBe(9)
+    expect(NODE_SHAPES.indexOf('flatplate')).toBe(10)
   })
 })
 
 describe('label occlusion (standing nodes)', () => {
+  it('a plate body rises above its foot too', () => {
+    const b = bodyBox('plate', 100, 200, 10)
+    expect(b.y1).toBe(200)
+    expect(b.y0).toBeLessThan(200 - 18)
+  })
   it('a gravestone body rises above its foot; discs centre on it', () => {
     const g = bodyBox('gravestone', 100, 200, 10)
     expect(g.y1).toBe(200)

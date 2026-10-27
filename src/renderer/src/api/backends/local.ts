@@ -182,7 +182,11 @@ export const localBackend: ApiBackend = {
       }
       const result = await handler(db, data, env, ctx)
       if (WRITE_CHANNELS.has(channel)) void persist(db)
-      return { success: true, data: result }
+      // Hand back a COPY, as Electron's IPC does: handlers return live DB rows,
+      // and an update that mutates a row in place would otherwise return the
+      // very object the store already holds — `arr[i] = res.data` is then a
+      // no-op to Vue and computeds over it (auras, tag chips) go stale.
+      return { success: true, data: result === undefined ? result : structuredClone(result) }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
     }

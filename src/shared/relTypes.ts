@@ -9,6 +9,7 @@
 // Layout hierarchy math never matches type literals — it reads symmetryRole.
 
 import type { DB, Env, RelationshipTypeDef, SymmetryRole } from './types'
+import { BUILTIN_SENTIMENT, clampSentiment } from './sentiment'
 
 /** Picker bands (UI grouping only — no behavior attached). */
 export const REL_BANDS = ['family', 'social', 'power', 'custom'] as const
@@ -27,6 +28,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     key: 'parent_child',
     label: 'Parent / Child',
     weight: 1,
+    sentiment: BUILTIN_SENTIMENT.parent_child,
     directed: true,
     symmetryRole: 'vertical',
     role_a: 'Parent',
@@ -40,6 +42,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     key: 'adopted',
     label: 'Adopted',
     weight: 0.95,
+    sentiment: BUILTIN_SENTIMENT.adopted,
     directed: true,
     symmetryRole: 'vertical',
     role_a: 'Adoptive parent',
@@ -53,6 +56,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     key: 'spouse',
     label: 'Spouse',
     weight: 0.9,
+    sentiment: BUILTIN_SENTIMENT.spouse,
     directed: false,
     symmetryRole: 'horizontal',
     role_a: '',
@@ -66,6 +70,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     key: 'sibling',
     label: 'Sibling',
     weight: 0.7,
+    sentiment: BUILTIN_SENTIMENT.sibling,
     directed: false,
     // NOT 'horizontal' — that would treat explicit siblings as couples in the
     // generations math. Siblings normally derive from shared parents; explicit
@@ -83,6 +88,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     key: 'partner',
     label: 'Partner',
     weight: 0.8,
+    sentiment: BUILTIN_SENTIMENT.partner,
     directed: false,
     symmetryRole: 'horizontal',
     role_a: '',
@@ -96,6 +102,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     key: 'friends',
     label: 'Friend',
     weight: 0.2,
+    sentiment: BUILTIN_SENTIMENT.friends,
     directed: false,
     symmetryRole: 'none',
     role_a: '',
@@ -109,6 +116,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     key: 'likes',
     label: 'Likes',
     weight: 0.05,
+    sentiment: BUILTIN_SENTIMENT.likes,
     directed: true,
     symmetryRole: 'none',
     // a likes b: a is the admirer, b is a's crush — role names double as the
@@ -124,6 +132,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     key: 'rival',
     label: 'Rival',
     weight: -0.3,
+    sentiment: BUILTIN_SENTIMENT.rival,
     directed: false,
     symmetryRole: 'none',
     role_a: '',
@@ -137,6 +146,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     key: 'mentor',
     label: 'Mentor / Student',
     weight: 0.3,
+    sentiment: BUILTIN_SENTIMENT.mentor,
     directed: true,
     symmetryRole: 'none',
     role_a: 'Mentor',
@@ -150,6 +160,7 @@ export const BUILTIN_REL_TYPES: BuiltinRelTypeSpec[] = [
     key: 'subordinate',
     label: 'Subordinate',
     weight: 0.4,
+    sentiment: BUILTIN_SENTIMENT.subordinate,
     directed: true,
     symmetryRole: 'none',
     role_a: 'Superior',
@@ -222,6 +233,21 @@ export function migrateRelationshipTypes(db: DB, env: Env): boolean {
   }
   for (const pid of Object.keys(db.projects || {})) {
     if (ensureProjectRelTypes(db, pid, env)) changed = true
+  }
+  if (backfillRelSentiment(db)) changed = true
+  return changed
+}
+
+/** The sentiment layer (src/shared/sentiment.ts) arrived after the registry:
+ *  give every def without a valid `sentiment` its built-in default (0 for
+ *  custom types). Idempotent; true when anything changed. Also run after a
+ *  project import, whose file may predate the layer. */
+export function backfillRelSentiment(db: DB): boolean {
+  let changed = false
+  for (const def of Object.values(db.rel_type_defs || {})) {
+    if (typeof def.sentiment === 'number' && Number.isFinite(def.sentiment)) continue
+    def.sentiment = clampSentiment(def.builtin ? (BUILTIN_SENTIMENT[def.key] ?? 0) : 0)
+    changed = true
   }
   return changed
 }

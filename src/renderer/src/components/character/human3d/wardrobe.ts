@@ -215,7 +215,7 @@ function topCover(opts: {
     const z = c.P[i * 3 + 2]
     const L = c.L
     const hemY = L.hipY + 0.25 - opts.hemDrop
-    let torso = S(hemY - 0.03, hemY + 0.03, y) * (1 - S(0.4, 0.75, c.leg[i] + c.foot[i]))
+    let torso = S(hemY - 0.1, hemY + 0.1, y) * (1 - S(0.4, 0.75, c.leg[i] + c.foot[i]))
     // neckline
     const neckW = c.neck[i] + c.head[i]
     if (opts.neck === 'turtle') {
@@ -234,14 +234,14 @@ function topCover(opts: {
       // front opening: below the neck base, in front
       const front = S(0.15, 0.5, z)
       const openY = L.neckY - depth + (opts.neck === 'v' ? Math.abs(x) * 1.6 : 0)
-      const open = front * S(openY - 0.03, openY + 0.03, y) * (1 - S(0.55, 0.75, Math.abs(x)))
+      const open = front * S(openY - 0.1, openY + 0.1, y) * (1 - S(0.55, 0.75, Math.abs(x)))
       torso *= 1 - open
       if (opts.neck === 'scoop')
         torso *= 1 - S(L.neckY - 0.25, L.neckY - 0.18, y) * (1 - front) * 0.6
     }
     const arm = c.arm[i] + c.hand[i]
     const t = c.armT[i]
-    let sleeve = 1 - S(opts.sleeve - 0.012, opts.sleeve + 0.012, t)
+    let sleeve = 1 - S(opts.sleeve - 0.03, opts.sleeve + 0.03, t)
     if (opts.strap) {
       // sleeveless: the armhole cuts in from the shoulder
       sleeve = 0
@@ -259,7 +259,7 @@ function bottomCover(legEnd: number, rise = 0): Cover {
     const top = L.waistY - 0.1 + rise
     const below = 1 - S(top - 0.03, top + 0.03, y)
     const leg = c.leg[i] + c.foot[i]
-    const legCover = 1 - S(legEnd - 0.012, legEnd + 0.012, c.legT[i])
+    const legCover = 1 - S(legEnd - 0.025, legEnd + 0.025, c.legT[i])
     const torsoPart = (1 - leg) * (1 - S(0.3, 0.6, c.arm[i] + c.hand[i]))
     return below * (torsoPart + leg * legCover * (1 - S(0.3, 0.6, c.foot[i])))
   }
@@ -649,9 +649,10 @@ export class Wardrobe {
     const n = c.n
     let cover = new Float32Array(n)
     for (let i = 0; i < n; i++) cover[i] = spec.cover(c, i)
-    // relax the coverage field so hems run smoothly between vertices
+    // relax the coverage field so hems run smoothly between vertices: a step
+    // sampled per vertex clips into a zig-zag, a soft ramp into a clean curve
     const nbs = this.neighbours(part)
-    for (let it = 0; it < 2; it++) {
+    for (let it = 0; it < 8; it++) {
       const next = new Float32Array(n)
       for (let i = 0; i < n; i++) {
         const list = nbs[i]

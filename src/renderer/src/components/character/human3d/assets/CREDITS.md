@@ -19,7 +19,26 @@ it's given here gladly.
 
 The region masks inside the file (scalp, brows, beard zones, lips, flush,
 translucency, wrinkle zones) are computed by `scripts/human3d/masks.py`. Hair,
-skin, eyes and clothing are generated procedurally at runtime — no textures or
-third-party art are bundled.
+eyes and clothing are generated procedurally at runtime.
 
 To rebuild: see the docstring at the top of `scripts/human3d/build.py`.
+
+# skin/*.webp — credits
+
+The four skin photos are MakeHuman **system skins** from
+`makehuman_system_assets_cc0.zip`
+(<https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/>),
+each "explicitly released as CC0 in September 2020" (Data Collection AB,
+Joel Palmius, Jonas Hauquier — see each skin's `.mhmat`):
+
+| file          | source skin                                             |
+| ------------- | ------------------------------------------------------- |
+| `young-f.webp` | `young_caucasian_female/young_lightskinned_female_diffuse.png` |
+| `young-m.webp` | `young_caucasian_male/young_lightskinned_male_diffuse.png`     |
+| `old-f.webp`   | `old_caucasian_female/old_lightskinned_female_diffuse.png`     |
+| `old-m.webp`   | `old_caucasian_male/old_lightskinned_male_diffuse.png`         |
+
+Converted to WebP (quality 0.9, 2048²) with the corner watermark — which lies
+outside every UV island — painted over in the padding colour. The skin shader
+divides each by its own mean torso colour (measured at conversion, kept in
+`skinMaterial.ts`) and recolours the ratio by the chosen skin tone.

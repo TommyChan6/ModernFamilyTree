@@ -21,6 +21,8 @@ import { drawIcon } from '../../lib/canvasIcon.js'
 import { hasIcon } from '../ui/icons.js'
 import { defaultNameLabel } from '../../lib/dataLabels'
 import { nowText } from './timelineText.js'
+import { billboard } from './tiltCanvas'
+import { frameRectToFlat } from './timelineTilt'
 
 // The event rail sits just clear of the Time-travel slider panel that rides
 // the gutter's right edge, so pills and chapter headers are never under it.
@@ -42,6 +44,10 @@ function pill(ctx, x, y, w, h, r) {
   else ctx.rect(x, y, w, h)
 }
 const yearText = (v) => (Number.isFinite(v) ? String(Math.floor(v)) : '')
+// Flat bounds to draw across: the viewport, or the tilted board's visible part
+// (the renderer's flatBounds) — so washes and hairlines reach the horizon.
+const boundsOf = (r) =>
+  r.flatBounds ? r.flatBounds() : { x0: 0, y0: 0, x1: r.width, y1: r.height }
 
 /** Era bands behind everything (bg canvas). */
 export function drawChronicleBg(r, ctx) {
@@ -49,15 +55,15 @@ export function drawChronicleBg(r, ctx) {
   if (!ch || !ch.eras.length || !r.layout.people.length) return
   const k = ch.eraIntensity ?? 1 // Style pane: how strongly eras wash the stage
   if (k <= 0.01) return
-  const W = r.width,
-    H = r.height
+  const fb = boundsOf(r)
+  const W = fb.x1
   for (const e of ch.eras) {
-    const y0 = Number.isFinite(e.a) ? r.sy(e.a) : -20
-    const y1 = Number.isFinite(e.b) ? r.sy(e.b) : H + 20
-    if (y1 < 0 || y0 > H || y1 - y0 < 0.5) continue
+    const y0 = Number.isFinite(e.a) ? r.sy(e.a) : fb.y0 - 20
+    const y1 = Number.isFinite(e.b) ? r.sy(e.b) : fb.y1 + 20
+    if (y1 < fb.y0 || y0 > fb.y1 || y1 - y0 < 0.5) continue
     const hot = ch.hover?.kind === 'era' && ch.hover.id === e.id
-    const top = Math.max(-2, y0)
-    const bot = Math.min(H + 2, y1)
+    const top = Math.max(fb.y0 - 2, y0)
+    const bot = Math.min(fb.y1 + 2, y1)
     // A wash that's a touch stronger at the band's leading edge.
     const g = ctx.createLinearGradient(0, top, 0, bot)
     const base = (r.light ? 0.075 : 0.085) * (hot ? 1.8 : 1) * k
@@ -71,7 +77,7 @@ export function drawChronicleBg(r, ctx) {
     ctx.lineWidth = 1
     ctx.setLineDash([6, 6])
     for (const y of [y0, y1]) {
-      if (y < 0 || y > H) continue
+      if (y < fb.y0 || y > fb.y1) continue
       ctx.beginPath()
       ctx.moveTo(GUTTER, y)
       ctx.lineTo(W, y)
@@ -87,8 +93,11 @@ export function drawChronicleFg(r, ctx, c) {
   r._chronRects = []
   const ch = r.hooks.getChronicle?.()
   if (!ch || !r.layout.people.length) return
-  const W = r.width,
-    H = r.height
+  const fb = boundsOf(r)
+  const W = fb.x1,
+    H = fb.y1
+  const T = r.view
+  const tilted = !!r.tilted
   const px = r.camera2.px
   const font = 'system-ui, sans-serif'
   const surface = r.light ? 'rgba(255,255,255,0.94)' : 'rgba(18,21,31,0.9)'
@@ -96,14 +105,19 @@ export function drawChronicleFg(r, ctx, c) {
   // ── Eras: rail stripes in the gutter + sticky chapter headers ──
   const headers = []
   for (const e of ch.eras) {
-    const y0 = Number.isFinite(e.a) ? r.sy(e.a) : -20
+    const y0 = Number.isFinite(e.a) ? r.sy(e.a) : fb.y0 - 20
     const y1 = Number.isFinite(e.b) ? r.sy(e.b) : H + 20
-    if (y1 < 0 || y0 > H) continue
+    if (y1 < fb.y0 || y0 > H) continue
     const hot = ch.hover?.kind === 'era' && ch.hover.id === e.id
     const x = 1 + e.lane * 5
     ctx.fillStyle = rgba(e.color, hot ? 1 : 0.8)
-    pill(ctx, x, Math.max(-4, y0 + 1), 3, Math.min(H + 8, y1) - Math.max(-4, y0 + 1) - 1, 1.5)
-    ctx.fill()
+    const ry = Math.max(fb.y0 - 4, y0 + 1)
+    // tilted, the stripe lies along the board's ruler (a rect, not a pill)
+    if (tilted) ctx.fillRect(x, ry, 3, Math.min(H + 8, y1) - ry - 1)
+    else {
+      pill(ctx, x, ry, 3, Math.min(H + 8, y1) - ry - 1, 1.5)
+      ctx.fill()
+    }
 
     // Header: sticky at the top of the visible band, pushed off by its end.
     if (y1 - y0 < 26) continue
@@ -121,29 +135,32 @@ export function drawChronicleFg(r, ctx, c) {
     const h = 22
     // Sticky: rides the top of the visible band (stopping below the stage's
     // top-left minimap), pushed off by the band's end; overlap lanes step right.
-    const hy = Math.min(Math.max(y0 + 8, STICKY_TOP), y1 - h - 6)
+    const hy = Math.min(Math.max(y0 + 8, fb.y0 + STICKY_TOP), y1 - h - 6)
     const hx = RAIL_X + e.lane * 14
-    ctx.globalAlpha = 0.97
-    ctx.fillStyle = surface
-    pill(ctx, hx, hy, w, h, 11)
-    ctx.fill()
-    ctx.strokeStyle = rgba(e.color, hot ? 1 : 0.7)
-    ctx.lineWidth = hot ? 1.6 : 1
-    ctx.stroke()
-    ctx.fillStyle = e.color
-    pill(ctx, hx + 5, hy + 5, 4, h - 10, 2)
-    ctx.fill()
-    ctx.textBaseline = 'middle'
-    ctx.textAlign = 'left'
-    ctx.font = `800 11px ${font}`
-    ctx.fillStyle = c.t1
-    if (icon) drawIcon(ctx, icon, hx + 15 + 6, hy + h / 2, 12, { color: c.t1, lineWidth: 2.2 })
-    ctx.fillText(label, hx + 15 + iconW, hy + h / 2 + 0.5)
-    ctx.font = `600 9.5px ${font}`
-    ctx.fillStyle = c.t3
-    ctx.fillText(span, hx + 21 + tw, hy + h / 2 + 0.5)
-    ctx.globalAlpha = 1
-    r._chronRects.push({ kind: 'era', id: e.id, x: hx, y: hy, w, h })
+    const g = billboard(ctx, hx + w / 2, hy + h / 2, () => {
+      ctx.globalAlpha = 0.97
+      ctx.fillStyle = surface
+      pill(ctx, hx, hy, w, h, 11)
+      ctx.fill()
+      ctx.strokeStyle = rgba(e.color, hot ? 1 : 0.7)
+      ctx.lineWidth = hot ? 1.6 : 1
+      ctx.stroke()
+      ctx.fillStyle = e.color
+      pill(ctx, hx + 5, hy + 5, 4, h - 10, 2)
+      ctx.fill()
+      ctx.textBaseline = 'middle'
+      ctx.textAlign = 'left'
+      ctx.font = `800 11px ${font}`
+      ctx.fillStyle = c.t1
+      if (icon) drawIcon(ctx, icon, hx + 15 + 6, hy + h / 2, 12, { color: c.t1, lineWidth: 2.2 })
+      ctx.fillText(label, hx + 15 + iconW, hy + h / 2 + 0.5)
+      ctx.font = `600 9.5px ${font}`
+      ctx.fillStyle = c.t3
+      ctx.fillText(span, hx + 21 + tw, hy + h / 2 + 0.5)
+      ctx.globalAlpha = 1
+    })
+    if (tilted && !g) continue
+    r._chronRects.push({ kind: 'era', id: e.id, ...frameRectToFlat({ x: hx, y: hy, w, h }, g, T) })
     headers.push({ x: hx, y: hy, w, h })
   }
 
@@ -159,7 +176,7 @@ export function drawChronicleFg(r, ctx, c) {
   for (const ev of visible) {
     const y = r.sy(ev.a)
     const yb = Number.isFinite(ev.b) ? r.sy(ev.b) : y
-    if (yb < -30 || y > H + 30) continue
+    if (yb < fb.y0 - 30 || y > H + 30) continue
     const hot = ch.hover?.kind === 'event' && ch.hover.id === ev.id
     const s = ev.importance === 3 ? 1.15 : ev.importance === 1 ? 0.85 : 1
 
@@ -233,36 +250,39 @@ export function drawChronicleFg(r, ctx, c) {
     }
     const py = y - h / 2
     placed.push({ x, y: py, w, h })
-    ctx.globalAlpha = 1
-    ctx.fillStyle = surface
-    pill(ctx, x, py, w, h, h / 2)
-    ctx.shadowColor = rgba(ev.color, hot ? 0.8 : 0.35)
-    ctx.shadowBlur = hot ? 14 : 6
-    ctx.fill()
-    ctx.shadowBlur = 0
-    ctx.strokeStyle = rgba(ev.color, hot ? 1 : 0.75)
-    ctx.lineWidth = hot ? 1.6 : 1
-    ctx.stroke()
-    // icon disc
-    ctx.beginPath()
-    ctx.arc(x + h / 2, y, h / 2 - 2.5, 0, Math.PI * 2)
-    ctx.fillStyle = rgba(ev.color, 0.28)
-    ctx.fill()
-    // The kind's icon stands in when a stored custom value doesn't resolve.
-    const iconOpts = { color: c.t1, lineWidth: 2.2 }
-    if (!drawIcon(ctx, ev.icon, x + h / 2, y, 11 * s, iconOpts))
-      drawIcon(ctx, ev.kindIcon || 'sparkle', x + h / 2, y, 11 * s, iconOpts)
-    ctx.textBaseline = 'middle'
-    if (title) {
-      ctx.textAlign = 'left'
-      ctx.font = `${ev.importance === 3 ? 800 : 700} ${11 * s}px ${font}`
-      ctx.fillStyle = c.t1
-      ctx.fillText(title, x + h + 4, y + 0.5)
-      ctx.font = `600 ${9 * s}px ${font}`
-      ctx.fillStyle = c.t3
-      ctx.fillText(yt, x + h + 8 + tw, y + 0.5)
-    }
-    r._chronRects.push({ kind: 'event', id: ev.id, x, y: py, w, h })
+    const g = billboard(ctx, x + h / 2, y, () => {
+      ctx.globalAlpha = 1
+      ctx.fillStyle = surface
+      pill(ctx, x, py, w, h, h / 2)
+      ctx.shadowColor = rgba(ev.color, hot ? 0.8 : 0.35)
+      ctx.shadowBlur = hot ? 14 : 6
+      ctx.fill()
+      ctx.shadowBlur = 0
+      ctx.strokeStyle = rgba(ev.color, hot ? 1 : 0.75)
+      ctx.lineWidth = hot ? 1.6 : 1
+      ctx.stroke()
+      // icon disc
+      ctx.beginPath()
+      ctx.arc(x + h / 2, y, h / 2 - 2.5, 0, Math.PI * 2)
+      ctx.fillStyle = rgba(ev.color, 0.28)
+      ctx.fill()
+      // The kind's icon stands in when a stored custom value doesn't resolve.
+      const iconOpts = { color: c.t1, lineWidth: 2.2 }
+      if (!drawIcon(ctx, ev.icon, x + h / 2, y, 11 * s, iconOpts))
+        drawIcon(ctx, ev.kindIcon || 'sparkle', x + h / 2, y, 11 * s, iconOpts)
+      ctx.textBaseline = 'middle'
+      if (title) {
+        ctx.textAlign = 'left'
+        ctx.font = `${ev.importance === 3 ? 800 : 700} ${11 * s}px ${font}`
+        ctx.fillStyle = c.t1
+        ctx.fillText(title, x + h + 4, y + 0.5)
+        ctx.font = `600 ${9 * s}px ${font}`
+        ctx.fillStyle = c.t3
+        ctx.fillText(yt, x + h + 8 + tw, y + 0.5)
+      }
+    })
+    if (tilted && !g) continue
+    r._chronRects.push({ kind: 'event', id: ev.id, ...frameRectToFlat({ x, y: py, w, h }, g, T) })
   }
 }
 

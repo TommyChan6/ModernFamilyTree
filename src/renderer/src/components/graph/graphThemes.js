@@ -666,6 +666,91 @@ export const GRAPH_THEMES = [
       spouseColor: '#b39a62',
       adoptedColor: '#6f9a8f'
     }
+  },
+  {
+    // A roll of arms: every person an escutcheon in their tincture (azure,
+    // gules, vert), the lineage drawn on sibling rails like a pedigree roll,
+    // marriages in gold leaf, embers drifting up from the hall's fire. Made
+    // for the medieval theme's vellum; reads on any ground.
+    id: 'heraldry',
+    name: 'Heraldry',
+    tagline: 'Coats of arms — shields on gilded lines, embers on the wind',
+    icon: 'shield',
+    swatch: ['#24478a', '#a8321e', '#c9a043'],
+    settings: {
+      nodeShape: 'shield',
+      nodeDecor: 'none',
+      decorColor: '#c9a043',
+      linkRoute: 'trident',
+      lineFx: 'gilded',
+      lineCurvature: 0.03,
+      ambientFx: 'embers',
+      ambientColorA: '#f2b45a',
+      ambientColorB: '#c9a043',
+      ambientDensity: 0.4,
+      maleColor: '#24478a',
+      femaleColor: '#a8321e',
+      unknownColor: '#2f6b4f',
+      parentChildColor: '#4a3524',
+      spouseColor: '#c9a043',
+      adoptedColor: '#6b3a6e'
+    }
+  },
+  {
+    // An illuminated leaf: roundels haloed in gold like saints in a psalter,
+    // iron-gall ink lines, lapis and vermilion, dust turning in candlelight.
+    id: 'illuminated',
+    name: 'Illuminated',
+    tagline: 'A manuscript leaf — lapis and gold leaf, dust in the candlelight',
+    icon: 'book-open',
+    swatch: ['#2b1d12', '#c9a043', '#2f5aa6'],
+    settings: {
+      nodeShape: 'circle',
+      nodeDecor: 'aura',
+      decorColor: '#c9a043',
+      linkRoute: 'organic',
+      lineFx: 'none',
+      lineCurvature: 0.06,
+      ambientFx: 'motes',
+      ambientColorA: '#f1d88c',
+      ambientColorB: '#e8c870',
+      ambientDensity: 0.45,
+      maleColor: '#2f5aa6',
+      femaleColor: '#a8321e',
+      unknownColor: '#6b8a5a',
+      parentChildColor: '#2b1d12',
+      spouseColor: '#c9a043',
+      adoptedColor: '#2f6b4f'
+    }
+  },
+  {
+    // A night sky: every person a star whose brightness counts their
+    // descendants, the departed twinkling, bloodlines drawn as fine silver
+    // constellation lines that stop short of each star, under a Milky Way.
+    // On light grounds the same chart prints as an ink star atlas.
+    id: 'constellation',
+    name: 'Constellation',
+    tagline: 'A night sky — brighter stars have more descendants',
+    icon: 'telescope',
+    swatch: ['#0b1230', '#cfe0ff', '#ffd9a0'],
+    settings: {
+      nodeShape: 'star',
+      nodeDecor: 'none',
+      decorColor: '#cfe0ff',
+      linkRoute: 'straight',
+      lineFx: 'starline',
+      lineCurvature: 0.0,
+      ambientFx: 'nightsky',
+      ambientColorA: '#cfe0ff',
+      ambientColorB: '#ffd9a0',
+      ambientDensity: 0.6,
+      maleColor: '#9cc2ff',
+      femaleColor: '#ffb8d2',
+      unknownColor: '#d8d0ff',
+      parentChildColor: '#aebfe6',
+      spouseColor: '#e6d3a8',
+      adoptedColor: '#9fd8d0'
+    }
   }
 ]
 

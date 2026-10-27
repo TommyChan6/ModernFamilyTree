@@ -2127,3 +2127,37 @@ describe('Projects page channels: projects:update + projects:duplicate', () => {
     expect(Object.values(db.images)).toHaveLength(1)
   })
 })
+
+describe('projects:fingerprints (the family fingerprint)', () => {
+  it('returns structural features for each owned project only, read-only', async () => {
+    initDB()
+    const { db, activeProjectId } = getDB()
+    const other = channelHandlers['projects:create'](db, { name: 'Other' }, handlerEnv)
+    for (const p of Object.values(db.projects)) p.user_id = p.id === activeProjectId ? 'u1' : 'u2'
+
+    const mine = channelHandlers['projects:fingerprints'](db, undefined, handlerEnv, {
+      user: { id: 'u1' },
+      token: 't'
+    })
+    expect(Object.keys(mine)).toEqual([activeProjectId])
+    const seeded = Object.values(db.persons).filter((p) => p.project_id === activeProjectId)
+    expect(mine[activeProjectId].people).toBe(seeded.length)
+    expect(mine[activeProjectId].generations.length).toBeGreaterThan(1)
+    expect(mine[activeProjectId].families).toBeGreaterThan(0)
+
+    const theirs = channelHandlers['projects:fingerprints'](db, undefined, handlerEnv, {
+      user: { id: 'u2' },
+      token: 't2'
+    })
+    expect(Object.keys(theirs)).toEqual([other.id])
+    expect(theirs[other.id].people).toBe(0)
+
+    // Pre-auth (no ctx) sees every project, like projects:overview.
+    const all = channelHandlers['projects:fingerprints'](db, undefined, handlerEnv)
+    expect(Object.keys(all).sort()).toEqual([activeProjectId, other.id].sort())
+
+    const { WRITE_CHANNELS, UNDOABLE_CHANNELS } = await import('../src/shared/dbCore')
+    expect(WRITE_CHANNELS.has('projects:fingerprints')).toBe(false)
+    expect([...UNDOABLE_CHANNELS].includes('projects:fingerprints')).toBe(false)
+  })
+})

@@ -11,7 +11,11 @@
 //    lines stay glued to the skin through every morph and pose: pores and
 //    wrinkles become a derivative bump, the rest tint the albedo;
 //  * makeup layers (lipstick + gloss, eyeshadow, liner, blush) on the region
-//    masks baked by scripts/human3d/masks.py.
+//    masks baked by scripts/human3d/masks.py;
+//  * a PHOTO albedo: MakeHuman's CC0 skin textures (young/old × female/male,
+//    assets/skin/) divided by their own mean colour give a detail ratio —
+//    blotches, veins, redness, real lips, knuckles — recoloured by the chosen
+//    tone, so every skin tone works from four light-skinned photos.
 
 import * as THREE from 'three'
 
@@ -36,16 +40,60 @@ export interface SkinParams {
   blushColor: string
   blush: number
   stubbleColor: string
+  /** 0..1 dense shade under a strand beard (0 for stubble / none). */
+  beardShade: number
   scalpColor: string
   browColor: string
   /** Painted brow underlay strength (strands draw the rest). */
   browPaint: number
+  /** 0 female … 1 male photo blend. */
+  male: number
+  /** 0 young … 1 old photo blend. */
+  oldness: number
+  /** 0..1: keep the photo's shaved-scalp shading (buzz cuts, bald men). */
+  shavedScalp: number
 }
 
 const linear = (hex: string) => new THREE.Color(hex)
 
+// MakeHuman's CC0 skins (see assets/CREDITS.md), WebP; mean = the linear
+// average colour of each photo's torso (measured when they were converted),
+// so texel / mean is a detail ratio around 1.
+const SKIN_PHOTOS = {
+  yf: {
+    url: new URL('./assets/skin/young-f.webp', import.meta.url).href,
+    mean: [0.6864, 0.4327, 0.2911]
+  },
+  ym: {
+    url: new URL('./assets/skin/young-m.webp', import.meta.url).href,
+    mean: [0.7861, 0.454, 0.2934]
+  },
+  of: {
+    url: new URL('./assets/skin/old-f.webp', import.meta.url).href,
+    mean: [0.7297, 0.5021, 0.374]
+  },
+  om: {
+    url: new URL('./assets/skin/old-m.webp', import.meta.url).href,
+    mean: [0.8274, 0.5301, 0.3324]
+  }
+} as const
+type PhotoId = keyof typeof SKIN_PHOTOS
+
 export function createSkinMaterial() {
+  const blank = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1)
+  blank.needsUpdate = true
+  const photoUniform = () => ({ value: blank as THREE.Texture })
+  const meanUniform = (id: PhotoId) => ({ value: new THREE.Vector3(...SKIN_PHOTOS[id].mean) })
   const uniforms = {
+    uSkinYF: photoUniform(),
+    uSkinYM: photoUniform(),
+    uSkinOF: photoUniform(),
+    uSkinOM: photoUniform(),
+    uMeanYF: meanUniform('yf'),
+    uMeanYM: meanUniform('ym'),
+    uMeanOF: meanUniform('of'),
+    uMeanOM: meanUniform('om'),
+    uSkinMix: { value: new THREE.Vector4(0, 0, 0, 0) },
     uTone: { value: linear('#d9a184') },
     uFlush: { value: 0.35 },
     uFreckles: { value: 0 },
@@ -64,6 +112,7 @@ export function createSkinMaterial() {
     uBlushColor: { value: linear('#e07a7a') },
     uBlush: { value: 0 },
     uStubbleColor: { value: linear('#2a1e15') },
+    uBeardShade: { value: 0 },
     uScalpColor: { value: linear('#3b2a1e') },
     uBrowColor: { value: linear('#2f2219') },
     uBrowPaint: { value: 0.5 },
@@ -93,8 +142,9 @@ export function createSkinMaterial() {
         /* glsl */ `#include <common>
 attribute vec4 aMaskA; // flush, eyeUpper, eyeLower, thin
 attribute vec4 aMaskB; // stubble, scalpShade, lips, brow
-attribute vec4 aMaskC; // forehead, crow's feet, nasolabial, (spare)
+attribute vec4 aMaskC; // forehead, crow's feet, nasolabial, scalp (raw)
 attribute vec3 aRef;   // unmorphed base position (dm)
+varying vec2 vSkinUv;
 varying vec4 vMaskA;
 varying vec4 vMaskB;
 varying vec4 vMaskC;
@@ -103,21 +153,27 @@ varying vec3 vRef;`
       .replace(
         '#include <begin_vertex>',
         /* glsl */ `#include <begin_vertex>
-vMaskA = aMaskA; vMaskB = aMaskB; vMaskC = aMaskC; vRef = aRef;`
+vMaskA = aMaskA; vMaskB = aMaskB; vMaskC = aMaskC; vRef = aRef; vSkinUv = uv;`
       )
 
     const lightsChunk = THREE.ShaderChunk.lights_physical_pars_fragment.replace(
       'reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );',
       /* glsl */ `{
-    // Subsurface approximation: per-channel wrap + soft red terminator
+    // Subsurface approximation (pre-integrated style): the lit side stays
+    // Lambertian; past the terminator each channel wraps a little further
+    // (red furthest), so shadows edge into a soft, faintly warm falloff
+    // instead of tinting the whole face orange.
     float ndl = dot( geometryNormal, directLight.direction );
-    vec3 w = vec3( 0.62, 0.28, 0.18 ) * uSss;
-    vec3 wrapped = clamp( ( vec3( ndl ) + w ) / ( ( 1.0 + w ) * ( 1.0 + w ) ), 0.0, 1.0 );
-    reflectedLight.directDiffuse += directLight.color * wrapped * BRDF_Lambert( material.diffuseColor );
+    vec3 w = vec3( 0.42, 0.2, 0.13 ) * uSss;
+    vec3 wrapped = clamp( ( vec3( ndl ) + w ) / ( 1.0 + w ), 0.0, 1.0 );
+    wrapped *= wrapped * ( 3.0 - 2.0 * wrapped ) * 0.35 + 0.65; // soften the toe
+    vec3 lam = vec3( saturate( ndl ) );
+    vec3 sss = max( lam, wrapped * ( 1.0 - 0.18 * vec3( 0.0, 1.0, 1.4 ) * ( 1.0 - lam ) ) );
+    reflectedLight.directDiffuse += directLight.color * sss * BRDF_Lambert( material.diffuseColor );
     // Back-scatter through ears / nostrils / fingers
     vec3 bl = normalize( directLight.direction + geometryNormal * 0.35 );
     float tr = pow( saturate( dot( geometryViewDir, -bl ) ), 3.0 ) * vMaskA.w * uSss;
-    reflectedLight.directDiffuse += directLight.color * tr * vec3( 1.0, 0.32, 0.18 ) * material.diffuseColor * 2.2;
+    reflectedLight.directDiffuse += directLight.color * tr * vec3( 1.0, 0.36, 0.24 ) * material.diffuseColor * 1.4;
   }`
     )
 
@@ -129,12 +185,17 @@ varying vec4 vMaskA;
 varying vec4 vMaskB;
 varying vec4 vMaskC;
 varying vec3 vRef;
+varying vec2 vSkinUv;
+uniform sampler2D uSkinYF, uSkinYM, uSkinOF, uSkinOM;
+uniform vec3 uMeanYF, uMeanYM, uMeanOF, uMeanOM;
+// uSkinMix: x = male weight, y = old weight, z = photos loaded (0/1), w = keep the photo's shaved scalp
+uniform vec4 uSkinMix;
 uniform vec3 uTone;
 uniform float uFlush, uFreckles, uMoles, uCircles, uDetail, uSss, uWrinkles, uAge;
 uniform vec3 uLipColor; uniform float uLips, uGloss;
 uniform vec3 uShadowColor; uniform float uShadow, uLiner;
 uniform vec3 uBlushColor; uniform float uBlush;
-uniform vec3 uStubbleColor, uBrowColor, uScalpColor; uniform float uBrowPaint;
+uniform vec3 uStubbleColor, uBrowColor, uScalpColor; uniform float uBrowPaint, uBeardShade;
 uniform float uHighlight, uHighlightRadius; uniform vec3 uHighlightCenter;
 
 float h3( vec3 p ) { p = fract( p * vec3( 443.897, 441.423, 437.195 ) ); p += dot( p, p.yzx + 19.19 ); return fract( ( p.x + p.y ) * p.z ); }
@@ -202,17 +263,38 @@ vec3 bumpNormal( vec3 surf_pos, vec3 surf_norm, float h, float strength, float f
 {
   vec3 r = vRef;
   vec3 skin = uTone;
-  // gentle mottling + slightly darker extremities
-  skin *= 0.94 + 0.12 * vnoise( r * 9.0 );
-  // blood: cheeks, nose, ears, lips' rim
-  vec3 blood = skin * vec3( 1.06, 0.78, 0.76 );
-  skin = mix( skin, blood, clamp( vMaskA.x * ( 0.35 + uFlush * 1.1 ), 0.0, 1.0 ) );
+  float photo = uSkinMix.z;
+  if ( photo > 0.5 ) {
+    // photo detail ratio, blended by sex + age, recoloured by the tone
+    vec3 young = mix( texture2D( uSkinYF, vSkinUv ).rgb / uMeanYF, texture2D( uSkinYM, vSkinUv ).rgb / uMeanYM, uSkinMix.x );
+    vec3 ratio = young;
+    if ( uSkinMix.y > 0.001 ) {
+      vec3 old = mix( texture2D( uSkinOF, vSkinUv ).rgb / uMeanOF, texture2D( uSkinOM, vSkinUv ).rgb / uMeanOM, uSkinMix.x );
+      ratio = mix( young, old, uSkinMix.y );
+    }
+    // deeper tones show less of a light photo's blotchiness
+    float toneL = dot( uTone, vec3( 0.2126, 0.7152, 0.0722 ) );
+    ratio = mix( vec3( 1.0 ), ratio, mix( 0.6, 1.0, smoothstep( 0.02, 0.25, toneL ) ) );
+    // the photos carry a shaved scalp: neutralise it unless the look wants it
+    ratio = mix( ratio, vec3( 0.97 ), smoothstep( 0.15, 0.6, vMaskC.w ) * ( 1.0 - uSkinMix.w ) );
+    // the palette tones are more saturated than real skin (red/blue ≈ 3 vs
+    // ≈ 2.4 in the photos) and read orange under a filmic curve: pull 20%
+    // toward the tone's own luminance
+    vec3 tone = mix( vec3( toneL ), uTone, 0.8 );
+    skin = tone * clamp( ratio, 0.0, 2.2 );
+    // the flush slider still warms the cheeks / nose (the photo has its own)
+    skin = mix( skin, skin * vec3( 1.03, 0.88, 0.88 ), clamp( vMaskA.x * max( 0.0, uFlush - 0.3 ) * 0.7, 0.0, 1.0 ) );
+  } else {
+    // procedural fallback while the photos load
+    skin *= 0.96 + 0.06 * vnoise( r * 9.0 ) + 0.03 * vnoise( r * 37.0 );
+    skin = mix( skin, skin * vec3( 1.03, 0.86, 0.86 ), clamp( vMaskA.x * ( 0.12 + uFlush * 0.6 ), 0.0, 1.0 ) );
+  }
   // under-eye shadows (+ lid shading)
   skin = mix( skin, skin * vec3( 0.78, 0.72, 0.8 ), vMaskA.z * uCircles * 0.9 );
-  skin = mix( skin, skin * vec3( 0.88, 0.8, 0.8 ), vMaskA.y * 0.35 );
-  // natural lips
-  vec3 lipNat = skin * vec3( 0.95, 0.62, 0.62 );
-  skin = mix( skin, lipNat, vMaskB.z * 0.85 );
+  skin = mix( skin, skin * vec3( 0.9, 0.84, 0.84 ), vMaskA.y * mix( 0.35, 0.12, photo ) );
+  // natural lips (the photo already has real ones: just a touch of rose)
+  vec3 lipNat = skin * vec3( 0.93, 0.66, 0.68 );
+  skin = mix( skin, lipNat, smoothstep( 0.0, 0.7, vMaskB.z ) * mix( 0.85, 0.25, photo ) );
   // freckles (cheeks + nose, a little everywhere on the face)
   if ( uFreckles > 0.001 ) {
     vec2 c = cells( r * 45.0 );
@@ -239,16 +321,23 @@ vec3 bumpNormal( vec3 surf_pos, vec3 surf_norm, float h, float strength, float f
     float cover = clamp( vMaskB.x, 0.0, 1.0 );
     skin = mix( skin, mix( skin * vec3( 0.86, 0.88, 0.93 ), uStubbleColor, 0.25 ), cover * 0.55 );
     skin = mix( skin, uStubbleColor, dots * cover * 0.75 );
+    // under a full beard the skin sits in the hair's shade: a dense wash, so
+    // strands read as a beard instead of needles on bare skin
+    skin = mix( skin, uStubbleColor * 0.8 + skin * 0.12, smoothstep( 0.2, 0.8, cover ) * uBeardShade * 0.75 );
   }
   if ( vMaskB.y > 0.001 ) {
-    vec2 c = cells( r * 140.0 );
-    float dots = 1.0 - smoothstep( 0.2, 0.5, c.x );
+    // under hair the scalp reads as a soft, even wash of the (shaded) hair
+    // colour; the follicle dots only show faintly, so partings look clean
+    // (streaked along the hair's fall, so gaps between strands read as more
+    // hair rather than skin or stubble)
+    float streak = vnoise( vec3( r.x * 90.0, r.y * 6.0, r.z * 90.0 ) );
     float cover = clamp( vMaskB.y, 0.0, 1.0 );
-    skin = mix( skin, mix( skin, uScalpColor, 0.55 ), cover * 0.8 );
-    skin = mix( skin, uScalpColor, dots * cover * 0.85 );
+    vec3 under = uScalpColor * ( 0.55 + 0.25 * streak );
+    skin = mix( skin, under, smoothstep( 0.0, 0.45, cover ) * 0.92 );
   }
-  // painted brow underlay
-  skin = mix( skin, uBrowColor, vMaskB.w * uBrowPaint * 0.45 );
+  // painted brow underlay: a soft-edged powder fill under the strands
+  // (a real brow is a dense soft mass — the strands alone read as scratches)
+  skin = mix( skin, mix( uBrowColor, skin, 0.25 ), smoothstep( 0.18, 0.75, vMaskB.w ) * min( 1.0, uBrowPaint * 1.6 ) );
   // makeup
   skin = mix( skin, uLipColor, vMaskB.z * uLips );
   float lid = vMaskA.y * smoothstep( 0.0, 1.0, vMaskA.y );
@@ -290,9 +379,49 @@ if ( uHighlight > 0.0 ) {
       )
   }
   // Every instance shares one program
-  mat.customProgramCacheKey = () => 'human3d-skin-v1'
+  mat.customProgramCacheKey = () => 'human3d-skin-v3'
+
+  // ── Photo albedo: the young pair loads at once, the old pair only once a
+  // look actually ages (saves ~40 MB of GPU memory for young characters)
+  const loaded = new Set<PhotoId>()
+  const loading = new Set<PhotoId>()
+  const textures: THREE.Texture[] = []
+  let wantOld = 0
+  const keyOf: Record<PhotoId, 'uSkinYF' | 'uSkinYM' | 'uSkinOF' | 'uSkinOM'> = {
+    yf: 'uSkinYF',
+    ym: 'uSkinYM',
+    of: 'uSkinOF',
+    om: 'uSkinOM'
+  }
+  const syncMix = () => {
+    const m = uniforms.uSkinMix.value
+    m.z = loaded.has('yf') && loaded.has('ym') ? 1 : 0
+    m.y = loaded.has('of') && loaded.has('om') ? wantOld : 0
+  }
+  const load = (id: PhotoId) => {
+    if (loading.has(id) || typeof document === 'undefined') return
+    loading.add(id)
+    new THREE.TextureLoader().load(SKIN_PHOTOS[id].url, (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace
+      tex.anisotropy = 8
+      textures.push(tex)
+      uniforms[keyOf[id]].value = tex
+      loaded.add(id)
+      syncMix()
+    })
+  }
+  load('yf')
+  load('ym')
 
   function setParams(p: SkinParams) {
+    uniforms.uSkinMix.value.x = Math.max(0, Math.min(1, p.male))
+    uniforms.uSkinMix.value.w = p.shavedScalp
+    wantOld = Math.max(0, Math.min(1, p.oldness))
+    if (wantOld > 0) {
+      load('of')
+      load('om')
+    }
+    syncMix()
     uniforms.uTone.value.set(p.tone)
     uniforms.uFlush.value = p.flush
     uniforms.uFreckles.value = p.freckles
@@ -311,15 +440,24 @@ if ( uHighlight > 0.0 ) {
     uniforms.uBlushColor.value.set(p.blushColor)
     uniforms.uBlush.value = p.blush
     uniforms.uStubbleColor.value.set(p.stubbleColor)
+    uniforms.uBeardShade.value = p.beardShade
     uniforms.uScalpColor.value.set(p.scalpColor)
     uniforms.uBrowColor.value.set(p.browColor)
     uniforms.uBrowPaint.value = p.browPaint
-    mat.clearcoat = 0.05 + p.sheen * 0.35
-    mat.clearcoatRoughness = 0.45 - p.sheen * 0.2
-    mat.roughness = 0.6 - p.sheen * 0.16
+    // skin is NOT plastic: one soft broad lobe, plus only a faint "oil"
+    // clearcoat (the shader strengthens it on the T-zone and glossed lips)
+    mat.clearcoat = 0.02 + p.sheen * 0.12
+    mat.clearcoatRoughness = 0.42 - p.sheen * 0.12
+    mat.roughness = 0.6 - p.sheen * 0.12
   }
 
-  return { material: mat, uniforms, setParams }
+  function dispose() {
+    mat.dispose()
+    blank.dispose()
+    for (const t of textures) t.dispose()
+  }
+
+  return { material: mat, uniforms, setParams, dispose }
 }
 
 export type SkinMaterial = ReturnType<typeof createSkinMaterial>

@@ -141,7 +141,30 @@ Membership lives in the `entity_tags` join; placement in the Groups view lives i
 | `type` | string | Free-form category (e.g. `family`); empty for plain tags. |
 | `source` | `"manual"` \| `"derived"` | Derived (smart) tags are planned; only manual tags are stored today. |
 | `color` / `icon` | string | Drive the chip and the Groups-view ring. |
+| `aura` | Aura \| absent | Optional special effect every member wears in the Graph and Timeline (see below). |
 | `created_at` / `updated_at` | string | |
+
+### Aura (special effect)
+
+Attached to a Tag (`aura`) or a trait FieldDef (`auras`: a list of rules, each an
+Aura plus `id`, a condition `when` and `scale`). Sanitized and resolved by
+[`src/shared/auras.ts`](../src/shared/auras.ts); absent on older data = none.
+
+```jsonc
+"aura": {
+  "ornament": "crown",   // none | halo | flame | frost | sparkle | crown | shadow | storm | bloom | aura | runes | orbit | burst | pulse
+  "color": "#e8b931",
+  "line": "gilded",      // a line-effect id (lineFx.js) or "none"
+  "tint": false          // ring the node / colour the lifeline
+}
+// a trait rule adds:
+"when": { "op": "is", "values": ["fire"], "min": null, "max": null },  // any | is | range
+"scale": false           // numeric traits: strength follows the value
+```
+
+A person matching several sources takes each slot (ornament, line, tint) from the
+highest-priority one: specific trait rules (`is` / `range`), then tags, then
+"has any value" rules.
 
 ### EntityTag (membership join)
 

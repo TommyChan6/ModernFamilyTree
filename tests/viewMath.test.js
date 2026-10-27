@@ -110,17 +110,20 @@ describe('computeTimelineLayout', () => {
     expect(m.year).toBeLessThanOrEqual(REF)
   })
 
-  it('anchors birth connectors at the child birth year', () => {
+  it('anchors child branches at the child birth year', () => {
     const L = computeTimelineLayout(persons, relationships, REF)
-    expect(L.births).toHaveLength(1)
-    expect(L.births[0].year).toBe(1975)
-    expect(L.births[0].adopted).toBe(false)
+    expect(L.branches).toHaveLength(1)
+    expect(L.branches[0].year).toBe(1975)
+    expect(L.branches[0].adopted).toBe(false)
+    expect(L.branches[0].childId).toBe('c')
+    expect(L.families).toHaveLength(1)
   })
 
   it('skips connectors whose people are not on the timeline', () => {
     const rels = [{ id: 'p2', type: 'parent_child', person_a_id: 'u', person_b_id: 'c' }]
     const L = computeTimelineLayout(persons, rels, REF)
-    expect(L.births).toHaveLength(0)
+    expect(L.branches).toHaveLength(0)
+    expect(L.families).toHaveLength(0)
   })
 
   it('respects a frozen lane order and appends people missing from it', () => {

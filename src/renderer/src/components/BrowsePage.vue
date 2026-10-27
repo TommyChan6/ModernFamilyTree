@@ -1841,7 +1841,9 @@ onUnmounted(() => {
    replaces the canopy and fireflies). Collections become hue-tinted washes,
    panels sit in narrow silk mounts, the hero title is brushed. */
 :root[data-theme='ink'] .bp-canopy,
-:root[data-theme='ink'] .bp-hero-crests {
+:root[data-theme='ink'] .bp-hero-crests,
+:root[data-theme='medieval'] .bp-canopy,
+:root[data-theme='medieval'] .bp-hero-crests {
   display: none;
 }
 :root[data-theme='ink'] .bp-topbar {

@@ -25,6 +25,16 @@
         >
         <button
           type="button"
+          class="chip-fx"
+          :class="{ on: !!tag.aura }"
+          :title="t('auras.entry.tag')"
+          :aria-label="t('auras.entry.tag')"
+          @click="openEffect(tag.id)"
+        >
+          <UiIcon name="sparkles" :size="12" />
+        </button>
+        <button
+          type="button"
           class="chip-remove"
           :title="t('tagChips.remove')"
           :aria-label="t('tagChips.remove')"
@@ -124,6 +134,10 @@ async function createAndAssign() {
   }
 }
 
+function openEffect(tagId) {
+  store.openAuras({ kind: 'tag', id: tagId })
+}
+
 function removeTag(tagId) {
   store.removeEntityTag(props.entityId, tagId)
 }
@@ -216,6 +230,25 @@ function removeTag(tagId) {
 
 .chip-remove:hover {
   color: var(--danger);
+}
+
+.chip-fx {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--t3);
+  cursor: pointer;
+  padding: 0;
+}
+
+.chip-fx:hover,
+.chip-fx.on {
+  color: var(--chip-c);
 }
 
 .tag-empty {

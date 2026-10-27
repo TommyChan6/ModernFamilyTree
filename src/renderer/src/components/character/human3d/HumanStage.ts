@@ -14,7 +14,8 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import type { Human3DState } from '../../../../../shared/character3d'
 import { loadHumanAsset, type HumanAsset } from './humanAsset'
 import { HumanBody, DM } from './HumanBody'
@@ -25,7 +26,11 @@ import { expressionWeights, poseOps, poseQuaternions, POSE_BY_ID } from './poses
 import {
   LIGHT_BY_ID,
   LIGHT_PRESETS,
+  GradeShader,
+  buildEnvScene,
   createBackdrop,
+  createFloor,
+  createMotes,
   createPodium,
   lightDir,
   type LightPreset
@@ -33,6 +38,16 @@ import {
 import { HairSystem } from './hairSystem'
 import { Wardrobe } from './wardrobe'
 import { REGIONS, type Region } from './regions'
+import { resolveHandles, vertexNormal, type HandlePoint } from './sculptHandles'
+
+/** A grab handle on screen (CSS px relative to the canvas). */
+export interface HandleScreen {
+  key: string
+  x: number
+  y: number
+  /** 0..1: how squarely the surface faces the camera (0 = turned away). */
+  facing: number
+}
 
 export type Quality = 'high' | 'balanced' | 'fast'
 
@@ -58,6 +73,8 @@ export class HumanStage {
   readonly controls: OrbitControls
   private composer: EffectComposer
   private gtao: GTAOPass
+  private bloom: UnrealBloomPass
+  private grade: ShaderPass
   private host: HTMLElement
   private ro: ResizeObserver
   private raf = 0
@@ -90,9 +107,12 @@ export class HumanStage {
   private rimB = new THREE.DirectionalLight(0xffffff, 1.5)
   private hemi = new THREE.HemisphereLight(0xffffff, 0x222222, 0.4)
   private backdrop = createBackdrop()
+  private floor = createFloor()
+  private motes = createMotes()
   private podium = createPodium()
   private preset: LightPreset = LIGHT_PRESETS[0]
-  private envTex: THREE.Texture | null = null
+  private pmrem: THREE.PMREMGenerator
+  private envCache = new Map<string, THREE.Texture>()
 
   // State tracking
   state: Human3DState | null = null
@@ -141,7 +161,8 @@ export class HumanStage {
       Math.min(window.devicePixelRatio || 1, this.quality === 'fast' ? 1 : 2)
     )
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
-    this.renderer.toneMapping = THREE.NeutralToneMapping
+    // AgX: a filmic roll-off that keeps skin from going orange in the highlights
+    this.renderer.toneMapping = THREE.AgXToneMapping
     this.renderer.toneMappingExposure = 1
     this.renderer.shadowMap.enabled = true
     // PCF with a wide kernel: soft penumbrae, so strand shadows read as hair
@@ -152,12 +173,15 @@ export class HumanStage {
     this.renderer.domElement.style.height = '100%'
     host.appendChild(this.renderer.domElement)
 
-    const pmrem = new THREE.PMREMGenerator(this.renderer)
-    this.envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
-    pmrem.dispose()
-    this.scene.environment = this.envTex
+    this.pmrem = new THREE.PMREMGenerator(this.renderer)
 
-    this.scene.add(this.backdrop.mesh, this.podium.group, this.hemi)
+    this.scene.add(
+      this.backdrop.mesh,
+      this.floor.mesh,
+      this.motes.points,
+      this.podium.group,
+      this.hemi
+    )
     for (const l of [this.key, this.fill, this.rimA, this.rimB]) {
       this.scene.add(l, l.target)
       l.target.position.set(0, 1, 0)
@@ -210,7 +234,13 @@ export class HumanStage {
     this.gtao.blendIntensity = 0.85
     this.gtao.enabled = this.quality !== 'fast'
     this.composer.addPass(this.gtao)
+    // bloom on the HDR buffer: only speculars, catchlights and rims glow
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x || 1, size.y || 1), 0.2, 0.6, 0.9)
+    this.bloom.enabled = this.quality !== 'fast'
+    this.composer.addPass(this.bloom)
     this.composer.addPass(new OutputPass())
+    this.grade = new ShaderPass(GradeShader)
+    this.composer.addPass(this.grade)
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
@@ -264,6 +294,10 @@ export class HumanStage {
     if (head) head.add(this.eyes.left, this.eyes.right)
     this.hair = new HairSystem(body)
     this.wardrobe = new Wardrobe(body)
+    this.handlePoints = resolveHandles(asset).map((p) => ({
+      ...p,
+      normal: new THREE.Vector3(...vertexNormal(asset, p.vertex))
+    }))
     if (this.state) this.apply(this.state, true)
   }
 
@@ -277,12 +311,15 @@ export class HumanStage {
     this.composer.setSize(w, h)
     this.composer.setPixelRatio(pr)
     this.gtao.setSize(w * pr, h * pr)
+    this.grade.uniforms.uAspect.value = w / h
+    this.motes.uniforms.uPx.value = h * pr
     this.wake()
   }
 
   setQuality(q: Quality) {
     this.quality = q
     this.gtao.enabled = q !== 'fast'
+    this.bloom.enabled = q !== 'fast'
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q === 'fast' ? 1 : 2))
     this.hair?.setDensityScale(q === 'high' ? 1 : q === 'balanced' ? 0.65 : 0.4)
     this.resize()
@@ -330,7 +367,10 @@ export class HumanStage {
         state.brows.color,
         state.beard,
         state.hair.color,
-        state.body.age
+        state.hair.style,
+        state.body.age,
+        state.body.gender,
+        state.body.ideal
       ])
     ) {
       this.updateSkin(state)
@@ -372,11 +412,29 @@ export class HumanStage {
 
   private updateSkin(state: Human3DState) {
     const ageF = Math.max(0, Math.min(1, (state.body.age - 35) / 50))
+    // idealize also retouches: finer pores, softer under-eye shadows
+    const ideal = state.body.ideal ?? 0
     this.skin.setParams({
       ...state.skin,
       ...state.makeup,
+      male: state.body.gender,
+      oldness: Math.max(0, Math.min(1, (state.body.age - 38) / 37)),
+      // the photos' shaved scalp suits buzz cuts and bald men; under hair or
+      // on a bald woman it would read as stubble
+      shavedScalp:
+        state.hair.style === 'buzz'
+          ? 0.7
+          : state.hair.style === 'bald'
+            ? Math.max(0, Math.min(1, (state.body.gender - 0.4) * 2.5)) * 0.8
+            : 0,
+      detail: state.skin.detail * (1 - ideal * 0.4),
+      circles: state.skin.circles * (1 - ideal * 0.5),
       age: ageF,
       stubbleColor: state.beard.color,
+      beardShade:
+        state.beard.style === 'none' || state.beard.style === 'stubble'
+          ? 0
+          : 0.5 + state.beard.density * 0.5,
       scalpColor: state.hair.color,
       browColor: state.brows.color,
       browPaint: state.brows.style === 'none' ? 0 : 0.12 + state.brows.density * 0.25
@@ -466,7 +524,25 @@ export class HumanStage {
   private presetFrom: LightPreset | null = null
   private presetT = 1
 
+  /** The preset's softbox environment (PMREM, cached per preset). */
+  private envFor(p: LightPreset) {
+    let tex = this.envCache.get(p.id)
+    if (!tex) {
+      const scene = buildEnvScene(p)
+      tex = this.pmrem.fromScene(scene, 0.02).texture
+      scene.traverse((o) => {
+        const m = o as THREE.Mesh
+        if (!m.isMesh) return
+        m.geometry.dispose()
+        ;(m.material as THREE.Material).dispose()
+      })
+      this.envCache.set(p.id, tex)
+    }
+    return tex
+  }
+
   private applyPreset(p: LightPreset, instant = false) {
+    this.scene.environment = this.envFor(p)
     this.presetFrom = instant ? null : this.preset
     this.preset = p
     this.presetT = instant ? 1 : 0
@@ -503,10 +579,26 @@ export class HumanStage {
     mixC(f.bg[0], to.bg[0], this.backdrop.uniforms.uTop.value)
     mixC(f.bg[1], to.bg[1], this.backdrop.uniforms.uMid.value)
     mixC(f.bg[2], to.bg[2], this.backdrop.uniforms.uLow.value)
+    mixC(f.halo[0], to.halo[0], this.backdrop.uniforms.uHalo.value)
+    this.backdrop.uniforms.uHaloAmt.value = mixN(f.halo[1], to.halo[1])
+    mixC(f.floor[0], to.floor[0], this.floor.uniforms.uBase.value)
+    mixC(f.floor[1], to.floor[1], this.floor.uniforms.uPool.value)
+    this.floor.uniforms.uEdge.value.copy(this.backdrop.uniforms.uLow.value)
     this.scene.environmentIntensity = mixN(f.envIntensity, to.envIntensity)
     this.renderer.toneMappingExposure = mixN(f.exposure, to.exposure)
     mixC(f.glow, to.glow, this.podium.ringMat.color)
-    this.hair?.setLights(this.key, this.rimA, this.hemi)
+    mixC(f.podium, to.podium, this.podium.bodyMat.color)
+    this.bloom.strength = mixN(f.bloom, to.bloom)
+    mixC(f.motes[0], to.motes[0], this.motes.uniforms.uColor.value)
+    this.motes.uniforms.uOpacity.value = mixN(f.motes[1], to.motes[1])
+    this.motes.points.visible = this.motes.uniforms.uOpacity.value > 0.001
+    const g = this.grade.uniforms
+    g.uContrast.value = mixN(f.grade.contrast, to.grade.contrast)
+    g.uSat.value = mixN(f.grade.sat, to.grade.sat)
+    g.uVignette.value = mixN(f.grade.vignette, to.grade.vignette)
+    mixC(f.grade.lift, to.grade.lift, g.uLift.value)
+    mixC(f.grade.gain, to.grade.gain, g.uGain.value)
+    this.hair?.setLights(this.key, this.rimA, this.hemi, this.fill)
   }
 
   // ── Camera ────────────────────────────────────────────────────────────────
@@ -519,8 +611,9 @@ export class HumanStage {
     let el = 4
     if (!body || regionId === 'full') {
       const h = body ? body.heightMeters() : 1.7
-      target = new THREE.Vector3(0, this.podium.top + h * 0.53, 0)
-      dist = Math.max(3.2, h * 2.6)
+      // a hair lower than centre: the figure sits high, clear of the dock
+      target = new THREE.Vector3(0, this.podium.top + h * 0.5, 0)
+      dist = Math.max(3.1, h * 2.6)
       el = 3
     } else {
       const r = REGIONS.find((x) => x.id === regionId) || REGIONS[0]
@@ -587,6 +680,75 @@ export class HumanStage {
     return best
   }
 
+  // ── Grab handles (direct sculpting, see sculptHandles.ts) ─────────────────
+  /** Every resolved grab point + its rest-pose surface normal. */
+  handlePoints: (HandlePoint & { normal: THREE.Vector3 })[] = []
+
+  /** World position of a grab point (follows shape, pose and idle motion). */
+  handleWorld(p: HandlePoint, out = new THREE.Vector3()) {
+    if (!this.body) return out.set(0, 0, 0)
+    return this.body.vertexWorld(p.vertex, p.bone, out)
+  }
+
+  /** Screen positions of one zone's handles, with a facing factor. */
+  projectHandles(zone: 'face' | 'body'): HandleScreen[] {
+    const body = this.body
+    if (!body) return []
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const out: HandleScreen[] = []
+    const p = new THREE.Vector3()
+    const n = new THREE.Vector3()
+    const q = new THREE.Quaternion()
+    for (const h of this.handlePoints) {
+      if (h.handle.zone !== zone) continue
+      this.handleWorld(h, p)
+      const bone = body.boneByName.get(h.bone)
+      n.copy(h.normal)
+      if (bone) n.applyQuaternion(bone.getWorldQuaternion(q))
+      const toCam = tmpV.copy(this.camera.position).sub(p).normalize()
+      // silhouette points (the nose tip seen in profile) must stay grabbable —
+      // that's exactly where depth gets sculpted — so only points clearly on
+      // the far side fade out
+      const facing = THREE.MathUtils.clamp((n.dot(toCam) + 0.45) / 0.45, 0, 1)
+      p.project(this.camera)
+      if (p.z > 1) continue
+      out.push({
+        key: h.key,
+        x: (p.x * 0.5 + 0.5) * rect.width,
+        y: (-p.y * 0.5 + 0.5) * rect.height,
+        facing
+      })
+    }
+    return out
+  }
+
+  /**
+   * A screen drag (CSS px) at a world point → the same motion in the
+   * character's frame, in decimetres (x = character-left, y = up, z = forward).
+   */
+  dragToLocal(world: THREE.Vector3, dxPx: number, dyPx: number, out = new THREE.Vector3()) {
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const dist = this.camera.position.distanceTo(world)
+    const perPx = (2 * dist * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2)) / rect.height
+    this.camera.updateMatrixWorld()
+    const right = tmpV.setFromMatrixColumn(this.camera.matrixWorld, 0)
+    const up = tmpV2.setFromMatrixColumn(this.camera.matrixWorld, 1)
+    out
+      .copy(right)
+      .multiplyScalar(dxPx * perPx)
+      .addScaledVector(up, -dyPx * perPx)
+    return out.divideScalar(DM)
+  }
+
+  /** How well a character-frame axis can be dragged from this view (0..1). */
+  axisReach(axis: ArrayLike<number>) {
+    this.camera.updateMatrixWorld()
+    const a = new THREE.Vector3(axis[0], axis[1], axis[2])
+    const right = tmpV.setFromMatrixColumn(this.camera.matrixWorld, 0)
+    const up = tmpV2.setFromMatrixColumn(this.camera.matrixWorld, 1)
+    return Math.max(Math.abs(a.dot(right)), Math.abs(a.dot(up)))
+  }
+
   /** Glow a region on the skin (null = none). */
   setHighlight(r: Region | null) {
     this.hovered = r
@@ -631,6 +793,8 @@ export class HumanStage {
     this.tick(dt)
     this.controls.update()
     this.hair?.update(this.camera, this.renderer.domElement.height)
+    this.motes.uniforms.uTime.value = this.clock.elapsedTime
+    this.grade.uniforms.uTime.value = this.clock.elapsedTime
     this.syncAoCamera()
     this.composer.render(dt)
   }
@@ -837,20 +1001,33 @@ export class HumanStage {
     const rt = new THREE.WebGLRenderTarget(size, size, { type: THREE.FloatType, samples: 4 })
     const comp = new EffectComposer(this.renderer, rt)
     comp.renderToScreen = false
-    const bgVisible = this.backdrop.mesh.visible
-    const podVisible = this.podium.group.visible
-    if (opts.transparent) {
-      this.backdrop.mesh.visible = false
-      this.podium.group.visible = false
-    }
+    const hide = [this.backdrop.mesh, this.floor.mesh, this.motes.points, this.podium.group]
+    const wasVisible = hide.map((o) => o.visible)
+    if (opts.transparent) for (const o of hide) o.visible = false
     const rp = new RenderPass(this.scene, this.camera)
     if (opts.transparent) {
       rp.clearColor = new THREE.Color(0, 0, 0)
       rp.clearAlpha = 0
     }
     comp.addPass(rp)
-    const out = new OutputPass()
-    comp.addPass(out)
+    let bloom: UnrealBloomPass | null = null
+    let grade: ShaderPass | null = null
+    if (!opts.transparent && this.bloom.enabled) {
+      bloom = new UnrealBloomPass(new THREE.Vector2(size, size), this.bloom.strength, 0.6, 0.9)
+      comp.addPass(bloom)
+    }
+    comp.addPass(new OutputPass())
+    if (!opts.transparent) {
+      // the same grade as the live view, minus the animated grain + fringing
+      grade = new ShaderPass(GradeShader)
+      for (const k of ['uContrast', 'uSat', 'uVignette', 'uLift', 'uGain'] as const) {
+        const v = this.grade.uniforms[k].value
+        grade.uniforms[k].value = v instanceof THREE.Color ? v.clone() : v
+      }
+      grade.uniforms.uGrain.value = 0
+      grade.uniforms.uFringe.value = 0
+      comp.addPass(grade)
+    }
     comp.setPixelRatio(1)
     comp.setSize(size, size)
     comp.render()
@@ -869,10 +1046,11 @@ export class HumanStage {
     }
     if (!opts.transparent) for (let i = 3; i < img.data.length; i += 4) img.data[i] = 255
     g.putImageData(img, 0, 0)
+    bloom?.dispose()
+    grade?.dispose()
     comp.dispose()
     rt.dispose()
-    this.backdrop.mesh.visible = bgVisible
-    this.podium.group.visible = podVisible
+    hide.forEach((o, i) => (o.visible = wasVisible[i]))
     this.camera.aspect = savedAspect
     this.camera.updateProjectionMatrix()
     this.camera.position.copy(savedPos)
@@ -894,10 +1072,13 @@ export class HumanStage {
     this.wardrobe?.dispose()
     this.body?.dispose()
     this.eyes.dispose()
-    this.skin.material.dispose()
+    this.skin.dispose()
     this.teethMat.dispose()
     this.tongueMat.dispose()
-    this.envTex?.dispose()
+    for (const t of this.envCache.values()) t.dispose()
+    this.pmrem.dispose()
+    this.bloom.dispose()
+    this.grade.dispose()
     this.composer.dispose()
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh

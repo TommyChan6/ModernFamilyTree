@@ -95,6 +95,14 @@
                   >
                     <span class="sm-ink-seal">墨</span> {{ t('settings.theme.ink') }}
                   </button>
+                  <button
+                    class="sm-seg-btn"
+                    :class="{ active: store.theme === 'medieval' }"
+                    @click="store.setTheme('medieval')"
+                  >
+                    <UiIcon name="castle" :size="16" />
+                    {{ t('settings.theme.medieval') }}
+                  </button>
                 </div>
               </div>
 
@@ -106,6 +114,9 @@
                     <p class="sm-field-desc">{{ t('settings.accent.desc') }}</p>
                     <p v-if="store.isInk" class="sm-field-desc">
                       {{ t('settings.accent.inkNote') }}
+                    </p>
+                    <p v-else-if="store.isMedieval" class="sm-field-desc">
+                      {{ t('settings.accent.medievalNote') }}
                     </p>
                   </div>
                 </div>

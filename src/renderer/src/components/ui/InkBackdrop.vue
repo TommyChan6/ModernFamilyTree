@@ -3,7 +3,8 @@
        soft washes, a huge cursive watermark (草书) brushed down one side, a
        far range of hills at the foot and a band of mist drifting across it.
        Pure CSS motion (transform/opacity only) — nothing runs per frame in JS.
-       Renders nothing outside the ink theme. -->
+       In the medieval theme it hands over to MedievalBackdrop (vellum,
+       candlelight, a far country of castles); renders nothing in the others. -->
   <div v-if="store.isInk" class="inkbd" :class="{ fixed }" aria-hidden="true">
     <span class="inkbd-wash inkbd-wash-a"></span>
     <span class="inkbd-wash inkbd-wash-b"></span>
@@ -11,10 +12,12 @@
     <span v-if="hills" class="inkbd-hills"></span>
     <span v-if="hills" class="inkbd-mist"></span>
   </div>
+  <MedievalBackdrop v-else-if="store.isMedieval" :hills="hills" :fixed="fixed" />
 </template>
 
 <script setup>
 import { useMainStore } from '../../store/index.js'
+import MedievalBackdrop from './MedievalBackdrop.vue'
 
 defineProps({
   /** A few characters brushed huge and faint down the right edge. */

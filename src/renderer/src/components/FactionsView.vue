@@ -8,13 +8,27 @@
       </div>
       <div class="fx-actions">
         <span class="fx-hint">{{ t('groups.hint') }}</span>
+        <div class="seg fx-style-seg" role="radiogroup" :aria-label="t('groups.style.label')">
+          <button
+            v-for="s in ZONE_STYLES"
+            :key="s.id"
+            class="seg-btn"
+            :class="{ active: store.groupsSettings.zoneStyle === s.id }"
+            role="radio"
+            :aria-checked="store.groupsSettings.zoneStyle === s.id"
+            :title="t(`groups.style.${s.id}Hint`)"
+            @click="setZoneStyle(s.id)"
+          >
+            <UiIcon :name="s.icon" :size="14" />{{ t(`groups.style.${s.id}`) }}
+          </button>
+        </div>
         <button class="btn btn-sm" @click="store.openForm()">
           <UiIcon name="plus" :size="14" />{{ nounLabel(store.noun) }}
         </button>
         <button
           v-if="visibleFactions.length > 1"
           class="btn btn-sm"
-          :title="t('groups.arrangeTitle')"
+          :title="isVenn ? t('groups.arrangeVennTitle') : t('groups.arrangeTitle')"
           @click="autoArrange"
         >
           <UiIcon name="sparkles" :size="14" />{{ t('groups.arrange') }}
@@ -374,6 +388,14 @@ import {
   arrangeInRing,
   membershipArcSpans
 } from './factions/factionLayout.js'
+import {
+  MEMBER_PAD,
+  membraneShape,
+  pointInShape,
+  shapeExtent,
+  vennTargets,
+  arrangeVenn
+} from './factions/vennLayout'
 import { FactionsRenderer } from './factions/webgl/FactionsRenderer.js'
 import { withAlpha } from './webgl/overlayUtils.js'
 import SceneTabs from './SceneTabs.vue'
@@ -480,7 +502,19 @@ const minimapAdapter = {
       const my = z.y * proj.sy + proj.oy
       const mr = Math.max(2, z.r * proj.sx)
       g.beginPath()
-      g.arc(mx, my, mr, 0, Math.PI * 2)
+      if (z.shape && isVenn.value) {
+        // the membrane outline, every 4th sample is plenty at minimap scale
+        const N = z.shape.length
+        for (let j = 0; j < N; j += 4) {
+          const a = (j / N) * Math.PI * 2
+          const r = z.shape[j] * proj.sx
+          const px = mx + Math.cos(a) * r
+          const py = my + Math.sin(a) * r
+          if (j) g.lineTo(px, py)
+          else g.moveTo(px, py)
+        }
+        g.closePath()
+      } else g.arc(mx, my, mr, 0, Math.PI * 2)
       g.fillStyle = withAlpha(z.color, 0.16)
       g.fill()
       g.strokeStyle = withAlpha(z.color, 0.55)
@@ -525,6 +559,56 @@ const sceneTabsRef = ref(null)
 const activeFactions = computed(() => store.activeGroups)
 const visibleFactions = computed(() => activeFactions.value.filter((f) => f.visible !== false))
 
+// ── Zone style (Style Studio → Groups, or the toolbar switch) ──────────────
+// rings: fixed discs, shared people tethered between them. venn: each group is
+// an elastic membrane that reaches out to engulf its members, so groups that
+// share people overlap around them.
+const isVenn = computed(() => store.groupsSettings.zoneStyle === 'venn')
+const ZONE_STYLES = [
+  { id: 'rings', icon: 'share-2' },
+  { id: 'venn', icon: 'blend' }
+]
+function setZoneStyle(id) {
+  store.updateGroupsSetting('zoneStyle', id)
+}
+
+// Membrane outlines (Venn), recomputed lazily after any sim tick / glide /
+// membership change — never more than once per frame.
+let zoneShapes = new Map() // factionId -> Float32Array (polar outline)
+let shapesDirty = true
+function shapesWanted() {
+  return isVenn.value || (renderer?.vennMorph || 0) > 0
+}
+function refreshShapes() {
+  shapesDirty = false
+  if (!shapesWanted()) {
+    zoneShapes.clear()
+    return
+  }
+  const soft = store.groupsSettings.membraneSoftness
+  const next = new Map()
+  for (const f of visibleFactions.value) {
+    const p = getZonePos(f)
+    const members = []
+    for (const pid of f.member_ids || []) {
+      const n = nodeById.get(pid)
+      if (n) members.push(n)
+    }
+    next.set(
+      f.id,
+      membraneShape(p.x, p.y, factionRadius((f.member_ids || []).length), members, {
+        softness: soft,
+        out: zoneShapes.get(f.id)
+      })
+    )
+  }
+  zoneShapes = next
+}
+function shapeOf(fid) {
+  if (shapesDirty) refreshShapes()
+  return zoneShapes.get(fid) || null
+}
+
 // ── Zone display positions (outside Vue reactivity; the renderer reads them) ─
 // zonePos is what the stage draws and what the simulation steers toward; it
 // tracks the persisted faction x/y except while a glide tween or a ring drag
@@ -551,6 +635,7 @@ let glideRaf = 0
 let glideT0 = 0
 
 function repaint() {
+  shapesDirty = true
   renderer?.markGeomDirty()
   renderer?.requestRedraw()
   minimapRef.value?.redraw()
@@ -593,8 +678,26 @@ let simNodes = []
 let nodeById = new Map()
 let pendingSpawn = null // { id, x, y } — where a freshly dropped person materialises
 
+// Venn: the zones as plain discs at their live display positions.
+function vennDiscs() {
+  return visibleFactions.value.map((f) => {
+    const p = getZonePos(f)
+    return {
+      id: f.id,
+      x: p.x,
+      y: p.y,
+      r: factionRadius((f.member_ids || []).length),
+      member_ids: f.member_ids || []
+    }
+  })
+}
+
+function currentTargets() {
+  return isVenn.value ? vennTargets(vennDiscs()) : computeTargets(activeFactions.value, getZonePos)
+}
+
 function forceAttract(alpha) {
-  const targets = computeTargets(activeFactions.value, getZonePos)
+  const targets = currentTargets()
   for (const n of simNodes) {
     const t = targets[n.id]
     if (!t) continue
@@ -603,9 +706,34 @@ function forceAttract(alpha) {
   }
 }
 
+// Venn only: ease people out of the discs of groups they don't belong to, so
+// position alone tells you someone's memberships.
+function forceExclude(alpha) {
+  if (!isVenn.value) return
+  const discs = vennDiscs()
+  if (discs.length < 2) return
+  const sets = discs.map((d) => new Set(d.member_ids))
+  for (const n of simNodes) {
+    if (n.fx != null) continue
+    for (let i = 0; i < discs.length; i++) {
+      if (sets[i].has(n.id)) continue
+      const d = discs[i]
+      const dx = n.x - d.x
+      const dy = n.y - d.y
+      const dist = Math.hypot(dx, dy) || 1e-3
+      const pen = d.r + NODE_R + 6 - dist
+      if (pen <= 0) continue
+      const k = Math.min(pen, 40) * 0.5 * alpha
+      n.vx += (dx / dist) * k
+      n.vy += (dy / dist) * k
+    }
+  }
+}
+
 function rebuildNodes() {
   syncZonePos()
-  const targets = computeTargets(activeFactions.value, getZonePos)
+  shapesDirty = true
+  const targets = currentTargets()
   const next = []
   const nextMap = new Map()
   for (const p of store.persons) {
@@ -724,6 +852,7 @@ function zonesData() {
       x: p.x,
       y: p.y,
       r: factionRadius(count),
+      shape: shapesWanted() ? shapeOf(f.id) : null,
       color: f.color,
       icon: f.icon,
       label,
@@ -896,7 +1025,8 @@ function zoneVisual(id) {
 // Bright membership links for the hovered / dragged person.
 function activeLinksData() {
   const pid = activePersonId.value
-  if (!pid) return []
+  // Venn: the membranes already show the memberships — no lines.
+  if (!pid || isVenn.value) return []
   const n = nodeById.get(pid)
   if (!n) return []
   const out = []
@@ -923,11 +1053,15 @@ function toScreen(e) {
   return { x: e.clientX - rect.left, y: e.clientY - rect.top }
 }
 
-/** Smallest visible ring containing the world point — the intended drop target */
+/** Smallest visible zone containing the world point — the intended drop target
+ *  (in Venn, "containing" means inside the membrane, lobes included). */
 function zoneAt(w) {
   let best = null
   for (const z of zonesData()) {
-    if (Math.hypot(z.x - w.x, z.y - w.y) <= z.r && (!best || z.r < best.r)) best = z
+    const inside = z.shape
+      ? pointInShape(z.shape, z.x, z.y, w.x, w.y)
+      : Math.hypot(z.x - w.x, z.y - w.y) <= z.r
+    if (inside && (!best || z.r < best.r)) best = z
   }
   return best
 }
@@ -1104,7 +1238,10 @@ function fitAll(animate = false) {
     maxX = -Infinity,
     maxY = -Infinity
   for (const f of fs) {
-    const r = factionRadius((f.member_ids || []).length)
+    const base = factionRadius((f.member_ids || []).length)
+    const shape = isVenn.value ? shapeOf(f.id) : null
+    // a membrane's lobes can reach past its disc (approximated as a circle)
+    const r = shape ? Math.min(shapeExtent(shape), base * 2.2) : base
     minX = Math.min(minX, f.x - r)
     minY = Math.min(minY, f.y - r - 44) // room for the header pill
     maxX = Math.max(maxX, f.x + r)
@@ -1451,7 +1588,10 @@ function toggleVisible(f) {
 async function autoArrange() {
   const cx = (stageW.value / 2 - tx.value) / k.value
   const cy = (stageH.value / 2 - ty.value) / k.value
-  const placed = arrangeInRing(visibleFactions.value, cx, cy)
+  // Venn: groups that share people slide into overlap, strangers keep apart.
+  const placed = isVenn.value
+    ? arrangeVenn(vennDiscs(), cx, cy, { pad: MEMBER_PAD })
+    : arrangeInRing(visibleFactions.value, cx, cy)
   store.recordGroupMoves(
     placed.map((p) => p.id),
     'layout'
@@ -1572,6 +1712,10 @@ onMounted(() => {
   })
   renderer.setTheme(store.isLightTheme)
   renderer.setInk(store.isInk)
+  renderer.setZoneStyle(store.groupsSettings.zoneStyle, {
+    lens: store.groupsSettings.lensGlow ? 1 : 0,
+    animate: false
+  })
   renderer.setHidden(!props.active)
   measure()
   // Ignore size reports while hidden (display:none reports 0×0, which would
@@ -1584,6 +1728,7 @@ onMounted(() => {
 
   sim = forceSimulation([])
     .force('attract', forceAttract)
+    .force('exclude', forceExclude)
     .force(
       'collide',
       forceCollide()
@@ -1640,6 +1785,23 @@ watch(
     focusLife
   ],
   () => renderer?.markStylesDirty()
+)
+// Zone style: the discs swell into membranes (or relax back) and everyone walks
+// to where the new style wants them.
+watch(
+  () => [store.groupsSettings.zoneStyle, store.groupsSettings.lensGlow],
+  ([style, lens], old) => {
+    renderer?.setZoneStyle(style, { lens: lens ? 1 : 0, animate: props.active })
+    if (old && style !== old[0]) {
+      shapesDirty = true
+      sim?.alpha(0.8).restart()
+      renderer?.markStylesDirty()
+    }
+  }
+)
+watch(
+  () => store.groupsSettings.membraneSoftness,
+  () => repaint()
 )
 // Meta changes (memberships, colours, renames) also change arc counts → full rebuild.
 watch(nodeMeta, () => {
@@ -1737,6 +1899,15 @@ onBeforeUnmount(() => {
   font-size: 12px;
   color: var(--t3);
   font-weight: 500;
+}
+/* Rings / Venn switch — sized to the strip's --ctl-sm buttons */
+.fx-style-seg {
+  padding: 2px;
+}
+.fx-style-seg .seg-btn {
+  min-height: calc(var(--ctl-sm) - 6px);
+  padding: 0 10px;
+  font-size: 12.5px;
 }
 
 /* ── Stage ───────────────────────────────────────────────── */

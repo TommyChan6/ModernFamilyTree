@@ -14,6 +14,7 @@ import type { HumanBody, SurfacePart } from './HumanBody'
 import { createHairMaterial, POINT_TEX_WIDTH, type HairMaterial } from './hairMaterial'
 import {
   buildHull,
+  collide,
   curlStrand,
   resample,
   rng,
@@ -62,8 +63,11 @@ export class HairSystem {
     key: THREE.DirectionalLight
     rim: THREE.DirectionalLight
     hemi: THREE.HemisphereLight
+    fill: THREE.DirectionalLight | null
   } | null = null
   private keys: Partial<Record<SetName, string>> = {}
+  /** Head centre (rig space) — the hair shader's mass-normal origin. */
+  private headC: V3 = [0, 7.5, 0]
 
   constructor(body: HumanBody) {
     this.body = body
@@ -75,8 +79,13 @@ export class HairSystem {
     if (this.state) this.setState(this.state)
   }
 
-  setLights(key: THREE.DirectionalLight, rim: THREE.DirectionalLight, hemi: THREE.HemisphereLight) {
-    this.lights = { key, rim, hemi }
+  setLights(
+    key: THREE.DirectionalLight,
+    rim: THREE.DirectionalLight,
+    hemi: THREE.HemisphereLight,
+    fill: THREE.DirectionalLight | null = null
+  ) {
+    this.lights = { key, rim, hemi, fill }
     for (const s of this.sets.values()) this.applyLights(s.mat)
   }
 
@@ -88,6 +97,10 @@ export class HairSystem {
     u.uKeyColor.value.copy(l.key.color).multiplyScalar(l.key.intensity * 0.32)
     u.uRimDir.value.copy(l.rim.position).sub(l.rim.target.position).normalize()
     u.uRimColor.value.copy(l.rim.color).multiplyScalar(l.rim.intensity * 0.3)
+    if (l.fill) {
+      u.uFillDir.value.copy(l.fill.position).sub(l.fill.target.position).normalize()
+      u.uFillColor.value.copy(l.fill.color).multiplyScalar(l.fill.intensity * 0.32)
+    } else u.uFillColor.value.setScalar(0)
     u.uSky.value.copy(l.hemi.color)
     u.uGround.value.copy(l.hemi.groundColor)
     u.uAmbient.value = l.hemi.intensity
@@ -133,6 +146,7 @@ export class HairSystem {
     const part = this.body.parts.get('body')
     if (!st || !part) return
     const frame = this.headFrame(part)
+    this.headC = frame.c
     let hull: Collision | null = null
     const getHull = () => (hull ||= this.buildCollision(part, frame))
     const scalpKey = JSON.stringify([st.hair, this.densityScale, this.body.version])
@@ -164,7 +178,8 @@ export class HairSystem {
     ])
     if (this.keys.beard !== beardKey) {
       this.keys.beard = beardKey
-      this.setBatch('beard', this.growBeard(part, frame, getHull()), st)
+      // beards sit on the skin: no clothing clearance (it flares neck hair out)
+      this.setBatch('beard', this.growBeard(part, frame, { ...getHull(), torsoPad: 0.02 }), st)
     }
     this.applyColors(st)
   }
@@ -214,16 +229,18 @@ export class HairSystem {
   private buildCollision(part: SurfacePart, f: HeadFrame): Collision {
     const P = part.finePos
     const body = this.body
-    // the ears stick out of the skull — hair lies over them, not out to their tips
+    // the ears stick out of the skull: hair lies OVER them (pulled 8% toward
+    // the head centre, so it doesn't flare out to their tips) — leaving them
+    // out entirely lets the ear tips poke through long hair as dark blots
     const thin = part.fineMasks.thin
-    const hull = buildHull(
-      f.c,
-      P,
-      1.6,
-      96,
-      64,
-      (i) => P[i * 3 + 1] > f.chinY - 0.12 && !(thin && thin[i] > 0.25)
-    )
+    const HP = P.slice()
+    if (thin) {
+      for (let i = 0; i < thin.length; i++) {
+        if (thin[i] <= 0.25) continue
+        for (let c = 0; c < 3; c++) HP[i * 3 + c] = f.c[c] + (P[i * 3 + c] - f.c[c]) * 0.92
+      }
+    }
+    const hull = buildHull(f.c, HP, 1.6, 96, 64, (i) => P[i * 3 + 1] > f.chinY - 0.12)
     const J = (name: string) => {
       const v = body.boneHead(name, new THREE.Vector3())
       return [v.x, v.y, v.z] as V3
@@ -270,10 +287,13 @@ export class HairSystem {
       parts.push({
         kind: 'ellipsoid',
         c: [sh[0] * 0.85, sh[1] + 0.05, sh[2]],
-        r: [0.42, 0.4, 0.46]
+        r: [0.5, 0.48, 0.54]
       })
     }
-    return { hull, torso, parts }
+    // hair drapes over the clothes, not through them: clear the thickest
+    // everyday top (shell thickness + its relaxation), else strands dip under
+    // the fabric and the hair reads as torn patches on the shoulders
+    return { hull, torso, torsoPad: 0.14, parts }
   }
 
   // ── Root sampling ─────────────────────────────────────────────────────────
@@ -374,11 +394,25 @@ export class HairSystem {
     )
     const paths: number[][] = []
     const used: RootSample[] = []
+    // Without a fringe, no strand may hang across the eyes / face: hairline
+    // strands that fail to sweep aside otherwise slash across the forehead
+    const faceX = f.earX * 0.55
+    const crossesFace = (p: number[]) => {
+      if (st.hair.fringe !== 'none') return false
+      for (let k = 3; k < p.length; k += 3) {
+        const y = p[k + 1]
+        // (the lower forehead counts too: a hairline strand dropping across it
+        // reads as a scratch on the skin)
+        if (y < f.browY + 0.28 && y > f.chinY && Math.abs(p[k]) < faceX && p[k + 2] > f.c[2] + 0.3)
+          return true
+      }
+      return false
+    }
     for (const root of roots) {
       if (paths.length >= count) break
       const clump = clumpRand(root.p, 0.11)
       const path = scalpStrand(style.id, root, f, st.hair, hull, R, clump)
-      if (!path || path.length < 6) continue
+      if (!path || path.length < 6 || crossesFace(path)) continue
       paths.push(path)
       used.push(root)
     }
@@ -400,7 +434,8 @@ export class HairSystem {
           from: 0.08
         })
       },
-      f
+      f,
+      { hull, margin: 0.016 }
     )
   }
 
@@ -411,8 +446,9 @@ export class HairSystem {
     const bu = part.fineMasks.browU
     const bv = part.fineMasks.browV
     const R = rng(4242)
+    // many FINE hairs: a few thick ones read as scratches, not a brow
     const count = Math.round(
-      1400 * (0.4 + st.brows.density * 0.9) * (st.brows.style === 'bushy' ? 1.4 : 1)
+      2800 * (0.4 + st.brows.density * 0.9) * (st.brows.style === 'bushy' ? 1.4 : 1)
     )
     const roots = this.sampleRoots(
       part,
@@ -437,7 +473,7 @@ export class HairSystem {
       paths.push(browStrand(st.brows.style, r, R))
       used.push(r)
     }
-    return this.toBatch(part, paths, used, 5, 0.0016, null, null)
+    return this.toBatch(part, paths, used, 5, 0.0012, null, null)
   }
 
   /**
@@ -494,7 +530,7 @@ export class HairSystem {
       for (const upper of [true, false]) {
         const arc = this.lashArcs(side, upper)
         if (!arc) continue
-        const count = Math.round((upper ? 110 : 50) * (0.4 + density * 0.9))
+        const count = Math.round((upper ? 110 : 64) * (0.4 + density * 0.9))
         for (let k = 0; k < count; k++) {
           const u = Math.min(0.999, (k + R() * 0.9) / count)
           if (!upper && (u < 0.1 || u > 0.94)) continue
@@ -588,7 +624,8 @@ export class HairSystem {
             })
           }
         : null,
-      null
+      null,
+      { hull, margin: 0.005 }
     )
   }
 
@@ -600,7 +637,9 @@ export class HairSystem {
     points: number,
     width: number,
     post: ((b: StrandBatch, i: number, o: number) => void) | null,
-    f: HeadFrame | null
+    f: HeadFrame | null,
+    /** Re-project every point out of the body after resampling + curling. */
+    clear: { hull: Collision; margin: number } | null = null
   ): StrandBatch | null {
     const count = paths.length
     if (!count) return null
@@ -629,6 +668,15 @@ export class HairSystem {
         b.rootW[i * 4 + k] = part.fineSkinWeight[fine * 4 + k]
       }
       post?.(b, i, i * points * 3)
+      if (clear) {
+        // Resampling cuts chords across the curved skull and the curl/frizz
+        // pass jiggles points with no collision — either one sinks segments
+        // into the scalp, where only dashes of each strand peek out. Push
+        // every point (roots excepted, ramping in) back above the skin.
+        const o = i * points * 3
+        for (let k = 1; k < points; k++)
+          collide(clear.hull, b.pts, o + k * 3, clear.margin * Math.min(1, 0.35 + k * 0.35))
+      }
     }
     if (f && b.outer) {
       // outerness: distance from the head centre relative to this strand's root
@@ -775,11 +823,14 @@ export class HairSystem {
         highlight?: string
         hAmt?: number
         grey?: number
+        /** Hair-mass shading amount (see hairMaterial uMass). */
+        mass?: number
       }
     ) => {
       const s = this.sets.get(name)
       if (!s) return
       const u = s.mat.uniforms
+      u.uHeadC.value.set(this.headC[0], this.headC[1], this.headC[2])
       u.uRoot.value.set(root)
       u.uTip.value.set(tip || root)
       if (opts.highlight) u.uHighlight.value.set(opts.highlight)
@@ -788,6 +839,7 @@ export class HairSystem {
       u.uTipFade.value = opts.tipFade ?? 0.2
       u.uDarkRoots.value = opts.dark ?? 0.4
       u.uGrey.value = opts.grey ?? 0
+      u.uMass.value = opts.mass ?? 0
     }
     const h = st.hair
     set('scalp', h.color, h.tip || h.color, {
@@ -796,13 +848,15 @@ export class HairSystem {
       hAmt: h.highlight ? 0.22 : 0,
       grey,
       tipFade: h.style === 'buzz' ? 0.5 : 0.22,
-      dark: 0.45
+      dark: 0.45,
+      mass: 1
     })
     set('brows', st.brows.color, st.brows.color, {
       gloss: 0.3,
       tipFade: 0.5,
       dark: 0.1,
-      grey: grey * 0.7
+      grey: grey * 0.7,
+      mass: 0.2
     })
     const lash = new THREE.Color(st.brows.color).lerp(
       new THREE.Color('#050505'),
@@ -813,7 +867,13 @@ export class HairSystem {
       tipFade: 0.4,
       dark: 0
     })
-    set('beard', st.beard.color, st.beard.color, { gloss: 0.35, tipFade: 0.35, dark: 0.3, grey })
+    set('beard', st.beard.color, st.beard.color, {
+      gloss: 0.35,
+      tipFade: 0.35,
+      dark: 0.3,
+      grey,
+      mass: 0.25
+    })
   }
 
   dispose() {

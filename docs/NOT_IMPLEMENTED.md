@@ -2,7 +2,10 @@
 
 *Compiled 2026-10-11 from every planning document in the repo, with each item checked
 against the code on that date (not against what the docs claim). Updated the same day
-after §1 (housekeeping and quick fixes) was worked through. This is the single
+after §1 (housekeeping and quick fixes) was worked through. **Re-verified 2026-10-18**
+against the code including uncommitted work: no open item had shipped in between; the
+Medieval theme and the plate node shapes moved §5.8 and §6.6 forward and added
+follow-ups (see those entries and Appendix A). This is the single
 list of everything that was planned, proposed, or wished for and does not exist yet,
 or exists only partly.*
 
@@ -118,9 +121,9 @@ waits on the new address.*
 - **Notes:** store a `points: [{x, y, kind: 'smooth'|'corner'}]` array in the same `curves` map. Keep the path math pure in `linkHelpers.js`, and extend the ribbon tessellation in the link material. Undo already flows through `captureLayoutState`.
 
 ### 2.2 Special effect for persons with a given tag
-- **Status:** Not started · **Effort:** M · **Source:** designDraft ("special effect on a specific tag?")
-- **Today:** node ornaments (aura / runes / orbit / burst / pulse, `gs.nodeDecor`) are global for every node. Node `glow` only means selected, hovered, traced or just born. Per-node colour and size are set by hand (action pane or paint wheel).
-- **To do:** a per-tag "effect" setting (an ornament, glow colour or line effect) stored on the tag or in graph settings, resolved per node in `linkVisual`/node styling. Members of the tag get the effect, and a node with several tagged effects follows a priority order.
+- **Status:** Done (2026-10-19), for tags **and** traits, in the Graph and the Timeline · **Source:** designDraft ("special effect on a specific tag?")
+- **What shipped ("auras"):** `Tag.aura` and `FieldDef.auras` (rules with a condition on the trait's value), resolved per person by `src/shared/auras.ts` with a priority order. Bearers wear an ornament (eight new ones — halo, flame, frost, sparkle, crown, shadow, storm, bloom — plus the five decor ornaments) on graph nodes and timeline pins, a line effect on their lifeline and on bonds between two bearers, and an optional tint. Edited in Style Studio → Whole app → Special effects, with a live preview and presets. Assigning an aura ignites it with a shockwave cascading down the generations. See CLAUDE.md → Auras.
+- **Follow-ups:** the Space 3D view, the Groups view and the Directory don't show auras yet; aura line effects pause under the 水墨 brush look, like every line effect.
 
 ### 2.3 Gravestone theme
 - **Status:** Done (2026-10-11) · **Source:** designDraft ("the characters are like gravestones, the ground in which they touches represents the birth year")
@@ -188,13 +191,9 @@ waits on the new address.*
   - convex-hull or halo drawing of tag clusters in the graph.
 
 ### 2.10 Constellation / night-sky skin
-- **Status:** Not started · **Effort:** M · **Source:** WILD_IDEAS D3
-- **Today:** the nebula/abyss/neon themes with "stars" particles are the closest.
-- **To do:**
-  - people draw as stars, with brightness and size scaled by descendant count (from the kinship index);
-  - links draw as thin constellation lines;
-  - deceased people twinkle;
-  - a "poster mode" export.
+- **Status:** Done (2026-10-26) · **Source:** WILD_IDEAS D3
+- **What shipped:** the `star` node shape (brightness/size by descendant count, departed twinkle, ink star atlas on light grounds), the `starline` line effect, the `nightsky` background, the `constellation` preset, and a star-chart poster (planisphere / atlas plate) in the Export dialog. See CLAUDE.md → Constellation skin.
+- **Follow-ups:** couple lines keep the default line-effect scope (not star lines); the end gap is a fixed 15 units rather than per-star; no night sky in performance mode or on the Timeline's background list.
 
 ### 2.11 Fan chart as a graph layout type
 - **Status:** Partial · **Effort:** M · **Source:** WILD_IDEAS D1
@@ -366,7 +365,9 @@ waits on the new address.*
 - **To do:** ghost one relative's look at about 40% over the current one on the stage.
 
 ### 5.8 Crest / heraldry builder
-- **Status:** Not started · **Effort:** L · **Source:** CHARACTER_VIEW_PROPOSAL §8.10, WILD_IDEAS C4 + "heraldry generator", MID_DEVELOPMENT §9
+- **Status:** Partial · **Effort:** L · **Source:** CHARACTER_VIEW_PROPOSAL §8.10, WILD_IDEAS C4 + "heraldry generator", MID_DEVELOPMENT §9
+- **Today (2026-10-18):** the Medieval theme's pure heraldry in `lib/medievalArt.ts`: `blazonFor(id, gender)` gives each **person** a stable coat of arms (gender picks the tincture; the rule of tincture is kept), shown via `medievalAvatarBg` in that theme only. The `heraldry` graph preset draws shield nodes.
+- **Missing:** arms per **tag** (the Groups view still has none), arms outside the Medieval theme, and any way to edit a blazon.
 - **To do:**
   - step 1 (cheap, WILD_IDEAS C4): a deterministic sigil per tag, hashing label and colour into an emblem for the Groups view;
   - step 2: an editable crest pack reusing the slot and palette engine.
@@ -426,7 +427,7 @@ waits on the new address.*
 
 ### 6.5 Font settings and custom fonts
 - **Status:** Partial · **Effort:** M · **Source:** designDraft styles ("a couple default ones, and allow the user to import their own font styles, font size, color")
-- **Today:** the only control is the graph's *Label size* slider. The bundled brush fonts are tied to the Ink theme.
+- **Today:** the only control is the graph's *Label size* slider. The bundled fonts are tied to their themes: the brush fonts to Ink, the blackletter/Cinzel set to Medieval.
 - **To do:**
   - an app font choice (a few bundled OFL fonts);
   - a UI scale (`--fs-*` multiplier);
@@ -436,8 +437,9 @@ waits on the new address.*
 
 ### 6.6 Per-view themes and backgrounds
 - **Status:** Partial · **Effort:** L · **Source:** designDraft big fixes ("nodes are rectangular plates on water surface with ripple effect, the water reflects, connections are stone slabs or waterflow")
-- **Today:** there are three app themes (light / dark / ink), 23 graph presets with atmospheres, and the Timeline's own style pane.
-- **Missing:** a water-surface scene (plates, ripples on drop, reflections, stone-slab or water-flow links), and a per-view background colour or image picker. Gravestone (§2.3) and constellation (§2.10) are siblings of this.
+- **Today:** there are four app themes (light / dark / ink / medieval), 28 graph presets with atmospheres, and the Timeline's own style pane. The standing **`plate` / `flatplate`** node shapes exist (`nodeShapes.js`; names above the crown), which covers the "rectangular plates" half of the request.
+- **Missing:** the water surface itself (ripples on drop, reflections, stone-slab or water-flow links), and a per-view background colour or image picker. Gravestone (§2.3) and constellation (§2.10) are siblings of this.
+- **Medieval theme follow-ups:** the shell, the DOM views (through the shared hook classes), full-screen pages and the graph (`graph/MedievalBackdrop.js`, the `heraldry` / `illuminated` presets) are dressed. The canvas views (Timeline, Groups, Map) render as the plain light theme, where Ink has its own painters per view (`TimelineInk.js`, `FactionsInk.js`, the `shanshui` map style). There are no Medieval Directory card styles or map style either (Ink has `scroll` / `moonfan` and `handscroll`), and no CJK blackletter: Chinese falls back to the system serif.
 
 ### 6.7 Sound effects and music
 - **Status:** Not started · **Effort:** M · **Source:** designDraft ("is adding music and sfx great for this program… give me a plan")
@@ -489,15 +491,15 @@ All client-side, zero-cost. Most come from WILD_IDEAS.
 | # | Item | Status | Effort | What exists / what to build |
 |---|---|---|---|---|
 | 7.1 | **Family / dynasty generator** (designDraft "generate family base on a few user criteria", WILD_IDEAS C1) | Not started | L | Only the first-run `seedSampleData` and the map's "Generate a world". Build a seeded generator in `src/shared/` (generations, family size, mortality, era, culture, feud chance) that emits people + relationships + traits through `persons:createMany` as one undo step. |
-| 7.2 | **Name generator** (C2) | Not started | S | Markov chains over small bundled corpora, optionally bound to a tag; suggest names in PersonForm and feed 7.1. |
+| 7.2 | **Name generator** (C2) | Done (2026-10-26) | — | `lib/nameGen.ts` + `NameDice.vue` in the person form's Name slot: nine cultures, per-tag training, parent surnames. Left: the dice in `PersonPicker`'s inline create; multi-word surnames. Ready to feed 7.1. |
 | 7.3 | **Trait inheritance simulator** (C3, designDraft "show genetic inheritance") | Not started | M | Only character-*look* inheritance exists. Model selected FieldDefs as genes (dominant/recessive alleles), predict a child from two parents, flag carriers across the tree, and show inherited traits flowing in the graph (a lens). |
 | 7.4 | **Drama detector** (A4) | Partial | M | `romanceInsights` finds mutual/one-way likes, triangles and rival admirers over `likes` edges only. Missing: feuds (rival chains across families), forbidden romance across rival tags, black sheep, reconciliations, and any use of tags or other types. |
-| 7.5 | **Sentiment / dynamics lens** (A3) | Not started | M | Weight is a layout force, not affect. Add a lens that recolours edges warm↔cold by type sentiment and sizes them by intensity. |
-| 7.6 | **Living-census scrubber** (B2) | Not started | M | The time slider shows a birth/marriage histogram only. Add live stats as you scrub: population alive, active marriages, mean age, births per decade, a mortality sparkline. |
+| 7.5 | **Sentiment / dynamics lens** (A3) | Done (2026-10-26) | — | `src/shared/sentiment.ts`; type + per-edge sentiment/intensity, graph Dynamics lens. Left: a feeling control in PersonForm's bond cards, a Timeline version, persisting the lens toggle. |
+| 7.6 | **Living-census scrubber** (B2) | Done (2026-10-26) | — | `time/censusMath.ts` + `CensusPanel.vue` on the Time slider. Left: "divorced" status without an `ended` year still counts as a couple. |
 | 7.7 | **Auto life story / obituary** (E4) | Not started | M | Templated (no AI) prose from structured data + kinship names. Doubles as a screen-reader narrative and the future SSR profile body. |
 | 7.8 | **Completeness meter / quests** (F1) | Not started | S | RelationshipsView has an Issues filter for structural problems. Add missing-field counts (birth year, photo, parents), a progress ring and click-through to fix. |
 | 7.9 | **Guess-who / twenty questions** (F3) | Not started | M | The Kinship quiz exists (name/who/hops). Add yes/no attribute questions narrowing to a mystery person. |
-| 7.10 | **Family fingerprint** (D4) | Not started | M | A deterministic mandala generated from tree structure, as project cover art and export. |
+| 7.10 | **Family fingerprint** (D4) | Done (2026-10-26) | — | `src/shared/fingerprint.ts` + `projects:fingerprints`, `components/fingerprint/`: Projects/profile cover art, dialog with PNG/SVG download. |
 | 7.11 | **What-if branch canons + diff** (B3) | Not started | L | Branch a project at a moment and diff people/relationships between branches. Could start from `projects:duplicate` plus a diff view. |
 | 7.12 | **Dynasty simulator** (H2) | Not started | L | Evolve the tree forward by rules; depends on 7.1. |
 | 7.13 | **Oral-history interview mode** (E2) | Not started | M | Guided prompts plus MediaRecorder, auto-attached to the person. Depends on 4.11. |
@@ -775,6 +777,10 @@ These still appear as "planned", "likely next" or "possible future" in older doc
 | DEPLOYMENT_PLAN | Step 2.7 plan switchboard, 2.8 paid chunks (client side), 3.1 importer script, 3.2b obfuscation (scoped) | `PLAN_FEATURES`, `paid/index.ts`, `scripts/importToSupabase.js`, `vite.config.web.js` |
 | OVERHAUL_GUIDE | All phases 0–9 | Shipped; derived tags are the one leftover (§4.2) |
 | designDraft, this doc §1 | Smaller view title bar; version from package.json; copyright notice; Norwegian UI locale; contact email in one place | `ViewHeader.vue`, `lib/appInfo.ts`, `i18n/locales/nb.js` (done 2026-10-11) |
+| designDraft ("rectangular plates"), this doc §6.6 | Plate node shapes that stand on their point | `plate` / `flatplate` in `graph/webgl/nodeShapes.js` (2026-10-18; the water surface is still open) |
+| — (new) | A fourth app theme: Medieval illuminated codex, with per-person coats of arms | `styles/medieval.css`, `lib/medievalArt.ts`, `graph/MedievalBackdrop.js`, `ui/MedievalBackdrop.vue` (2026-10-18; follow-ups in §6.6) |
+| WILD_IDEAS | C2 name generator, D3 constellation skin, A3 dynamics lens, B2 census, D4 family fingerprint (2026-10-26) | `lib/nameGen.ts`, `graph/constellation.ts`, `src/shared/sentiment.ts`, `time/censusMath.ts`, `src/shared/fingerprint.ts` (see §7) |
+| WILD_IDEAS §I | I1 household rivers, I5 tilted timeline with rising arcs, I7 time warp (2026-10-26) | `timeline/householdRivers.ts`, `timelineTilt.ts`, `timeWarp.ts` |
 
 ---
 
@@ -796,7 +802,7 @@ Worth correcting so the docs stop disagreeing with the code:
 
 ## Appendix C: in-code markers
 
-`TODO` / "not implemented" / "coming soon" markers in `src/` (none in `tests/`) as of 2026-10-11:
+`TODO` / "not implemented" / "coming soon" markers in `src/` (none in `tests/`) as of 2026-10-11, re-checked 2026-10-18 (unchanged):
 
 | Location | Marker |
 |---|---|

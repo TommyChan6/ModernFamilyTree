@@ -41,7 +41,10 @@
     <div v-if="store.inspectorTab === 'inspector'" class="dock-body inspector">
       <template v-if="person">
         <div class="insp-hero">
-          <div class="insp-avatar" :style="{ background: avatarGradient(person.gender) }">
+          <div
+            class="insp-avatar"
+            :style="{ background: avatarGradient(person.gender, person.id) }"
+          >
             <img
               v-if="person.primary_image && imageUrl(person.primary_image)"
               class="insp-avatar-img"
@@ -114,6 +117,7 @@ import { api } from '../api'
 import RightSidebar from './RightSidebar.vue'
 import TagChipsEditor from './TagChipsEditor.vue'
 import { inkAvatarBg } from './ui/inkChrome'
+import { medievalAvatarBg } from '../lib/medievalArt'
 import UiIcon from './ui/UiIcon.js'
 
 // The tabbed, collapsible right dock: Inspector (selection details + quick
@@ -141,8 +145,9 @@ function initials(name) {
     .toUpperCase()
 }
 
-function avatarGradient(gender) {
+function avatarGradient(gender, id) {
   if (store.isInk) return inkAvatarBg(gender)
+  if (store.isMedieval) return medievalAvatarBg(gender, id) // their coat of arms
   if (gender === 'male') return 'linear-gradient(135deg, #3a7bd5, #2351a0)'
   if (gender === 'female') return 'linear-gradient(135deg, #c95fa0, #923075)'
   return 'linear-gradient(135deg, #5c6bc0, #3c4a9e)'

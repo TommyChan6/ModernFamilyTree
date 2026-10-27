@@ -47,6 +47,9 @@ checkpoint · Tags over a membership join · Accounts/auth · **3D Space** graph
 web build (IndexedDB) · CI + TS adoption started · **Kinship** (2026-09-30: A1 kinship
 calculator in EN/NO/简/繁, A2 Bloodline meter + pedigree collapse, A5 linchpins, D2
 bloodline flow, D5 POV lens, F2/F4 quiz + six-degrees, a Kin Walker, ancestor fan).
+**2026-10-26:** C2 name generator, D3 constellation skin, A3 dynamics lens, B2 living census, D4 family
+fingerprint, and the Timeline's I1 household rivers, I5 tilted board with rising arcs and
+I7 time warp.
 
 ### 📋 Already planned / documented (don't duplicate — extend instead)
 - **Platform:** Supabase backend, cloud auth, sharing/visibility, fork & remix, public
@@ -287,6 +290,63 @@ get honest uncertainty; fandoms get a canon-confidence spectrum; collaborators (
 The 3D Space graph, but you *stand inside it* in VR/AR via WebXR — walk among your ancestors
 as stars (D3). The 3D engine already exists; WebXR is a camera/input layer over it. The
 ultimate "whoa" demo for large dynasties.
+
+### I. Timeline relationship metaphors
+
+*Shipped 2026-10-26: **I1** (Rivers mode, `timeline/householdRivers.ts`), **I5** (Timeline
+tilt, `timeline/timelineTilt.ts`) and **I7** (time warp, `timeline/timeWarp.ts`). I2, I3,
+I4 and I6 are still open.*
+
+*Context: the Timeline's parent→child lines used to pile up at the child's birth year,
+two per child, passing over unrelated lifelines with no way to tell where they ended.
+Already shipped (2026-10): one **family stem** per couple hanging from their marriage rope,
+one **branch** per child that nests by reach, **bridges** (a branch is cut open where it
+passes under a living lifeline), a hover card that explains any line, a **live-crossing**
+lane optimiser (only lives alive at that time count as obstacles), and the **Sprout** mode
+(lanes reused once their occupant is gone; each life peels out of its parents' stem). See
+`timeline/timelineLinks.ts`. These are the bigger swings that would come next.*
+
+**I1. Household rivers** 🧪😎 · Effort **L** · 🏗️ timeline layout + `buildFamilies`
+Columns are *households*, not people. Parents run side by side in a household channel;
+children are born **inside** it, between them — parentage reads by containment, so there are
+no birth lines at all. A child's lifeline crosses to a new household channel in the year
+they marry (the only crossings left are marriages, which are rare and meaningful); a
+remarriage moves them again, and children of the second marriage appear in the second
+household. Deaths narrow the river; unmarried adults leave for their own channel at a set
+age. Needs polyline lifelines (today they're straight capsules) and household-aware hit
+tests / lane drag / retime. We couldn't find this in any genealogy tool or paper.
+
+**I2. Childhood carries the household colour** 🎯😎 · Effort **S–M** · 🏗️ LifelineLayer
+Each couple gets a hue; the first ~18 years of a child's lifeline are tinted with a blend of
+the parents' hues, fading into the child's own colour. Children match their parents by colour
+without tracing anything — works with every layout and mode. Needs a per-vertex colour ramp
+in `LifelineLayer` (one more packed instance attribute; mind the ANGLE attribute budget).
+
+**I3. Birth beads** 🎯 · Effort **M** · 🏗️ NodeLayer + AvatarAtlas
+Each child becomes a small face bead on each parent's lifeline at the birth year — a parent's
+life reads as a necklace of their children, and the bead's height *is* the parent's age at
+the birth. The child gets a tiny two-face "parents" badge beside its pin. Branches hide by
+default and draw only on hover / selection.
+
+**I4. Portals for long links** 🎯 · Effort **S** · 🏗️ the branch writer + `fx.ripple`
+A link that would span more than ~6 lanes draws only short stubs ending in a portal ring with
+the other person's initials; clicking a ring flies the camera to the other end (an off-page
+connector, flowchart-style). Removes the cross-canvas arcs that cause most of the overlap.
+
+**I5. Arcs that rise into 3D** 😎🧪 · Effort **M** · 🏗️ the graph's perspective tilt (`graph/webgl/coords.js`)
+Lay the timeline down as a board (the graph's tilt + turn homography); birth arcs lift out of
+the plane, higher for longer distances, and turning the view (Q/E) separates overlapping arcs
+by parallax.
+
+**I6. Kinship accordion** 🎯 · Effort **M** · 🏗️ `useKinship` lens + lane glide
+Select someone and every lane resizes by kinship distance to them: blood relatives wide,
+in-laws medium, the unrelated squeezed to hairlines — animated with the existing lane glide.
+Everything unrelated gets out of the way without being hidden.
+
+**I7. Stretch time where births cluster** 🧪 · Effort **M** · 🏗️ `sy()` + the year grid
+A non-linear year axis: expand where births are dense (siblings a year apart separate),
+compress empty decades. A fisheye on time, toggleable; the year grid and every hit test go
+through one warped `sy()`.
 
 ---
 

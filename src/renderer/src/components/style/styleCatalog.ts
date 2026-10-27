@@ -13,7 +13,7 @@
 
 export type StyleLayer = 'app' | 'view'
 /** Which settings object a chapter's keys live in. */
-export type StyleSource = 'graph' | 'timeline' | 'store'
+export type StyleSource = 'graph' | 'timeline' | 'groups' | 'store'
 
 export interface StyleChapter {
   id: string
@@ -53,10 +53,13 @@ export const APP_CHAPTERS: StyleChapter[] = [
       'unknownColor',
       'parentChildColor',
       'spouseColor',
-      'adoptedColor'
+      'adoptedColor',
+      'dynamicsWarm',
+      'dynamicsCold'
     ]
   },
-  { id: 'profiles', icon: 'id-card', labelKey: 'styleStudio.chapters.profiles' }
+  { id: 'profiles', icon: 'id-card', labelKey: 'styleStudio.chapters.profiles' },
+  { id: 'auras', icon: 'sparkles', labelKey: 'styleStudio.chapters.auras' }
 ]
 
 export const VIEW_CHAPTERS: Record<string, StyleChapter[]> = {
@@ -76,7 +79,8 @@ export const VIEW_CHAPTERS: Record<string, StyleChapter[]> = {
         'labelSize',
         'showLabels',
         'showAge',
-        'glowOnHover'
+        'glowOnHover',
+        'starTwinkle'
       ]
     },
     {
@@ -145,7 +149,15 @@ export const VIEW_CHAPTERS: Record<string, StyleChapter[]> = {
       icon: 'grid-3x3',
       labelKey: 'styleStudio.chapters.canvas',
       source: 'timeline',
-      keys: ['connectors', 'grid', 'labels', 'eventMarkers', 'ageTicks', 'eraIntensity']
+      keys: [
+        'connectors',
+        'grid',
+        'labels',
+        'eventMarkers',
+        'ageTicks',
+        'eraIntensity',
+        'leaveHomeAge'
+      ]
     },
     {
       id: 'air',
@@ -153,10 +165,33 @@ export const VIEW_CHAPTERS: Record<string, StyleChapter[]> = {
       labelKey: 'styleStudio.chapters.air',
       source: 'timeline',
       keys: ['ambientFx', 'ambientColorA', 'ambientColorB', 'ambientDensity']
+    },
+    {
+      id: 'time',
+      icon: 'unfold-vertical',
+      labelKey: 'styleStudio.chapters.time',
+      source: 'timeline',
+      keys: ['timeWarp', 'warpStrength']
+    },
+    {
+      id: 'camera',
+      icon: 'rotate-3d',
+      labelKey: 'styleStudio.chapters.camera',
+      source: 'timeline',
+      keys: ['viewTilt', 'tiltAngle', 'tiltYaw', 'arcLift']
     }
   ],
   directory: [{ id: 'cards', icon: 'id-card', labelKey: 'styleStudio.chapters.cards' }],
-  map: [{ id: 'map', icon: 'map', labelKey: 'styleStudio.chapters.mapStyle' }]
+  map: [{ id: 'map', icon: 'map', labelKey: 'styleStudio.chapters.mapStyle' }],
+  groups: [
+    {
+      id: 'shapes',
+      icon: 'blend',
+      labelKey: 'styleStudio.chapters.shapes',
+      source: 'groups',
+      keys: ['zoneStyle', 'membraneSoftness', 'lensGlow']
+    }
+  ]
 }
 
 /** Does this view have a style layer of its own? */
@@ -182,7 +217,7 @@ export const STYLE_ENTRIES: StyleEntry[] = [
     chapter: 'theme',
     key: 'theme',
     labelKey: 'settings.theme.title',
-    words: 'dark light ink mode'
+    words: 'dark light ink medieval codex parchment mode'
   },
   {
     scope: 'app',
@@ -235,10 +270,31 @@ export const STYLE_ENTRIES: StyleEntry[] = [
   },
   {
     scope: 'app',
+    chapter: 'palette',
+    key: 'dynamicsWarm',
+    labelKey: 'sentiment.style.warm',
+    words: 'dynamics sentiment feeling warm love lens colour color'
+  },
+  {
+    scope: 'app',
+    chapter: 'palette',
+    key: 'dynamicsCold',
+    labelKey: 'sentiment.style.cold',
+    words: 'dynamics sentiment feeling cold rival estranged lens colour color'
+  },
+  {
+    scope: 'app',
     chapter: 'profiles',
     key: 'profileStyle',
     labelKey: 'styleStudio.profile.title',
     words: 'cinematic scroll person'
+  },
+  {
+    scope: 'app',
+    chapter: 'auras',
+    key: 'auras',
+    labelKey: 'styleStudio.chapters.auras',
+    words: 'effect special aura glow crown flame frost halo sparkle tag trait ornament'
   },
   // ── graph ──
   {
@@ -274,6 +330,13 @@ export const STYLE_ENTRIES: StyleEntry[] = [
   },
   { scope: 'graph', chapter: 'nodes', key: 'showAge', labelKey: G + 'showAge' },
   { scope: 'graph', chapter: 'nodes', key: 'glowOnHover', labelKey: G + 'glowOnHover' },
+  {
+    scope: 'graph',
+    chapter: 'nodes',
+    key: 'starTwinkle',
+    labelKey: G + 'starTwinkle',
+    words: 'star constellation night sky departed deceased'
+  },
   {
     scope: 'graph',
     chapter: 'lines',
@@ -391,10 +454,75 @@ export const STYLE_ENTRIES: StyleEntry[] = [
   },
   {
     scope: 'timeline',
+    chapter: 'canvas',
+    key: 'leaveHomeAge',
+    labelKey: TL + 'leaveHome',
+    words: 'rivers household channel adult age'
+  },
+  {
+    scope: 'timeline',
     chapter: 'air',
     key: 'ambientFx',
     labelKey: 'graphStyle.groups.atmosphere',
     words: 'particles fireflies snow'
+  },
+  {
+    scope: 'timeline',
+    chapter: 'time',
+    key: 'timeWarp',
+    labelKey: TL + 'timeWarp',
+    words: 'warp stretch fisheye density births axis'
+  },
+  {
+    scope: 'timeline',
+    chapter: 'time',
+    key: 'warpStrength',
+    labelKey: TL + 'warpStrength',
+    words: 'warp stretch fisheye'
+  },
+  {
+    scope: 'timeline',
+    chapter: 'camera',
+    key: 'viewTilt',
+    labelKey: TL + 'tilt',
+    words: '3d perspective board'
+  },
+  { scope: 'timeline', chapter: 'camera', key: 'tiltAngle', labelKey: TL + 'tiltAngle' },
+  {
+    scope: 'timeline',
+    chapter: 'camera',
+    key: 'tiltYaw',
+    labelKey: TL + 'tiltYaw',
+    words: 'rotate turn'
+  },
+  {
+    scope: 'timeline',
+    chapter: 'camera',
+    key: 'arcLift',
+    labelKey: TL + 'arcLift',
+    words: 'arcs height parallax 3d'
+  },
+  // ── groups ──
+  {
+    scope: 'groups',
+    chapter: 'shapes',
+    key: 'zoneStyle',
+    labelKey: 'styleStudio.groups.shape',
+    words: 'venn rings membrane overlap circle shared'
+  },
+  {
+    scope: 'groups',
+    chapter: 'shapes',
+    key: 'membraneSoftness',
+    labelKey: 'styleStudio.groups.softness',
+    words: 'venn membrane fluid taut'
+  },
+  {
+    scope: 'groups',
+    chapter: 'shapes',
+    key: 'lensGlow',
+    labelKey: 'styleStudio.groups.lens',
+    words: 'venn overlap intersection'
   },
   // ── directory / map ──
   {

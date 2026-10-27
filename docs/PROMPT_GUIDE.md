@@ -37,8 +37,8 @@ Words in a prompt do three different jobs. A strong prompt uses all three.
 > "Make the projects page **amazing and wow the user** — think **out of the box**.
 > Use **3D card tilt with a moving specular highlight**, a **staggered entrance**, and
 > **soft layered shadows**. Keep it **consistent with the design tokens**, working in
-> **dark, light and ink themes**, **transform/opacity-only animation**, honouring
-> **prefers-reduced-motion**. **Verify** in `npm run dev:web` and screenshot all three themes."
+> **dark, light, ink and medieval themes**, **transform/opacity-only animation**, honouring
+> **prefers-reduced-motion**. **Verify** in `npm run dev:web` and screenshot all four themes."
 
 A prompt that is only superlatives ("make it beautiful, cool, amazing, wow") gets the
 agent's generic idea of beautiful. A prompt that names even two or three concrete
@@ -100,7 +100,8 @@ screenshot-worthy · "feels alive" · "feels expensive" · "feels like a game, n
 **Mood references** (often more effective than adjectives):
 museum exhibit · luxury watch site · Apple product page · Pixar title card ·
 JRPG menu · sci-fi HUD · botanical illustration · old atlas · Chinese ink painting (水墨) ·
-illuminated manuscript · trading card · constellation map · stained glass ·
+illuminated manuscript · portolan sea chart · heraldic roll of arms · trading card ·
+constellation map · stained glass ·
 paper cut-out diorama · night sky · aquarium · library card catalog
 
 ### 4.2 Creativity
@@ -136,13 +137,15 @@ palette harmony · **accent colour** (the user-chosen one) · monochrome + one a
 tints and shades · **contrast** (WCAG AA) · semantic colours (danger, success, muted) ·
 colour temperature (warm/cool) · gradient · mesh gradient · duotone · subtle noise grain ·
 glow · tinted shadows · colour-coded categories · desaturated secondary info ·
-"colour carries meaning, not decoration" · "works in dark, light **and** ink themes"
+heraldic tinctures (metal on colour) · gold leaf ·
+"colour carries meaning, not decoration" · "works in dark, light, ink **and** medieval themes"
 
 ### 4.5 Typography
 
 type scale (`--fs-xs…xl`) · weight contrast · letter-spacing / tracking · tabular numbers ·
 line length · line height · small caps / eyebrow labels · truncation · readable ≥ 11px ·
 text hierarchy (`--t1` / `--t2` / `--t3`) · brush/calligraphy font (ink theme only) ·
+blackletter headings, Roman-capital rubrics, illuminated initials (medieval theme only) ·
 "headings that feel editorial" · "numbers that don't jitter while counting"
 
 ### 4.6 Depth, light and material
@@ -152,7 +155,7 @@ text hierarchy (`--t1` / `--t2` / `--t3`) · brush/calligraphy font (ink theme o
 | **Shadow** | soft shadow · **layered shadow** (`--shadow-sm` / `--shadow-lg`) · contact shadow · drop shadow · ambient occlusion · long shadow · inner shadow · tinted shadow · shadow that grows on hover/lift |
 | **Lighting** | **rim light** · key + fill light · glow · bloom · halo · specular highlight · sheen / shine sweep · god rays · spotlight · vignette · caustics · light that follows the cursor · day/night lighting |
 | **3D effects** | **perspective tilt** · parallax layers · depth of field / blur · isometric · extrusion · card flip · rotate-in · 3D carousel · floating objects · camera dolly / orbit · z-depth on hover |
-| **Material** | glass / frosted (`--glass-soft`, `--glass-strong`) · paper · rice paper · ink wash · parchment · metal · holographic / iridescent · enamel · velvet · neon · water surface · stone · wood grain · film grain |
+| **Material** | glass / frosted (`--glass-soft`, `--glass-strong`) · paper · rice paper · ink wash · parchment · vellum · gold leaf · tooled leather · sealing wax · metal · holographic / iridescent · enamel · velvet · neon · water surface · stone · wood grain · film grain |
 
 ### 4.7 Motion and animation
 
@@ -162,7 +165,7 @@ text hierarchy (`--t1` / `--t2` / `--t3`) · brush/calligraphy font (ink theme o
 - **Choreography:**
   - **staggered entrance**, cascade, sequence, orchestrated reveal;
   - shared-element transition, **FLIP** reorder, morph, cross-fade;
-  - page/view transition, iris wipe, ink-blot reveal.
+  - page/view transition, iris wipe, ink-blot reveal, page-burn reveal, page turn.
 - **Character** (the classic animation principles):
   - anticipation, follow-through, squash and stretch, secondary motion;
   - arcs (not straight lines), slow-in/slow-out.
@@ -271,7 +274,7 @@ no per-frame allocations · release GL contexts and dispose GPU resources on unm
 - unit-test pure math (`tests/*.test.js`);
 - **run `npm test`, `npm run typecheck`, `npm run lint`, `npm run format:check`**;
 - **verify in the running app** (`npm run dev`) **and the web build** (`npm run dev:web`);
-- **screenshot in dark, light and ink themes**;
+- **screenshot in dark, light, ink and medieval themes**;
 - "show me the evidence"; "report exactly what you verified and what you didn't".
 
 ### 5.5 Debugging
@@ -307,7 +310,7 @@ likely to be followed. Paste the lines that apply.
 | Web parity | "It must work identically in `npm run dev` and `npm run dev:web`." |
 | Zero cost | "Zero cost: no paid services, nothing that needs card details, no new paid APIs." |
 | Plain JSON over IPC | "Payloads to `api.invoke` must be plain JSON (no Vue reactive proxies)." |
-| Themes | "Works in dark, light **and** ink (水墨) themes; use `store.isLightTheme` for renderers." |
+| Themes | "Works in dark, light, ink (水墨) **and** medieval themes; use `store.isLightTheme` for renderers, `store.isInk` / `store.isMedieval` for themed dress. Modals wear the `.ink-mount ink-unroll ink-veil` hook classes so both ornate themes dress them." |
 | Tokens and accent | "Colours only from CSS tokens; use `var(--accent)` / `rgba(var(--accent-rgb), a)`, never the literal blue." |
 | Icons | "No emoji anywhere. Icons are Lucide names via `UiIcon` / `drawIcon` (add to `ui/lucideIcons.js` if needed)." |
 | Dialogs | "No native `alert`/`confirm`: use `confirmDialog` / `toast`, and `undoToast` after undoable deletes." |
@@ -373,7 +376,7 @@ Fill in the blanks. Delete the lines that don't apply.
 > Give me **3 distinct directions** as self-contained local HTML mockups first, and say
 > which you'd pick and why.
 > Guardrails: still **consistent** with the app's tokens, icons and control sizes; works in
-> all three themes; 60fps; GPU-cheap; reduced-motion fallback; no new dependencies
+> all four themes; 60fps; GPU-cheap; reduced-motion fallback; no new dependencies
 > unless free and small.
 
 ### 8.3 Polish pass (careful)
@@ -381,7 +384,7 @@ Fill in the blanks. Delete the lines that don't apply.
 > Polish ___: tighten alignment and spacing to the 8px grid, unify control heights,
 > centre icon contents, improve contrast of secondary text, add hover/press states and
 > a subtle entrance. **No layout or behaviour changes.** Screenshot before and after in
-> all three themes.
+> all four themes.
 
 ### 8.4 Bug fix
 

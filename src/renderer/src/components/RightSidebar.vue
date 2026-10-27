@@ -25,7 +25,7 @@
           @dragstart="onDragStart(row.p, $event)"
           @dragend="store.draggingPersonId = null"
         >
-          <div class="avatar" :style="{ background: avatarGradient(row.p.gender) }">
+          <div class="avatar" :style="{ background: avatarGradient(row.p.gender, row.p.id) }">
             <img
               v-if="row.p.primary_image && imageUrl(row.p.primary_image)"
               class="avatar-img"
@@ -79,6 +79,7 @@ import { useI18n } from '../i18n'
 import { nounLabel } from '../lib/dataLabels'
 import { api } from '../api'
 import { inkAvatarBg } from './ui/inkChrome'
+import { medievalAvatarBg } from '../lib/medievalArt'
 import UiIcon from './ui/UiIcon.js'
 import SearchField from './ui/SearchField.vue'
 
@@ -190,8 +191,9 @@ function genderColor(gender) {
   return '#5c6bc0'
 }
 
-function avatarGradient(gender) {
+function avatarGradient(gender, id) {
   if (store.isInk) return inkAvatarBg(gender)
+  if (store.isMedieval) return medievalAvatarBg(gender, id) // their coat of arms
   if (gender === 'male') return 'linear-gradient(135deg, #3a7bd5, #2351a0)'
   if (gender === 'female') return 'linear-gradient(135deg, #c95fa0, #923075)'
   return 'linear-gradient(135deg, #5c6bc0, #3c4a9e)'

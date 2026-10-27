@@ -88,6 +88,18 @@
             <span class="rtp-w-label">{{ t('relTypesPanel.structural') }}</span>
             <span class="rtp-w-val">{{ def.weight.toFixed(2) }}</span>
           </div>
+          <!-- Feeling: the type's default sentiment on the Dynamics ramp -->
+          <div class="rtp-row-weight rtp-row-feel" :title="t('sentiment.typeFeelingHint')">
+            <span class="rtp-w-label rtp-feel-label">{{ t('sentiment.feeling') }}</span>
+            <span class="rtp-w-label">{{ t('sentiment.cold') }}</span>
+            <FeelingSlider
+              :model-value="typeSentiment(def)"
+              :aria-label="t('sentiment.feelingAria')"
+              @update:model-value="patchSentiment(def, $event)"
+            />
+            <span class="rtp-w-label">{{ t('sentiment.warm') }}</span>
+            <span class="rtp-w-val">{{ fmtSigned(typeSentiment(def)) }}</span>
+          </div>
         </div>
       </div>
 
@@ -177,6 +189,13 @@
           <span class="rtp-w-label">{{ t('relTypesPanel.structural') }}</span>
           <span class="rtp-w-val">{{ draft.weight.toFixed(2) }}</span>
         </div>
+        <div class="rtp-row-weight rtp-new-weight" :title="t('sentiment.typeFeelingHint')">
+          <span class="rtp-w-label rtp-feel-label">{{ t('sentiment.feeling') }}</span>
+          <span class="rtp-w-label">{{ t('sentiment.cold') }}</span>
+          <FeelingSlider v-model="draft.sentiment" :aria-label="t('sentiment.feelingAria')" />
+          <span class="rtp-w-label">{{ t('sentiment.warm') }}</span>
+          <span class="rtp-w-val">{{ fmtSigned(draft.sentiment) }}</span>
+        </div>
       </div>
     </div>
   </div>
@@ -191,6 +210,8 @@ import { translate as tr, useI18n } from '../i18n'
 import { relTypeLabel, relRoleLabel } from '../lib/dataLabels'
 import UiIcon from './ui/UiIcon.js'
 import IconPicker from './ui/IconPicker.vue'
+import FeelingSlider from './sentiment/FeelingSlider.vue'
+import { clampSentiment, typeSentiment } from '../../../shared/sentiment'
 
 defineEmits(['close'])
 const store = useMainStore()
@@ -282,6 +303,22 @@ function patchWeight(def, val) {
   weightTimer = setTimeout(() => store.updateRelType({ id: def.id, weight: w }), 300)
 }
 
+// Feeling (the Dynamics lens's default for this type): live locally, persisted
+// debounced like the weight slider.
+const sentimentTimers = new Map()
+function patchSentiment(def, val) {
+  const s = clampSentiment(val)
+  def.sentiment = s
+  clearTimeout(sentimentTimers.get(def.id))
+  sentimentTimers.set(
+    def.id,
+    setTimeout(() => store.updateRelType({ id: def.id, sentiment: s }), 300)
+  )
+}
+function fmtSigned(v) {
+  return (v > 0 ? '+' : '') + v.toFixed(2)
+}
+
 async function removeDef(def) {
   const inUse = store.relationships.filter((r) => r.type === def.key).length
   const ok = await confirmDialog({
@@ -303,6 +340,7 @@ const draft = reactive({
   role_a: '',
   role_b: '',
   weight: 0,
+  sentiment: 0,
   symmetryRole: 'none'
 })
 
@@ -316,6 +354,7 @@ async function create() {
     role_a: draft.directed ? draft.role_a : '',
     role_b: draft.directed ? draft.role_b : '',
     weight: draft.weight,
+    sentiment: draft.sentiment,
     symmetryRole: draft.symmetryRole
   })
   if (res.success) {
@@ -323,6 +362,7 @@ async function create() {
     draft.role_a = ''
     draft.role_b = ''
     draft.weight = 0
+    draft.sentiment = 0
     draft.directed = false
     draft.symmetryRole = 'none'
   }
@@ -458,6 +498,9 @@ async function create() {
   gap: 8px;
   margin-top: 6px;
   padding-left: 30px;
+}
+.rtp-feel-label {
+  min-width: 64px;
 }
 .rtp-row-gen {
   display: flex;

@@ -21,6 +21,13 @@
         <UiIcon class="sd-bay-glyph" :name="bay.icon" :size="14" />
         <span class="sd-bay-label">{{ bay.label }}</span>
         <span class="sd-bay-hint" :title="bay.hint">{{ bay.hint }}</span>
+        <NameDice
+          v-if="bay.slot === 'name' && bay.defs.length && nameCtx"
+          :name-defs="bay.defs"
+          :gender-t="genderT"
+          :context="nameCtx"
+          @apply="applyNames"
+        />
       </div>
 
       <!-- gender gradient bar: ends edit the graph's male/female colors -->
@@ -121,6 +128,7 @@ import { useMainStore } from '../../store/index.js'
 import { genderInfo, lerpColorHex, slotAccepts } from '../../../../shared/fields'
 import { SLOT_META } from './fieldUi.js'
 import FieldInput from './FieldInput.vue'
+import NameDice from './NameDice.vue'
 import UiIcon from '../ui/UiIcon.js'
 import { useI18n } from '../../i18n'
 import { fieldLabel } from '../../lib/dataLabels'
@@ -129,7 +137,9 @@ const props = defineProps({
   defs: { type: Array, required: true },
   draft: { type: Object, required: true }, // fieldId → { value, ... }
   /** { active, defType, overSlot } while a list row is being dragged */
-  dragState: { type: Object, default: () => ({ active: false, defType: null, overSlot: null }) }
+  dragState: { type: Object, default: () => ({ active: false, defType: null, overSlot: null }) },
+  /** { selfId, parentIds, tagIds } for the name dice; null hides it. */
+  nameCtx: { type: Object, default: null }
 })
 const emit = defineEmits(['update'])
 const { t } = useI18n()
@@ -170,6 +180,11 @@ function reorderName(def, dir) {
   // Two writes: give each the other's position.
   store.setFieldSlot(def.id, 'name', swap.slot_order)
   store.setFieldSlot(swap.id, 'name', def.slot_order)
+}
+
+/** The name dice fills one or more name-slot values. */
+function applyNames(updates) {
+  for (const u of updates) emit('update', u.fieldId, { value: u.value })
 }
 
 function setSlotColor(def, color) {

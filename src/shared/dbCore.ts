@@ -55,17 +55,21 @@ import {
 
 export { migrateFieldSystem } from './fields'
 import {
+  backfillRelSentiment,
   clampWeight,
   coerceSymmetryRole,
   ensureProjectRelTypes,
   relTypeByKey,
   relTypesForProject
 } from './relTypes'
+import { clampSentiment, coerceEdgeIntensity, coerceEdgeSentiment } from './sentiment'
 
 export { migrateRelationshipTypes } from './relTypes'
 import { applyMapPatch } from './maps'
+import { sanitizeAura, sanitizeTraitAuras } from './auras'
 import { sanitizeModel3D } from './character3d'
 import { applyEraPatch, applyEventPatch } from './chronicle'
+import { fingerprintsFromDb } from './fingerprint'
 import { UNDOABLE_CHANNELS, historyHandlers, withHistory } from './history'
 
 export { UNDOABLE_CHANNELS } from './history'
@@ -1297,6 +1301,16 @@ export const channelHandlers: Record<string, Handler> = {
     return { projects, activeProjectId: db.activeProjectId }
   },
 
+  // The family fingerprint (shared/fingerprint.ts) of every owned project —
+  // structural features the renderer turns into each card's mandala. Read-only.
+  'projects:fingerprints'(db, _data, _env, ctx) {
+    const list = ctx?.user ? projectsOf(db, ctx.user.id) : Object.values(db.projects)
+    return fingerprintsFromDb(
+      db,
+      list.map((p) => p.id)
+    )
+  },
+
   'projects:create'(db, data, env, ctx) {
     if (ctx?.user) {
       const limits = limitsFor(ctx.user)
@@ -1524,6 +1538,7 @@ export const channelHandlers: Record<string, Handler> = {
     // project has its locked default traits and built-in relationship types.
     ensureProjectFields(db, project.id, env)
     ensureProjectRelTypes(db, project.id, env)
+    backfillRelSentiment(db) // files from before the sentiment layer
     return project
   },
 
@@ -1719,6 +1734,10 @@ export const channelHandlers: Record<string, Handler> = {
       created_at: now,
       updated_at: now
     }
+    if (data?.auras !== undefined) {
+      const auras = sanitizeTraitAuras(data.auras, def, () => env.uuid())
+      if (auras.length) def.auras = auras
+    }
     db.field_defs[id] = def
     let value = null
     if (data?.personId && db.persons[data.personId]) {
@@ -1740,6 +1759,15 @@ export const channelHandlers: Record<string, Handler> = {
     if (data.has_timeframe !== undefined) def.has_timeframe = !!data.has_timeframe
     if (data.icon !== undefined) def.icon = String(data.icon)
     if (data.unit !== undefined) def.unit = String(data.unit)
+    // Effects follow the def: a new rule list, or the old one re-checked when
+    // the options change (rules pointing at a removed option drop it).
+    if (data.auras !== undefined || (data.config !== undefined && def.auras)) {
+      const auras = sanitizeTraitAuras(data.auras !== undefined ? data.auras : def.auras, def, () =>
+        env.uuid()
+      )
+      if (auras.length) def.auras = auras
+      else delete def.auras
+    }
     def.updated_at = env.nowStr()
     // Label/config/unit feed the composed labels — refresh the project.
     recomputeSnapshots(db, projectPersonIds(db))
@@ -1916,6 +1944,10 @@ export const channelHandlers: Record<string, Handler> = {
       formed: data.formed ?? null,
       ended: data.ended ?? null,
       label: data.label ?? null,
+      // The Dynamics layer: null = inherit the type's sentiment / the default
+      // intensity; anything else is clamped (−1..1 / 0..1).
+      sentiment: coerceEdgeSentiment(data.sentiment),
+      intensity: coerceEdgeIntensity(data.intensity),
       created_at: env.nowStr()
     }
     db.relationships[id] = rel
@@ -1935,6 +1967,8 @@ export const channelHandlers: Record<string, Handler> = {
     if (data.formed !== undefined) existing.formed = data.formed
     if (data.ended !== undefined) existing.ended = data.ended
     if (data.label !== undefined) existing.label = data.label
+    if (data.sentiment !== undefined) existing.sentiment = coerceEdgeSentiment(data.sentiment)
+    if (data.intensity !== undefined) existing.intensity = coerceEdgeIntensity(data.intensity)
     if (data.person_a_id !== undefined) existing.person_a_id = data.person_a_id
     if (data.person_b_id !== undefined) existing.person_b_id = data.person_b_id
     return existing
@@ -1961,6 +1995,7 @@ export const channelHandlers: Record<string, Handler> = {
       key: id, // custom defs: the id doubles as the type slug
       label: String(data?.label ?? '').trim() || 'New type',
       weight: clampWeight(data?.weight ?? 0),
+      sentiment: clampSentiment(data?.sentiment ?? 0),
       directed: !!data?.directed,
       symmetryRole: coerceSymmetryRole(data?.symmetryRole),
       role_a: String(data?.role_a ?? ''),
@@ -1986,6 +2021,7 @@ export const channelHandlers: Record<string, Handler> = {
     if (!def) throw new Error('Relationship type not found')
     if (data.label !== undefined) def.label = String(data.label).trim() || def.label
     if (data.weight !== undefined) def.weight = clampWeight(data.weight)
+    if (data.sentiment !== undefined) def.sentiment = clampSentiment(data.sentiment)
     if (data.color !== undefined) def.color = String(data.color)
     if (data.glyph !== undefined) def.glyph = String(data.glyph)
     if (Array.isArray(data.statuses) && data.statuses.length) {
@@ -2044,6 +2080,8 @@ export const channelHandlers: Record<string, Handler> = {
       created_at: now,
       updated_at: now
     }
+    const aura = sanitizeAura(data?.aura)
+    if (aura) tag.aura = aura
     db.tags[id] = tag
     return tag
   },
@@ -2055,6 +2093,11 @@ export const channelHandlers: Record<string, Handler> = {
     if (data.type !== undefined) existing.type = data.type
     if (data.color !== undefined) existing.color = data.color
     if (data.icon !== undefined) existing.icon = data.icon
+    if (data.aura !== undefined) {
+      const aura = sanitizeAura(data.aura)
+      if (aura) existing.aura = aura
+      else delete existing.aura
+    }
     existing.updated_at = env.nowStr()
     return existing
   },

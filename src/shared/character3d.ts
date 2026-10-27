@@ -26,6 +26,8 @@ export interface Human3DBody {
   caucasian: number
   breastSize: number
   breastFirmness: number
+  /** 0 = as sculpted … 1 = idealized (the game-creator beauty pass). */
+  ideal: number
 }
 
 export interface Human3DSkin {
@@ -160,7 +162,8 @@ export const DEFAULT_HUMAN3D: Human3DState = {
     asian: 0.333,
     caucasian: 0.334,
     breastSize: 0.5,
-    breastFirmness: 0.5
+    breastFirmness: 0.5,
+    ideal: 0.6
   },
   shape: {},
   skin: {

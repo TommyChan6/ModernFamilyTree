@@ -10,7 +10,11 @@ import { defaultNameLabel } from '../lib/dataLabels'
 import { accentVars, normalizeHex, DEFAULT_ACCENT } from '../lib/accent.js'
 import { revealTransition } from '../lib/themeReveal.js'
 import { installInkAssets } from '../lib/inkArt'
+import { installMedievalAssets } from '../lib/medievalArt'
 import { toast } from '../lib/dialogs.js'
+import { resolveAuras } from '../../../shared/auras'
+import { computeFingerprintFeatures } from '../../../shared/fingerprint'
+import { dynamicsPalette as resolveDynamicsPalette } from '../../../shared/sentiment'
 
 /** Validate the saved Sheet layout JSON: widths are clamped positive numbers,
  *  hidden is a string list, sort is { key, dir: ±1 } or null. Anything else
@@ -93,15 +97,19 @@ export const useMainStore = defineStore('main', () => {
   const modalOpen = ref(false)
   const formOpen = ref(false)
   const editingPerson = ref(null)
-  // 'dark' | 'light' | 'ink' — ink (水墨) is a light, rice-paper theme with
-  // calligraphy and a cinnabar accent (styles/ink.css, lib/inkArt.ts).
+  // 'dark' | 'light' | 'ink' | 'medieval' — ink (水墨) is a light, rice-paper
+  // theme with calligraphy and a cinnabar accent (styles/ink.css,
+  // lib/inkArt.ts); medieval is an illuminated codex on vellum with lapis and
+  // gold (styles/medieval.css, lib/medievalArt.ts).
   const theme = ref('dark')
-  const THEMES = ['dark', 'light', 'ink']
-  /** Renderers' `isLight` flag — ink paints on pale paper too. */
+  const THEMES = ['dark', 'light', 'ink', 'medieval']
+  /** Renderers' `isLight` flag — ink and medieval paint on pale paper too. */
   const isLightTheme = computed(() => theme.value !== 'dark')
   const isInk = computed(() => theme.value === 'ink')
-  // The theme to return to when the ink toggle is switched off (session only).
-  const inkReturnTheme = ref('light')
+  const isMedieval = computed(() => theme.value === 'medieval')
+  // The plain theme to return to when the ink / medieval toggle is switched
+  // off (session only).
+  const returnTheme = ref('light')
   const accent = ref(DEFAULT_ACCENT) // user accent color (hex) — see lib/accent.js
   const settingsOpen = ref(false) // the Style Studio (components/style/StyleStudio.vue)
   // Which studio layer is in front: 'view' (this view's own style) or 'app'
@@ -225,7 +233,8 @@ export const useMainStore = defineStore('main', () => {
     nodeOpacity: 1.0,
     linkOpacity: 0.6,
     // ── Aesthetics system (see components/graph/graphThemes.js) ─────────────
-    nodeShape: 'circle', // circle|square|diamond|hexagon|shield|oval|octagon|heart|gravestone
+    nodeShape: 'circle', // circle|square|diamond|hexagon|shield|oval|octagon|heart|gravestone|plate|flatplate|star
+    starTwinkle: true, // star nodes: the departed twinkle faintly (constellation skin)
     nodeDecor: 'none', // none|aura|runes|orbit|burst|pulse|enso
     decorColor: '#d4af37',
     linkRoute: 'organic', // organic|straight|arc|elbow|trident|circuit|wave|bezier|brush
@@ -244,9 +253,20 @@ export const useMainStore = defineStore('main', () => {
     // ── Perspective tilt: the 2D layouts seen as a board in 3D ─────────────
     viewTilt: false,
     tiltAngle: 48, // degrees (8–64)
-    tiltYaw: 0 // degrees the board is turned (-180–180), tilted view only
+    tiltYaw: 0, // degrees the board is turned (-180–180), tilted view only
+    // ── Relationship dynamics (the Dynamics lens; src/shared/sentiment.ts) ──
+    dynamicsWarm: '', // '' = the theme's default warm
+    dynamicsCold: '' // '' = the theme's default cold
   }
   const graphSettings = ref({ ...GRAPH_SETTING_DEFAULTS })
+  // The Dynamics lens's warm↔cold ramp: the theme's defaults (muted ink-wash
+  // tones on 水墨, lapis/vermilion on the codex) under the user's two picks.
+  const dynamicsPalette = computed(() =>
+    resolveDynamicsPalette(theme.value, {
+      warm: graphSettings.value.dynamicsWarm,
+      cold: graphSettings.value.dynamicsCold
+    })
+  )
 
   // Timeline visual settings (the Timeline's Style pane) — same persistence
   // scheme as the graph's (timeline_* keys, JSON values, type-checked restore).
@@ -268,9 +288,29 @@ export const useMainStore = defineStore('main', () => {
     ambientFx: 'none',
     ambientColorA: '#ffd27a',
     ambientColorB: '#7ac9ff',
-    ambientDensity: 0.5
+    ambientDensity: 0.5,
+    // Time warp: stretch the year axis where births cluster (timeWarp.ts)
+    timeWarp: false,
+    warpStrength: 0.7,
+    // Perspective tilt: the timeline laid down as a board (timelineTilt.ts);
+    // family arcs rise off it by arcLift
+    viewTilt: false,
+    tiltAngle: 48,
+    tiltYaw: 0,
+    arcLift: 1,
+    // Household rivers mode: unmarried adults get their own channel at this age
+    leaveHomeAge: 25
   }
   const timelineSettings = ref({ ...TIMELINE_SETTING_DEFAULTS })
+
+  // Groups view visual settings (the Style Studio's Groups layer) — groups_* keys,
+  // same scheme as the timeline's.
+  const GROUPS_SETTING_DEFAULTS = {
+    zoneStyle: 'rings', // rings (discs + tethers) | venn (membranes wrap shared members)
+    membraneSoftness: 0.5, // venn: 0 taut tendrils … 1 broad, fluid pull
+    lensGlow: true // venn: shade the overlaps as lit lenses
+  }
+  const groupsSettings = ref({ ...GROUPS_SETTING_DEFAULTS })
 
   // ── Computed ───────────────────────────────────────────────────────────────
   const selectedPerson = computed(
@@ -326,6 +366,23 @@ export const useMainStore = defineStore('main', () => {
     }
     return m
   })
+  // Auras: the special effect each person wears, resolved from tag + trait
+  // effects (src/shared/auras.ts). auraOf.get(personId) → ResolvedAura; the
+  // graph and timeline read it at draw time. `counts` = bearers per source.
+  const auraResolution = computed(() =>
+    resolveAuras({
+      tags: tags.value,
+      entityTags: entityTags.value,
+      defs: fieldDefs.value,
+      values: fieldValues.value,
+      personIds: persons.value.map((p) => p.id)
+    })
+  )
+  const auraOf = computed(() => auraResolution.value.byPerson)
+  // What the Style Studio's Special effects chapter should open on
+  // ({ kind: 'tag' | 'trait', id } | null) — set by openAuras().
+  const auraFocus = ref(null)
+
   // Canonical, timestamp-free form of the arrangement state, for comparing the
   // working copy against the checkpoint.
   function arrangementFingerprint(sceneList, placements, userYear) {
@@ -555,6 +612,8 @@ export const useMainStore = defineStore('main', () => {
   // Shared by native logout and the Supabase signed-out transition.
   function clearWorkspace() {
     projects.value = []
+    fingerprints.value = {}
+    fingerprintProjectId.value = null
     activeProjectId.value = null
     persons.value = []
     fieldDefs.value = []
@@ -738,8 +797,46 @@ export const useMainStore = defineStore('main', () => {
   // Per-project headline counts for the profile page's project cards.
   // Returned (not stored) — the page fetches fresh numbers each open.
   async function fetchProjectsOverview() {
+    fetchFingerprints() // the cards' mandalas, fetched alongside
     const res = await api.invoke('projects:overview')
     return res.success ? res.data.projects : []
+  }
+
+  // ── Family fingerprint (shared/fingerprint.ts → lib/familyFingerprint.ts) ──
+  // Structural features per project for the mandala cover art. Non-active
+  // projects come from `projects:fingerprints` (cached here); the active one
+  // is derived live from the loaded rows — a lazy computed, so it only runs
+  // while a mandala is on screen (the component debounces its redraws).
+  const fingerprints = ref({}) // projectId → FingerprintFeatures
+  const fingerprintProjectId = ref(null) // the large Family fingerprint dialog
+  const activeFingerprint = computed(() => {
+    if (!activeProjectId.value) return null
+    return computeFingerprintFeatures({
+      projectId: activeProjectId.value,
+      persons: persons.value,
+      relationships: relationships.value,
+      typeRoles: relTypeRoles.value,
+      tags: tags.value,
+      entityTags: entityTags.value
+    })
+  })
+  function fingerprintOf(projectId) {
+    if (!projectId) return null
+    if (projectId === activeProjectId.value) return activeFingerprint.value
+    return fingerprints.value[projectId] ?? null
+  }
+  async function fetchFingerprints() {
+    const res = await api.invoke('projects:fingerprints')
+    if (res.success && res.data) fingerprints.value = { ...fingerprints.value, ...res.data }
+  }
+  function openFingerprint(projectId) {
+    fingerprintProjectId.value = projectId || activeProjectId.value
+    if (fingerprintProjectId.value && !fingerprintOf(fingerprintProjectId.value)) {
+      fetchFingerprints()
+    }
+  }
+  function closeFingerprint() {
+    fingerprintProjectId.value = null
   }
 
   // ── Project actions ───────────────────────────────────────────────────────
@@ -974,6 +1071,19 @@ export const useMainStore = defineStore('main', () => {
       }
     }
     timelineSettings.value = restoredTimeline
+    const restoredGroups = { ...GROUPS_SETTING_DEFAULTS }
+    for (const key of Object.keys(GROUPS_SETTING_DEFAULTS)) {
+      const raw = saved[`groups_${key}`]
+      if (raw == null) continue
+      try {
+        const v = JSON.parse(raw)
+        if (typeof v === typeof GROUPS_SETTING_DEFAULTS[key]) restoredGroups[key] = v
+      } catch {
+        /* stale value — keep the default */
+      }
+    }
+    if (!['rings', 'venn'].includes(restoredGroups.zoneStyle)) restoredGroups.zoneStyle = 'rings'
+    groupsSettings.value = restoredGroups
     // Restore the directory card style (unknown/stale values → classic)
     cardStyle.value = CARD_STYLES.includes(saved.cardStyle) ? saved.cardStyle : 'classic'
     profileStyle.value = PROFILE_STYLES.includes(saved.profileStyle)
@@ -1351,6 +1461,11 @@ export const useMainStore = defineStore('main', () => {
     return res
   }
 
+  /** Replace a trait's effect rules ([] removes them). One undo step. */
+  function setTraitAuras(defId, auras) {
+    return updateFieldDef({ id: defId, auras: JSON.parse(JSON.stringify(auras || [])) })
+  }
+
   async function deleteFieldDef(id) {
     const res = await api.invoke('fields:deleteDef', { id })
     if (res.success) {
@@ -1488,6 +1603,11 @@ export const useMainStore = defineStore('main', () => {
       if (idx !== -1) tags.value[idx] = res.data
     }
     return res
+  }
+
+  /** Give a tag a special effect (null removes it). One undo step. */
+  function setTagAura(tagId, aura) {
+    return updateTag({ id: tagId, aura: aura ? JSON.parse(JSON.stringify(aura)) : null })
   }
 
   async function deleteTag(id) {
@@ -1876,18 +1996,24 @@ export const useMainStore = defineStore('main', () => {
   function setTheme(t, { animate = true, origin } = {}) {
     if (!THEMES.includes(t)) return
     const changed = t !== theme.value
-    const inkSwitch = t === 'ink' || theme.value === 'ink'
-    if (t === 'ink') {
-      installInkAssets() // paper/brush textures as CSS vars, generated once
-      if (theme.value !== 'ink') inkReturnTheme.value = theme.value
-    }
+    const ornate = (th) => th === 'ink' || th === 'medieval'
+    if (t === 'ink') installInkAssets() // paper/brush textures as CSS vars, generated once
+    if (t === 'medieval') installMedievalAssets() // vellum, flourishes, seal — once
+    if (ornate(t) && !ornate(theme.value)) returnTheme.value = theme.value
     const apply = async () => {
       theme.value = t
       document.documentElement.dataset.theme = t
       await nextTick() // let watchers (renderers) recolour inside the snapshot
     }
-    // into or out of ink, the new theme bleeds across as an ink blot
-    if (animate && changed) revealTransition(apply, origin, { ink: inkSwitch })
+    // into or out of ink, the new theme bleeds across as an ink blot; into or
+    // out of medieval, it burns through the page
+    const reveal =
+      t === 'medieval' || theme.value === 'medieval'
+        ? 'burn'
+        : t === 'ink' || theme.value === 'ink'
+          ? 'ink'
+          : 'circle'
+    if (animate && changed) revealTransition(apply, origin, { style: reveal })
     else apply()
     if (animate) api.invoke('globalSettings:set', { key: 'theme', value: t })
   }
@@ -1899,6 +2025,13 @@ export const useMainStore = defineStore('main', () => {
     const style = document.documentElement.style
     for (const [k, v] of Object.entries(accentVars(clean))) style.setProperty(k, v)
     if (persist) api.invoke('globalSettings:set', { key: 'accent', value: clean })
+  }
+
+  /** Open the Style Studio on its Special effects chapter, optionally focused
+   *  on one tag / trait ({ kind: 'tag' | 'trait', id }). */
+  function openAuras(focus = null) {
+    auraFocus.value = focus ? { ...focus, at: Date.now() } : { at: Date.now() }
+    toggleSettings(true, { layer: 'app' })
   }
 
   /** Open/close the Style Studio. `open` forces a state; `layer` brings
@@ -2037,7 +2170,12 @@ export const useMainStore = defineStore('main', () => {
 
   /** Ink theme on/off (the topbar 墨 seal): off returns to the theme it left. */
   function toggleInk(opts = {}) {
-    setTheme(theme.value === 'ink' ? inkReturnTheme.value || 'light' : 'ink', opts)
+    setTheme(theme.value === 'ink' ? returnTheme.value || 'light' : 'ink', opts)
+  }
+
+  /** Medieval theme on/off (the topbar shield): off returns to the theme it left. */
+  function toggleMedieval(opts = {}) {
+    setTheme(theme.value === 'medieval' ? returnTheme.value || 'light' : 'medieval', opts)
   }
 
   /** Switch the person profile's presentation and remember it for this project. */
@@ -2091,6 +2229,16 @@ export const useMainStore = defineStore('main', () => {
     for (const [key, value] of Object.entries(patch))
       api.invoke('settings:set', { key: `timeline_${key}`, value: JSON.stringify(value) })
   }
+  /** Apply Groups view style settings (one control, a chapter reset) — one
+   *  reactive update, then persist each key. */
+  function applyGroupsSettings(patch) {
+    groupsSettings.value = { ...groupsSettings.value, ...patch }
+    for (const [key, value] of Object.entries(patch))
+      api.invoke('settings:set', { key: `groups_${key}`, value: JSON.stringify(value) })
+  }
+  function updateGroupsSetting(key, value) {
+    applyGroupsSettings({ [key]: value })
+  }
   function resetTimelineSettings() {
     for (const [key, value] of Object.entries(TIMELINE_SETTING_DEFAULTS))
       updateTimelineSetting(key, value)
@@ -2136,6 +2284,13 @@ export const useMainStore = defineStore('main', () => {
     updateProfile,
     changePassword,
     fetchProjectsOverview,
+    fingerprints,
+    fingerprintProjectId,
+    activeFingerprint,
+    fingerprintOf,
+    fetchFingerprints,
+    openFingerprint,
+    closeFingerprint,
     // project
     projects,
     activeProjectId,
@@ -2198,6 +2353,8 @@ export const useMainStore = defineStore('main', () => {
     isLightTheme,
     isInk,
     toggleInk,
+    isMedieval,
+    toggleMedieval,
     accent,
     setAccent,
     settingsOpen,
@@ -2227,8 +2384,13 @@ export const useMainStore = defineStore('main', () => {
     openUserPage,
     language,
     graphSettings,
+    dynamicsPalette,
     timelineSettings,
     updateTimelineSetting,
+    groupsSettings,
+    updateGroupsSetting,
+    applyGroupsSettings,
+    GROUPS_SETTING_DEFAULTS,
     resetTimelineSettings,
     lockNodes,
     cleanView,
@@ -2293,6 +2455,12 @@ export const useMainStore = defineStore('main', () => {
     deleteRelType,
     createTag,
     updateTag,
+    setTagAura,
+    setTraitAuras,
+    auraResolution,
+    auraOf,
+    auraFocus,
+    openAuras,
     deleteTag,
     addEntityTag,
     removeEntityTag,

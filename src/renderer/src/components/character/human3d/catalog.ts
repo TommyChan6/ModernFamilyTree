@@ -136,8 +136,9 @@ export const FACE_GROUPS: ShapeGroup[] = [
       lr('eye-height1', 'decr', 'incr', 'Inner opening', ['Narrow', 'Open']),
       lr('eye-height2', 'decr', 'incr', 'Middle opening', ['Narrow', 'Open']),
       lr('eye-height3', 'decr', 'incr', 'Outer opening', ['Narrow', 'Open']),
-      lr('eye-corner1', 'down', 'up', 'Inner corner', DOWN_UP),
-      lr('eye-corner2', 'down', 'up', 'Outer corner (tilt)', DOWN_UP),
+      // (MakeHuman's corner1 targets move the OUTER corner, corner2 the inner)
+      lr('eye-corner1', 'down', 'up', 'Outer corner (tilt)', DOWN_UP),
+      lr('eye-corner2', 'down', 'up', 'Inner corner', DOWN_UP),
       lr('eye-push1', 'in', 'out', 'Inner depth', IN_OUT),
       lr('eye-push2', 'in', 'out', 'Outer depth', IN_OUT),
       lr('eye-epicanthus', 'in', 'out', 'Epicanthic fold', LESS_MORE),
@@ -369,18 +370,68 @@ export const MACRO_SLIDERS: {
   { key: 'weight', label: 'Weight', ends: ['Slender', 'Heavy'] },
   { key: 'muscle', label: 'Muscle', ends: ['Soft', 'Athletic'] },
   { key: 'proportions', label: 'Proportions', ends: ['Uncommon', 'Ideal'] },
+  { key: 'ideal', label: 'Idealize', ends: ['Realistic', 'Idealized'] },
   { key: 'breastSize', label: 'Bust', ends: ['Small', 'Full'] },
   { key: 'breastFirmness', label: 'Bust firmness', ends: ['Soft', 'Firm'] }
 ]
 
 export const ANCESTRY_KEYS = ['african', 'asian', 'caucasian'] as const
 
-/** Every target weight for a state: macros + shape sliders + expression. */
+/**
+ * The "idealize" beauty pass — what game creators start every face from:
+ * slightly larger, lifted eyes, a refined nose, a defined cupid's bow with
+ * corners that rest up rather than down, higher cheekbones, a cleaner jaw
+ * and a longer neck. Slider id → [female, male] amount at idealize = 1
+ * (the sex macro blends between them). It sums under the user's own sliders,
+ * so every slider still reaches its full range.
+ */
+export const IDEAL_SHAPE: Record<string, [number, number]> = {
+  'eye-scale-decr-incr': [0.28, 0.14],
+  'eye-corner1-down-up': [0.22, 0.1],
+  'eye-height2-decr-incr': [0.12, 0.04],
+  'eye-bag-decr-incr': [-0.35, -0.3],
+  'nose-scale-horiz-decr-incr': [-0.25, -0.12],
+  'nose-scale-vert-decr-incr': [-0.12, 0],
+  'nose-point-width-decr-incr': [-0.3, -0.15],
+  'nose-width1-decr-incr': [-0.15, -0.05],
+  'nose-nostrils-width-decr-incr': [-0.22, -0.1],
+  'nose-point-down-up': [0.15, 0.05],
+  'mouth-upperlip-volume-decr-incr': [0.18, 0],
+  'mouth-lowerlip-volume-decr-incr': [0.1, 0],
+  'mouth-cupidsbow-decr-incr': [0.3, 0.12],
+  'mouth-angles-down-up': [0.18, 0.1],
+  'cheek-bones-decr-incr': [0.3, 0.3],
+  'cheek-volume-decr-incr': [-0.1, -0.18],
+  'chin-width-decr-incr': [-0.22, 0],
+  'chin-bones-decr-incr': [-0.28, 0.06],
+  'chin-prominent-decr-incr': [0.1, 0.25],
+  'chin-height-decr-incr': [0, 0.1],
+  'head-fat-decr-incr': [-0.18, -0.15],
+  'forehead-temple-decr-incr': [0.12, 0.08],
+  'neck-scale-vert-decr-incr': [0.18, 0.06],
+  'neck-scale-horiz-decr-incr': [-0.15, 0],
+  'neck-double-decr-incr': [-0.4, -0.4]
+}
+
+function addIdeal(w: Map<string, number>, ideal: number, gender: number) {
+  if (!(ideal > 0)) return
+  const g = Math.max(0, Math.min(1, gender))
+  for (const [id, [f, m]] of Object.entries(IDEAL_SHAPE)) {
+    const slider = SLIDER_BY_ID.get(id)
+    if (!slider) continue
+    const v = (f + (m - f) * g) * ideal
+    if (Math.abs(v) < 1e-4) continue
+    for (const t of v < 0 ? slider.min : slider.max) w.set(t, (w.get(t) || 0) + Math.abs(v))
+  }
+}
+
+/** Every target weight for a state: macros + idealize + shape sliders + expression. */
 export function shapeTargetWeights(
   state: Human3DState,
   expression?: Map<string, number>
 ): Map<string, number> {
   const w = macroTargetWeights(state.body)
+  addIdeal(w, state.body.ideal ?? 0, state.body.gender)
   for (const [key, value] of Object.entries(state.shape)) {
     const at = key.indexOf('@')
     if (at > 0) {

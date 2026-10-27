@@ -200,6 +200,10 @@
                 : t('personForm.row.setTimeframe')
             }}
           </button>
+          <button class="fr-mi" @click="openEffects">
+            <UiIcon class="fr-mi-ic" name="sparkles" :size="14" />{{ t('auras.entry.trait')
+            }}<span class="fr-mi-hint">{{ t('auras.entry.traitHint') }}</span>
+          </button>
           <div class="fr-mi-sep"></div>
           <div class="fr-mi-slots">
             <span class="fr-mi-slots-label">{{ t('personForm.row.moveToSlot') }}</span>
@@ -383,6 +387,11 @@ async function applyAll() {
 async function toggleTimeframe() {
   menuOpen.value = false
   await store.updateFieldDef({ id: props.def.id, has_timeframe: !props.def.has_timeframe })
+}
+
+function openEffects() {
+  menuOpen.value = false
+  store.openAuras({ kind: 'trait', id: props.def.id })
 }
 
 async function moveToSlot(slot) {

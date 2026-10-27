@@ -12,6 +12,8 @@
 // they ride along with pans and zooms.
 
 import { drawIcon } from '../../lib/canvasIcon.js'
+import { TiltCanvas, billboard } from './tiltCanvas'
+import { isTilted, visibleFlatBounds } from './timelineTilt'
 
 const TAU = Math.PI * 2
 const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif'
@@ -46,6 +48,22 @@ export class TimelineFx {
     this._raf = 0
     this._seed = 1
     this._tick = this._tick.bind(this)
+    // Tilted stage: everything here is in FLAT stage px and goes through a
+    // projecting context (tiltCanvas.ts); fb = the flat bounds to span.
+    this._tc = null
+    this._view = null
+    this.fb = { x0: 0, y0: 0, x1: 0, y1: 0 }
+  }
+
+  /** The renderer's stage transform (TimelineRenderer.view) — null / untilted
+   *  = draw flat. */
+  setTilt(view) {
+    this._view = view && isTilted(view) ? view : null
+    if (this._view) {
+      if (!this._tc) this._tc = new TiltCanvas(this.g, this._view)
+      this._tc.setView(this._view)
+    }
+    this.kick()
   }
 
   resize(w, h, dpr = window.devicePixelRatio || 1) {
@@ -131,7 +149,10 @@ export class TimelineFx {
   }
 
   _draw(t) {
-    const g = this.g
+    const g = this._view ? this._tc.ctx : this.g
+    this.fb = this._view
+      ? visibleFlatBounds(this._view, this.w, this.h, 24)
+      : { x0: 0, y0: 0, x1: this.w, y1: this.h }
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     g.clearRect(0, 0, this.w, this.h)
     if (this.trace) this._drawTrace(g, t)
@@ -211,7 +232,7 @@ export class TimelineFx {
         g.lineDashOffset = this.reduced ? 0 : -t * 20
         g.beginPath()
         g.moveTo(p.x0 ?? 0, p.y)
-        g.lineTo(this.w, p.y)
+        g.lineTo(this.fb.x1, p.y)
         g.stroke()
         g.setLineDash([])
         g.globalAlpha = 1
@@ -251,7 +272,7 @@ export class TimelineFx {
         grad.addColorStop(0.5, withA(p.color, 0.08))
         grad.addColorStop(1, withA(p.color, 0.2))
         g.fillStyle = grad
-        g.fillRect(p.x0 ?? 0, y0, this.w - (p.x0 ?? 0), y1 - y0)
+        g.fillRect(p.x0 ?? 0, y0, this.fb.x1 - (p.x0 ?? 0), y1 - y0)
         g.strokeStyle = p.color
         g.lineWidth = 2.5
         g.lineCap = 'round'
@@ -310,17 +331,18 @@ export class TimelineFx {
         grad.addColorStop(0.5, withA(p.color, 0.16 + 0.06 * pulse))
         grad.addColorStop(1, withA(p.color, 0))
         g.fillStyle = grad
-        g.fillRect(p.x - 26, 0, 52, this.h)
+        const fb = this.fb
+        g.fillRect(p.x - 26, fb.y0, 52, fb.y1 - fb.y0)
         g.strokeStyle = p.color
         g.globalAlpha = 0.55
         g.lineWidth = 1.2
         g.setLineDash([4, 6])
         g.lineDashOffset = this.reduced ? 0 : -t * 24
         g.beginPath()
-        g.moveTo(p.x - 22, 0)
-        g.lineTo(p.x - 22, this.h)
-        g.moveTo(p.x + 22, 0)
-        g.lineTo(p.x + 22, this.h)
+        g.moveTo(p.x - 22, fb.y0)
+        g.lineTo(p.x - 22, fb.y1)
+        g.moveTo(p.x + 22, fb.y0)
+        g.lineTo(p.x + 22, fb.y1)
         g.stroke()
         g.setLineDash([])
         g.globalAlpha = 1
@@ -596,6 +618,10 @@ function roundRect(g, x, y, w, h, r) {
  *  An optional leading `icon` (icon name) is drawn in the chip's colour; icon +
  *  text are measured and centred as one unit. */
 function chip(g, x, y, text, color, pal, anchor = 'left', big = false, icon = null) {
+  // tilted: an upright billboard standing at its anchor
+  billboard(g, x, y, () => chipBody(g, x, y, text, color, pal, anchor, big, icon))
+}
+function chipBody(g, x, y, text, color, pal, anchor, big, icon) {
   g.save()
   g.font = `${big ? 800 : 700} ${big ? 12 : 10.5}px ${FONT}`
   const isz = big ? 13 : 11.5

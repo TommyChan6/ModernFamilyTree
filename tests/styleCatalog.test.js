@@ -35,7 +35,7 @@ describe('style studio catalogue', () => {
   })
 
   it('chapter keys never overlap within one settings source', () => {
-    for (const source of ['graph', 'timeline']) {
+    for (const source of ['graph', 'timeline', 'groups']) {
       const seen = new Set()
       const lists = [APP_CHAPTERS, ...Object.values(VIEW_CHAPTERS)]
       for (const c of lists.flat().filter((c) => c.source === source))
@@ -49,7 +49,8 @@ describe('style studio catalogue', () => {
   it('gates Advanced-only chapters on caps.style', () => {
     expect(chaptersFor('graph', 'full').some((c) => c.id === 'physics')).toBe(true)
     expect(chaptersFor('graph', 'basic').some((c) => c.id === 'physics')).toBe(false)
-    expect(chaptersFor('groups')).toEqual([])
+    expect(chaptersFor('groups').map((c) => c.id)).toEqual(['shapes'])
+    expect(chaptersFor('relationships')).toEqual([])
     expect(hasViewStyle('graph')).toBe(true)
     expect(hasViewStyle('relationships')).toBe(false)
   })

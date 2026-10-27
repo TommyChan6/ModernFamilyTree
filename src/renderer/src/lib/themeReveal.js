@@ -9,6 +9,7 @@
 // before and after it.
 
 import { inkBlotMaskUrl } from './inkArt'
+import { burnMaskUrl } from './medievalArt'
 
 let lastPointer = null
 
@@ -38,8 +39,10 @@ function originPoint(origin) {
 /**
  * @param {() => unknown} apply
  * @param {{x:number,y:number}} [origin]
- * @param {{ ink?: boolean }} [opts] ink: the new theme bleeds out of the click
- *   point as a ragged ink blot (the 水墨 theme's own reveal) instead of a circle.
+ * @param {{ style?: 'circle' | 'ink' | 'burn' }} [opts] how the new theme
+ *   grows out of the click point: a circle (default); 'ink' — a ragged ink
+ *   blot (the 水墨 theme's own reveal); 'burn' — a flame-edged hole burning
+ *   through the page (the medieval theme's).
  */
 export function revealTransition(apply, origin, opts = {}) {
   const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
@@ -56,8 +59,8 @@ export function revealTransition(apply, origin, opts = {}) {
     apply()
     return
   }
-  if (opts.ink) {
-    inkReveal(vt, x, y, r)
+  if (opts.style === 'ink' || opts.style === 'burn') {
+    maskReveal(vt, x, y, r, opts.style)
     return
   }
   vt.ready
@@ -76,15 +79,23 @@ export function revealTransition(apply, origin, opts = {}) {
     .catch(() => {})
 }
 
-// Ink reveal: the incoming snapshot is masked by an ink blot (lib/inkArt.ts)
-// that blooms from the click point — fast at first, then creeping as the ink
-// wicks into the paper. The mask image lives in CSS (html.ink-reveal, see
-// styles/ink.css); only its size/position animate.
-function inkReveal(vt, x, y, r) {
+// Mask reveals: the incoming snapshot is masked by a shape that grows from
+// the click point. 'ink' — an ink blot (lib/inkArt.ts) that blooms fast at
+// first, then creeps as the ink wicks into the paper; 'burn' — a hole burning
+// through the vellum (lib/medievalArt.ts) while the old page scorches. The
+// mask image lives in CSS (html.ink-reveal / html.med-reveal, see
+// styles/ink.css and styles/medieval.css); only its size/position animate.
+const MASKS = {
+  ink: { prop: '--ink-blot-mask', cls: 'ink-reveal', url: () => inkBlotMaskUrl(17), ms: 1500 },
+  burn: { prop: '--med-burn-mask', cls: 'med-reveal', url: () => burnMaskUrl(23), ms: 1400 }
+}
+
+function maskReveal(vt, x, y, r, style) {
+  const m = MASKS[style]
   const root = document.documentElement
-  root.style.setProperty('--ink-blot-mask', `url("${inkBlotMaskUrl(17)}")`)
-  root.classList.add('ink-reveal')
-  const S = ((2 * r) / 0.84) * 1.08 // blot radius is 0.42·S — make it overrun the far corner
+  root.style.setProperty(m.prop, `url("${m.url()}")`)
+  root.classList.add(m.cls)
+  const S = ((2 * r) / 0.84) * 1.08 // shape radius is 0.42·S — make it overrun the far corner
   vt.ready
     .then(() => {
       root.animate(
@@ -98,12 +109,12 @@ function inkReveal(vt, x, y, r) {
           offset: [0, 0.4, 1]
         },
         {
-          duration: 1500,
+          duration: m.ms,
           easing: 'cubic-bezier(0.3, 0.6, 0.25, 1)',
           pseudoElement: '::view-transition-new(root)'
         }
       )
     })
     .catch(() => {})
-  vt.finished.finally(() => root.classList.remove('ink-reveal'))
+  vt.finished.finally(() => root.classList.remove(m.cls))
 }

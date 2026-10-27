@@ -4,6 +4,7 @@
       v-if="store.settingsOpen"
       ref="rootEl"
       class="studio"
+      :class="{ 'over-modal': store.formOpen }"
       :data-layer="layer"
       role="dialog"
       :aria-label="t('styleStudio.title')"
@@ -188,6 +189,7 @@ import GraphStyleSheet from './GraphStyleSheet.vue'
 import TimelineStyleSheet from './TimelineStyleSheet.vue'
 import DirectoryStyleSheet from './DirectoryStyleSheet.vue'
 import MapStyleSheet from './MapStyleSheet.vue'
+import GroupsStyleSheet from './GroupsStyleSheet.vue'
 import {
   RAIL_VIEWS,
   STYLE_ENTRIES,
@@ -212,7 +214,8 @@ const SHEETS = {
   graph: GraphStyleSheet,
   timeline: TimelineStyleSheet,
   directory: DirectoryStyleSheet,
-  map: MapStyleSheet
+  map: MapStyleSheet,
+  groups: GroupsStyleSheet
 }
 
 const rootEl = ref(null)
@@ -290,6 +293,7 @@ const savedText = computed(() =>
 function sourceOf(c) {
   if (c.source === 'graph') return [store.graphSettings, store.GRAPH_SETTING_DEFAULTS]
   if (c.source === 'timeline') return [store.timelineSettings, store.TIMELINE_SETTING_DEFAULTS]
+  if (c.source === 'groups') return [store.groupsSettings, store.GROUPS_SETTING_DEFAULTS]
   return null
 }
 function tunedOf(c) {
@@ -303,6 +307,7 @@ function resetChapter() {
   if (!src) return
   const patch = defaultsPatch(src[1], c.keys)
   if (c.source === 'timeline') store.applyTimelineSettings(patch)
+  else if (c.source === 'groups') store.applyGroupsSettings(patch)
   else {
     if (Object.keys(patch).some((k) => THEME_KEYS.has(k))) patch.themePreset = 'custom'
     store.applyGraphSettings(patch)
@@ -422,6 +427,17 @@ function onKeydown(e) {
   e.stopPropagation()
   store.toggleSettings(false)
 }
+
+// store.openAuras(): land on the app layer's Special effects chapter.
+watch(
+  () => store.auraFocus,
+  (f) => {
+    if (!f) return
+    query.value = ''
+    chapterOf.app = 'auras'
+  },
+  { immediate: true }
+)
 
 // A fresh open starts on the view's own layer when it has one; a view with
 // nothing of its own opens straight onto the app layer.

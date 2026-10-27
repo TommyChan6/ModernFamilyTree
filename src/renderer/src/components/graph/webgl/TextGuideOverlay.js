@@ -1,5 +1,11 @@
 import { worldToScreen, tiltParams, clipSegment } from './coords.js'
-import { shapeLabelDrop, shapeTopLift, shapeAnchor } from './nodeShapes.js'
+import {
+  shapeLabelDrop,
+  shapeLabelAbove,
+  shapeLabelRise,
+  shapeTopLift,
+  shapeAnchor
+} from './nodeShapes.js'
 import { bodyBox, makeOccluder } from './occlusion.js'
 import { drawIcon, iconPath } from '../../../lib/canvasIcon.js'
 import { INK_FONTS, inkFontsReady } from '../../../lib/inkArt'
@@ -220,7 +226,7 @@ export class TextGuideOverlay {
 
     // ---- node labels (screen space, culled + LOD) ----
     // ---- Spotlight layout: the stage light, ring guides, the lead's halo ----
-    if (opts.spotlight) this._drawSpotlight(opts.spotlight)
+    if (opts.spotlight) this._drawSpotlight(opts.spotlight, opts)
 
     // ---- newcomers: a ripple ring as each one pops in (under the names) ----
     if (opts.pops?.length) this._drawPops(opts, c)
@@ -307,8 +313,17 @@ export class TextGuideOverlay {
     ctx.textBaseline = 'alphabetic'
     if (ink) return this._drawInkLabels(opts, c, fontPx)
     const margin = 60
-    const nameFont = `500 ${fontPx}px system-ui, sans-serif`
-    const ageFont = `600 ${fontPx}px system-ui, sans-serif`
+    // Star nodes (constellation skin) label like a star chart: a thin italic
+    // serif, lightly letter-spaced.
+    const chart = gs.nodeShape === 'star'
+    const nameFont = chart
+      ? `italic 400 ${fontPx}px Georgia, 'Times New Roman', serif`
+      : `500 ${fontPx}px system-ui, sans-serif`
+    const ageFont = chart
+      ? `400 ${fontPx * 0.9}px Georgia, 'Times New Roman', serif`
+      : `600 ${fontPx}px system-ui, sans-serif`
+    const spaced = chart && 'letterSpacing' in ctx
+    if (spaced) ctx.letterSpacing = `${(fontPx * 0.06).toFixed(2)}px`
     const occ = this._occluder(opts)
     for (const n of opts.nodes) {
       const s = worldToScreen(n.x, n.y, t)
@@ -322,7 +337,10 @@ export class TextGuideOverlay {
       // Under the perspective tilt a label shrinks with its node (ps = 1 flat).
       const ps = s.s ?? 1
       if (fontPx * ps < 6) continue
-      const y = s.y + shapeLabelDrop(gs.nodeShape, r) * t.k * ps
+      // Plates stand in the ground: their name rides above the crown instead.
+      const y = shapeLabelAbove(gs.nodeShape)
+        ? s.y - shapeLabelRise(gs.nodeShape, r) * t.k * ps
+        : s.y + shapeLabelDrop(gs.nodeShape, r) * t.k * ps
       // The trait system composes the full node label (name-slot words + any
       // "show in graph" values); pre-trait nodes fall back to the first name.
       const first = n.graph_label ?? (n.name ? n.name.split(' ')[0] : '')
@@ -360,6 +378,7 @@ export class TextGuideOverlay {
       if (ps !== 1) ctx.restore()
     }
     ctx.globalAlpha = 1
+    if (spaced) ctx.letterSpacing = '0px'
   }
 
   // 水墨 labels: names brushed in 楷书 with a soft paper halo (so a stroke passing
@@ -388,7 +407,9 @@ export class TextGuideOverlay {
       const r = opts.radiusOf ? opts.radiusOf(n) : gs.nodeRadius
       const ps = s.s ?? 1
       if (fontPx * ps < 6) continue
-      const y = s.y + ((shapeLabelDrop(gs.nodeShape, r) - 2) * t.k + fontPx * 0.7) * ps
+      const y = shapeLabelAbove(gs.nodeShape)
+        ? s.y - (shapeLabelRise(gs.nodeShape, r) * t.k + fontPx * 0.12) * ps
+        : s.y + ((shapeLabelDrop(gs.nodeShape, r) - 2) * t.k + fontPx * 0.7) * ps
       const first = n.graph_label ?? (n.name ? n.name.split(' ')[0] : '')
       const age = opts.showAge && opts.ageOf ? opts.ageOf(n) : null
       const devPx = fontPx * ps * dpr
@@ -695,7 +716,7 @@ export class TextGuideOverlay {
     }
   }
 
-  _drawSpotlight(sp) {
+  _drawSpotlight(sp, opts = {}) {
     const ctx = this.ctx,
       t = this.transform
     const now = performance.now() / 1000
@@ -768,11 +789,17 @@ export class TextGuideOverlay {
       ctx.restore()
     })
 
-    // The lead's halo: wheeling rays + a breathing double ring.
+    // The lead's halo: wheeling rays + a breathing double ring — around the
+    // body (a standing shape rises above its foot), crowned above it all.
     const nr = (sp.radius || 22) * k * 1.5
+    const shape = opts.gs?.nodeShape
+    const ps = s.s ?? 1
+    const rl = sp.drawnRadius || sp.radius || 22
+    const bodyY = s.y - shapeAnchor(shape).hitLift * rl * k * ps
+    const standing = shapeAnchor(shape).lift > 0
     const rays = 12
     ctx.save()
-    ctx.translate(s.x, s.y)
+    ctx.translate(s.x, bodyY)
     ctx.rotate(now * 0.35)
     for (let i = 0; i < rays; i++) {
       const a = (i / rays) * Math.PI * 2
@@ -793,7 +820,7 @@ export class TextGuideOverlay {
     const breathe = 0.5 + 0.5 * Math.sin(now * 2.4)
     for (let j = 0; j < 2; j++) {
       ctx.beginPath()
-      ctx.arc(s.x, s.y, nr * (1.08 + j * 0.22 + breathe * 0.06), 0, Math.PI * 2)
+      ctx.arc(s.x, bodyY, nr * (1.08 + j * 0.22 + breathe * 0.06), 0, Math.PI * 2)
       ctx.strokeStyle = rgba((j ? 0.35 : 0.8) * (0.6 + 0.4 * breathe))
       ctx.lineWidth = j ? 1 : 2
       ctx.shadowColor = col
@@ -807,7 +834,10 @@ export class TextGuideOverlay {
       ctx,
       'crown',
       s.x,
-      s.y - nr * 1.55 - Math.sin(now * 2) * 2,
+      (standing
+        ? s.y - (shapeTopLift(shape, rl, opts.showLabels ? opts.gs.labelSize : 0) * k + 12) * ps
+        : s.y - nr * 1.55) -
+        Math.sin(now * 2) * 2,
       Math.max(13, 16 * Math.min(1.4, k)),
       { color: col, lineWidth: 2.2 }
     )
@@ -866,7 +896,10 @@ export class TextGuideOverlay {
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     const placed = []
-    const liftOf = (cand) => shapeTopLift(gs.nodeShape, gs.nodeRadius) * t.k * (cand.s.s ?? 1) + 6
+    // above the crown — and above the name when it rides on top (plates)
+    const nameRoom = opts.showLabels ? gs.labelSize : 0
+    const liftOf = (cand) =>
+      shapeTopLift(gs.nodeShape, gs.nodeRadius, nameRoom) * t.k * (cand.s.s ?? 1) + 6
     const bg =
       this.ink === 'paper'
         ? 'rgba(245,239,224,0.94)'

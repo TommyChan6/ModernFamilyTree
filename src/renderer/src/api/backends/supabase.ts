@@ -4,6 +4,13 @@ import { unwrapRequest } from '../../../../shared/auth'
 import { channelHandlers, EMPTY_DB } from '../../../../shared/dbCore'
 import { ensureProjectFields } from '../../../../shared/fields'
 import { ensureProjectRelTypes } from '../../../../shared/relTypes'
+import { coerceEdgeIntensity, coerceEdgeSentiment } from '../../../../shared/sentiment'
+import { sanitizeAura } from '../../../../shared/auras'
+import {
+  computeFingerprintFeatures,
+  countsOnlyFeatures,
+  type FingerprintFeatures
+} from '../../../../shared/fingerprint'
 import { pickImageAsDataUrl } from './local'
 
 // Supabase backend: the hosted implementation of the api seam. Each channel
@@ -316,6 +323,8 @@ const relationshipsSpec: TableSpec = {
     formed: r.formed,
     ended: r.ended,
     label: r.label,
+    sentiment: r.sentiment ?? null,
+    intensity: r.intensity ?? null,
     created_at: r.created_at
   }),
   toRow: (r, treeId) => ({
@@ -328,6 +337,8 @@ const relationshipsSpec: TableSpec = {
     formed: r.formed ?? null,
     ended: r.ended ?? null,
     label: r.label ?? null,
+    sentiment: coerceEdgeSentiment(r.sentiment),
+    intensity: coerceEdgeIntensity(r.intensity),
     created_at: r.created_at
   })
 }
@@ -437,6 +448,75 @@ const handlers: Record<string, (data: Payload) => Promise<unknown>> = {
       }))
     )
     return { projects, activeProjectId }
+  },
+
+  // projects:fingerprints → the family fingerprint of every visible tree,
+  // computed here from narrow paged selects (persons / relationships /
+  // factions). Hierarchy roles use the legacy fallback until relTypes are
+  // stored per tree. Any failure degrades to counts-only crests.
+  async 'projects:fingerprints'() {
+    const client = await sb()
+    const trees = ok(await client.from('trees').select('id')) as any[]
+    const ids = trees.map((t) => t.id as string)
+    if (!ids.length) return {}
+    const paged = async (table: string, cols: string): Promise<any[]> => {
+      const out: any[] = []
+      for (let page = 0; page < 50; page++) {
+        const rows = ok(
+          await client
+            .from(table)
+            .select(cols)
+            .in('tree_id', ids)
+            .order('id', { ascending: true })
+            .range(page * 1000, page * 1000 + 999)
+        ) as any[]
+        out.push(...rows)
+        if (rows.length < 1000) break
+      }
+      return out
+    }
+    try {
+      const [persons, rels, factions] = await Promise.all([
+        paged('persons', '*'),
+        paged('relationships', 'id, tree_id, person_a_id, person_b_id, type'),
+        paged('factions', 'id, tree_id, color, member_ids')
+      ])
+      const by = <T>(rows: any[], map: (r: any) => T): Map<string, T[]> => {
+        const m = new Map<string, T[]>()
+        for (const r of rows) {
+          const list = m.get(r.tree_id) ?? []
+          list.push(map(r))
+          m.set(r.tree_id, list)
+        }
+        return m
+      }
+      const pBy = by(persons, (r) => r)
+      const rBy = by(rels, (r) => r)
+      const fBy = by(factions, (r) => r)
+      const out: Record<string, FingerprintFeatures> = {}
+      for (const id of ids) {
+        const tags = fBy.get(id) ?? []
+        out[id] = computeFingerprintFeatures({
+          projectId: id,
+          persons: pBy.get(id) ?? [],
+          relationships: rBy.get(id) ?? [],
+          tags,
+          entityTags: tags.flatMap((f: any) =>
+            (f.member_ids ?? []).map((pid: string) => ({ entity_id: pid, tag_id: f.id }))
+          )
+        })
+      }
+      return out
+    } catch {
+      const out: Record<string, FingerprintFeatures> = {}
+      for (const id of ids) {
+        out[id] = countsOnlyFeatures(id, {
+          persons: await countFor('persons', id),
+          relationships: await countFor('relationships', id)
+        })
+      }
+      return out
+    }
   },
 
   // projects:create → INSERT a tree owned by the signed-in user. The plan
@@ -647,7 +727,9 @@ const handlers: Record<string, (data: Payload) => Promise<unknown>> = {
           status: data.status || 'active',
           formed: data.formed ?? null,
           ended: data.ended ?? null,
-          label: data.label ?? null
+          label: data.label ?? null,
+          sentiment: coerceEdgeSentiment(data.sentiment),
+          intensity: coerceEdgeIntensity(data.intensity)
         })
         .select()
         .single()
@@ -662,6 +744,9 @@ const handlers: Record<string, (data: Payload) => Promise<unknown>> = {
     for (const k of ['type', 'status', 'formed', 'ended', 'label', 'person_a_id', 'person_b_id']) {
       if (data[k] !== undefined) patch[k] = data[k]
     }
+    // The Dynamics layer (src/shared/sentiment.ts): null = inherit / default.
+    if (data.sentiment !== undefined) patch.sentiment = coerceEdgeSentiment(data.sentiment)
+    if (data.intensity !== undefined) patch.intensity = coerceEdgeIntensity(data.intensity)
     const client = await sb()
     const row = ok(
       await client.from('relationships').update(patch).eq('id', data.id).select().single()
@@ -696,6 +781,7 @@ const handlers: Record<string, (data: Payload) => Promise<unknown>> = {
           type: data?.type || '',
           color: data?.color || '#6c8ef5',
           icon: data?.icon || '',
+          aura: sanitizeAura(data?.aura),
           member_ids: []
         })
         .select()
@@ -704,12 +790,13 @@ const handlers: Record<string, (data: Payload) => Promise<unknown>> = {
     return mapFaction(row)
   },
 
-  // tags:update → UPDATE label/type/color/icon when present.
+  // tags:update → UPDATE label/type/color/icon/aura when present.
   async 'tags:update'(data) {
     const patch: Record<string, unknown> = { updated_at: now() }
     for (const k of ['label', 'type', 'color', 'icon']) {
       if (data[k] !== undefined) patch[k] = data[k]
     }
+    if (data.aura !== undefined) patch.aura = sanitizeAura(data.aura)
     const client = await sb()
     const row = ok(await client.from('factions').update(patch).eq('id', data.id).select().single())
     return mapFaction(row)

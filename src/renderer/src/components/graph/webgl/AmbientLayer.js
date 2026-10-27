@@ -22,7 +22,12 @@ export const AMBIENT_MODES = [
   'rain',
   'motes',
   'mist', // 留白 — a few vast, slow veils of mist drifting across the paper
-  'plum' // 梅 — sparse plum blossoms tumbling down
+  'plum', // 梅 — sparse plum blossoms tumbling down
+  // The constellation skin's sky: on dark grounds instance 0 paints a deep
+  // night backdrop with a Milky-Way band; the rest are fixed stars of mixed
+  // colour temperature (uColorA blue-white ↔ uColorB warm). On light grounds
+  // only the stars remain, printed faintly in ink.
+  'nightsky'
 ]
 export function ambientModeId(name) {
   const i = AMBIENT_MODES.indexOf(name)
@@ -60,7 +65,8 @@ export class AmbientLayer {
         uCam: { value: new THREE.Vector2(0, 0) },
         uColorA: { value: new THREE.Color('#ffd27a') },
         uColorB: { value: new THREE.Color('#7ac9ff') },
-        uIntensity: { value: 1 }
+        uIntensity: { value: 1 },
+        uDark: { value: 1 } // 1 on dark grounds (the night sky paints its backdrop)
       },
       // (uTime is shared by both stages — the mist veils churn in the fragment shader.)
       vertexShader: /* glsl */ `
@@ -70,6 +76,7 @@ export class AmbientLayer {
         uniform vec2 uSize;
         uniform vec2 uCam;
         uniform float uIntensity;
+        uniform float uDark;
         out vec2 vLocal;
         out float vShape;
         out float vAlpha;
@@ -89,7 +96,22 @@ export class AmbientLayer {
           float size = 3.0, rot = 0.0, alpha = 0.5, shape = 0.0;
           vec2 stretch = vec2(1.0);
           bool placed = false; // the branch positioned + wrapped itself
-          if (m == 8) { // mist — vast soft veils, slow lateral drift, lower-biased
+          if (m == 10 && gl_InstanceID == 0) { // night sky backdrop — covers the view
+            pos = uSize * 0.5;
+            size = 1.0;
+            stretch = uSize * 0.5 + 2.0;
+            alpha = uDark;
+            shape = 8.0;
+            placed = true;
+          } else if (m == 10) { // night sky stars — fixed, faint parallax, slow scintillation
+            size = 0.8 + 1.7 * s.z * s.z * s.z;
+            alpha = (0.32 + 0.6 * s.w) * (0.86 + 0.14 * sin(t * (0.35 + s.w) + s.x * 6.283));
+            shape = s.z > 0.965 && uDark > 0.5 ? 2.0 : 9.0; // flares only on a dark sky
+            if (shape < 2.5) { size *= 2.2; alpha *= 0.55; }
+            pos += uCam * (0.02 + 0.05 * s.w);
+            pos = mod(pos, span) - 30.0;
+            placed = true;
+          } else if (m == 8) { // mist — vast soft veils, slow lateral drift, lower-biased
             float W = uSize.x * (0.26 + 0.30 * s.z);
             float H = 22.0 + 64.0 * s.w;
             float spanX = uSize.x + 2.0 * W;
@@ -163,7 +185,7 @@ export class AmbientLayer {
           vLocal = position.xy;
           vShape = shape;
           vMix = s.z;
-          vAlpha = alpha * uIntensity;
+          vAlpha = shape > 7.5 && shape < 8.5 ? alpha : alpha * uIntensity;
           vec2 corner = rot2(position.xy * size * stretch, rot);
           gl_Position = projectionMatrix * modelViewMatrix * vec4(pos + corner, 0.0, 1.0);
         }
@@ -173,6 +195,7 @@ export class AmbientLayer {
         uniform vec3 uColorA;
         uniform vec3 uColorB;
         uniform float uTime;
+        uniform float uDark;
         in vec2 vLocal;
         in float vShape;
         in float vAlpha;
@@ -222,6 +245,23 @@ export class AmbientLayer {
             float stamen = smoothstep(0.08, 0.0, abs(r - 0.36)) * step(0.55, cos(ang * 9.0));
             col = mix(col, vec3(0.42, 0.18, 0.12), stamen * 0.8);
             col *= 0.86 + 0.14 * (1.0 - e);
+          } else if (sh == 8) {   // night sky — deep gradient, Milky-Way band, faint nebula
+            vec2 q = vLocal;
+            vec3 sky = mix(vec3(0.012, 0.022, 0.06), vec3(0.035, 0.045, 0.11), q.y * 0.5 + 0.5);
+            float bd = q.x * 0.42 + q.y * 0.9 - 0.08;
+            float n = 0.6 * aNoise(q * 3.1 + 11.0) + 0.4 * aNoise(q * 7.3 - 3.0);
+            float band = exp(-bd * bd * 4.5) * (0.5 + 0.5 * n);
+            float dust = smoothstep(0.55, 0.85, aNoise(q * vec2(9.0, 14.0) + 4.0)) * exp(-bd * bd * 16.0);
+            vec3 milk = mix(uColorA, vec3(0.78, 0.74, 0.96), 0.5);
+            sky += milk * band * 0.16 - vec3(0.02, 0.02, 0.03) * dust;
+            sky += uColorB * 0.03 * smoothstep(0.45, 1.0, aNoise(q * 2.2 + 7.0));
+            sky *= 1.0 - 0.32 * dot(q * 0.72, q * 0.72);
+            col = sky;
+            a = 1.0;
+          } else if (sh == 9) {   // night-sky star — a crisp point with a soft rim
+            a = exp(-r * r * 6.0) + 0.25 * exp(-r * r * 1.6);
+            col = mix(col, vec3(1.0), 0.35 * exp(-r * r * 14.0));
+            if (uDark < 0.5) { col = mix(col, vec3(0.08, 0.11, 0.22), 0.85); a *= 0.55; }
           } else {                // plain soft disc
             a = smoothstep(1.0, 0.5, r);
           }
@@ -249,6 +289,7 @@ export class AmbientLayer {
   /** Theme hint (the mist thins on dark grounds). */
   setDark(dark) {
     this.dark = !!dark
+    this.material.uniforms.uDark.value = this.dark ? 1 : 0
   }
 
   resize(w, h) {
@@ -264,7 +305,8 @@ export class AmbientLayer {
     u.uColorB.value.set(gs.ambientColorB || '#7ac9ff')
     const density = gs.ambientDensity ?? 0.5
     const mist = mode === ambientModeId('mist'),
-      plum = mode === ambientModeId('plum')
+      plum = mode === ambientModeId('plum'),
+      sky = mode === ambientModeId('nightsky')
     // Pale veils read far stronger on a dark ground — thin the mist there.
     u.uIntensity.value = (0.55 + 0.45 * density) * (mist && this.dark ? 0.4 : 1)
     this.geometry.instanceCount =
@@ -274,7 +316,9 @@ export class AmbientLayer {
           ? Math.round(6 + density * 12)
           : plum
             ? Math.round(14 + density * 40)
-            : Math.round(60 + density * (MAX - 60))
+            : sky
+              ? Math.round(110 + density * (MAX - 110))
+              : Math.round(60 + density * (MAX - 60))
     this.mesh.visible = mode !== 0
     return mode !== 0
   }

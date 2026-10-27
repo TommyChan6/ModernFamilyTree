@@ -31,14 +31,19 @@ export interface PoseDef {
 // The rest pose is MakeHuman's A-pose (arms ~45 deg down). Calibrated
 // against renders: for the LEFT arm z- lowers / z+ raises, flex+ swings
 // forward, twist+ turns the palm toward the thigh.
+// MakeHuman's rest pose bends the elbows ~45° FORWARD (invisible from the
+// front, but from the side the forearms jut out and the arms read stubby), so
+// lowering the arms means straightening the elbow too: a negative flex. The
+// palm turns toward the thigh with an intrinsic 'roll' — an extrinsic twist
+// after the swing would cone the forearm out of line. Calibrated in side view.
 const ARMS_DOWN: PoseOp[] = [
-  ['clavicle.L', 'z', -3],
-  ['upperarm01.L', 'z', -40],
-  ['upperarm01.L', 'flex', 4],
-  ['lowerarm01.L', 'flex', 0],
-  ['lowerarm01.L', 'z', 5],
-  ['lowerarm01.L', 'twist', 20],
-  ['wrist.L', 'flex', 4]
+  ['clavicle.L', 'z', -4],
+  ['upperarm01.L', 'z', -37],
+  ['upperarm01.L', 'flex', -4],
+  ['lowerarm01.L', 'roll', 35],
+  ['lowerarm01.L', 'flex', -42],
+  ['lowerarm01.L', 'z', 6],
+  ['wrist.L', 'flex', 0]
 ]
 
 /** Relaxed fingers: a soft natural curl. */

@@ -269,6 +269,11 @@
             </select>
           </div>
         </div>
+        <EdgeFeeling
+          v-model:sentiment="editing.sentiment"
+          v-model:intensity="editing.intensity"
+          :type-key="editing.type"
+        />
         <div class="rv-editor-footer">
           <div class="rv-editor-preview" :style="{ '--rel-c': meta(editing.type).color }">
             {{ previewSentence }}
@@ -351,7 +356,10 @@
                 :title="row.a ? t('relsView.viewPerson', { name: row.a.name }) : ''"
                 @click.stop="row.a && store.selectPerson(row.a.id)"
               >
-                <div class="rv-avatar" :style="{ background: avatarGradient(row.a?.gender) }">
+                <div
+                  class="rv-avatar"
+                  :style="{ background: avatarGradient(row.a?.gender, row.a?.id) }"
+                >
                   <img
                     v-if="row.a?.primary_image && imageUrl(row.a.primary_image)"
                     class="rv-avatar-img"
@@ -446,7 +454,10 @@
                 :title="row.b ? t('relsView.viewPerson', { name: row.b.name }) : ''"
                 @click.stop="row.b && store.selectPerson(row.b.id)"
               >
-                <div class="rv-avatar" :style="{ background: avatarGradient(row.b?.gender) }">
+                <div
+                  class="rv-avatar"
+                  :style="{ background: avatarGradient(row.b?.gender, row.b?.id) }"
+                >
                   <img
                     v-if="row.b?.primary_image && imageUrl(row.b.primary_image)"
                     class="rv-avatar-img"
@@ -598,6 +609,11 @@
                     </select>
                   </div>
                 </div>
+                <EdgeFeeling
+                  v-model:sentiment="editing.sentiment"
+                  v-model:intensity="editing.intensity"
+                  :type-key="editing.type"
+                />
                 <div class="rv-editor-footer">
                   <div class="rv-editor-preview" :style="{ '--rel-c': meta(editing.type).color }">
                     {{ previewSentence }}
@@ -660,6 +676,7 @@ import { useMainStore } from '../store/index.js'
 import { api } from '../api'
 import { yearDate } from '../../../shared/calendarMath'
 import PersonPicker from './personForm/PersonPicker.vue'
+import EdgeFeeling from './sentiment/EdgeFeeling.vue'
 import RelTypesPanel from './RelTypesPanel.vue'
 import UiIcon from './ui/UiIcon.js'
 import SearchField from './ui/SearchField.vue'
@@ -669,6 +686,7 @@ import { undoToast } from '../lib/undoToast.js'
 import { translate as tr, useI18n } from '../i18n'
 import { defaultNameLabel, relRoleLabel, relStatusLabel, relTypeLabel } from '../lib/dataLabels'
 import { inkAvatarBg, inkRelColor, inkRelGlyph, isRomanticType } from './ui/inkChrome'
+import { medievalAvatarBg } from '../lib/medievalArt'
 
 const store = useMainStore()
 const { t } = useI18n()
@@ -703,7 +721,7 @@ const PERSON_ICON_PATH =
 // Virtualization geometry: every row is a fixed 57px (56 + 1px border); the
 // expanded inline editor adds a fixed block below its row.
 const ROW_H = 57
-const EDITOR_EXPAND = 152
+const EDITOR_EXPAND = 196 // the editor grid + the Feeling strip + footer
 const HEAD_OFFSET = 55 // scroll padding + sticky header above the row body
 const OVERSCAN_ROWS = 5
 
@@ -765,8 +783,9 @@ const editError = ref('')
 function imageUrl(filename) {
   return api.getImageUrl(filename) || ''
 }
-function avatarGradient(gender) {
+function avatarGradient(gender, id) {
   if (store.isInk) return inkAvatarBg(gender)
+  if (store.isMedieval) return medievalAvatarBg(gender, id) // their coat of arms
   if (gender === 'male') return 'linear-gradient(135deg, #3a7bd5, #2351a0)'
   if (gender === 'female') return 'linear-gradient(135deg, #c95fa0, #923075)'
   return 'linear-gradient(135deg, #5c6bc0, #3c4a9e)'
@@ -1087,7 +1106,9 @@ function startAdd() {
     type: 'parent_child',
     formed_year: '',
     ended_year: '',
-    status: 'active'
+    status: 'active',
+    sentiment: null, // null = inherit the type's feeling (Dynamics lens)
+    intensity: null
   }
 }
 function startEdit(rel) {
@@ -1099,7 +1120,9 @@ function startEdit(rel) {
     type: rel.type,
     formed_year: rel.formed?.year || '',
     ended_year: rel.ended?.year || '',
-    status: rel.status || 'active'
+    status: rel.status || 'active',
+    sentiment: rel.sentiment ?? null,
+    intensity: rel.intensity ?? null
   }
 }
 function toggleAdd() {
@@ -1180,7 +1203,9 @@ async function saveEdit() {
     type: e.type,
     formed: yearDate(e.formed_year),
     ended: yearDate(e.ended_year),
-    status: validStatuses.includes(e.status) ? e.status : validStatuses[0] || 'active'
+    status: validStatuses.includes(e.status) ? e.status : validStatuses[0] || 'active',
+    sentiment: e.sentiment ?? null,
+    intensity: e.intensity ?? null
   }
   const res =
     e.id === 'new'

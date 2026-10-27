@@ -204,8 +204,61 @@ export interface FieldDef {
   /** System origin for seeded/migrated defs ('' = user-created). Lets the
    *  legacy persons:create/update payload keep working as an adapter. */
   sys: string
+  /** Special effects for everyone whose value matches a rule (auras.ts).
+   *  Optional: absent on older data = none. */
+  auras?: TraitAura[]
   created_at: string
   updated_at: string
+}
+
+// ── Auras (special effects attached to a tag or a trait) ────────────────────
+// Everyone carrying the tag / matching the trait rule wears the effect in the
+// Graph and the Timeline: an ornament around their node / avatar pin, a line
+// effect on their lifeline (and on graph bonds between two bearers), and an
+// optional tint. Resolution + sanitizing live in src/shared/auras.ts.
+
+/** Ornament ids drawn around a node (the node shader's aura branch). */
+export type AuraOrnament =
+  | 'none'
+  | 'halo'
+  | 'flame'
+  | 'frost'
+  | 'sparkle'
+  | 'crown'
+  | 'shadow'
+  | 'storm'
+  | 'bloom'
+  | 'aura'
+  | 'runes'
+  | 'orbit'
+  | 'burst'
+  | 'pulse'
+
+export interface Aura {
+  ornament: AuraOrnament
+  /** '#rrggbb' — the ornament's colour (and the tint). */
+  color: string
+  /** A graph line-effect id (lineFx.js) or 'none'. */
+  line: string
+  /** Ring the node / pin and colour the lifeline in `color`. */
+  tint: boolean
+}
+
+/** When a trait rule applies. 'any' = has a (truthy) value; 'is' = one of
+ *  `values` (select option ids; text: contains, case-insensitive); 'range' =
+ *  min ≤ value ≤ max (numbers, sliders; dates compare by year). */
+export interface AuraWhen {
+  op: 'any' | 'is' | 'range'
+  values: string[]
+  min: number | null
+  max: number | null
+}
+
+export interface TraitAura extends Aura {
+  id: string
+  when: AuraWhen
+  /** Numeric traits: the ornament's strength follows the value. */
+  scale: boolean
 }
 
 /** One person's value for one trait. A row with value null means "attached
@@ -262,6 +315,11 @@ export interface Relationship {
   ended?: DateValue | null
   /** Optional per-edge label shown instead of the type's ("estranged uncle"). */
   label?: string | null
+  /** Per-edge feeling −1 cold … +1 warm; null = inherit the type's sentiment
+   *  (src/shared/sentiment.ts). */
+  sentiment?: number | null
+  /** How strongly it's felt, 0..1; null = the default (DEFAULT_INTENSITY). */
+  intensity?: number | null
   created_at: string
 }
 
@@ -284,6 +342,9 @@ export interface RelationshipTypeDef {
   /** Structural weight −1..+1: +1 pure structural (strong layout spring),
    *  0 pure affinity (decorative overlay, no force), negative = repulsion. */
   weight: number
+  /** Emotional default of this type's edges, −1 cold … +1 warm (the Dynamics
+   *  lens; edges may override it). Built-ins seed from BUILTIN_SENTIMENT. */
+  sentiment: number
   /** Directed a→b (arrowed) vs symmetric. */
   directed: boolean
   symmetryRole: SymmetryRole
@@ -318,6 +379,8 @@ export interface Tag {
   source: 'manual' | 'derived'
   color: string
   icon: string
+  /** A special effect every member wears (auras.ts). null/absent = none. */
+  aura?: Aura | null
   created_at: string
   updated_at: string
 }

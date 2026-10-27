@@ -63,6 +63,7 @@
                 :defs="store.fieldDefs"
                 :draft="draft"
                 :drag-state="drag"
+                :name-ctx="nameCtx"
                 @update="updateDraft"
               />
             </section>
@@ -851,6 +852,23 @@ function buildExistingRels(personId) {
   })
   return rels
 }
+
+// The name dice's context: this person, their parents (existing + pending
+// vertical links where the other side is role_a) and their tags.
+const nameCtx = computed(() => {
+  const vertical = (ty) => store.relTypeRoles.get(ty) === 'vertical'
+  const parents = new Set()
+  for (const r of existingRels.value) if (!r.isA && vertical(r.relType)) parents.add(r.otherId)
+  for (const l of pendingLinks.value) {
+    if (l.dir === 'a' && vertical(l.defKey)) parents.add(l.personId)
+  }
+  const selfId = store.editingPerson?.id || null
+  return {
+    selfId,
+    parentIds: [...parents],
+    tagIds: selfId ? (store.tagsOf.get(selfId) || []).map((tag) => tag.id) : []
+  }
+})
 
 // Derived siblinghood (shared parents) for the person being edited — shown as
 // read-only chips; explicit sibling rows stay for half/step exceptions.

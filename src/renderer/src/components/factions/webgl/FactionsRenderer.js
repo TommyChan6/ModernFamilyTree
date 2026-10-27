@@ -8,6 +8,8 @@ import { CapsuleLayer } from '../../webgl/CapsuleLayer.js'
 import { ArcLayer } from '../../webgl/ArcLayer.js'
 import { createCssColorCache, roundRect } from '../../webgl/overlayUtils.js'
 import { ZoneLayer } from './ZoneLayer.js'
+import { MembraneLayer } from './MembraneLayer.js'
+import { shapeRadius } from '../vennLayout'
 import { InkStrokeLayer } from '../../webgl/InkStrokeLayer.js'
 import { InkDropLayer, RIPPLE, DROP } from '../../webgl/InkDropLayer.js'
 import { InkMistLayer } from '../../webgl/InkMistLayer.js'
@@ -20,6 +22,8 @@ const NODE_R = 17
 const ARC_R = 22.5
 const SPIN = (Math.PI * 2) / 14 // multi-faction arc orbit: one turn per 14s
 const TETHER_FLOW = 10 // dash drift, world units/s (the old fx-flow)
+const MORPH_IN = 0.75 // s — discs swell into membranes (with a damped wobble)
+const MORPH_OUT = 0.45 // s — membranes relax back into discs
 const PERSON_ICON_PATH =
   'M12 12.5c2.49 0 4.5-2.01 4.5-4.5S14.49 3.5 12 3.5 7.5 5.51 7.5 8s2.01 4.5 4.5 4.5zm0 2.25c-3 0-9 1.51-9 4.5V22h18v-2.75c0-2.99-6-4.5-9-4.5z'
 
@@ -28,6 +32,13 @@ function rgb(hex) {
   _col.set(hex || '#888')
   return [_col.r, _col.g, _col.b]
 }
+
+// A damped wobble, like a cell membrane settling after it stretches.
+function easeMembrane(t) {
+  if (t >= 1) return 1
+  return 1 - Math.pow(2, -9 * t) * Math.cos(t * Math.PI * 2.2)
+}
+const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 
 // easeOutBack — the springy overshoot of the old fx-pop CSS entrance.
 function easeOutBack(t) {
@@ -87,12 +98,20 @@ export class FactionsRenderer {
       this.requestRedraw()
     })
     this.zones = new ZoneLayer({ renderOrder: 1 })
+    // Venn style: zones as elastic membranes that wrap shared members. `_morph`
+    // tweens 0 (discs, ZoneLayer) ↔ 1 (membranes, MembraneLayer).
+    this.membranes = new MembraneLayer({ renderOrder: 1 })
+    this._venn = false
+    this._morph = 0
+    this._morphFrom = 0
+    this._morphStart = null
     this.threads = new CapsuleLayer({ renderOrder: 2 })
     this.arcs = new ArcLayer({ renderOrder: 3 })
     this.nodes = new NodeLayer({ atlasTexture: this.atlas.texture, pixelRatio: this.dpr })
     this.nodes.mesh.renderOrder = 4
     this.world.add(
       this.zones.object3d,
+      this.membranes.object3d,
       this.threads.object3d,
       this.arcs.object3d,
       this.nodes.object3d
@@ -117,6 +136,7 @@ export class FactionsRenderer {
     this.mist.setLook({ color: hexToRgb01(INK.paperLight), strength: 0.26 })
     this.mist.setMotion(this._reduced ? 0 : 1)
     this.zones.setMotion(this._reduced ? 0 : 1)
+    this.membranes.setMotion(this._reduced ? 0 : 1)
     this.scene.add(this.mist.object3d)
 
     this.picker = new Picker()
@@ -159,6 +179,7 @@ export class FactionsRenderer {
   setTheme(isLight) {
     this._css.invalidate()
     this.nodes.setThemeUniforms(isLight)
+    this.membranes.setLight(isLight)
     this._light = isLight
     if (this.ink) this._applyInkUniforms()
     this.markAllDirty()
@@ -180,6 +201,7 @@ export class FactionsRenderer {
     if (on === this.ink) return
     this.ink = on
     this.zones.setInk(on)
+    this.membranes.setInk(on)
     this.arcs.setInk(on)
     this.threads.object3d.visible = !on
     this.inkThreads.object3d.visible = on
@@ -218,6 +240,54 @@ export class FactionsRenderer {
     if (this._ripples.length > 12) this._ripples.shift()
     this.markGeomDirty()
     this.requestRedraw()
+  }
+
+  // ── Zone style: 'rings' (discs + tethers) | 'venn' (membranes) ─────────────
+  /** Switch the zone style; tweens the morph unless `animate` is false. */
+  setZoneStyle(style, { lens = 1, animate = true } = {}) {
+    this.membranes.setLens(lens)
+    const venn = style === 'venn'
+    if (venn !== this._venn) {
+      this._venn = venn
+      if (animate && !this._reduced) {
+        this._morphFrom = this._morph
+        this._morphStart = -1 // stamped by the next frame (_timeSec may be stale)
+      } else {
+        this._morph = venn ? 1 : 0
+        this._morphStart = null
+      }
+    }
+    this.markGeomDirty()
+    this.requestRedraw()
+  }
+
+  /** How far the zones currently are from discs (0) to membranes (1). */
+  get vennMorph() {
+    return this._morph
+  }
+
+  _stepMorph() {
+    if (this._morphStart == null) return false
+    if (this._morphStart < 0) this._morphStart = this._timeSec
+    const target = this._venn ? 1 : 0
+    const dur = this._venn ? MORPH_IN : MORPH_OUT
+    const t = Math.max(0, (this._timeSec - this._morphStart) / dur)
+    if (t >= 1) {
+      this._morph = target
+      this._morphStart = null
+      return false
+    }
+    const e = this._venn ? easeMembrane(t) : easeInOut(t)
+    this._morph = this._morphFrom + (target - this._morphFrom) * e
+    return true
+  }
+
+  /** World y of a zone's top edge — where its header pill hangs. In the Venn
+   *  style that is the top of the (morphed) membrane, not of the disc. */
+  zoneTop(z) {
+    if (!z.shape || this._morph <= 0) return z.y - z.r
+    const top = shapeRadius(z.shape, -Math.PI / 2)
+    return z.y - (z.r + Math.max(0, top - z.r) * Math.min(1, this._morph))
   }
 
   markGeomDirty() {
@@ -354,9 +424,14 @@ export class FactionsRenderer {
     const accentRGB = rgb(c.accent)
     const entranceActive = this._timeSec < this._entranceUntil
 
-    // Zones.
-    this.zones.setCount(zonesArr.length)
-    for (let i = 0; i < zonesArr.length; i++) {
+    // Zones: discs, or membranes while the Venn style is on / morphing.
+    const morphing = this._stepMorph()
+    const morph = this._morph
+    const useMembranes = morph > 0.0005 || this._venn
+    this._writeMembranes(useMembranes ? zonesArr : [], morph)
+    const discCount = useMembranes ? 0 : zonesArr.length
+    this.zones.setCount(discCount)
+    for (let i = 0; i < discCount; i++) {
       const z = zonesArr[i]
       const a = this._zAnim.get(z.id)
       if (!a) continue
@@ -380,6 +455,10 @@ export class FactionsRenderer {
     this.arcs.setCount(arcTotal)
     let arcI = 0
     let tetherCount = 0
+    let multiCount = 0
+    // Tethers dissolve as the membranes take over showing who is shared.
+    const tetherK = 1 - Math.min(1, morph)
+    const tethersOn = tetherK > 0.002
     for (let i = 0; i < nodesArr.length; i++) {
       const n = nodesArr[i]
       const meta = metas.get(n.id)
@@ -437,7 +516,10 @@ export class FactionsRenderer {
           meta.multi ? SPIN : 0
         )
       }
-      if (meta.multi) tetherCount += meta.arcs.length
+      if (meta.multi) {
+        multiCount++
+        if (tethersOn) tetherCount += meta.arcs.length
+      }
     }
     this.nodes.commitPositions()
     this.nodes.commitStyles()
@@ -447,19 +529,20 @@ export class FactionsRenderer {
     // Threads: faint always-on tethers for multi-faction people + bright
     // membership links for the active (hovered / dragged) person.
     const zoneById = new Map(zonesArr.map((z) => [z.id, z]))
+    const liveLinks = tethersOn ? links : []
     if (this.ink) {
-      this._writeInkThreads(nodesArr, metas, zoneById, links, tetherCount)
+      this._writeInkThreads(nodesArr, metas, zoneById, liveLinks, tetherCount, tetherK)
       let dropActive = false
       for (const a of this._zAnim.values()) if (a.dropA > 0.01) dropActive = true
-      this._ambient = !this._hidden && (!this._reduced || tetherCount > 0 || dropActive)
+      this._ambient = !this._hidden && (!this._reduced || multiCount > 0 || dropActive)
       this._writeRipples()
-      return entranceActive
+      return entranceActive || morphing
     }
-    this.threads.setCount(tetherCount + links.length)
+    this.threads.setCount(tetherCount + liveLinks.length)
     let ti = 0
     for (const n of nodesArr) {
       const meta = metas.get(n.id)
-      if (!meta?.multi) continue
+      if (!meta?.multi || !tethersOn) continue
       const v = this._pVis.get(n.id)
       const a = this._pAnim.get(n.id)
       const groupOp = (v?.tetherOp ?? 1) * (a ? a.op * this._entrance(a).e : 1)
@@ -477,38 +560,58 @@ export class FactionsRenderer {
           z.y,
           1.3,
           rgb(z.color),
-          0.3 * groupOp,
+          0.3 * groupOp * tetherK,
           2,
           7,
           TETHER_FLOW
         )
       }
     }
-    for (const l of links) {
-      this.threads.set(ti++, l.x1, l.y1, l.x2, l.y2, 1.6, rgb(l.color), 0.75, 3, 6, 0)
+    for (const l of liveLinks) {
+      this.threads.set(ti++, l.x1, l.y1, l.x2, l.y2, 1.6, rgb(l.color), 0.75 * tetherK, 3, 6, 0)
     }
     this.threads.commit()
 
     // Ambient GPU motion keeps the loop alive: orbiting arcs + flowing tethers
-    // + the marching-ants drop halo.
+    // (or the lens sheen in Venn) + the marching-ants drop halo.
     let dropActive = false
     for (const a of this._zAnim.values()) if (a.dropA > 0.01) dropActive = true
-    this._ambient = tetherCount > 0 || dropActive
-    return entranceActive
+    this._ambient = multiCount > 0 || dropActive
+    return entranceActive || morphing
+  }
+
+  _writeMembranes(zonesArr, morph) {
+    const M = this.membranes
+    M.setCount(zonesArr.length)
+    for (let i = 0; i < zonesArr.length; i++) {
+      const z = zonesArr[i]
+      const a = this._zAnim.get(z.id)
+      const color = this.ink ? hexToRgb01(z.color) : rgb(z.color)
+      M.set(i, z.x, z.y, z.r, z.shape || null, morph, color, {
+        fillA: a ? a.fillA : 0,
+        ringA: a ? a.ringA : 0,
+        ringW: a ? a.ringW : 0,
+        dropA: a ? a.dropA : 0,
+        scale: a ? a.s : 1,
+        opacity: a ? a.op : 0,
+        seed: this.ink ? (hashStr(String(z.id)) % 1000) / 37 : 0
+      })
+    }
+    M.commit()
   }
 
   // Ink tethers: thin dry brush threads from multi-group people to each camp,
   // plus firmer strokes for the hovered / dragged person's memberships.
-  _writeInkThreads(nodesArr, metas, zoneById, links, tetherCount) {
+  _writeInkThreads(nodesArr, metas, zoneById, links, tetherCount, tetherK = 1) {
     const T = this.inkThreads
     T.setCount(tetherCount + links.length)
     let ti = 0
     for (const n of nodesArr) {
       const meta = metas.get(n.id)
-      if (!meta?.multi) continue
+      if (!meta?.multi || !tetherCount) continue
       const v = this._pVis.get(n.id)
       const a = this._pAnim.get(n.id)
-      const groupOp = (v?.tetherOp ?? 1) * (a ? a.op * this._entrance(a).e : 1)
+      const groupOp = (v?.tetherOp ?? 1) * (a ? a.op * this._entrance(a).e : 1) * tetherK
       for (const fid of meta.factionIds) {
         const z = zoneById.get(fid)
         if (!z) {
@@ -542,7 +645,7 @@ export class FactionsRenderer {
         l.y2,
         3.2,
         inkNodePigment(this, l.color),
-        0.85,
+        0.85 * tetherK,
         seed,
         0.6,
         0,
@@ -648,7 +751,7 @@ export class FactionsRenderer {
         const cw = ctx.measureText(String(z.count)).width
         w = pad + iconW + lw + 10 * k * ps + cw + pad
       }
-      const cs = worldToScreen(z.x, z.y - z.r - 30 + 13, t) // pill centre
+      const cs = worldToScreen(z.x, this.zoneTop(z) - 30 + 13, t) // pill centre
       const x = cs.x - w / 2,
         y = cs.y - h / 2
       if (x + w < -20 || x > this.width + 20 || y + h < -20 || y > this.height + 20) continue
@@ -761,6 +864,7 @@ export class FactionsRenderer {
     this.threads.setTime(time)
     this.arcs.setTime(time)
     this.zones.setTime(time)
+    this.membranes.setTime(time)
     if (this.ink) {
       this.inkThreads.setTime(time)
       this.inkRipples.setTime(time)
@@ -831,6 +935,8 @@ export class FactionsRenderer {
         a.ps = a.tps
       }
       this._entranceUntil = 0
+      this._morph = this._venn ? 1 : 0
+      this._morphStart = null
       this._writeBuffers()
       this.atlas.flush()
       this._drawOverlay()
@@ -882,6 +988,7 @@ export class FactionsRenderer {
     this._glCanvas?.removeEventListener('webglcontextrestored', this._onContextRestored)
     this.atlas.dispose()
     this.zones.dispose()
+    this.membranes.dispose()
     this.threads.dispose()
     this.arcs.dispose()
     this.nodes.dispose()

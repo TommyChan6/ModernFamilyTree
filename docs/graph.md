@@ -199,14 +199,22 @@ drives a coordinated look system, all persisted per project as `graph_*` setting
 
 - **Node shapes** — every node is drawn as a signed-distance shape in the
   instanced fragment shader ([`NodeMaterial.js`](../src/renderer/src/components/graph/webgl/NodeMaterial.js)):
-  circle / square / diamond / hexagon / shield / oval / octagon / heart / gravestone
+  circle / square / diamond / hexagon / shield / oval / octagon / heart / gravestone / plate / flatplate
   (`gs.nodeShape`, a single `uShape` uniform — still one draw call; ids and anchors in
   [`nodeShapes.js`](../src/renderer/src/components/graph/webgl/nodeShapes.js)). Avatar,
   border ring, drop shadow and focus haze all follow the SDF. The **gravestone** is a
   full material (`stoneNode()`: granite, bevel light, bronze portrait cameo, engraved
   grooves, moss, grass and an earth mound) and **stands on** its point instead of
-  centring on it (`shapeAnchor().lift`) — in the Birth layout each stone rests on its
-  birth-year line; labels, kin pills and picking follow the anchor.
+  centring on it; the **plate** (`plateNode()`: an upright slab with a lit top edge and
+  shaded side for thickness, polished face with sheen, framed portrait window, engraved
+  name band, planted in a cut in the earth) and its minimal sibling the **flat plate**
+  (`flatPlateNode()`: one flat colour, a ringed portrait circle, a thin ground line) stand
+  the same way. All three share one `lift`
+  (`shapeAnchor().lift`; the shader bakes a single base line), so their bottom edge is
+  the person's position — in the Birth layout each rests on its birth-year line; labels,
+  kin pills, picking, depth order and name dimming all follow the anchor. The two plates
+  set `labelAbove` (`shapeLabelAbove` / `shapeLabelRise`): their names ride above the
+  crown, and kin pills, the Spotlight crown and the new-person name box stack above that.
 - **Ornaments** (`gs.nodeDecor` + `decorColor`) — procedural decor around the rim,
   same shader: `aura` (gilded double ring), `runes` (revolving dashed sigils),
   `orbit` (comet spark on a track), `burst` (turning spike crown), `pulse`

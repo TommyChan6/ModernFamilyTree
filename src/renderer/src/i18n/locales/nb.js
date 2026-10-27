@@ -1,6 +1,43 @@
 // Norsk bokmål — translated from en.js (the source locale). Missing keys fall
 // back to English, so new strings can land in en.js first.
 export default {
+  // Relasjonsdynamikk — følelseslaget + grafens Dynamikk-linse
+  sentiment: {
+    lens: 'Dynamikk',
+    lensHint: 'Farg hvert bånd varmt ↔ kaldt etter følelsen; bredden viser hvor sterkt den kjennes',
+    legendTitle: 'Dynamikk',
+    close: 'Slå av Dynamikk-linsen',
+    cold: 'Kald',
+    neutral: 'Nøytral',
+    warm: 'Varm',
+    faint: 'Svak',
+    strong: 'Sterk',
+    widthNote: 'Linjebredde = intensitet',
+    ringNote: 'Ringer = hver persons samlede temperatur',
+    counts: '{warm} varme · {neutral} nøytrale · {cold} kalde',
+    feeling: 'Følelse',
+    intensity: 'Intensitet',
+    feelingAria: 'Følelse, fra kald til varm',
+    intensityAria: 'Intensitet, fra svak til sterk',
+    fromType: 'Fra type',
+    fromTypeTitle: 'Bruk typens standardfølelse',
+    defaultIntensity: 'Standard',
+    defaultIntensityTitle: 'Bruk standardintensiteten',
+    typeFeelingHint:
+      'Hvordan denne typen bånd føles som standard — Dynamikk-linsen farger den på skalaen kald ↔ varm. Enkeltbånd kan overstyre den.',
+    levels: {
+      hostile: 'Fiendtlig',
+      cool: 'Kjølig',
+      neutral: 'Nøytral',
+      warm: 'Varm',
+      loving: 'Kjærlig'
+    },
+    style: {
+      title: 'Dynamikk-linse',
+      warm: 'Varm følelse',
+      cold: 'Kald følelse'
+    }
+  },
   topbar: {
     search: 'Gå til en person',
     export: 'Eksporter',
@@ -16,6 +53,8 @@ export default {
     darkMode: 'Mørkt tema',
     inkOn: 'Tusjmaleri-tema (水墨)',
     inkOff: 'Forlat tusjmaleri-temaet',
+    medievalOn: 'Middelalder-tema (illuminert kodeks)',
+    medievalOff: 'Forlat middelaldertemaet',
     newProject: 'Nytt prosjekt',
     closeProject: 'Lukk prosjekt',
     undo: 'Angre siste dataendring',
@@ -550,6 +589,63 @@ export default {
     importFailed: 'Importen mislyktes: {error}',
     importPhotos: 'Bilder er ikke med i prosjektfiler.',
     accent: 'Aksentfargen er oppdatert'
+  },
+  fingerprint: {
+    title: 'Familiefingeravtrykk',
+    menu: 'Familiefingeravtrykk',
+    open: 'Vis familiefingeravtrykket',
+    ariaOf: 'Familiefingeravtrykket til {name}',
+    close: 'Lukk',
+    subtitle:
+      'Et våpenmerke tegnet ut fra formen på dette treet. Det er unikt for prosjektet og tegnes på nytt etter hvert som familien vokser.',
+    partial: 'Tegnet bare ut fra antall – hele strukturen er ikke tilgjengelig her.',
+    downloadPng: 'Last ned PNG',
+    downloadSvg: 'Last ned SVG',
+    saved: 'Lagret {name}',
+    failed: 'Kunne ikke lage bildet',
+    living: 'Samme tre, samme merke: legg til en person, så endrer det seg forsiktig.',
+    legend: {
+      rings: {
+        label: 'Ringer',
+        text: 'Én per generasjon, med en perle for hver person ({n} generasjoner, {m} personer)'
+      },
+      petals: {
+        label: 'Kronblader',
+        text: 'Ett per familie, gjentatt ved hver stjernespiss og vokser ut fra foreldrenes ring ({n} familier)'
+      },
+      shape: {
+        label: 'Kronbladform',
+        text: 'Lengre = flere barn per familie (snitt {n}); spissere = mer ujevne familiestørrelser'
+      },
+      symmetry: {
+        label: 'Stjerne',
+        text: 'Én spiss per stamlinje, minst tre ({m} stamlinjer)'
+      },
+      rosette: {
+        label: 'Rosett',
+        text: 'Sammenflettede sirkler for par, ruter for gjengifte ({n} par, {m} gjengiftet)'
+      },
+      core: {
+        label: 'Kjerne',
+        text: 'Delt etter kjønnsbalanse ({n} % / {m} %)'
+      },
+      threads: {
+        label: 'Tråder',
+        text: 'Vennskap, rivalisering og andre sosiale bånd ({n})'
+      },
+      halo: {
+        label: 'Glorie',
+        text: 'Én perle per tiår, store perler ved hvert århundre ({n} tiår)'
+      },
+      satellites: {
+        label: 'Satellitter',
+        text: 'Grupper som ikke henger sammen med hovedtreet; gnister for personer uten bånd ({n} grupper, {m} alene)'
+      },
+      tints: {
+        label: 'Farger',
+        text: 'Kronbladene får fargene til de mest brukte taggene ({n} av {m} tagger)'
+      }
+    }
   },
   projectMenu: {
     button: 'Prosjekt',
@@ -1113,15 +1209,17 @@ export default {
     },
     theme: {
       title: 'Tema',
-      desc: 'Bytt mellom mørkt, lyst og 水墨-tusjmaleri-grensesnittet.',
+      desc: 'Bytt mellom mørkt, lyst, 水墨-tusjmaleri og det illuminerte middelaldergrensesnittet.',
       light: 'Lyst',
       dark: 'Mørkt',
-      ink: 'Tusj'
+      ink: 'Tusj',
+      medieval: 'Middelalder'
     },
     accent: {
       title: 'Aksentfarge',
       desc: 'Farger knapper, markeringer og valg i hele appen.',
       inkNote: 'Tusjtemaet stempler alltid i cinnoberrødt.',
+      medievalNote: 'Middelaldertemaet illumineres alltid i lasurblått og gull.',
       custom: 'Egendefinert farge',
       reset: 'Tilbakestill til standard',
       presets: {
@@ -1285,6 +1383,40 @@ export default {
     camera: 'Kamera',
     lighting: 'Lys',
     dragToSculpt: 'dra for å forme · klikk for å redigere',
+    handleDepthHint: 'snu til siden for å dra i dybden',
+    handle: {
+      crown: 'Toppen av hodet',
+      headSide: 'Siden av hodet',
+      forehead: 'Panne',
+      temple: 'Tinning',
+      brow: 'Bryn',
+      browTail: 'Brynhale',
+      eyeInner: 'Indre øyekrok',
+      eyeOuter: 'Ytre øyekrok',
+      lid: 'Øvre øyelokk',
+      noseBridge: 'Neserygg',
+      noseTip: 'Nesetipp',
+      noseWing: 'Neseside',
+      cheekbone: 'Kinnbein',
+      cheek: 'Kinn',
+      upperLip: 'Overleppe',
+      lowerLip: 'Underleppe',
+      mouthCorner: 'Munnvik',
+      chin: 'Hake',
+      chinSide: 'Hakeside',
+      jawCorner: 'Kjevevinkel',
+      ear: 'Øre',
+      neck: 'Hals',
+      shoulder: 'Skulder',
+      bust: 'Bryst',
+      waist: 'Midje',
+      belly: 'Mage',
+      hip: 'Hofte',
+      glutes: 'Sete',
+      upperArm: 'Overarm',
+      thigh: 'Lår',
+      calf: 'Legg'
+    },
     clickToEdit: 'klikk for å redigere',
     expression: 'Uttrykk',
     undo: 'Angre',
@@ -1476,8 +1608,8 @@ export default {
       'eye-height1-decr-incr': 'Indre åpning',
       'eye-height2-decr-incr': 'Midtre åpning',
       'eye-height3-decr-incr': 'Ytre åpning',
-      'eye-corner1-down-up': 'Indre øyekrok',
-      'eye-corner2-down-up': 'Ytre øyekrok (helning)',
+      'eye-corner1-down-up': 'Ytre øyekrok (helning)',
+      'eye-corner2-down-up': 'Indre øyekrok',
       'eye-push1-in-out': 'Indre dybde',
       'eye-push2-in-out': 'Ytre dybde',
       'eye-epicanthus-in-out': 'Epikantusfold',
@@ -1620,7 +1752,8 @@ export default {
       muscle: 'Muskler',
       proportions: 'Proporsjoner',
       breastSize: 'Byste',
-      breastFirmness: 'Bystefasthet'
+      breastFirmness: 'Bystefasthet',
+      ideal: 'Idealiser'
     },
     anc: {
       african: 'Afrikansk',
@@ -1775,6 +1908,8 @@ export default {
     },
     light: {
       studio: 'Studio',
+      atelier: 'Atelier',
+      cinematic: 'Filmatisk',
       daylight: 'Dagslys',
       golden: 'Gyllen time',
       moonlight: 'Månelys',
@@ -2277,9 +2412,12 @@ export default {
       camera: 'Kamera',
       physics: 'Fysikk',
       lifelines: 'Livslinjer',
+      time: 'Tid',
       canvas: 'Lerret',
       cards: 'Kort',
-      mapStyle: 'Kartstil'
+      mapStyle: 'Kartstil',
+      shapes: 'Former',
+      auras: 'Spesialeffekter'
     },
     saved: {
       deviceAll: 'Lagret på denne enheten · alle prosjekter, alle visninger',
@@ -2323,6 +2461,134 @@ export default {
     },
     directory: {
       cardModesOnly: 'Kortforsider vises i rutenett- og kortscenemodusene.'
+    },
+    groups: {
+      shape: 'Gruppeform',
+      shapeSub: 'Hvordan en gruppe tegnes, og hvordan den viser hvem den deler med andre grupper.',
+      ringsBlurb:
+        'Faste sirkler. Delte medlemmer står mellom gruppene sine, bundet til hver av dem.',
+      vennBlurb:
+        'Levende membraner. Hver gruppe strekker seg rundt folkene sine, så delte medlemmer står der gruppene overlapper.',
+      preview: 'Forhåndsvisning av stilen {style}',
+      softness: 'Mykhet',
+      softTaut: 'Stram',
+      softFluid: 'Flytende',
+      lens: 'Linseglød',
+      lensHint: 'Skygg overlappene som opplyste linser',
+      arrangeTip:
+        'Ordne i verktøylinjen skyver grupper som deler folk inn i hverandre, og holder resten fra hverandre.',
+      ringsTip: 'Bytt til Venn for å se delte medlemmer som overlapp i stedet for tråder.'
+    }
+  },
+  auras: {
+    intro:
+      'Gi en tagg eller en egenskap en spesialeffekt. Alle som har den, bærer effekten i grafen og tidslinjen.',
+    active: 'Aktive effekter',
+    add: 'Legg til effekt',
+    addTitle: 'Gi en effekt til…',
+    cancel: 'Avbryt',
+    kinds: { tag: 'Tagg', trait: 'Egenskap' },
+    searchTags: 'Finn en tagg…',
+    searchTraits: 'Finn en egenskap…',
+    noTags: 'Ingen tagger ennå. Tagg en {noun} på profilen, og gi så taggen en effekt her.',
+    noTraits: 'Ingen egenskaper ennå.',
+    noMatch: 'Ingenting samsvarer med «{q}»',
+    hasEffect: 'Har en effekt',
+    ruleCount: 'Effekter: {n}',
+    empty: {
+      title: 'Ingen spesialeffekter ennå',
+      body: 'Kron kongeslekten, sett magikerne i brann, la nordboerne fryse til is. Velg en tagg eller en egenskap for å begynne.',
+      cta: 'Legg til den første effekten'
+    },
+    bearersNone: 'Ingen ennå',
+    bearersOne: '{noun}: {n}',
+    bearersOther: '{noun}: {n}',
+    draft: 'Ikke lagret',
+    draftHint: 'Et forslag. Endre hva du vil, eller behold det som det er.',
+    keep: 'Behold',
+    edit: 'Rediger effekten',
+    collapse: 'Skjul',
+    remove: 'Fjern effekten',
+    discard: 'Forkast',
+    removed: 'Effekten er fjernet fra «{name}»',
+    saveFailed: 'Kunne ikke lagre effekten',
+    tagMembers: 'Alle med denne taggen',
+    preview: {
+      label: 'Direkte forhåndsvisning',
+      replay: 'Tenn på nytt',
+      sample: 'Et eksempel ({noun}) med denne effekten'
+    },
+    presets: {
+      title: 'Forhåndsvalg',
+      royal: 'Kongelig',
+      saint: 'Helgen',
+      inferno: 'Inferno',
+      frostborn: 'Frostbåren',
+      arcane: 'Arkan',
+      cursed: 'Forbannet',
+      stormcaller: 'Stormkaller',
+      blossom: 'Blomstring',
+      bloodline: 'Blodslinje'
+    },
+    ornament: 'Ornament',
+    ornaments: {
+      none: { label: 'Ingen', hint: 'Ingen pynt — bare linjen og fargetonen' },
+      halo: { label: 'Glorie', hint: 'En helgens glorie som lyser bak hodet' },
+      flame: { label: 'Flamme', hint: 'Flammer som slikker opp rundt noden' },
+      frost: { label: 'Frost', hint: 'Iskrystaller som kryper over kanten' },
+      sparkle: { label: 'Gnister', hint: 'Blinkende stjerner som driver rundt' },
+      crown: { label: 'Krone', hint: 'En krone på toppen' },
+      shadow: { label: 'Skygge', hint: 'Mørk røyk som krøller seg ut bakfra' },
+      storm: { label: 'Storm', hint: 'Lyn som spraker rundt kanten' },
+      bloom: { label: 'Blomst', hint: 'Kronblad som driver i en langsom sirkel' },
+      aura: { label: 'Aura', hint: 'En dobbel gullring som glitrer rundt kanten' },
+      runes: { label: 'Runer', hint: 'En runering som snur seg langsomt' },
+      orbit: { label: 'Bane', hint: 'En gnist som kretser rundt noden' },
+      burst: { label: 'Stjerne', hint: 'En taggete stjerne bak noden' },
+      pulse: { label: 'Puls', hint: 'Ekkoringer som slår utover' }
+    },
+    color: 'Farge',
+    tint: 'Fargetone',
+    tintHint: 'Ring rundt noden og farg livslinjen i denne fargen',
+    line: 'Linjeeffekt',
+    lineHint: 'Renner nedover livslinjen og langs bånd mellom to bærere.',
+    noLine: 'Enkel',
+    when: {
+      title: 'Hvem bærer den',
+      any: 'Alle verdier',
+      is: 'Er en av',
+      contains: 'Inneholder',
+      range: 'I intervall',
+      checkedNote: 'Alle som har denne avkrysset, bærer effekten.',
+      pickOptions: 'Velg minst ett alternativ.',
+      noOptions: 'Denne egenskapen har ingen alternativer ennå.',
+      containsPh: 'Skriv et ord, trykk Enter',
+      addWord: 'Legg til',
+      removeWord: 'Fjern «{v}»',
+      needWord: 'Legg til minst ett ord.',
+      needBound: 'Angi en nedre eller øvre grense.',
+      min: 'Fra',
+      max: 'Til',
+      minYear: 'Fra år',
+      maxYear: 'Til år',
+      scale: 'Skaler med verdien',
+      scaleHint: 'Høyere verdier gir et sterkere ornament',
+      sumAny: 'Har en verdi',
+      sumChecked: 'Når avkrysset',
+      sumIs: 'Er {v}',
+      sumContains: 'Inneholder «{v}»',
+      sumBetween: '{min} til {max}',
+      sumAtLeast: '{min} eller mer',
+      sumAtMost: 'Opptil {max}',
+      sumYearBetween: 'År {min}–{max}',
+      sumYearFrom: 'Fra {min}',
+      sumYearUntil: 'Til {max}',
+      sumScaled: 'skalerer med verdien'
+    },
+    entry: {
+      trait: 'Spesialeffekt…',
+      traitHint: 'Få alle som har den til å gløde',
+      tag: 'Spesialeffekt'
     }
   },
   graphStyle: {
@@ -2365,6 +2631,7 @@ export default {
       showLabels: 'Vis etiketter',
       showAge: 'Vis alder',
       glowOnHover: 'Glød ved peking',
+      starTwinkle: 'Avdøde stjerner blinker',
       unknown: 'Ukjent',
       lineStyle: 'Linjestil',
       lineOpacity: 'Linjeopasitet',
@@ -2384,10 +2651,14 @@ export default {
       repulsion: 'Frastøting'
     },
     brushOwns: 'Penselstrøk styrer linjene nå – effektene kommer tilbake med en annen linjestil.',
+    starHint: 'Klarere, større stjerner har flere etterkommere. Bilder vises ved peking.',
     useOrganic: 'Bruk Organisk',
     reset: 'Tilbakestill alt',
     shapes: {
       gravestone: 'Gravstein',
+      plate: 'Stående plate',
+      flatplate: 'Enkel plate',
+      star: 'Stjerne',
       circle: 'Sirkel',
       square: 'Kvadrat',
       diamond: 'Rute',
@@ -2454,7 +2725,8 @@ export default {
       rain: 'Regn',
       motes: 'Støv',
       mist: 'Tåke',
-      plum: 'Plomme'
+      plum: 'Plomme',
+      nightsky: 'Nattehimmel'
     },
     fxScopes: {
       lineage: {
@@ -2510,12 +2782,28 @@ export default {
       gilded: {
         label: 'Forgylt',
         hint: 'Et kongelig gulltau med en glans som vandrer langs det'
+      },
+      starline: {
+        label: 'Stjernekart',
+        hint: 'Stjernebildelinjer — tynne sølvstreker som stopper like før hver stjerne'
       }
     },
     themes: {
+      constellation: {
+        name: 'Stjernebilde',
+        tagline: 'En nattehimmel — klarere stjerner har flere etterkommere'
+      },
       graveyard: {
         name: 'Kirkegård',
         tagline: 'Gravsteiner på sin fødselsårs-jord — best i Født-oppsettet'
+      },
+      heraldry: {
+        name: 'Heraldikk',
+        tagline: 'Våpenskjold — skjold på forgylte linjer, glør i vinden'
+      },
+      illuminated: {
+        name: 'Illuminert',
+        tagline: 'Et manuskriptblad — lasurstein og bladgull, støv i levende lys'
       },
       classic: {
         name: 'Klassisk',
@@ -2777,6 +3065,38 @@ export default {
     fitAll: 'Tilpass alt',
     refresh: 'Oppdater oppsettet — kjør slektstre-algoritmen på nytt',
     refreshAria: 'Oppdater oppsettet',
+    warpToggle: 'Strekk travle år — utvid aksen der fødslene klumper seg',
+    tiltToggle: 'Vipp tidslinjen til 3D (T)',
+    modes: {
+      lanes: {
+        label: 'Baner',
+        title:
+          'Hvert liv har sin egen bane — familiestammer og broer viser hvem som stammer fra hvem'
+      },
+      sprout: {
+        label: 'Spire',
+        title:
+          'Livene spirer ut av foreldrenes familiestamme og gjenbruker baner når forrige eier er borte — kompakt og flytende'
+      },
+      rivers: {
+        label: 'Elver',
+        title:
+          'Husholdningselver — hver husholdning er en kanal: barn fødes inne i foreldrenes kanal, og et liv krysser bare over når det gifter seg eller flytter hjemmefra'
+      }
+    },
+    river: {
+      household: 'Husholdningen til {names}',
+      own: '{name}s egen husholdning',
+      joined: 'Flyttet inn: {names}'
+    },
+    bond: {
+      born: 'Født {year}',
+      childOf: 'Barn av {names}',
+      adoptedBy: 'Adoptert av {names}',
+      ageAt: '{name} var {age}',
+      oneChild: '1 barn',
+      children: '{n} barn'
+    },
     zoomAxes: 'Tidsakse {v} · baner {h}',
     focus: {
       title: 'Fokus',
@@ -2921,6 +3241,20 @@ export default {
       ageTicks: 'Aldersmerker',
       ageTicksHint: 'Et hakk for hvert tiår av hvert liv',
       eraWash: 'Epokefarge',
+      leaveHome: 'Flytter hjemmefra',
+      leaveHomeHint: 'Husholdningselver: ugifte voksne flytter til en egen kanal ved denne alderen',
+      ageYears: '{n} år',
+      timeWarp: 'Strekk travle år',
+      timeWarpHint: 'Søsken født med ett års mellomrom skilles; tomme tiår foldes sammen',
+      warpStrength: 'Strekk',
+      warpNote:
+        'Rutenettet følger fortsatt ekte år — linjene står bare tettere der tiden er strukket. Stripen langs årsmargen viser det: aksentfarge = strukket, grå = presset.',
+      tilt: 'Vipp til 3D',
+      tiltAngle: 'Vippevinkel',
+      tiltYaw: 'Drei',
+      arcLift: 'Buehøyde',
+      tiltHint:
+        'T vipper, Q / E dreier, Alt-dra setter vinkel og dreining. Familiebuene reiser seg fra brettet — drei det for å skille buer som overlapper.',
       density: 'Tetthet',
       colours: 'Farger',
       segs: {
@@ -3028,6 +3362,36 @@ export default {
     speed: 'Avspillingshastighet — {speed}',
     reverse: 'Snu avspillingsretningen',
     loop: 'Gjenta avspilling'
+  },
+  census: {
+    toggle: 'Folketelling: levende demografi for dette året',
+    title: 'Folketelling',
+    close: 'Lukk folketellingen',
+    emptyTitle: 'Ingen å telle ennå',
+    emptyBody:
+      'Gi personene et fødselsår, så teller folketellingen hvem som levde i hvert år du reiser til.',
+    alive: 'I live',
+    couples: 'Par',
+    meanAge: 'Snittalder',
+    medianAge: 'Medianalder',
+    nobody: 'Ingen er i live i {year}',
+    trend: '{delta} sammenlignet med ti år tidligere',
+    genderSplit: 'Mann: {male} · Kvinne: {female} · Annet eller ukjent: {other}',
+    decade: '{decade}-årene',
+    decadeSpan: '{from}–{to}',
+    bornIn: 'Født i {decade}',
+    diedIn: 'Døde i {decade}',
+    generations: 'Generasjoner i live',
+    oldest: 'Eldste i live',
+    ageShort: 'alder {age}',
+    selectPerson: 'Velg {name}',
+    population: 'Befolkning',
+    populationAria: 'Befolkning over tid. Klikk for å reise til et år.',
+    mortality: 'Dødsfall per tiår',
+    noDeaths: 'Ingen dødsfall registrert',
+    mortalityAria: 'Registrerte dødsfall per tiår. Klikk for å reise til et år.',
+    hoverValue: '{year}: {value}',
+    hoverDeaths: '{decade}: {value}'
   },
   chronicle: {
     now: 'nå',
@@ -3262,6 +3626,14 @@ export default {
     title: 'Grupper',
     hint: 'Dra personer inn i ringer · Dra ringer for å ordne · Klikk en person for å administrere',
     arrangeTitle: 'Ordne gruppene i en ring',
+    arrangeVennTitle: 'Trekk grupper som deler folk inn i hverandre, hold resten fra hverandre',
+    style: {
+      label: 'Gruppestil',
+      rings: 'Ringer',
+      venn: 'Venn',
+      ringsHint: 'Faste sirkler, med delte medlemmer bundet mellom dem',
+      vennHint: 'Sirklene strekker seg rundt delte medlemmer og overlapper som et Venn-diagram'
+    },
     arrange: 'Ordne',
     newGroup: 'Ny gruppe',
     emptySceneTitle: 'Ingen grupper i denne scenen',
@@ -4701,6 +5073,18 @@ export default {
     born: 'f. {year}',
     noMatches: 'Ingen treff'
   },
+  starChart: {
+    section: 'Stjernekartplakat',
+    toggle: 'Ramme inn som stjernekart',
+    frame: {
+      circle: 'Planisfære',
+      rect: 'Atlasplate'
+    },
+    hint: 'Trykt på en nattehimmel, med timering og tegnforklaring.',
+    autoSubtitle: 'Et kart over {count} stjerner',
+    legend: 'Lysstyrke = etterkommere',
+    hour: '{h}t'
+  },
   exportModal: {
     title: 'Eksporter bilde',
     sub: 'Lag et bilde av prosjektet og lagre det hvor du vil',
@@ -5247,6 +5631,38 @@ export default {
       people: '{n} personer',
       projects: '{n} prosjekter',
       photos: '{n} bilder'
+    }
+  },
+  // Navnegenerator (WILD_IDEAS C2) — terningen ved navnefeltet
+  nameGen: {
+    dice: 'Foreslå et navn',
+    title: 'Navnegenerator',
+    close: 'Lukk',
+    source: 'Høres ut som',
+    ownTags: 'Foreslåtte tagger',
+    otherTags: 'Andre tagger',
+    cultures: 'Kulturer',
+    tagOption: '{label} ({n})',
+    blendNote: 'Lært fra {n} navn, blandet med {culture}.',
+    useName: 'Bruk «{name}»',
+    empty: 'Ingen navn kom ut. Prøv en annen kilde.',
+    reroll: 'Kast på nytt',
+    surnameFrom: {
+      patronym: 'Etternavn etter farens navn',
+      parent: 'Etternavn fra foreldrene',
+      tag: 'Taggens vanligste etternavn',
+      generated: 'Generert etternavn'
+    },
+    corpus: {
+      english: 'Engelsk og angelsaksisk',
+      norse: 'Norrønt',
+      roman: 'Romersk',
+      slavic: 'Slavisk',
+      celtic: 'Keltisk',
+      elvish: 'Høyfantasy (alvisk)',
+      dwarven: 'Dvergisk og orkisk',
+      japanese: 'Japansk',
+      chinese: 'Kinesisk (pinyin)'
     }
   }
 }

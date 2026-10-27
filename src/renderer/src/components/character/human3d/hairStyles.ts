@@ -761,7 +761,8 @@ export function lashStrand(
   const prof = upper
     ? 0.55 + Math.sin(Math.min(1, u * 1.1) * Math.PI) * 0.45 + u * 0.2
     : 0.5 + Math.sin(u * Math.PI) * 0.5
-  const L = (upper ? 0.085 : 0.04) * prof * (0.6 + length * 0.9) * (0.85 + R() * 0.3)
+  // lower lashes are short + fine (long ones read as stubble under the eye)
+  const L = (upper ? 0.085 : 0.024) * prof * (0.6 + length * 0.9) * (0.85 + R() * 0.3)
   const sideX = p[0] >= 0 ? 1 : -1
   const curlDir: V3 = upper ? [sideX * u * 0.3, 1, 0.15] : [sideX * u * 0.2, -1, 0.2]
   const pts: number[] = [...p]

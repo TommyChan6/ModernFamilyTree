@@ -7,6 +7,8 @@
 
 import { computeTreeOrder } from '../graph/familyTreeLayout'
 import { toOrdinal } from '../../../../shared/calendarMath'
+import { buildFamilies, optimizeLaneOrder, packSproutLanes } from './timelineLinks'
+import { layoutHouseholdRivers } from './householdRivers'
 
 export const GUTTER = 64 // fixed year-axis gutter width (screen px)
 export const LANE_W = 150 // horizontal distance between lifelines (unscaled px)
@@ -18,11 +20,53 @@ export function lifeEnd(p, refYear) {
   return death != null && death <= refYear ? death : refYear
 }
 
-// Lane order comes from the same family-tree layout algorithm the Tree View
-// uses: couples sit in neighbouring lanes and children land near their parents,
-// so marriage/birth connectors stay short and cross as little as possible.
-export function computeLaneOrder(persons, relationships, typeRoles) {
-  return computeTreeOrder(persons, relationships, typeRoles)
+/** The timeline modes: every life in its own lane, lives sprouting out of
+ *  their parents' stem into reusable lanes, or household rivers — channels per
+ *  household that children are born inside (per timeline scene). */
+export const TIMELINE_MODES = ['lanes', 'sprout', 'rivers']
+
+// Lane order starts from the same family-tree layout algorithm the Tree View
+// uses (couples side by side, children near their parents), then a local
+// search trims the crossings that matter: a connector passing over a lane
+// whose person is alive in that year. Empty lanes (not yet born / long gone)
+// cost nothing.
+export function computeLaneOrder(persons, relationships, typeRoles, refYear = null) {
+  const tree = computeTreeOrder(persons, relationships, typeRoles)
+  const ref = refYear ?? new Date().getFullYear()
+  const people = []
+  for (const p of persons) {
+    const birthYear = toOrdinal(p.birth)
+    if (birthYear != null) people.push({ id: p.id, birthYear, endYear: lifeEnd(p, ref) })
+  }
+  if (people.length < 3) return tree
+  const marriages = marriageLinks(persons, relationships, ref, people)
+  const { branches } = buildFamilies(people, relationships, marriages, typeRoles)
+  return optimizeLaneOrder(tree, people, branches, marriages)
+}
+
+// Marriage years as the optimiser sees them (dated, else mid shared life).
+function marriageLinks(persons, relationships, refYear, people) {
+  const byId = new Map(persons.map((p) => [p.id, p]))
+  const placed = new Set(people.map((p) => p.id))
+  const out = []
+  for (const r of relationships) {
+    if (r.type !== 'spouse' || !placed.has(r.person_a_id) || !placed.has(r.person_b_id)) continue
+    out.push({
+      id: r.id,
+      ids: [r.person_a_id, r.person_b_id],
+      year: marriageYear(r, byId.get(r.person_a_id), byId.get(r.person_b_id), refYear).year
+    })
+  }
+  return out
+}
+
+// A marriage's year: recorded, else a plausible spot inside the shared lifespan.
+function marriageYear(r, pa, pb, refYear) {
+  const year = toOrdinal(r.formed) || null
+  if (year) return { year, estimated: false }
+  const lo = Math.max(toOrdinal(pa.birth), toOrdinal(pb.birth))
+  const hi = Math.min(lifeEnd(pa, refYear), lifeEnd(pb, refYear))
+  return { year: hi > lo ? Math.min(lo + 25, hi) : lo, estimated: true }
 }
 
 export function computeTimelineLayout(
@@ -31,7 +75,8 @@ export function computeTimelineLayout(
   refYear,
   laneOrder = null,
   typeRoles = null,
-  extraYears = [] // story-event years: the axis stretches to show them too
+  extraYears = [], // story-event years: the axis stretches to show them too
+  { mode = 'lanes', leaveHomeAge = 25 } = {}
 ) {
   const birthOf = (p) => toOrdinal(p.birth)
   const dated = persons.filter((p) => birthOf(p) != null)
@@ -72,6 +117,7 @@ export function computeTimelineLayout(
     return {
       id: p.id,
       i,
+      lane: i,
       laneX: X0 + i * LANE_W,
       birthYear: birth,
       endYear: end,
@@ -94,7 +140,6 @@ export function computeTimelineLayout(
   const personById = new Map(persons.map((p) => [p.id, p]))
 
   const marriages = []
-  const births = []
   for (const r of relationships) {
     if (r.type === 'spouse') {
       const a = laneById.get(r.person_a_id)
@@ -103,15 +148,7 @@ export function computeTimelineLayout(
       const pa = personById.get(r.person_a_id)
       const pb = personById.get(r.person_b_id)
 
-      let year = toOrdinal(r.formed) || null
-      let estimated = false
-      if (!year) {
-        // No recorded date — sketch a plausible spot inside the shared lifespan
-        const lo = Math.max(toOrdinal(pa.birth), toOrdinal(pb.birth))
-        const hi = Math.min(lifeEnd(pa, refYear), lifeEnd(pb, refYear))
-        year = hi > lo ? Math.min(lo + 25, hi) : lo
-        estimated = true
-      }
+      const { year, estimated } = marriageYear(r, pa, pb, refYear)
       const divorced = r.status === 'divorced'
       // Badge text; the renderer draws `badgeIcon` (an icon name) before it.
       const badge = estimated ? 'add year' : String(year)
@@ -129,31 +166,74 @@ export function computeTimelineLayout(
         estimated,
         badge,
         badgeIcon,
-        bw: badge.length * 6.6 + 33
-      })
-    } else if (r.type === 'parent_child' || r.type === 'adopted') {
-      const parent = laneById.get(r.person_a_id)
-      const child = laneById.get(r.person_b_id)
-      if (!parent || !child) continue
-      births.push({
-        id: r.id,
-        ids: [r.person_a_id, r.person_b_id],
-        laneXp: parent.laneX,
-        laneXc: child.laneX,
-        year: child.birthYear,
-        adopted: r.type === 'adopted'
+        bw: badge.length * 6.6 + 33,
+        endedYear: toOrdinal(r.ended) ?? null
       })
     }
   }
 
+  // One branch per child per parent set, hanging off the family's stem.
+  const { families, branches } = buildFamilies(people, relationships, marriages, typeRoles)
+
+  // Sprout: lanes become slots in time — reused once their occupant is gone,
+  // each newborn taking the free slot nearest its parents' stem.
+  let laneCount = people.length
+  if (mode === 'sprout' && people.length) {
+    for (const b of branches) b.sprout = b.primary
+    const rank = new Map(people.map((p) => [p.id, p.i]))
+    const lanes = packSproutLanes(people, rank, branches, marriages)
+    laneCount = 0
+    for (const p of people) {
+      p.lane = lanes.get(p.id) ?? 0
+      p.laneX = X0 + p.lane * LANE_W
+      laneCount = Math.max(laneCount, p.lane + 1)
+    }
+    for (const m of marriages) {
+      const xa = laneById.get(m.ids[0]).laneX,
+        xb = laneById.get(m.ids[1]).laneX
+      m.laneX1 = Math.min(xa, xb)
+      m.laneX2 = Math.max(xa, xb)
+    }
+  }
+
+  // Rivers: channels are households; children are born inside their parents'
+  // channel, so there are no stems or branches to draw (containment shows it).
+  let rivers = null
+  let worldW = X0 + Math.max(0, laneCount - 1) * LANE_W + 220
+  if (mode === 'rivers' && people.length) {
+    const rank = new Map(people.map((p) => [p.id, p.i]))
+    const rv = layoutHouseholdRivers(people, families, branches, marriages, rank, {
+      leaveHomeAge,
+      x0: X0
+    })
+    for (const p of people) {
+      p.path = rv.paths.get(p.id) || null
+      if (p.path) p.laneX = rv.birthX.get(p.id)
+    }
+    for (const m of marriages) {
+      const c = rv.confluences.get(m.id)
+      if (!c) continue
+      if (m.estimated) m.year = c.year
+      m.laneX1 = Math.min(c.xa, c.xb)
+      m.laneX2 = Math.max(c.xa, c.xb)
+    }
+    rivers = { households: rv.households, stints: rv.stints, families, branches }
+    worldW = rv.maxX + 220
+  }
+  const isRivers = !!rivers
+
   return {
     people,
     marriages,
-    births,
+    families: isRivers ? [] : families,
+    branches: isRivers ? [] : branches,
+    rivers,
+    mode: isRivers ? 'rivers' : mode === 'sprout' ? 'sprout' : 'lanes',
+    laneCount,
     minYear,
     maxYear,
     yearSpan,
-    worldWBase: X0 + Math.max(0, people.length - 1) * LANE_W + 220,
+    worldWBase: worldW,
     undatedCount: persons.length - people.length
   }
 }

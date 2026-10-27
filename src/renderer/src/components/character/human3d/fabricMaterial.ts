@@ -65,7 +65,8 @@ export function createFabricMaterial() {
     sheenRoughness: 0.6,
     sheenColor: new THREE.Color(1, 1, 1),
     side: THREE.DoubleSide,
-    alphaTest: 0.5
+    alphaTest: 0.5,
+    alphaToCoverage: true
   })
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms)
@@ -131,7 +132,17 @@ vec3 fabricBump( vec3 surf_pos, vec3 surf_norm, float h, float faceDir ) {
   return normalize( abs( fDet ) * surf_norm - vGrad );
 }`
       )
-      .replace('#include <alphatest_fragment>', `if ( vCover < 0.5 || vRef.y < uCutY ) discard;`)
+      .replace(
+        '#include <alphatest_fragment>',
+        // anti-aliased hem: coverage from the iso-line's screen distance,
+        // resolved through alpha-to-coverage under MSAA
+        `if ( vRef.y < uCutY ) discard;
+{
+  float edge = ( vCover - 0.5 ) / max( fwidth( vCover ), 1e-4 ) + 0.5;
+  if ( edge <= 0.0 ) discard;
+  diffuseColor.a = clamp( edge, 0.0, 1.0 );
+}`
+      )
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
@@ -170,8 +181,8 @@ vec3 fabricBump( vec3 surf_pos, vec3 surf_norm, float h, float faceDir ) {
   c *= 1.0 - ( 1.0 - smoothstep( 0.0, 0.03, abs( vRef.y - uSoleY - 0.04 ) ) ) * 0.35 * step( -90.0, uSoleY );
   float hem = smoothstep( 0.5, 0.56, vCover ) * ( 1.0 - smoothstep( 0.56, 0.62, vCover ) );
   c *= 1.0 - hem * 0.28;
-  // folds catch less light in their valleys
-  c *= 0.9 + 0.1 * smoothstep( 0.3, 0.7, fbm( r * vec3( 1.6, 7.0, 1.6 ) ) );
+  // folds catch less light in their valleys (deeper where the cloth gathers)
+  c *= 0.84 + 0.16 * smoothstep( 0.3, 0.7, fbm( r * vec3( 1.6, 7.0, 1.6 ) ) ) - vFold * 0.06;
   diffuseColor.rgb = c;
 }`
       )
@@ -181,7 +192,7 @@ vec3 fabricBump( vec3 surf_pos, vec3 surf_norm, float h, float faceDir ) {
 normal = fabricBump( -vViewPosition, normal, fabricHeight( vRef ), faceDirection );`
       )
   }
-  mat.customProgramCacheKey = () => 'human3d-fabric-v1'
+  mat.customProgramCacheKey = () => 'human3d-fabric-v2'
 
   function setLook(look: FabricLook) {
     const p = FABRIC_PARAMS[look.fabric] || FABRIC_PARAMS.cotton
@@ -195,8 +206,9 @@ normal = fabricBump( -vViewPosition, normal, fabricHeight( vRef ), faceDirection
     uniforms.uFolds.value = look.fabric === 'metal' || look.fabric === 'leather' ? 0.3 : 1
     mat.roughness = p.rough
     mat.metalness = p.metal
-    mat.sheen = p.sheen
-    mat.sheenColor.set(look.color).lerp(new THREE.Color(1, 1, 1), 0.5)
+    // sheen tinted by the cloth itself — a white sheen washes colours out grey
+    mat.sheen = p.sheen * 0.7
+    mat.sheenColor.set(look.color).lerp(new THREE.Color(1, 1, 1), 0.25)
     mat.clearcoat = p.clear
     mat.clearcoatRoughness = 0.3
   }

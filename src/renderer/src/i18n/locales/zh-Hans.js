@@ -1,5 +1,41 @@
 // 简体中文 (Simplified Chinese)
 export default {
+  // 关系动态 —— 情感层 + 图谱的「动态」透镜
+  sentiment: {
+    lens: '动态',
+    lensHint: '按情感把每段关系染成暖 ↔ 冷；线宽表示感情的强烈程度',
+    legendTitle: '动态',
+    close: '关闭动态透镜',
+    cold: '冷',
+    neutral: '中性',
+    warm: '暖',
+    faint: '淡',
+    strong: '浓',
+    widthNote: '线宽 = 强度',
+    ringNote: '圆环 = 每个人的整体温度',
+    counts: '{warm} 暖 · {neutral} 中性 · {cold} 冷',
+    feeling: '情感',
+    intensity: '强度',
+    feelingAria: '情感，从冷到暖',
+    intensityAria: '强度，从淡到浓',
+    fromType: '沿用类型',
+    fromTypeTitle: '使用该类型的默认情感',
+    defaultIntensity: '默认',
+    defaultIntensityTitle: '使用默认强度',
+    typeFeelingHint: '这类关系默认的情感 —— 动态透镜会按冷 ↔ 暖为它着色。单段关系可以单独覆盖。',
+    levels: {
+      hostile: '敌对',
+      cool: '冷淡',
+      neutral: '中性',
+      warm: '温暖',
+      loving: '深爱'
+    },
+    style: {
+      title: '动态透镜',
+      warm: '暖色情感',
+      cold: '冷色情感'
+    }
+  },
   topbar: {
     search: '跳转到某个人',
     export: '导出',
@@ -15,6 +51,8 @@ export default {
     darkMode: '深色模式',
     inkOn: '水墨画主题',
     inkOff: '退出水墨主题',
+    medievalOn: '中世纪手抄本主题',
+    medievalOff: '退出中世纪主题',
     newProject: '新建项目',
     closeProject: '关闭项目',
     undo: '撤销上一次数据编辑',
@@ -507,6 +545,62 @@ export default {
     importFailed: '导入失败：{error}',
     importPhotos: '项目文件不包含照片。',
     accent: '强调色已更新'
+  },
+  fingerprint: {
+    title: '家族指纹',
+    menu: '家族指纹',
+    open: '查看家族指纹',
+    ariaOf: '{name}的家族指纹',
+    close: '关闭',
+    subtitle: '一枚由这棵树的结构绘成的徽记。它为本项目独有，并随家族成长而重新绘制。',
+    partial: '仅根据数量绘制——此处无法获取完整结构。',
+    downloadPng: '下载 PNG',
+    downloadSvg: '下载 SVG',
+    saved: '已保存 {name}',
+    failed: '无法生成图片',
+    living: '同一棵树，同一枚徽记：添加一个人，它只会轻轻变化。',
+    legend: {
+      rings: {
+        label: '环',
+        text: '每一代一环，每颗珠代表其中一人（{n} 代，{m} 人）'
+      },
+      petals: {
+        label: '花瓣',
+        text: '每个家庭一片，在星形的每个尖角重复，从父母所在的环生出（{n} 个家庭）'
+      },
+      shape: {
+        label: '花瓣形状',
+        text: '越长表示每个家庭的子女越多（平均 {n}）；越尖表示家庭规模越不均'
+      },
+      symmetry: {
+        label: '星形',
+        text: '每条始祖支系一个尖角，至少三个（{m} 条始祖支系）'
+      },
+      rosette: {
+        label: '玫瑰花饰',
+        text: '交织的圆代表夫妻，菱形代表再婚（{n} 对夫妻，{m} 人再婚）'
+      },
+      core: {
+        label: '核心',
+        text: '按性别比例分割（{n}% / {m}%）'
+      },
+      threads: {
+        label: '丝线',
+        text: '友谊、竞争及其他社会关系（{n}）'
+      },
+      halo: {
+        label: '光环',
+        text: '跨越的每个十年一颗珠，世纪处为大珠（{n} 个十年）'
+      },
+      satellites: {
+        label: '卫星',
+        text: '未与主树相连的群体；火花代表没有任何关系的人（{n} 个群体，{m} 人独处）'
+      },
+      tints: {
+        label: '颜色',
+        text: '花瓣采用最常用的标签颜色（{m} 个标签中的 {n} 个）'
+      }
+    }
   },
   projectMenu: {
     button: '项目',
@@ -1058,15 +1152,17 @@ export default {
     },
     theme: {
       title: '主题',
-      desc: '在深色、浅色与水墨画界面之间切换。',
+      desc: '在深色、浅色、水墨画与中世纪泥金手抄本界面之间切换。',
       light: '浅色',
       dark: '深色',
-      ink: '水墨'
+      ink: '水墨',
+      medieval: '中世纪'
     },
     accent: {
       title: '强调色',
       desc: '为整个应用的按钮、高亮和选中状态着色。',
       inkNote: '水墨主题始终使用朱砂印泥红。',
+      medievalNote: '中世纪主题始终以青金石蓝与金箔装饰。',
       custom: '自定义颜色',
       reset: '恢复默认',
       presets: {
@@ -1224,6 +1320,40 @@ export default {
     camera: '镜头',
     lighting: '灯光',
     dragToSculpt: '拖动以塑形 · 点击以编辑',
+    handleDepthHint: '转到侧面可拖动深度',
+    handle: {
+      crown: '头顶',
+      headSide: '头侧',
+      forehead: '额头',
+      temple: '太阳穴',
+      brow: '眉毛',
+      browTail: '眉尾',
+      eyeInner: '内眼角',
+      eyeOuter: '外眼角',
+      lid: '上眼睑',
+      noseBridge: '鼻梁',
+      noseTip: '鼻尖',
+      noseWing: '鼻翼',
+      cheekbone: '颧骨',
+      cheek: '脸颊',
+      upperLip: '上唇',
+      lowerLip: '下唇',
+      mouthCorner: '嘴角',
+      chin: '下巴',
+      chinSide: '下巴侧',
+      jawCorner: '下颌角',
+      ear: '耳朵',
+      neck: '脖子',
+      shoulder: '肩膀',
+      bust: '胸部',
+      waist: '腰部',
+      belly: '腹部',
+      hip: '胯部',
+      glutes: '臀部',
+      upperArm: '上臂',
+      thigh: '大腿',
+      calf: '小腿'
+    },
     clickToEdit: '点击编辑',
     expression: '表情',
     undo: '撤销',
@@ -1415,8 +1545,8 @@ export default {
       'eye-height1-decr-incr': '内侧开度',
       'eye-height2-decr-incr': '中部开度',
       'eye-height3-decr-incr': '外侧开度',
-      'eye-corner1-down-up': '内眼角',
-      'eye-corner2-down-up': '外眼角（倾斜）',
+      'eye-corner1-down-up': '外眼角（倾斜）',
+      'eye-corner2-down-up': '内眼角',
       'eye-push1-in-out': '内侧深度',
       'eye-push2-in-out': '外侧深度',
       'eye-epicanthus-in-out': '内眦赘皮',
@@ -1559,7 +1689,8 @@ export default {
       muscle: '肌肉',
       proportions: '比例',
       breastSize: '胸部',
-      breastFirmness: '胸部挺度'
+      breastFirmness: '胸部挺度',
+      ideal: '美化'
     },
     anc: {
       african: '非洲',
@@ -1714,6 +1845,8 @@ export default {
     },
     light: {
       studio: '影棚',
+      atelier: '画室',
+      cinematic: '电影感',
       daylight: '日光',
       golden: '黄金时刻',
       moonlight: '月光',
@@ -2213,9 +2346,12 @@ export default {
       camera: '镜头',
       physics: '物理',
       lifelines: '生命线',
+      time: '时间',
       canvas: '画布',
       cards: '卡片',
-      mapStyle: '地图风格'
+      mapStyle: '地图风格',
+      shapes: '形状',
+      auras: '特效'
     },
     saved: {
       deviceAll: '保存在此设备 · 所有项目、所有视图',
@@ -2259,6 +2395,130 @@ export default {
     },
     directory: {
       cardModesOnly: '卡片样式在网格和卡片舞台模式中显示。'
+    },
+    groups: {
+      shape: '分组形状',
+      shapeSub: '分组的绘制方式，以及它如何显示与其他分组共有的成员。',
+      ringsBlurb: '固定的圆圈。共有成员位于各分组之间，并以连线牵向每个分组。',
+      vennBlurb: '有生命的薄膜。每个分组都会伸展包住自己的成员，共有成员便落在分组重叠之处。',
+      preview: '{style}样式预览',
+      softness: '柔软度',
+      softTaut: '紧绷',
+      softFluid: '流动',
+      lens: '透镜光晕',
+      lensHint: '将重叠部分绘成发光的透镜',
+      arrangeTip: '工具栏中的“排列”会让共有成员的分组彼此重叠，其余分组则保持分开。',
+      ringsTip: '切换到维恩样式，以重叠而非连线来显示共有成员。'
+    }
+  },
+  auras: {
+    intro: '给标签或特征加上特效。拥有它的每个人都会在关系图和时间线中带上这个特效。',
+    active: '已启用的特效',
+    add: '添加特效',
+    addTitle: '为谁添加特效…',
+    cancel: '取消',
+    kinds: { tag: '标签', trait: '特征' },
+    searchTags: '查找标签…',
+    searchTraits: '查找特征…',
+    noTags: '还没有标签。先在{noun}的资料中添加标签，再在这里给标签加特效。',
+    noTraits: '还没有特征。',
+    noMatch: '没有与“{q}”匹配的结果',
+    hasEffect: '已有特效',
+    ruleCount: '特效：{n}',
+    empty: {
+      title: '还没有特效',
+      body: '为王族戴上王冠，让法师燃起火焰，让北境之民覆上寒霜。选择一个标签或特征开始吧。',
+      cta: '添加第一个特效'
+    },
+    bearersNone: '暂无',
+    bearersOne: '{n}个{noun}',
+    bearersOther: '{n}个{noun}',
+    draft: '未保存',
+    draftHint: '这是推荐的样式。可以随意修改，或直接保留。',
+    keep: '保留',
+    edit: '编辑此特效',
+    collapse: '收起',
+    remove: '移除此特效',
+    discard: '放弃',
+    removed: '已从“{name}”移除特效',
+    saveFailed: '无法保存特效',
+    tagMembers: '带此标签的所有人',
+    preview: {
+      label: '实时预览',
+      replay: '重新点燃',
+      sample: '一个带有此特效的示例{noun}'
+    },
+    presets: {
+      title: '预设',
+      royal: '王族',
+      saint: '圣者',
+      inferno: '烈焰',
+      frostborn: '霜裔',
+      arcane: '奥秘',
+      cursed: '诅咒',
+      stormcaller: '唤雷者',
+      blossom: '花开',
+      bloodline: '血脉'
+    },
+    ornament: '装饰',
+    ornaments: {
+      none: { label: '无', hint: '不加装饰——只有线条和着色' },
+      halo: { label: '光轮', hint: '头后一圈圣者的光轮' },
+      flame: { label: '火焰', hint: '节点周围升腾的火焰' },
+      frost: { label: '寒霜', hint: '冰晶爬满边缘' },
+      sparkle: { label: '星光', hint: '闪烁的星星环绕飘动' },
+      crown: { label: '王冠', hint: '顶上戴着一顶王冠' },
+      shadow: { label: '暗影', hint: '身后卷起的黑烟' },
+      storm: { label: '雷暴', hint: '边缘噼啪作响的闪电' },
+      bloom: { label: '花瓣', hint: '花瓣缓缓环绕飘落' },
+      aura: { label: '光环', hint: '边缘闪烁的双层金环' },
+      runes: { label: '符文', hint: '缓缓旋转的符文环' },
+      orbit: { label: '环绕', hint: '绕着节点飞行的火花' },
+      burst: { label: '星芒', hint: '节点身后的尖角星芒' },
+      pulse: { label: '脉动', hint: '向外扩散的回声波纹' }
+    },
+    color: '颜色',
+    tint: '着色',
+    tintHint: '用此颜色给节点描边、为生命线上色',
+    line: '线条特效',
+    lineHint: '沿生命线流动，也会出现在两位持有者之间的关系线上。',
+    noLine: '普通',
+    when: {
+      title: '谁会带上它',
+      any: '任意值',
+      is: '是其中之一',
+      contains: '包含',
+      range: '范围内',
+      checkedNote: '勾选了此项的每个人都会带上特效。',
+      pickOptions: '请至少选择一个选项。',
+      noOptions: '此特征还没有选项。',
+      containsPh: '输入一个词，按回车',
+      addWord: '添加',
+      removeWord: '移除“{v}”',
+      needWord: '请至少添加一个词。',
+      needBound: '请设置下限或上限。',
+      min: '从',
+      max: '到',
+      minYear: '起始年份',
+      maxYear: '结束年份',
+      scale: '随数值增强',
+      scaleHint: '数值越高，装饰越强烈',
+      sumAny: '有任意值',
+      sumChecked: '勾选时',
+      sumIs: '是 {v}',
+      sumContains: '包含“{v}”',
+      sumBetween: '{min} 至 {max}',
+      sumAtLeast: '{min} 及以上',
+      sumAtMost: '最多 {max}',
+      sumYearBetween: '{min}–{max} 年',
+      sumYearFrom: '{min} 年起',
+      sumYearUntil: '至 {max} 年',
+      sumScaled: '随数值增强'
+    },
+    entry: {
+      trait: '特效…',
+      traitHint: '让拥有它的每个人发光',
+      tag: '特效'
     }
   },
   graphStyle: {
@@ -2301,6 +2561,7 @@ export default {
       showLabels: '显示标签',
       showAge: '显示年龄',
       glowOnHover: '悬停发光',
+      starTwinkle: '逝者之星闪烁',
       unknown: '未知',
       lineStyle: '连线样式',
       lineOpacity: '连线不透明度',
@@ -2320,10 +2581,14 @@ export default {
       repulsion: '斥力'
     },
     brushOwns: '目前连线由笔触绘制——切换到其他连线样式后特效即恢复。',
+    starHint: '星越亮越大，后代越多。悬停时显示照片。',
     useOrganic: '改用自然曲线',
     reset: '全部重置',
     shapes: {
       gravestone: '墓碑',
+      plate: '立牌',
+      flatplate: '简约立牌',
+      star: '星辰',
       circle: '圆形',
       square: '方形',
       diamond: '菱形',
@@ -2390,7 +2655,8 @@ export default {
       rain: '雨',
       motes: '微尘',
       mist: '山岚',
-      plum: '梅花'
+      plum: '梅花',
+      nightsky: '夜空'
     },
     fxScopes: {
       lineage: {
@@ -2446,12 +2712,28 @@ export default {
       gilded: {
         label: '鎏金',
         hint: '一条皇家金绳，光泽沿着它流转'
+      },
+      starline: {
+        label: '星图',
+        hint: '星座连线——纤细的银线，在每颗星前留出空隙'
       }
     },
     themes: {
+      constellation: {
+        name: '星座',
+        tagline: '一片夜空——后代越多，星越亮'
+      },
       graveyard: {
         name: '墓园',
         tagline: '墓碑立在各自出生年份的土地上——在出生布局中最佳'
+      },
+      heraldry: {
+        name: '纹章',
+        tagline: '盾徽 — 鎏金线上的盾牌，风中余烬'
+      },
+      illuminated: {
+        name: '泥金手抄本',
+        tagline: '手抄本书页 — 青金石与金箔，烛光中的微尘'
       },
       classic: {
         name: '经典',
@@ -2711,6 +2993,35 @@ export default {
     fitAll: '全部适配',
     refresh: '刷新布局——重新运行家谱算法',
     refreshAria: '刷新布局',
+    warpToggle: '拉伸密集年份——出生集中处放宽时间轴',
+    tiltToggle: '将时间线倾斜为 3D（T）',
+    modes: {
+      lanes: {
+        label: '泳道',
+        title: '每个人独占一条泳道——家族主干与跨线分支标明谁是谁的后代'
+      },
+      sprout: {
+        label: '萌芽',
+        title: '生命线从父母的家族主干中萌发，并在前一位主人离世后复用泳道——紧凑而流畅'
+      },
+      rivers: {
+        label: '家河',
+        title: '家庭河流——每个家庭是一条河道：孩子在父母的河道中出生，生命线只在结婚或离家时跨越'
+      }
+    },
+    river: {
+      household: '{names}的家庭',
+      own: '{name}自己的家',
+      joined: '迁入：{names}'
+    },
+    bond: {
+      born: '生于 {year}',
+      childOf: '{names} 之子女',
+      adoptedBy: '由 {names} 收养',
+      ageAt: '{name} 时年 {age} 岁',
+      oneChild: '1 个子女',
+      children: '{n} 个子女'
+    },
     zoomAxes: '时间轴 {v} · 泳道 {h}',
     focus: {
       title: '聚焦',
@@ -2854,6 +3165,20 @@ export default {
       ageTicks: '年龄刻度',
       ageTicksHint: '每段生命每十年一个刻度',
       eraWash: '时代底色',
+      leaveHome: '离家年龄',
+      leaveHomeHint: '家庭河流：未婚的成年人在这个年龄迁入自己的河道',
+      ageYears: '{n} 岁',
+      timeWarp: '拉伸密集年份',
+      timeWarpHint: '相隔一年出生的兄弟姐妹得以分开；空白的年代被压缩',
+      warpStrength: '拉伸强度',
+      warpNote:
+        '网格仍按真实年份绘制——只是在时间被拉伸处更密。年份栏边的色条标示：强调色为拉伸，灰色为压缩。',
+      tilt: '倾斜为 3D',
+      tiltAngle: '倾斜角度',
+      tiltYaw: '旋转',
+      arcLift: '弧线高度',
+      tiltHint:
+        'T 倾斜，Q / E 旋转，按住 Alt 拖动可调角度与旋转。家族弧线会从平面升起——转动视角即可分开重叠的弧线。',
       density: '密度',
       colours: '颜色',
       segs: {
@@ -2961,6 +3286,35 @@ export default {
     speed: '播放速度——{speed}',
     reverse: '反转播放方向',
     loop: '循环播放'
+  },
+  census: {
+    toggle: '人口普查：这一年的实时人口统计',
+    title: '人口普查',
+    close: '关闭人口普查',
+    emptyTitle: '暂时无人可统计',
+    emptyBody: '为人物填写出生年份，人口普查就会统计你穿越到的每一年有谁在世。',
+    alive: '在世',
+    couples: '伴侣',
+    meanAge: '平均年龄',
+    medianAge: '年龄中位数',
+    nobody: '{year} 年无人在世',
+    trend: '与十年前相比 {delta}',
+    genderSplit: '男：{male} · 女：{female} · 其他或未知：{other}',
+    decade: '{decade}年代',
+    decadeSpan: '{from}–{to}',
+    bornIn: '{decade}出生',
+    diedIn: '{decade}去世',
+    generations: '在世世代',
+    oldest: '在世最年长者',
+    ageShort: '{age} 岁',
+    selectPerson: '选择{name}',
+    population: '人口',
+    populationAria: '人口随时间变化。点击可穿越到某一年。',
+    mortality: '每十年死亡人数',
+    noDeaths: '暂无死亡记录',
+    mortalityAria: '每十年有记录的死亡人数。点击可穿越到某一年。',
+    hoverValue: '{year}：{value}',
+    hoverDeaths: '{decade}：{value}'
   },
   chronicle: {
     now: '至今',
@@ -3194,6 +3548,14 @@ export default {
     title: '分组',
     hint: '把成员拖入圆环 · 拖动圆环排列 · 点击成员进行管理',
     arrangeTitle: '将分组排成一圈',
+    arrangeVennTitle: '让共有成员的分组彼此重叠，其余保持分开',
+    style: {
+      label: '分组样式',
+      rings: '圆环',
+      venn: '维恩',
+      ringsHint: '固定的圆圈，共有成员以连线牵在中间',
+      vennHint: '圆圈伸展包住共有成员，像维恩图一样重叠'
+    },
     arrange: '排列',
     newGroup: '新建分组',
     emptySceneTitle: '此场景中没有分组',
@@ -4614,6 +4976,18 @@ export default {
     born: '生于{year}',
     noMatches: '无匹配结果'
   },
+  starChart: {
+    section: '星图海报',
+    toggle: '以星图装裱',
+    frame: {
+      circle: '星盘',
+      rect: '星图图版'
+    },
+    hint: '印在夜空上，配有时角刻度环和图例。',
+    autoSubtitle: '{count} 颗星的星图',
+    legend: '亮度 = 后代数量',
+    hour: '{h}时'
+  },
   exportModal: {
     title: '导出图片',
     sub: '为项目合成一张图片并保存到任意位置',
@@ -5156,6 +5530,38 @@ export default {
       people: '{n}名成员',
       projects: '{n}个项目',
       photos: '{n}张照片'
+    }
+  },
+  // 名字生成器（WILD_IDEAS C2）—— 名字槽旁的骰子
+  nameGen: {
+    dice: '推荐名字',
+    title: '名字生成器',
+    close: '关闭',
+    source: '取名风格',
+    ownTags: '推荐标签',
+    otherTags: '其他标签',
+    cultures: '文化',
+    tagOption: '{label}（{n}）',
+    blendNote: '从 {n} 个名字中学习，并融合{culture}风格。',
+    useName: '使用“{name}”',
+    empty: '没有生成名字，换个来源试试。',
+    reroll: '重新生成',
+    surnameFrom: {
+      patronym: '姓氏取自父亲的名字',
+      parent: '姓氏随父母',
+      tag: '该标签最常见的姓氏',
+      generated: '自动生成的姓氏'
+    },
+    corpus: {
+      english: '英格兰与盎格鲁-撒克逊',
+      norse: '北欧',
+      roman: '古罗马',
+      slavic: '斯拉夫',
+      celtic: '凯尔特',
+      elvish: '奇幻（精灵）',
+      dwarven: '矮人与兽人',
+      japanese: '日本',
+      chinese: '中文（拼音）'
     }
   }
 }

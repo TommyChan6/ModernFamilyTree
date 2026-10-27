@@ -17,6 +17,7 @@ import {
 } from '../src/renderer/src/components/character/human3d/humanMorph'
 import {
   ALL_SHAPE_GROUPS,
+  IDEAL_SHAPE,
   SLIDER_BY_ID,
   shapeTargetWeights
 } from '../src/renderer/src/components/character/human3d/catalog'
@@ -51,6 +52,15 @@ import {
   EXPRESSIONS
 } from '../src/renderer/src/components/character/human3d/poses'
 import { defaultModel3D, sanitizeModel3D, DEFAULT_HUMAN3D } from '../src/shared/character3d'
+import {
+  SCULPT_HANDLES,
+  axisResponse,
+  axisVector,
+  displacementAt,
+  resolveHandles,
+  solveSlider,
+  vertexNormal
+} from '../src/renderer/src/components/character/human3d/sculptHandles'
 
 // A unit cube as 6 outward-facing quads over 8 corners
 const CUBE_V = [
@@ -195,6 +205,7 @@ describe('Slider catalogue', () => {
 
   it('turns state into target weights (symmetric, per-side, unipolar, expression)', () => {
     const s = defaultModel3D()
+    s.body.ideal = 0
     s.shape = {
       'eye-scale-decr-incr': 0.5,
       'eye-scale-decr-incr@l': 0.25,
@@ -207,6 +218,36 @@ describe('Slider catalogue', () => {
     expect(w.get('head-oval')).toBeCloseTo(0.6)
     expect(w.get('nose-hump-decr')).toBeCloseTo(0.3)
     expect(w.get('expr/mouth-open')).toBeCloseTo(0.4)
+  })
+
+  it('layers the idealize beauty pass under the sliders, blended by sex', () => {
+    for (const id of Object.keys(IDEAL_SHAPE)) expect(SLIDER_BY_ID.has(id), id).toBe(true)
+    const s = defaultModel3D()
+    s.body.ideal = 0
+    const plain = shapeTargetWeights(s)
+    expect(plain.get('l-eye-scale-incr') || 0).toBe(0)
+    s.body.ideal = 1
+    s.body.gender = 0
+    expect(shapeTargetWeights(s).get('l-eye-scale-incr')).toBeCloseTo(
+      IDEAL_SHAPE['eye-scale-decr-incr'][0]
+    )
+    // a negative amount drives the slider's min targets
+    expect(shapeTargetWeights(s).get('nose-scale-horiz-decr')).toBeCloseTo(0.25)
+    s.body.gender = 1
+    expect(shapeTargetWeights(s).get('chin-bones-incr')).toBeCloseTo(
+      IDEAL_SHAPE['chin-bones-decr-incr'][1]
+    )
+    // the user's own slider still adds on top
+    s.shape = { 'eye-scale-decr-incr': 0.5 }
+    expect(shapeTargetWeights(s).get('r-eye-scale-incr')).toBeCloseTo(
+      0.5 + IDEAL_SHAPE['eye-scale-decr-incr'][1]
+    )
+  })
+
+  it('fills idealize in on old saved looks (sanitize default)', () => {
+    const old = JSON.parse(JSON.stringify(DEFAULT_HUMAN3D))
+    delete old.body.ideal
+    expect(sanitizeModel3D(old).body.ideal).toBe(DEFAULT_HUMAN3D.body.ideal)
   })
 })
 
@@ -389,6 +430,76 @@ describe('sanitizeModel3D', () => {
     expect(m.outfit.accessories).toEqual(['glasses', 'cap'])
     expect(Object.keys(m.shape)).toHaveLength(400)
     expect(sanitizeModel3D(null)).toEqual(defaultModel3D())
+  })
+})
+
+describe('Grab handles (direct sculpting)', () => {
+  it('solves the slider value that moves a landmark by the pull', () => {
+    // max end moves the point +0.4 dm, min end −0.2 dm
+    expect(solveSlider(0, 0.2, 0.4, -0.2)).toBeCloseTo(0.5)
+    expect(solveSlider(0, -0.1, 0.4, -0.2)).toBeCloseTo(-0.5)
+    // continuing from a set value, across zero onto the other end
+    expect(solveSlider(0.5, -0.3, 0.4, -0.2)).toBeCloseTo(-0.5)
+    expect(solveSlider(0, 9, 0.4, -0.2)).toBe(1)
+    // both ends push the same way and the pull asks for the other: rest at 0
+    expect(solveSlider(0.5, -0.5, 0.4, 0.3)).toBe(0)
+    // targets that barely touch the point: a plain linear response
+    expect(solveSlider(0, 0.15, 0, 0)).toBeCloseTo(0.5)
+    expect(displacementAt(-0.5, 0.4, -0.2)).toBeCloseTo(-0.1)
+  })
+
+  it('points the outward axis away from the midline on each side', () => {
+    expect(axisVector('x', 1)).toEqual([1, 0, 0])
+    expect(axisVector('x', -1)).toEqual([-1, 0, 0])
+    expect(axisVector('z', -1)).toEqual([0, 0, 1])
+  })
+
+  it('only drives sliders the catalogue has', () => {
+    for (const h of SCULPT_HANDLES)
+      for (const id of Object.values(h.axes))
+        expect(SLIDER_BY_ID.has(id), h.id + ' → ' + id).toBe(true)
+  })
+
+  it('resolves every handle on the real mesh, mirrored and anatomically ordered', async () => {
+    const { readFileSync } = await import('fs')
+    const { gunzipSync } = await import('zlib')
+    const { parseHumanAsset } =
+      await import('../src/renderer/src/components/character/human3d/humanAsset')
+    const raw = gunzipSync(
+      readFileSync('src/renderer/src/components/character/human3d/assets/human3d.bin')
+    )
+    const a = parseHumanAsset(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength))
+    const pts = resolveHandles(a)
+    const expected = SCULPT_HANDLES.reduce((n, h) => n + (h.mirror ? 2 : 1), 0)
+    expect(pts).toHaveLength(expected)
+    const P = (key) => {
+      const p = pts.find((x) => x.key === key)
+      return [a.base[p.vertex * 3], a.base[p.vertex * 3 + 1], a.base[p.vertex * 3 + 2]]
+    }
+    // pairs mirror across the midline
+    for (const h of SCULPT_HANDLES.filter((x) => x.mirror)) {
+      const l = P(h.id + '.l')
+      const r = P(h.id + '.r')
+      expect(l[0]).toBeGreaterThan(0)
+      expect(r[0]).toBeCloseTo(-l[0], 1)
+      expect(r[1]).toBeCloseTo(l[1], 1)
+    }
+    // a face reads top → bottom, and inner corners sit nearer the nose
+    expect(P('eyeInner.l')[0]).toBeLessThan(P('eyeOuter.l')[0])
+    expect(P('lid.l')[1]).toBeGreaterThan(P('eyeInner.l')[1] - 0.05)
+    expect(P('noseTip')[1]).toBeGreaterThan(P('upperLip')[1])
+    expect(P('upperLip')[1]).toBeGreaterThan(P('lowerLip')[1])
+    expect(P('lowerLip')[1]).toBeGreaterThan(P('chin')[1])
+    expect(P('noseTip')[2]).toBeGreaterThan(P('chin')[2])
+    expect(P('crown')[1]).toBeGreaterThan(P('forehead')[1])
+    // grabbing the nose tip in profile really drives its projection
+    const tip = pts.find((x) => x.key === 'noseTip')
+    const r = axisResponse(a, tip, 'z')
+    expect(r.slider).toBe('nose-scale-depth-decr-incr')
+    expect(r.dMax).toBeGreaterThan(0)
+    expect(r.dMin).toBeLessThan(0)
+    // rest normals face out of the body
+    expect(vertexNormal(a, tip.vertex)[2]).toBeGreaterThan(0.5)
   })
 })
 

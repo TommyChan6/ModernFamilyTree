@@ -36,6 +36,9 @@
       <!-- 水墨 backdrop (rice paper + distant mountains, parallax) — painted by
          graph/InkBackdrop.js behind the transparent WebGL canvas -->
       <div v-show="!spaceActive" ref="inkBackdropEl" class="ink-backdrop" aria-hidden="true"></div>
+      <!-- medieval backdrop (vellum, a portolan's rhumb lines, castles) —
+         graph/MedievalBackdrop.js, shown in the medieval theme -->
+      <div v-show="!spaceActive" ref="medBackdropEl" class="ink-backdrop" aria-hidden="true"></div>
       <canvas v-show="!spaceActive" ref="glCanvasEl" class="graph-gl"></canvas>
       <canvas v-show="!spaceActive" ref="overlayEl" class="graph-overlay"></canvas>
       <!-- Marquee (box / lasso) selection region — screen-space, drawn over the
@@ -642,6 +645,23 @@
         <Transition name="pane">
           <div v-if="relTypesOpen" class="canvas-pane reltypes-pane">
             <div class="panel-title">{{ t('rail.relationships') }}</div>
+            <!-- Dynamics lens: recolour bonds warm <-> cold by feeling -->
+            <label v-if="!spaceActive" class="rtl-dyn" :title="t('sentiment.lensHint')">
+              <UiIcon class="rtl-dyn-ic" name="thermometer" :size="14" />
+              <span class="rtl-dyn-label">{{ t('sentiment.lens') }}</span>
+              <span
+                class="rtl-dyn-ramp"
+                :style="{ background: `linear-gradient(90deg, ${dynamicsGradient})` }"
+                aria-hidden="true"
+              ></span>
+              <input
+                type="checkbox"
+                class="switch"
+                :checked="dynamicsOn"
+                :aria-label="t('sentiment.lens')"
+                @change="toggleDynamics"
+              />
+            </label>
             <div class="rtl-scroll">
               <button
                 v-for="(row, i) in relTypeRows"
@@ -748,6 +768,15 @@
           </div>
         </Transition>
 
+        <!-- Dynamics lens key (the cold <-> warm ramp + width = intensity) -->
+        <Transition name="pane">
+          <DynamicsLegend
+            v-if="dynamicsActive"
+            :counts="dynamicsCounts"
+            @close="dynamicsOn = false"
+          />
+        </Transition>
+
         <!-- Legend -->
         <Transition name="pane">
           <div v-if="legendOpen" class="canvas-pane graph-legend">
@@ -832,7 +861,10 @@ import {
 import { useGraphAnimation } from './graph/useGraphAnimation.js'
 import { useTimeTravel } from './time/useTimeTravel'
 import { toOrdinal } from '../../../shared/calendarMath'
+import { auraLineBetween } from '../../../shared/auras'
 import { WebGLGraphRenderer } from './graph/webgl/WebGLGraphRenderer.js'
+import { auraShaderId } from './graph/webgl/NodeMaterial.js'
+import { descendantCounts, starMagnitude, starSizeMul } from './graph/constellation'
 import { inkLook, inkLinkColor, inkNodeFill } from './graph/inkStyle.js'
 import {
   stampFamilyContext,
@@ -870,6 +902,15 @@ import { lineFxSpec, lineFxApplies } from './graph/webgl/lineFx.js'
 import { computeSpotlightLayout, defaultMainCharacter } from './graph/spotlightLayout'
 import { chronicleViewModel } from './chronicle/chronicleModel.js'
 import ChroniclePane from './chronicle/ChroniclePane.vue'
+import DynamicsLegend from './graph/DynamicsLegend.vue'
+import {
+  dynamicsWidth,
+  effectiveIntensity,
+  effectiveSentiment,
+  nodeTemperatures,
+  sentimentColor,
+  sentimentGradient
+} from '../../../shared/sentiment'
 import PersonPicker from './personForm/PersonPicker.vue'
 import KinshipPane from './kinship/KinshipPane.vue'
 import KinshipCard from './kinship/KinshipCard.vue'
@@ -886,6 +927,7 @@ const { t, locale } = useI18n()
 const tt = useTimeTravel()
 const glCanvasEl = ref(null)
 const inkBackdropEl = ref(null)
+const medBackdropEl = ref(null)
 const overlayEl = ref(null)
 const containerEl = ref(null)
 const searchQuery = ref('')
@@ -908,6 +950,7 @@ const legendColors = computed(() => {
 })
 const relTypesOpen = ref(false) // Relationships pane toggle
 const soloType = ref(null) // when set, only this relationship type stays lit
+const dynamicsOn = ref(false) // Dynamics lens: bonds warm ↔ cold, width = intensity
 const pathAnchor = ref(null) // first ctrl-clicked person (armed, waiting for the second)
 const pathInfo = ref(null) // { ids, rels } | { none, fromId, toId } — the traced connection
 const egoDepth = ref(0) // Orbit rings: 0 = off, 1..3 = hops kept lit around the selection
@@ -1258,6 +1301,53 @@ function toggleSolo(key) {
   markLinkStyles()
 }
 watch(soloType, () => markLinkStyles())
+
+// ── Dynamics lens (relationship sentiment — src/shared/sentiment.ts) ────────
+// Every bond recolours on the cold ↔ warm ramp and its width becomes its
+// intensity; each person rings in their overall temperature. Colours are
+// computed once per data / palette / toggle change (never per frame) and read
+// by linkVisual / nodeVisual; toggling just restyles (the renderer tweens it).
+const dynamicsActive = computed(() => dynamicsOn.value && !spaceActive.value)
+const dynamicsLinks = computed(() => {
+  if (!dynamicsActive.value) return null
+  const pal = store.dynamicsPalette
+  const defs = store.relTypeByKey
+  const out = new Map()
+  for (const r of store.relationships) {
+    const s = effectiveSentiment(r, defs.get(r.type))
+    const i = effectiveIntensity(r)
+    out.set(r.id, { s, i, color: sentimentColor(s, pal), width: dynamicsWidth(i) })
+  }
+  return out
+})
+const dynamicsNodes = computed(() => {
+  if (!dynamicsActive.value) return null
+  const pal = store.dynamicsPalette
+  const defs = store.relTypeByKey
+  const temps = nodeTemperatures(store.relationships, (k) => defs.get(k))
+  const out = new Map()
+  for (const [id, T] of temps) if (T.heat > 0.02) out.set(id, sentimentColor(T.t, pal))
+  return out
+})
+const dynamicsCounts = computed(() => {
+  const L = dynamicsLinks.value
+  if (!L) return null
+  const c = { warm: 0, neutral: 0, cold: 0 }
+  for (const v of L.values()) {
+    if (v.s > 0.15) c.warm++
+    else if (v.s < -0.15) c.cold++
+    else c.neutral++
+  }
+  return c
+})
+const dynamicsGradient = computed(() => sentimentGradient(store.dynamicsPalette))
+function toggleDynamics() {
+  dynamicsOn.value = !dynamicsOn.value
+}
+watch([dynamicsLinks, dynamicsNodes], () => {
+  markNodeStyles()
+  markLinkStyles()
+})
 
 // ── Connection trace (ctrl-click two people) ────────────────────────────────
 // First ctrl-click arms an anchor; the second runs a BFS over EVERY edge type
@@ -2361,7 +2451,14 @@ async function addPersonAt(w) {
     }
   }
   const s = worldToScreen(node ? node.x : w.x, node ? node.y : w.y, ctx.transform)
-  nameBubble.value = { id: res.data.id, x: s.x, y: s.y, value: '' }
+  // A standing shape rises above its foot: open the name box above its crown.
+  const crown =
+    shapeAnchor(store.graphSettings.nodeShape).top *
+    store.graphSettings.nodeRadius *
+    ctx.transform.k *
+    s.s
+  const rise = shapeAnchor(store.graphSettings.nodeShape).lift > 0 ? crown : 0
+  nameBubble.value = { id: res.data.id, x: s.x, y: s.y - rise, value: '' }
   await nextTick()
   nameInputEl.value?.focus()
 }
@@ -2675,6 +2772,26 @@ function linkTimeHidden(d) {
   return d._tAppear > tt.gateYear.value || d._tAppear < tt.gateStartYear.value
 }
 
+// ── Constellation skin (nodeShape 'star') ────────────────────────────────────
+// A star's magnitude grows with the person's descendant count (log scale,
+// computed once per data change from the kinship index — only while the star
+// shape is on); the departed twinkle. nodeVisual() hands both to the shader.
+const starMagnitudes = computed(() => {
+  if (store.graphSettings.nodeShape !== 'star') return null
+  const idx = kinship.index.value
+  const counts = descendantCounts(idx.ids, idx.children)
+  const out = new Map()
+  for (const [id, c] of counts) out.set(id, starMagnitude(c))
+  return out
+})
+function starOf(n, gs) {
+  const mags = starMagnitudes.value
+  if (!mags) return null
+  const departed =
+    n.death?.year != null && (!store.currentDate || n.death.year <= store.currentDate.year)
+  return { k: mags.get(n.id) ?? 0, twinkle: departed && gs.starTwinkle !== false }
+}
+
 // ── Per-node / per-link visual descriptors (single source of truth for styling) ──────
 // These reproduce the old SVG renderNodes/renderLinks styling, including the Highlights
 // panel filters, but as plain values consumed by the WebGL layers each redraw.
@@ -2775,6 +2892,12 @@ function nodeVisual(n) {
     } else if (spotlightRingOf[n.id] === -1) opacityMul *= 0.42
   }
 
+  // Dynamics lens: each person rings in their temperature (the weighted mean
+  // feeling of their bonds); a trace / orbit / kin lens keeps its own rings.
+  if (dynamicsNodes.value && !kinRing && !pathActive.value && !egoMap.value) {
+    kinRing = dynamicsNodes.value.get(n.id) || null
+  }
+
   // Armed trace anchor: a beacon while waiting for the second ctrl-click.
   if (pathAnchor.value === n.id && !pathInfo.value) {
     pathGlow = true
@@ -2809,18 +2932,26 @@ function nodeVisual(n) {
 
   // Highlight-slot ring: a colored border (selection still wins).
   const hl = n.highlight ? n.highlight.color || '#f5a623' : null
+  // Aura (a tag's / trait's special effect): the ornament rides in the shader;
+  // a tint is the weakest ring, so every lens and highlight still reads over it.
+  const au = store.auraOf.get(n.id)
+  const auraId = au ? auraShaderId(au.ornament) : 0
+  const tint = !selected && !wheelRing && !kinRing && !hl ? au?.tint || null : null
+  const star = starOf(n, gs)
   return {
-    radius: gs.nodeRadius * radiusMul * (ov?.size ?? 1),
+    radius: gs.nodeRadius * radiusMul * (ov?.size ?? 1) * (star ? starSizeMul(star.k) : 1),
     fill,
     // A crisp white rim for selection; the accent halo/ring rides just outside it
     // (drawn in the shader) so the blue reads as focus without a doubled rim.
-    border: selected ? '#ffffff' : wheelRing || kinRing || hl || '#ffffff',
-    borderPx: selected ? 2.4 : wheelRing || kinRing ? 2.8 : hl ? 2.6 : 1.5,
-    borderA: selected ? 1 : wheelRing || kinRing ? 1 : hl ? 0.92 : 0.18,
+    border: selected ? '#ffffff' : wheelRing || kinRing || hl || tint || '#ffffff',
+    borderPx: selected ? 2.4 : wheelRing || kinRing ? 2.8 : hl ? 2.6 : tint ? 2.4 : 1.5,
+    borderA: selected ? 1 : wheelRing || kinRing ? 1 : hl ? 0.92 : tint ? 0.9 : 0.18,
     opacity: gs.nodeOpacity * opacityMul,
     selected,
     glow: selected || timeGlow || pathGlow || (hoverId === n.id && gs.glowOnHover) ? 1 : 0,
-    imageUrl: n.primary_image ? getImageUrl(n.primary_image) : null
+    imageUrl: n.primary_image ? getImageUrl(n.primary_image) : null,
+    aura: auraId ? { id: auraId, k: au.intensity, color: au.color } : null,
+    star
   }
 }
 
@@ -2955,6 +3086,29 @@ function linkVisual(d) {
   // The solo lens brings its isolated type to life.
   if (soloType.value === d.type && dashLen > 0 && !flow) flow = 24
 
+  // Dynamics lens: the bond's feeling owns its colour and its intensity its
+  // width (opacity scales with it too, on top of any time / focus fading).
+  // Cold bonds break into a tense, backward-marching dash; warm ones run solid.
+  // Line effects stand down (lensDash) so the ramp reads true.
+  const dyn = dynamicsLinks.value?.get(d.id)
+  if (dyn) {
+    colorHex = dyn.color
+    width = dyn.width * (look.links ? 1.8 : 1)
+    opacity = Math.min(1, opacity * (0.8 + 0.8 * dyn.i))
+    if (!timeDissolved) {
+      if (dyn.s < -0.25) {
+        dashLen = look.links ? 9 : 5
+        dashGap = look.links ? 6 : 3.5
+        flow = -18
+      } else {
+        dashLen = dashGap = 0
+        flow = 0
+      }
+    }
+    fadeTo = 1
+    lensDash = true
+  }
+
   // Kinship lens: bonds between two people in view stay (fading in with the
   // ripple); the rest recede. On Ancestors / Descendants the direct line
   // streams like ink down the generations.
@@ -3064,17 +3218,22 @@ function linkVisual(d) {
   // In-scope bonds render as an animated shader effect (bloodstream, river,
   // neon…). Lenses that draw the line themselves (the trace chain, the kin
   // bloodline flow, the delete arm) and time-travel ghosts keep their plain
-  // dashed look; the 水墨 brush look owns the links when it's on.
+  // dashed look; the 水墨 brush look owns the links when it's on. A bond
+  // between two bearers of the same aura line wears that line whatever the
+  // global choice and scope say (a flaming bloodline runs between flame-bearers).
   let fx = 0
   let fxPad = 1
-  const fxSpec = lineFxSpec(gs.lineFx)
+  const auraLine = auraLineBetween(store.auraOf.get(d.person_a_id), store.auraOf.get(d.person_b_id))
+  const fxId =
+    auraLine ||
+    (lineFxApplies(gs.lineFxScope, store.relTypeRoles.get(d.type) || 'none') ? gs.lineFx : null)
+  const fxSpec = lineFxSpec(fxId)
   if (
     fxSpec.n &&
     !look.links &&
     !timeHidden &&
     !timeDissolved &&
     !lensDash &&
-    lineFxApplies(gs.lineFxScope, store.relTypeRoles.get(d.type) || 'none') &&
     !(pathActive.value && pathRelIdSet.value.has(d.id)) &&
     !(deleteArm.value?.isRel && deleteArm.value.id === d.id)
   ) {
@@ -3092,6 +3251,7 @@ function linkVisual(d) {
   const inkNoArrow = look.links && inkRole === 'vertical' && !isPatMat
   let arrowColor = marker && !inkNoArrow ? markerColor(marker, gs, def) : null
   if (arrowColor && look.links) arrowColor = inkLinkColor(arrowColor, inkRole, look.mode)
+  if (arrowColor && dyn) arrowColor = dyn.color // Dynamics lens: the arrow shares the feeling
   return {
     colorHex,
     width,
@@ -3145,6 +3305,7 @@ function initGraph() {
     glCanvas: glCanvasEl.value,
     overlayCanvas: overlayEl.value,
     backdropEl: inkBackdropEl.value,
+    medBackdropEl: medBackdropEl.value,
     hooks
   })
   ctx.renderer.resize(width, height)
@@ -4620,7 +4781,10 @@ function spotlightOverlay() {
     rings: spotlightRings,
     color: '#f5c542',
     light: store.isLightTheme,
-    radius: store.graphSettings.nodeRadius
+    radius: store.graphSettings.nodeRadius,
+    // the lead's DRAWN size (spotlight emphasis) — standing shapes hang the
+    // halo and crown off the body, which must match where its name sits
+    drawnRadius: nodeVisual(n).radius
   }
 }
 
@@ -5309,6 +5473,18 @@ watch(
     markLinkStyles()
   }
 )
+// Auras (tag / trait special effects): restyle nodes (ornament, tint ring) and
+// bonds (aura lines) when who-wears-what changes. Watches the computed Map's
+// reference, not the data. While the view is hidden the restyle waits, so the
+// renderer's ignition plays when the graph comes back on screen.
+let aurasStale = false
+watch([() => store.auraOf, () => store.activeView], ([auras, view], [prevAuras]) => {
+  if (auras !== prevAuras) aurasStale = true
+  if (!aurasStale || view !== 'graph') return
+  aurasStale = false
+  markNodeStyles()
+  markLinkStyles()
+})
 // Labs switched off (or mode dropped below Advanced) while a space scene is
 // open: re-enter it as its 2D fallback (Free over the same positions).
 watch(
@@ -5365,10 +5541,22 @@ watch(
 // Tuning a type's weight/color in the registry re-parameterizes the springs
 // (d3 caches per-link values, so the functions must be re-applied) and
 // restyles the links.
+// A feeling-only edit (sentiment, colour, label) just restyles — it must not
+// re-heat the layout.
+let relTypesForceKey = ''
 watch(
   () => store.relTypes,
   () => {
+    const forceKey = store.relTypes
+      .map((d) => `${d.key}:${d.weight}:${d.symmetryRole}:${d.directed}`)
+      .join('|')
+    const forceSame = forceKey === relTypesForceKey
+    relTypesForceKey = forceKey
     if (!ctx.simulation) return
+    if (forceSame) {
+      markLinkStyles()
+      return
+    }
     applyLinkForceParams()
     // Symmetry roles may have changed — re-derive the family routing context.
     stampFamilyContext(ctx.linksData, store.relTypeRoles)
@@ -5673,6 +5861,33 @@ watch(
   gap: 8px;
   min-width: 244px;
   max-width: 268px;
+}
+/* Dynamics lens switch (a ramp swatch says what it does) */
+.rtl-dyn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: var(--ctl-sm);
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--elevated);
+  cursor: pointer;
+}
+.rtl-dyn-ic {
+  flex: none;
+  color: var(--t2);
+}
+.rtl-dyn-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t1);
+}
+.rtl-dyn-ramp {
+  flex: 1;
+  height: 5px;
+  min-width: 30px;
+  border-radius: 3px;
 }
 .rtl-scroll {
   display: flex;

@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { createNodeMaterial, QUAD_SCALE } from './NodeMaterial.js'
+import { packStarState } from '../constellation'
 
 // Holds the instanced node mesh and its per-instance typed-array attributes. Positions are
 // rewritten every frame (cheap); styles only when selection/theme/settings/highlights change.
@@ -45,16 +46,20 @@ export class NodeLayer {
     this.radius = mk('iRadius', 1)
     this.fill = mk('iFill', 3)
     this.border = mk('iBorder', 3)
-    this.borderPx = mk('iBorderPx', 1)
-    this.borderA = mk('iBorderA', 1)
-    this.opacity = mk('iOpacity', 1)
-    this.selected = mk('iSelected', 1)
-    this.glow = mk('iGlow', 1)
-    this.avatar = mk('iAvatar', 1)
-    this.born = mk('iBorn', 1)
-    this.born.fill(-1e4)
-    this.pop = mk('iPop', 1) // appear-pop start time (uTime clock); -1e4 = settled
-    this.pop.fill(-1e4)
+    // Scalars are packed four to an attribute — the shader is near the vertex-
+    // attribute limit (ANGLE/D3D11 also spends one on gl_InstanceID).
+    this.look = mk('iLook', 4) // border px, border alpha, opacity, atlas layer
+    // selected (+ the star skin's magnitude/twinkle packed on top — constellation.ts),
+    // glow, ink bloom birth, appear-pop start
+    this.state = mk('iState', 4)
+    // Aura (special effect from a tag / trait): ornament id, strength, ignite
+    // start, colour packed as one 24-bit integer (exact in float32).
+    this.aura = mk('iAura', 4)
+    for (let i = 0; i < capacity; i++) {
+      this.state[i * 4 + 2] = -1e4 // born: settled
+      this.state[i * 4 + 3] = -1e4 // pop: settled
+      this.aura[i * 4 + 2] = -1e4
+    }
 
     g.instanceCount = this.count
     this.geometry = g
@@ -87,7 +92,9 @@ export class NodeLayer {
     this.pos[i * 2 + 1] = y
   }
 
-  // s: { radius, fill:[r,g,b], border:[r,g,b], borderPx, opacity, selected, glow, avatar }
+  // s: { radius, fill:[r,g,b], border:[r,g,b], borderPx, opacity, selected, glow, avatar,
+  //      auraId?, auraK?, auraBorn?, auraRGB?:[r,g,b], starK?, starTwinkle? }
+  //      — auraId 0/absent = no aura; starK null/absent = not a star
   setStyle(i, s) {
     if (this.slotOf) i = this.slotOf[i]
     this.radius[i] = s.radius
@@ -97,14 +104,18 @@ export class NodeLayer {
     this.border[i * 3] = s.border[0]
     this.border[i * 3 + 1] = s.border[1]
     this.border[i * 3 + 2] = s.border[2]
-    this.borderPx[i] = s.borderPx
-    this.borderA[i] = s.borderA == null ? 1 : s.borderA
-    this.opacity[i] = s.opacity
-    this.selected[i] = s.selected ? 1 : 0
-    this.glow[i] = s.glow || 0
-    this.avatar[i] = s.avatar
-    this.born[i] = s.born == null ? -1e4 : s.born
-    this.pop[i] = s.pop == null ? -1e4 : s.pop
+    this.look[i * 4] = s.borderPx
+    this.look[i * 4 + 1] = s.borderA == null ? 1 : s.borderA
+    this.look[i * 4 + 2] = s.opacity
+    this.look[i * 4 + 3] = s.avatar
+    this.state[i * 4] = packStarState(!!s.selected, s.starK ?? null, !!s.starTwinkle)
+    this.state[i * 4 + 1] = s.glow || 0
+    this.state[i * 4 + 2] = s.born == null ? -1e4 : s.born
+    this.state[i * 4 + 3] = s.pop == null ? -1e4 : s.pop
+    this.aura[i * 4] = s.auraId || 0
+    this.aura[i * 4 + 1] = s.auraK == null ? 1 : s.auraK
+    this.aura[i * 4 + 2] = s.auraBorn == null ? -1e4 : s.auraBorn
+    this.aura[i * 4 + 3] = packRGB(s.auraRGB)
   }
 
   commitPositions() {
@@ -115,19 +126,7 @@ export class NodeLayer {
 
   commitStyles() {
     if (!this._attr.iRadius) return
-    for (const k of [
-      'iRadius',
-      'iFill',
-      'iBorder',
-      'iBorderPx',
-      'iBorderA',
-      'iOpacity',
-      'iSelected',
-      'iGlow',
-      'iAvatar',
-      'iBorn',
-      'iPop'
-    ])
+    for (const k of ['iRadius', 'iFill', 'iBorder', 'iLook', 'iState', 'iAura'])
       this._attr[k].needsUpdate = true
   }
 
@@ -162,11 +161,13 @@ export class NodeLayer {
       u.uShadowOffset.value.set(0.045, 0.09)
       u.uSilhouetteColor.value.setRGB(1, 1, 1)
       u.uGlowColor.value.setRGB(0.16, 0.2, 0.3) // deep slate haze (white is invisible on light)
+      u.uStarLight.value = 1 // star nodes print as an ink star atlas on light grounds
     } else {
       u.uShadowStrength.value = 0.35
       u.uShadowOffset.value.set(0.09, 0.135)
       u.uSilhouetteColor.value.setRGB(1, 1, 1)
       u.uGlowColor.value.setRGB(1, 1, 1) // white haze
+      u.uStarLight.value = 0
     }
   }
 
@@ -203,6 +204,13 @@ export class NodeLayer {
     this.geometry?.dispose()
     this.material?.dispose()
   }
+}
+
+/** [r,g,b] (0..1) → one integer 0..0xffffff; the vertex shader unpacks it. */
+export function packRGB(c) {
+  if (!c) return 0xffffff
+  const b8 = (v) => Math.max(0, Math.min(255, Math.round(v * 255)))
+  return b8(c[0]) * 65536 + b8(c[1]) * 256 + b8(c[2])
 }
 
 export { QUAD_SCALE }

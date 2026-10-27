@@ -165,6 +165,26 @@
                 </label>
               </section>
 
+              <section v-if="posterAvailable" class="exp-group">
+                <h3 class="exp-label">{{ t('starChart.section') }}</h3>
+                <label class="exp-check-row">
+                  <input v-model="posterOn" type="checkbox" />
+                  {{ t('starChart.toggle') }}
+                </label>
+                <div v-if="posterOn" class="exp-seg">
+                  <button
+                    v-for="f in POSTER_FRAMES"
+                    :key="f"
+                    class="exp-seg-btn"
+                    :class="{ on: posterFrame === f }"
+                    @click="posterFrame = f"
+                  >
+                    {{ t('starChart.frame.' + f) }}
+                  </button>
+                </div>
+                <p v-if="posterOn" class="exp-poster-hint">{{ t('starChart.hint') }}</p>
+              </section>
+
               <section class="exp-group">
                 <h3 class="exp-label">{{ t('exportModal.text') }}</h3>
                 <input v-model="title" class="exp-input" :placeholder="t('exportModal.titlePh')" />
@@ -252,6 +272,7 @@ import {
   composeExport,
   sanitizeFilename
 } from './export/exportCompose'
+import { starChartLayout, composeStarChart } from './export/starChartPoster'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -305,6 +326,15 @@ const filenameEdited = ref(false)
 const crop = ref(null) // committed CropRect (scene fractions) or null
 const cropMode = ref(false)
 const cropDraft = ref(null) // rect being dragged (scene fractions)
+// Star-chart poster framing — offered while the graph wears the constellation
+// skin (star nodes); always printed on a night sky, whatever the colour scheme.
+const POSTER_FRAMES = ['circle', 'rect']
+const posterOn = ref(true)
+const posterFrame = ref('circle')
+const posterAvailable = computed(
+  () => srcView.value === 'graph' && store.graphSettings.nodeShape === 'star'
+)
+const posterActive = computed(() => posterAvailable.value && posterOn.value)
 
 const format = computed(() => EXPORT_FORMATS.find((f) => f.id === formatId.value))
 const exportW = computed(() =>
@@ -413,6 +443,7 @@ function measurePreviewBox() {
 onUnmounted(() => ro?.disconnect())
 
 function lightFor(schemeId) {
+  if (posterActive.value) return false // glowing stars on the poster's night sky
   if (schemeId === 'dark') return false
   if (schemeId === 'light') return true
   return null // match the app / transparent keeps current labels readable
@@ -448,8 +479,29 @@ function composeOpts(width, height, { forCropOverlay = false } = {}) {
     title: title.value,
     subtitle: subtitle.value,
     stamp: stampOn.value ? stampText.value : '',
-    crop: forCropOverlay ? null : crop.value
+    crop: forCropOverlay ? null : crop.value,
+    poster: posterActive.value
+      ? {
+          width,
+          height,
+          frame: posterFrame.value,
+          title: title.value,
+          subtitle:
+            subtitle.value || t('starChart.autoSubtitle', { count: store.persons.length || 0 }),
+          legend: t('starChart.legend'),
+          stamp: stampOn.value ? stampText.value : '',
+          crop: forCropOverlay ? null : crop.value,
+          hourLabel: (h) => t('starChart.hour', { h })
+        }
+      : null
   }
+}
+// The poster swaps in its own layout + painter; everything else is shared.
+function layoutFor(opts) {
+  return opts.poster ? starChartLayout(opts.poster) : computeComposeLayout(opts)
+}
+function composeFor(scene, opts) {
+  return opts.poster ? composeStarChart(scene, opts.poster) : composeExport(scene, opts)
 }
 
 function scheduleRender() {
@@ -472,7 +524,10 @@ watch(
     stampOn,
     crop,
     cropMode,
-    formatId
+    formatId,
+    posterOn,
+    posterFrame,
+    posterAvailable
   ],
   scheduleRender
 )
@@ -512,13 +567,11 @@ function drawPreview() {
 
   const inCropMode = cropMode.value
   const opts = composeOpts(pw, ph, { forCropOverlay: inCropMode })
-  const L = computeComposeLayout(opts)
+  const L = layoutFor(opts)
   // Capture at the FULL export content size — label LOD, line widths and text
   // sizes then match the downloaded file exactly; compose downscales it into
   // the preview (the content rects share an aspect, so nothing shifts).
-  const FL = computeComposeLayout(
-    composeOpts(exportW.value, exportH.value, { forCropOverlay: inCropMode })
-  )
+  const FL = layoutFor(composeOpts(exportW.value, exportH.value, { forCropOverlay: inCropMode }))
   const cap = captureSizeFor(FL.content, inCropMode ? null : crop.value)
   const scene = props.capture(srcView.value, {
     width: cap.width,
@@ -528,7 +581,7 @@ function drawPreview() {
   empty.value = !scene
   sceneDstRect = scene ? fitRectContain(scene.width, scene.height, L.content) : null
 
-  const composed = composeExport(scene, opts)
+  const composed = composeFor(scene, opts)
   const g = canvas.getContext('2d')
   g.clearRect(0, 0, pw, ph)
   g.drawImage(composed, 0, 0)
@@ -634,14 +687,14 @@ function doExport() {
     setTimeout(() => {
       try {
         const opts = composeOpts(exportW.value, exportH.value)
-        const L = computeComposeLayout(opts)
+        const L = layoutFor(opts)
         const cap = captureSizeFor(L.content, crop.value)
         const scene = props.capture(srcView.value, {
           width: cap.width,
           height: cap.height,
           light: lightFor(scheme.value)
         })
-        const out = composeExport(scene, opts)
+        const out = composeFor(scene, opts)
         const name = `${sanitizeFilename(filename.value)}.${format.value.ext}`
         out.toBlob(
           (blob) => {
@@ -674,6 +727,11 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.exp-poster-hint {
+  margin: 6px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--t3);
+}
 .exp-backdrop {
   position: fixed;
   inset: 0;

@@ -49,6 +49,16 @@
             <span class="shape-preview" :class="'shape-' + s"></span>
           </button>
         </div>
+        <StSwitch
+          v-if="gs.nodeShape === 'star'"
+          skey="starTwinkle"
+          :label="t('graphStyle.labels.starTwinkle')"
+          :model-value="gs.starTwinkle !== false"
+          @update:model-value="set('starTwinkle', $event)"
+        />
+        <p v-if="gs.nodeShape === 'star'" class="st-hint">
+          <UiIcon name="star" :size="13" />{{ t('graphStyle.starHint') }}
+        </p>
       </section>
       <section class="st-section" data-skey="nodeDecor">
         <h4 class="st-sec-title">{{ t('graphStyle.labels.ornament') }}</h4>
@@ -411,7 +421,10 @@ const SHAPES = [
   'oval',
   'octagon',
   'heart',
-  'gravestone'
+  'gravestone',
+  'plate',
+  'flatplate',
+  'star'
 ]
 const DECORS = ['none', 'aura', 'runes', 'orbit', 'burst', 'pulse', 'enso']
 // Little SVG glyphs previewing each route system (44 × 20 viewBox).
@@ -456,7 +469,8 @@ const AMBIENTS = [
   { id: 'rain', icon: 'cloud-rain' },
   { id: 'motes', icon: 'sparkle' },
   { id: 'mist', icon: 'mountain' },
-  { id: 'plum', icon: 'flower' }
+  { id: 'plum', icon: 'flower' },
+  { id: 'nightsky', icon: 'moon-star' }
 ]
 
 const fxCurrent = computed(() => lineFxSpec(gs.value.lineFx))
@@ -810,6 +824,19 @@ function setTilt(key, v) {
   clip-path: path(
     'M3 18 L3 15.5 L4.5 15.5 L4.5 8 A4.5 4.5 0 0 1 13.5 8 L13.5 15.5 L15 15.5 L15 18 Z'
   );
+}
+/* Plate: an upright slab with its edge showing (matches the shader's sdPlate). */
+.shape-plate {
+  clip-path: polygon(14% 14%, 22% 6%, 86% 6%, 86% 86%, 78% 100%, 14% 100%);
+}
+/* Flat plate: a plain tall rounded slab (matches the shader's sdFlatPlate). */
+.shape-flatplate {
+  border-radius: 3px;
+  transform: scaleX(0.7);
+}
+/* Star: a four-point diffraction star (the shader's starNode). */
+.shape-star {
+  clip-path: polygon(50% 0%, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0% 50%, 42% 42%);
 }
 .shape-heart {
   clip-path: polygon(
